@@ -181,3 +181,49 @@ func (s *Store) Counts(project string) (map[Channel]int, error) {
 	}
 	return counts, nil
 }
+
+// cursorBucket holds per-project last-tick timestamps. It is a reserved bucket
+// name a project key (an absolute path) can never collide with.
+const cursorBucket = "__cursors__"
+
+// Cursor returns the last-tick time for project (zero if never ticked). It is
+// the coarse modtime filter for transcript scanning — only a performance
+// optimization to avoid re-parsing old transcripts. Exactly-once correctness
+// comes from Enqueue's dedup, not from this cursor.
+func (s *Store) Cursor(project string) (time.Time, error) {
+	var t time.Time
+	err := s.db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(cursorBucket))
+		if b == nil {
+			return nil
+		}
+		v := b.Get([]byte(project))
+		if v == nil {
+			return nil
+		}
+		return t.UnmarshalBinary(v)
+	})
+	if err != nil {
+		return time.Time{}, fmt.Errorf("cursor: %w", err)
+	}
+	return t, nil
+}
+
+// SetCursor records the last-tick time for project.
+func (s *Store) SetCursor(project string, ts time.Time) error {
+	buf, err := ts.MarshalBinary()
+	if err != nil {
+		return fmt.Errorf("set cursor: %w", err)
+	}
+	err = s.db.Update(func(tx *bolt.Tx) error {
+		b, err := tx.CreateBucketIfNotExists([]byte(cursorBucket))
+		if err != nil {
+			return err
+		}
+		return b.Put([]byte(project), buf)
+	})
+	if err != nil {
+		return fmt.Errorf("set cursor: %w", err)
+	}
+	return nil
+}
