@@ -36,6 +36,8 @@ func init() {
 		publishCmd,
 		learningsCmd,
 		tickCmd,
+		sessionStartCmd,
+		setupHooksCmd,
 		doctorCmd,
 	)
 }
