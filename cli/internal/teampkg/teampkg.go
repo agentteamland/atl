@@ -71,7 +71,7 @@ func CopyAssets(srcDir, claudeDir string) (map[string]string, error) {
 				return err
 			}
 			dst := filepath.Join(claudeDir, rel)
-			if err := copyFile(p, dst); err != nil {
+			if err := CopyFile(p, dst); err != nil {
 				return err
 			}
 			h, err := fanout.HashFile(dst)
@@ -91,7 +91,9 @@ func CopyAssets(srcDir, claudeDir string) (map[string]string, error) {
 	return files, nil
 }
 
-func copyFile(src, dst string) error {
+// CopyFile copies src to dst, creating parent directories as needed. Shared by
+// install (asset reflect) and update (fan-out refresh).
+func CopyFile(src, dst string) error {
 	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 		return err
 	}
