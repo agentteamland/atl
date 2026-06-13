@@ -121,6 +121,35 @@ func TestEnqueueValidation(t *testing.T) {
 	}
 }
 
+func TestCursor(t *testing.T) {
+	s := newTestStore(t)
+
+	c, err := s.Cursor("proj")
+	if err != nil {
+		t.Fatalf("cursor: %v", err)
+	}
+	if !c.IsZero() {
+		t.Fatalf("default cursor should be zero, got %v", c)
+	}
+
+	now := time.Unix(1000, 0).UTC()
+	if err := s.SetCursor("proj", now); err != nil {
+		t.Fatalf("set cursor: %v", err)
+	}
+	got, _ := s.Cursor("proj")
+	if !got.Equal(now) {
+		t.Fatalf("cursor: got %v want %v", got, now)
+	}
+
+	// the cursor bucket must not leak into item listings
+	if _, err := s.Enqueue("proj", Item{ID: "x", Channel: ChannelLearning, Payload: "p"}); err != nil {
+		t.Fatalf("enqueue: %v", err)
+	}
+	if pending, _ := s.Pending("proj", ""); len(pending) != 1 {
+		t.Fatalf("cursor leaked into pending or item lost: %d items", len(pending))
+	}
+}
+
 // TestPendingOrdering asserts stable EnqueuedAt-then-ID ordering.
 func TestPendingOrdering(t *testing.T) {
 	s := newTestStore(t)
