@@ -1,0 +1,9 @@
+# Go build artifacts
+/cli/bin/
+/cli/dist/
+*.test
+*.out
+coverage.out
+
+# OS
+.DS_Store

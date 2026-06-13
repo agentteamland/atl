@@ -1,0 +1,183 @@
+// Package queue is the durable, multi-channel work queue at the heart of the
+// v2 learning loop.
+//
+// Markers captured in conversation are transferred here exactly once
+// (idempotent by item ID), processed by per-channel handlers, then deleted —
+// so a processed item can never be re-reported. This structurally eliminates
+// the v1 re-report bug class (H-3): reports come from the queue, never from
+// re-scanning an ever-growing transcript, and deletion leaves nothing to
+// re-surface.
+//
+// Backed by bbolt: a single embedded file (~/.atl/queue.db), no server, no
+// CGo — which keeps cross-platform builds trivial (the v2 script-only
+// distribution). One file holds every project's queue, isolated into
+// per-project buckets.
+package queue
+
+import (
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"sort"
+	"time"
+
+	bolt "go.etcd.io/bbolt"
+)
+
+// Channel identifies the kind of work an item carries. The queue is generic:
+// one infrastructure, many per-channel processors.
+type Channel string
+
+const (
+	ChannelLearning    Channel = "learning"
+	ChannelProfileFact Channel = "profile-fact"
+)
+
+// Item is a single unit of queued work.
+type Item struct {
+	ID         string    `json:"id"`          // dedup key — same marker ⇒ same ID
+	Channel    Channel   `json:"channel"`     // which processor handles it
+	Payload    string    `json:"payload"`     // the marker body / work content
+	EnqueuedAt time.Time `json:"enqueued_at"` // for stable ordering
+}
+
+// NewID derives a stable dedup ID from a channel + payload. The same marker
+// transferred twice produces the same ID and dedups on enqueue — the
+// marker-hash-dedup pattern that makes transfer exactly-once.
+func NewID(channel Channel, payload string) string {
+	sum := sha256.Sum256([]byte(string(channel) + "\x00" + payload))
+	return hex.EncodeToString(sum[:])
+}
+
+// Store is a bbolt-backed queue.
+type Store struct {
+	db *bolt.DB
+}
+
+// DefaultPath returns the standard queue location (~/.atl/queue.db), creating
+// the ~/.atl directory if needed.
+func DefaultPath() (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	dir := filepath.Join(home, ".atl")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, "queue.db"), nil
+}
+
+// Open opens (creating if needed) the queue database at path.
+func Open(path string) (*Store, error) {
+	db, err := bolt.Open(path, 0o600, &bolt.Options{Timeout: time.Second})
+	if err != nil {
+		return nil, fmt.Errorf("open queue db: %w", err)
+	}
+	return &Store{db: db}, nil
+}
+
+// Close closes the underlying database.
+func (s *Store) Close() error {
+	return s.db.Close()
+}
+
+// Enqueue adds it to project's queue, idempotently by it.ID. It reports
+// whether the item was newly added (false = a same-ID item already existed, so
+// this call is a no-op — the dedup that makes marker transfer exactly-once).
+func (s *Store) Enqueue(project string, it Item) (added bool, err error) {
+	if it.ID == "" {
+		return false, fmt.Errorf("enqueue: empty item ID")
+	}
+	if it.Channel == "" {
+		return false, fmt.Errorf("enqueue: empty channel")
+	}
+	if it.EnqueuedAt.IsZero() {
+		it.EnqueuedAt = time.Now().UTC()
+	}
+	err = s.db.Update(func(tx *bolt.Tx) error {
+		b, err := tx.CreateBucketIfNotExists([]byte(project))
+		if err != nil {
+			return err
+		}
+		if b.Get([]byte(it.ID)) != nil {
+			return nil // already present — dedup no-op
+		}
+		buf, err := json.Marshal(it)
+		if err != nil {
+			return err
+		}
+		added = true
+		return b.Put([]byte(it.ID), buf)
+	})
+	if err != nil {
+		return false, fmt.Errorf("enqueue: %w", err)
+	}
+	return added, nil
+}
+
+// Pending returns all queued items for project, sorted by EnqueuedAt then ID.
+// If channel is non-empty, only items on that channel are returned.
+func (s *Store) Pending(project string, channel Channel) ([]Item, error) {
+	var items []Item
+	err := s.db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(project))
+		if b == nil {
+			return nil
+		}
+		return b.ForEach(func(_, v []byte) error {
+			var it Item
+			if err := json.Unmarshal(v, &it); err != nil {
+				return err
+			}
+			if channel == "" || it.Channel == channel {
+				items = append(items, it)
+			}
+			return nil
+		})
+	})
+	if err != nil {
+		return nil, fmt.Errorf("pending: %w", err)
+	}
+	sort.Slice(items, func(i, j int) bool {
+		if items[i].EnqueuedAt.Equal(items[j].EnqueuedAt) {
+			return items[i].ID < items[j].ID
+		}
+		return items[i].EnqueuedAt.Before(items[j].EnqueuedAt)
+	})
+	return items, nil
+}
+
+// Delete removes a processed item (processed-then-deleted). Idempotent:
+// deleting a missing item is a no-op.
+func (s *Store) Delete(project, id string) error {
+	err := s.db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(project))
+		if b == nil {
+			return nil
+		}
+		return b.Delete([]byte(id))
+	})
+	if err != nil {
+		return fmt.Errorf("delete: %w", err)
+	}
+	return nil
+}
+
+// Counts returns the pending item count per channel for project. This is what
+// `atl learnings status` and the SessionStart count read from — correct by
+// construction, never inferred from re-scanning.
+func (s *Store) Counts(project string) (map[Channel]int, error) {
+	items, err := s.Pending(project, "")
+	if err != nil {
+		return nil, err
+	}
+	counts := map[Channel]int{}
+	for _, it := range items {
+		counts[it.Channel]++
+	}
+	return counts, nil
+}
