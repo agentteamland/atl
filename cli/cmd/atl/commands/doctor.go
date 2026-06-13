@@ -26,7 +26,7 @@ var doctorCmd = &cobra.Command{
 		}
 		defer st.Close()
 
-		results := doctor.Run(doctor.QueueChecks(st, project, time.Now()))
+		results := doctor.Run(append(doctor.QueueChecks(st, project, time.Now()), integrityCheck(project)))
 		for _, r := range results {
 			healed := ""
 			if r.Healed {

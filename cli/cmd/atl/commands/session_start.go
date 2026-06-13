@@ -29,9 +29,11 @@ var sessionStartCmd = &cobra.Command{
 			fmt.Printf("atl: captured %d new learning(s) from the previous session\n", enqueued)
 		}
 
-		// Doctor self-check — surface only non-OK results.
-		for _, r := range doctor.Run(doctor.QueueChecks(st, project, time.Now())) {
-			if r.Status != doctor.OK {
+		// Doctor self-check + asset integrity restore (#2b). Surface non-OK
+		// results and any self-heal that fired (visible, never silent).
+		checks := append(doctor.QueueChecks(st, project, time.Now()), integrityCheck(project))
+		for _, r := range doctor.Run(checks) {
+			if r.Status != doctor.OK || r.Healed {
 				fmt.Printf("atl doctor: %s — %s\n", r.Status, r.Detail)
 			}
 		}
