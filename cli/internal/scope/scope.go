@@ -114,3 +114,23 @@ func LayerDir(s Scope, projectRoot string) (string, error) {
 		return "", fmt.Errorf("scope %q has no single layer directory", s)
 	}
 }
+
+// ClaudeDir returns Claude Code's on-disk root for a single-layer scope — where
+// assets are reflected (the install target). The global layer bridges into
+// ~/.claude, the project layer into <projectRoot>/.claude. LayerDir is where
+// ATL's own state lives; ClaudeDir is where the agents/skills/rules go. Both has
+// no single directory and is an error.
+func ClaudeDir(s Scope, projectRoot string) (string, error) {
+	switch s {
+	case Global:
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", err
+		}
+		return filepath.Join(home, ".claude"), nil
+	case Project:
+		return filepath.Join(projectRoot, ".claude"), nil
+	default:
+		return "", fmt.Errorf("scope %q has no single claude directory", s)
+	}
+}
