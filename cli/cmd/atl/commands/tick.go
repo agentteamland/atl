@@ -5,7 +5,9 @@ import (
 	"os"
 	"time"
 
+	"github.com/agentteamland/atl/cli/internal/doctor"
 	"github.com/agentteamland/atl/cli/internal/drain"
+	"github.com/agentteamland/atl/cli/internal/generation"
 	"github.com/agentteamland/atl/cli/internal/queue"
 	"github.com/agentteamland/atl/cli/internal/throttle"
 	"github.com/agentteamland/atl/cli/internal/transcript"
@@ -16,13 +18,15 @@ var tickCmd = &cobra.Command{
 	Use:   "tick",
 	Short: "Run the in-session maintenance tick",
 	Long: "Run the in-session maintenance tick — the work the three-speed cadence\n" +
-		"fires every few minutes via the prompt-piggyback throttle. The v2 target is\n" +
-		"drain + doctor + fan-out; this wires the drain.\n\n" +
+		"fires every few minutes via the prompt-piggyback throttle: a cheap\n" +
+		"every-call fan-out (guarded by the global generation counter, so it's a\n" +
+		"no-op when nothing changed) plus a throttled drain + doctor self-check.\n\n" +
 		"By default it discovers this project's Claude Code transcripts (modified\n" +
 		"since the last tick), extracts the assistant text, and transfers any capture\n" +
-		"markers into the durable queue — exactly once. --throttle skips the run if\n" +
-		"the last tick was within the given duration (how the per-prompt hook stays\n" +
-		"cheap). --file drains a single file instead (manual/debug).",
+		"markers into the durable queue — exactly once. --throttle skips the heavier\n" +
+		"drain+doctor pass if the last tick was within the given duration (how the\n" +
+		"per-prompt hook stays cheap); the fan-out still runs (it's already ~free).\n" +
+		"--file drains a single file instead (manual/debug).",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		st, project, err := openQueue()
 		if err != nil {
@@ -45,7 +49,20 @@ var tickCmd = &cobra.Command{
 			return nil
 		}
 
-		// Throttle gate (auto mode): skip silently if we ticked too recently.
+		// Every-call fan-out, generation-guarded: a no-op (one small file read)
+		// when the global layer hasn't changed since this project last fanned out,
+		// so it's cheap enough to ride every prompt.
+		if changed, gen, gerr := generation.Changed(project); gerr == nil && changed {
+			if n, ferr := fanOut(project); ferr == nil {
+				if n > 0 {
+					fmt.Printf("tick: fanned out %d file(s) from the global layer\n", n)
+				}
+				_ = generation.MarkSeen(project, gen)
+			}
+		}
+
+		// Throttle gate (auto mode): skip the heavier drain+doctor pass if we ran
+		// it too recently.
 		throttleDur, _ := cmd.Flags().GetDuration("throttle")
 		var stamp string
 		if throttleDur > 0 {
@@ -61,6 +78,14 @@ var tickCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
+		// Doctor self-check (queue health + asset integrity), same as session-start.
+		for _, r := range doctor.Run(append(doctor.QueueChecks(st, project, time.Now()), integrityCheck(project))) {
+			if r.Status != doctor.OK || r.Healed {
+				fmt.Printf("tick doctor: %s — %s\n", r.Status, r.Detail)
+			}
+		}
+
 		if throttleDur > 0 {
 			_ = throttle.Touch(stamp)
 		}
@@ -117,5 +142,5 @@ func drainProjectTranscripts(st *queue.Store, project string) (scanned, found, e
 
 func init() {
 	tickCmd.Flags().String("file", "", "drain a single file instead of discovering transcripts (manual/debug)")
-	tickCmd.Flags().Duration("throttle", 0, "skip if the last tick was within this duration (e.g. 10m)")
+	tickCmd.Flags().Duration("throttle", 0, "skip the drain+doctor pass if the last tick was within this duration (e.g. 10m)")
 }

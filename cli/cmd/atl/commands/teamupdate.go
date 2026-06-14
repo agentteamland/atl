@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/agentteamland/atl/cli/internal/fanout"
+	"github.com/agentteamland/atl/cli/internal/generation"
 	"github.com/agentteamland/atl/cli/internal/index"
 	"github.com/agentteamland/atl/cli/internal/manifest"
 	"github.com/agentteamland/atl/cli/internal/scope"
@@ -38,6 +39,7 @@ func updateTeams(projectRoot string) (int, error) {
 		if err != nil {
 			return advanced, err
 		}
+		scopeAdvanced := 0
 		for _, m := range manifests {
 			entry, lookErr := ix.Lookup(m.Handle, m.Name)
 			if lookErr != nil {
@@ -50,6 +52,10 @@ func updateTeams(projectRoot string) (int, error) {
 				return advanced, err
 			}
 			advanced++
+			scopeAdvanced++
+		}
+		if s == scope.Global && scopeAdvanced > 0 {
+			_ = generation.Bump() // global team upgraded → other projects fan out
 		}
 	}
 	return advanced, nil
