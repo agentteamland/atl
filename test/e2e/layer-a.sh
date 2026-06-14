@@ -92,6 +92,15 @@ printf '\n<!-- e2e: global-side update -->\n' >> "$GA"
 grep -q "global-side update" "$HOME/proj/.claude/$GREL" \
   && ok "unmodified project file refreshed from global" || bad "fan-out did not refresh"
 
+echo "== 6. list shows installed teams; remove deletes one scope =="
+restore
+list_out="$(cd "$HOME/proj" && atl list 2>&1)"
+echo "$list_out" | grep -q "design-system-team" && ok "list shows the installed team" || bad "list missing team -- got: [$list_out]"
+( cd "$HOME/proj" && atl remove agentteamland/design-system-team >/dev/null ) || bad "remove errored"
+[ ! -e "$HOME/proj/.claude/agents/ds-architect-agent" ] && ok "remove deleted project files" || bad "remove left files"
+if ls "$HOME/proj/.atl/installed/"*.json >/dev/null 2>&1; then bad "remove left project manifest"; else ok "remove dropped project manifest"; fi
+[ -d "$HOME/.claude/agents/ds-architect-agent" ] && ok "global untouched by project-scoped remove" || bad "global wrongly removed"
+
 echo ""
 echo "Layer A: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

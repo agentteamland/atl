@@ -38,5 +38,7 @@ func init() {
 		sessionStartCmd,
 		setupHooksCmd,
 		doctorCmd,
+		listCmd,
+		removeCmd,
 	)
 }
