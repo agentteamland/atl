@@ -18,8 +18,9 @@ var updateCmd = &cobra.Command{
 	Short: "Refresh installed teams",
 	Long: "Refresh installed teams. Runs automatically in the background (the\n" +
 		"three-speed cadence: per-prompt local fan-out + throttled network update);\n" +
-		"this command is the manual surface. Unmodified project copies refresh from\n" +
-		"global; modified copies are preserved (pull, never push).",
+		"this command is the manual surface. It pulls a fresh index, upgrades any\n" +
+		"team with a newer published version, and fans global gains out to project\n" +
+		"copies — always preserving files you modified locally (pull, never push).",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		projectRoot, err := os.Getwd()
 		if err != nil {
@@ -28,16 +29,25 @@ var updateCmd = &cobra.Command{
 		// Best-effort network refresh of the index cache; Resolve falls back to
 		// cache/embedded on failure, so being offline is fine.
 		_ = index.RefreshCache(index.RawURL)
+
+		upgraded, err := updateTeams(projectRoot)
+		if err != nil {
+			return err
+		}
 		refreshed, err := fanOut(projectRoot)
 		if err != nil {
 			return err
 		}
-		// Network update (new CLI version, fresh index, upstream team updates) is
-		// throttled / session-start work — not wired in this PR.
-		if refreshed == 0 {
-			fmt.Println("atl update: everything up to date")
-		} else {
+
+		switch {
+		case upgraded > 0 && refreshed > 0:
+			fmt.Printf("atl update: upgraded %d team(s), refreshed %d file(s) from global\n", upgraded, refreshed)
+		case upgraded > 0:
+			fmt.Printf("atl update: upgraded %d team(s)\n", upgraded)
+		case refreshed > 0:
 			fmt.Printf("atl update: refreshed %d file(s) from the global layer\n", refreshed)
+		default:
+			fmt.Println("atl update: everything up to date")
 		}
 		return nil
 	},
@@ -72,7 +82,7 @@ func fanOut(projectRoot string) (refreshed int, err error) {
 	}
 	for _, pm := range projManifests {
 		// Only teams that also live in the global layer have an upstream to pull
-		// from. Project-only teams refresh via the network path (a later PR).
+		// from. Project-only teams refresh via the network path (updateTeams).
 		if _, rerr := manifest.Read(globalLayer, pm.Handle, pm.Name); rerr != nil {
 			continue
 		}
