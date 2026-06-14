@@ -39,6 +39,12 @@ var updateCmd = &cobra.Command{
 			return err
 		}
 
+		// Core ships in the binary; refresh it into the global layer so a binary
+		// upgrade propagates the latest rules + skills. Best-effort.
+		if coreN, _ := reflectCore(); coreN > 0 {
+			fmt.Printf("atl update: refreshed %d core file(s)\n", coreN)
+		}
+
 		switch {
 		case upgraded > 0 && refreshed > 0:
 			fmt.Printf("atl update: upgraded %d team(s), refreshed %d file(s) from global\n", upgraded, refreshed)

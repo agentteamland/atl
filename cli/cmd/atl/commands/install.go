@@ -93,6 +93,12 @@ var installCmd = &cobra.Command{
 			fmt.Printf("atl: warning — could not bind automation hooks: %v\n", herr)
 		}
 
+		// Reflect the platform core (rules + skills) into the global layer — it
+		// ships in the binary and underpins every team. Best-effort.
+		if _, cerr := reflectCore(); cerr != nil {
+			fmt.Printf("atl: warning — could not reflect core: %v\n", cerr)
+		}
+
 		fmt.Printf("atl: installed %s@%s at %s scope\n", entry.Ref(), tm.Version, scopeLabel(targets))
 		return nil
 	},
