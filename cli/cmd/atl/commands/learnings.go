@@ -1,8 +1,10 @@
 package commands
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/agentteamland/atl/cli/internal/queue"
 	"github.com/spf13/cobra"
@@ -10,10 +12,12 @@ import (
 
 var learningsCmd = &cobra.Command{
 	Use:   "learnings",
-	Short: "Inspect the learning queue",
-	Long: "Inspect the durable learning queue — the substrate the self-driving loop\n" +
-		"runs on. Markers captured in conversation are transferred into the queue\n" +
-		"exactly once, processed, then deleted (so they can never be re-reported).",
+	Short: "Inspect and drain the learning queue",
+	Long: "Inspect and drain the durable learning queue — the substrate the\n" +
+		"self-driving loop runs on. Markers captured in conversation are transferred\n" +
+		"into the queue exactly once; the /drain skill folds each into the knowledge\n" +
+		"base (wiki / journal / agent KB) and acks it, so it's deleted and can never\n" +
+		"be re-reported. peek + ack are the deterministic surface that skill uses.",
 }
 
 var learningsStatusCmd = &cobra.Command{
@@ -46,6 +50,65 @@ var learningsStatusCmd = &cobra.Command{
 		for ch, n := range counts { // any future channels
 			fmt.Printf("  %-14s %d\n", string(ch), n)
 		}
+		return nil
+	},
+}
+
+// learningsPeekCmd lists pending items for the /drain skill to process. The
+// skill reads --json, integrates each item, then calls `ack <id>`.
+var learningsPeekCmd = &cobra.Command{
+	Use:   "peek",
+	Short: "List pending queue items (for the /drain skill)",
+	Long: "List pending items the /drain skill consumes: id, channel, payload.\n" +
+		"--channel filters to one channel (e.g. learning); --json emits the full\n" +
+		"machine-readable list the skill drives off of.",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		st, project, err := openQueue()
+		if err != nil {
+			return err
+		}
+		defer st.Close()
+
+		channel, _ := cmd.Flags().GetString("channel")
+		items, err := st.Pending(project, queue.Channel(channel))
+		if err != nil {
+			return err
+		}
+		if jsonOut, _ := cmd.Flags().GetBool("json"); jsonOut {
+			b, err := json.MarshalIndent(items, "", "  ")
+			if err != nil {
+				return err
+			}
+			fmt.Println(string(b))
+			return nil
+		}
+		if len(items) == 0 {
+			fmt.Println("no pending items")
+			return nil
+		}
+		for _, it := range items {
+			fmt.Printf("%-12s  %-12s  %s\n", it.ID[:12], it.Channel, firstLine(it.Payload))
+		}
+		return nil
+	},
+}
+
+// learningsAckCmd deletes a processed item — processed-then-deleted, so it can
+// never be re-reported. The /drain skill calls this after integrating an item.
+var learningsAckCmd = &cobra.Command{
+	Use:   "ack <id>",
+	Short: "Mark an item processed (delete it from the queue)",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		st, project, err := openQueue()
+		if err != nil {
+			return err
+		}
+		defer st.Close()
+		if err := st.Delete(project, args[0]); err != nil {
+			return err
+		}
+		fmt.Printf("acked %s\n", args[0])
 		return nil
 	},
 }
@@ -84,6 +147,14 @@ var learningsEnqueueCmd = &cobra.Command{
 	},
 }
 
+// firstLine returns the first line of s, marked with an ellipsis if truncated.
+func firstLine(s string) string {
+	if i := strings.IndexByte(s, '\n'); i >= 0 {
+		return s[:i] + " …"
+	}
+	return s
+}
+
 // openQueue opens the default queue and resolves the current project key (cwd).
 func openQueue() (*queue.Store, string, error) {
 	dbPath, err := queue.DefaultPath()
@@ -103,5 +174,7 @@ func openQueue() (*queue.Store, string, error) {
 }
 
 func init() {
-	learningsCmd.AddCommand(learningsStatusCmd, learningsEnqueueCmd)
+	learningsPeekCmd.Flags().Bool("json", false, "emit pending items as JSON")
+	learningsPeekCmd.Flags().String("channel", "", "filter to one channel (e.g. learning)")
+	learningsCmd.AddCommand(learningsStatusCmd, learningsPeekCmd, learningsAckCmd, learningsEnqueueCmd)
 }
