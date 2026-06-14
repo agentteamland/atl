@@ -1,0 +1,16 @@
+{
+  "name": "@agentteamland/docs",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Official documentation for AgentTeamLand.",
+  "scripts": {
+    "dev": "vitepress dev site",
+    "build": "vitepress build site",
+    "preview": "vitepress preview site"
+  },
+  "devDependencies": {
+    "vitepress": "^1.5.0",
+    "vue": "^3.5.0"
+  }
+}
