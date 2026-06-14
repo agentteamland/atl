@@ -86,6 +86,14 @@ var tickCmd = &cobra.Command{
 			}
 		}
 
+		// Lift this project's accumulated gains to the global layer (ring 1→2).
+		// Auto + visible (decision doc 5.1): additive, conflict-archived, and
+		// pinnable, so it's risk-free enough to ride the tick instead of waiting
+		// for a manual `atl promote`. Quiet when there's nothing to lift.
+		if pr, perr := promoteGains(project, ""); perr == nil && pr.lifted > 0 {
+			fmt.Printf("tick: %s\n", pr.String())
+		}
+
 		if throttleDur > 0 {
 			_ = throttle.Touch(stamp)
 		}
