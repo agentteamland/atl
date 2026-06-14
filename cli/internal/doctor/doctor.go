@@ -70,7 +70,7 @@ func Worst(results []Result) Status {
 
 // Tunables for the queue checks. Constants for now; config-driven later.
 const (
-	BacklogWarn    = 50              // pending items above this => drain isn't keeping up
+	BacklogWarn    = 50             // pending items above this => drain isn't keeping up
 	CursorStaleAge = 24 * time.Hour // cursor older than this (with items) => ticks not running
 )
 

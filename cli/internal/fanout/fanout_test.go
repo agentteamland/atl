@@ -12,10 +12,10 @@ func TestDecide(t *testing.T) {
 		baseline, local, upstream string
 		want                      Decision
 	}{
-		{"already up to date", "a", "b", "b", UpToDate},        // local == upstream
-		{"unmodified gets refreshed", "a", "a", "b", Refresh},  // local == baseline, upstream differs
+		{"already up to date", "a", "b", "b", UpToDate},         // local == upstream
+		{"unmodified gets refreshed", "a", "a", "b", Refresh},   // local == baseline, upstream differs
 		{"user-modified is preserved", "a", "x", "b", Preserve}, // local diverged from baseline
-		{"all identical", "a", "a", "a", UpToDate},             // up-to-date wins over refresh
+		{"all identical", "a", "a", "a", UpToDate},              // up-to-date wins over refresh
 		{"modified but matches upstream", "a", "b", "b", UpToDate},
 	}
 	for _, c := range cases {
