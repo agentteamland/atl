@@ -2,9 +2,10 @@
 
 Global rules + skills for the ATL platform (the v1 `agentteamland/core` content).
 
-**Status:** porting in progress. The full rule/skill set lands in a later v2 step (decision doc, migration sequencing step 3) — rewritten to the simplified concept set (unified agent-KB, no `memory`, shrunk docs-sync). Added directly in v2 so far:
+**Status:** porting in progress (decision doc, migration sequencing step 3) — rewritten to the simplified concept set (unified agent-KB, no `memory`, shrunk docs-sync).
 
-- `rules/communication-style.md` — how agents/skills talk to the user (fluent language, gloss each technical term on first use, no jargon overload)
-- `skills/drain/` — the learning-queue drain skill
+**Rules — ported (7):** `agent-structure`, `branch-hygiene`, `communication-style`, `karpathy-guidelines`, `knowledge-system`, `learning-capture`, `skill-selection-discipline`. From v1's 9, three were dropped from user-facing core: `version-check` (the CLI does it now via `session-start`/`update`/`doctor`), and `team-repo-maintenance` + `docs-sync` (maintainer-side, not shipped to users).
 
-Distribution wiring (how core rules reach `~/.claude`) is part of the content-port step.
+**Skills — porting:** `skills/drain/` done; `save-learnings` folded into drain. `wiki` / `create-pr` / `create-code-diagram` pending.
+
+Distribution wiring (how core rules + skills reach `~/.claude`) is part of a later content-port step.
