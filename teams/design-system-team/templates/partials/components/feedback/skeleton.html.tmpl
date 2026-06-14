@@ -1,0 +1,35 @@
+<!-- Skeleton — spec card render
+     Source spec: ds-architect-agent/children/components/feedback.md#skeleton -->
+<div class="dst-component-card">
+  <div class="flex items-baseline justify-between mb-2">
+    <h3 class="text-lg font-medium text-gray-900">Skeleton</h3>
+    <p class="text-xs text-gray-500 font-mono">3 variants · 1 size · 2 states</p>
+  </div>
+  <p class="dst-component-intro">Placeholder shape that fills space while data loads. Reduces perceived latency by setting layout expectations.</p>
+
+  <div class="dst-spec-row">
+    <span class="dst-spec-label">Variants</span>
+    <div class="dst-spec-values">
+      <span class="dst-spec-pill dst-pill-variant">line</span>
+      <span class="dst-spec-pill dst-pill-variant">block</span>
+      <span class="dst-spec-pill dst-pill-variant">circle</span>
+    </div>
+  </div>
+
+  <div class="dst-spec-row">
+    <span class="dst-spec-label">Sizes</span>
+    <div class="dst-spec-values">
+      <span class="dst-spec-pill dst-pill-size">default · 1.2s shimmer</span>
+    </div>
+  </div>
+
+  <div class="dst-spec-row">
+    <span class="dst-spec-label">States</span>
+    <div class="dst-spec-values">
+      <span class="dst-spec-pill dst-pill-state">shimmering</span>
+      <span class="dst-spec-pill dst-pill-state">static</span>
+    </div>
+  </div>
+
+  <div class="dst-spec-note"><strong>Composition rule:</strong> mirror the actual component layout. A list of cards loading should show a list of card skeletons — not a single "Loading…" label. <strong>Reduced motion:</strong> animation disabled, gradient frozen.</div>
+</div>

@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ name }} — Design System</title>
+  <link rel="stylesheet" href="../../tailwind.min.css">
+  <link rel="stylesheet" href="../../styles.css">
+  <!-- AGENT: emit Google Fonts <link> here based on ds.json typography.fontFamilies if any have googleFont set -->
+  {{ GOOGLE_FONTS_LINKS }}
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+  <!-- Sticky sidebar TOC (hidden on small screens) -->
+  <!-- AGENT: emit one .ds-nav-link per top-level section in the page (Brand, Iconography, …, Voice, Accessibility),
+    and one .ds-subnav-link per Components group present in ds.json.components (Actions / Forms / Feedback / Navigation / Display / Overlays / Charts).
+    Group order: actions → forms → feedback → navigation → display → overlays → charts.
+    Skip groups with zero components. The href values must match the section/group anchor ids below. -->
+  <aside id="ds-sidebar" class="hidden lg:flex lg:flex-col lg:fixed lg:top-0 lg:left-0 lg:bottom-0 lg:w-56 lg:overflow-y-auto lg:border-r lg:border-gray-200 lg:bg-white lg:z-10">
+    <div class="px-5 py-5 border-b border-gray-100">
+      <p class="text-[11px] uppercase tracking-wider text-gray-400 font-semibold">{{ name }} DS</p>
+      <p class="text-sm font-semibold text-gray-900 mt-0.5">Detail</p>
+    </div>
+    <nav class="py-3 pb-8">
+      {{ SIDEBAR_NAV_LINKS }}
+    </nav>
+  </aside>
+
+  <!-- Top nav -->
+  <nav class="bg-white border-b border-gray-200 lg:ml-56">
+    <div class="max-w-5xl mx-auto px-8 py-4 flex items-center justify-between">
+      <a href="../../index.html" class="text-sm text-gray-500 hover:text-gray-700">← Back to studio</a>
+      <span class="text-xs font-mono text-gray-400">v{{ version }} · {{ lastModified }}</span>
+    </div>
+  </nav>
+
+  <main class="max-w-5xl mx-auto px-8 py-12 space-y-16 lg:ml-56">
+
+    <!-- Header -->
+    <header>
+      <h1 class="text-4xl font-semibold text-gray-900">{{ name }}</h1>
+      <p class="text-lg text-gray-600 mt-2">{{ description }}</p>
+      <p class="text-base italic text-gray-700 mt-4">"{{ brandTagline }}"</p>
+    </header>
+
+    <!-- Brand -->
+    <!-- AGENT: render each lockup with TWO mutually-exclusive stages — one .theme-only-light, one .theme-only-dark.
+      The page-level theme toggle (sun/moon button bottom-right) controls which stage is visible at any time.
+      DO NOT render both themes side-by-side anymore — the previous "light + dark grid" was confusing because the
+      toggle already declares the active theme.
+
+      Each lockup wrapper:
+        <div class="ds-lockup">
+          <div class="theme-only-light">
+            <div class="ds-lockup-stage ds-lockup-stage-light">{logomark + wordmark}</div>
+          </div>
+          <div class="theme-only-dark">
+            <div class="ds-lockup-stage ds-lockup-stage-dark">{logomark or fallback + wordmark}</div>
+            {WARN STRIP IF logomarkDark IS NULL}
+          </div>
+        </div>
+
+      Dark stage rules:
+      - If ds.json.brand.logomarkDark is defined (path or inline SVG), render it.
+      - Otherwise, render the LIGHT asset on the dark surface AND emit a .ds-lockup-warn strip:
+        "⚠ Dark variant not declared — falling back to the light asset. Adding <code>brand.logomarkDark</code> will update this section."
+      Same rule for wordmarkDark; the warn strip mentions whichever asset is missing. -->
+    <section id="brand" class="space-y-6">
+      <h2 class="text-2xl font-semibold text-gray-900">Brand</h2>
+
+      <div class="ds-brand-card bg-white p-8 rounded-xl border border-gray-200 space-y-6">
+        <!-- Lockups (theme-aware — single visible stage per active theme) -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {{ BRAND_LOCKUP_PAIRS }}
+        </div>
+
+        <!-- Personality + meta -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2 border-t border-gray-100">
+          <div>
+            <p class="text-xs uppercase tracking-wider text-gray-500 mb-3 mt-4">Personality</p>
+            <div class="flex flex-wrap gap-2">
+              <!-- AGENT: emit one chip per personality keyword -->
+              <!-- EXAMPLE: <span class="px-3 py-1 rounded-full bg-gray-100 text-sm text-gray-700">{{KEYWORD}}</span> -->
+              {{ PERSONALITY_CHIPS }}
+            </div>
+          </div>
+          <div>
+            <p class="text-xs uppercase tracking-wider text-gray-500 mb-3 mt-4">Type & icon</p>
+            <p class="text-xs text-gray-500">Iconography · <span class="font-mono">{{ iconFamily }} · {{ iconStyle }} · {{ iconStrokeWidth }} stroke</span></p>
+            <p class="text-xs text-gray-500 mt-1">Wordmark · <span class="font-mono">{{ wordmarkFont }} {{ wordmarkWeight }} · {{ wordmarkLetterSpacing }}</span></p>
+          </div>
+        </div>
+      </div>
+
+      <p class="text-xs text-gray-500">{{ BRAND_NOTE_OR_PLACEHOLDER }} Dark variants live at <code class="font-mono bg-gray-100 px-1 rounded">brand.logomarkDark</code> / <code class="font-mono bg-gray-100 px-1 rounded">brand.wordmarkDark</code> — null means "use light".</p>
+    </section>
+
+    <!-- Iconography (only render if ds.json has brand.iconography defined) -->
+    <section id="iconography" class="space-y-6">
+      <h2 class="text-2xl font-semibold text-gray-900">Iconography</h2>
+
+      <div class="bg-white p-8 rounded-xl border border-gray-200 space-y-8">
+        <div class="flex items-start justify-between gap-6 flex-wrap">
+          <div>
+            <p class="text-sm text-gray-700">Icon family — <strong>{{ iconFamily }}</strong> ({{ iconStyle }} style).</p>
+            <p class="text-xs font-mono text-gray-500 mt-1">strokeWidth {{ iconStrokeWidth }} · defaultSize {{ iconDefaultSize }} · round caps + joins</p>
+          </div>
+          <p class="text-xs text-gray-500 max-w-sm text-right">Preview uses inline SVG path data so the rendered page stays self-contained. Production imports from the icon package (<code class="font-mono bg-gray-100 px-1 rounded">lucide-react</code>, <code class="font-mono bg-gray-100 px-1 rounded">lucide_icons</code>, etc.).</p>
+        </div>
+
+        <!-- Size ramp -->
+        <div>
+          <p class="text-xs uppercase tracking-wider text-gray-500 mb-3">Size ramp</p>
+          <div class="flex items-end justify-start gap-8 py-6 px-6 bg-gray-50 rounded-lg">
+            <!-- AGENT: render the same representative icon (map-pin is a good default) at 16 / 20 / 24 / 32 / 48. Highlight the defaultSize with a star and brand color stroke.
+              EXAMPLE PATTERN:
+              <div class="text-center">
+                <svg style="width:16px; height:16px;" viewBox="0 0 24 24" fill="none" stroke="#151915" stroke-width="{{STROKE}}" stroke-linecap="round" stroke-linejoin="round">{{ICON_PATHS}}</svg>
+                <p class="text-xs font-mono text-gray-500 mt-2">16</p>
+              </div>
+            -->
+            {{ ICON_SIZE_RAMP }}
+          </div>
+        </div>
+
+        <!-- Icon sampler -->
+        <div>
+          <p class="text-xs uppercase tracking-wider text-gray-500 mb-3">Product sampler — common icons across this product</p>
+          <div class="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
+            <!-- AGENT: emit 20-30 inline SVG tiles drawn from the declared icon family. Group by role: navigation (menu/close/chevrons/search), actions (edit/trash/upload/download/share), media (video/play/pause/map-pin/heart/star), social (user/users/message/bell), states (check/alert/info), settings/home/calendar/clock.
+              Use the declared strokeWidth. Paths must be the real family's paths (lucide, feather, heroicons, etc.) so the preview matches production.
+              EXAMPLE TILE:
+              <div class="dst-icon-tile"><svg viewBox="0 0 24 24">{{ICON_PATHS}}</svg><span class="dst-icon-name">{{ICON_NAME}}</span></div>
+            -->
+            {{ ICON_SAMPLER_TILES }}
+          </div>
+        </div>
+
+        <!-- Dark context (only if ds.json has palette.dark) -->
+        {{ ICON_DARK_STRIP_OR_EMPTY }}
+      </div>
+    </section>
+
+    <!-- Palette -->
+    <section id="palette" class="space-y-6">
+      <h2 class="text-2xl font-semibold text-gray-900">Palette</h2>
+
+      <!-- Brand colors -->
+      <div>
+        <h3 class="text-lg font-medium text-gray-700 mb-4">Brand</h3>
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          <!-- AGENT FILLS THIS for each entry in palette.brand
+            EXAMPLE PATTERN:
+            <div class="dst-swatch">
+              <div class="dst-swatch-color" style="background:{{HEX}}"></div>
+              <div class="dst-swatch-meta">
+                <p class="dst-swatch-name">{{NAME}}</p>
+                <p class="dst-swatch-hex">{{HEX}}</p>
+                <span class="dst-wcag-badge {{WCAG_CLASS}} mt-2 inline-block">vs white {{RATIO}}:1 {{WCAG_LEVEL}}</span>
+              </div>
+            </div>
+          -->
+          {{ BRAND_PALETTE_SWATCHES }}
+        </div>
+      </div>
+
+      <!-- Semantic colors -->
+      <div>
+        <h3 class="text-lg font-medium text-gray-700 mb-4">Semantic</h3>
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          <!-- AGENT: same pattern as above for palette.semantic.* (excluding nested objects like text — those rendered separately if needed) -->
+          {{ SEMANTIC_PALETTE_SWATCHES }}
+        </div>
+      </div>
+
+      <!-- Dark mode (only if ds.json has palette.dark) -->
+      {{ DARK_MODE_SECTION_OR_EMPTY }}
+    </section>
+
+    <!-- Typography -->
+    <section id="typography" class="space-y-6">
+      <h2 class="text-2xl font-semibold text-gray-900">Typography</h2>
+
+      <div class="bg-white p-8 rounded-xl border border-gray-200">
+        <p class="text-sm text-gray-500 mb-2">Font families</p>
+        <p class="font-mono text-xs text-gray-600 mb-6">{{ FONT_FAMILIES_LIST }}</p>
+
+        <!-- Type ramp -->
+        <div class="space-y-0">
+          <!-- AGENT FILLS THIS for each entry in typography.scale
+            EXAMPLE PATTERN:
+            <div class="dst-type-row">
+              <span style="font-size:{{SIZE}}; line-height:{{LH}}; font-weight:{{WEIGHT}}; letter-spacing:{{TRACK}}; font-family:{{FAMILY}};">
+                {{SAMPLE_TEXT}}
+              </span>
+              <span class="dst-type-meta">{{NAME}} · {{SIZE}}/{{LH}} · {{WEIGHT}}</span>
+            </div>
+            SAMPLE_TEXT defaults to "Welcome, the quick brown fox" but can be customized per ramp slot
+          -->
+          {{ TYPE_RAMP_ROWS }}
+        </div>
+      </div>
+    </section>
+
+    <!-- Spacing & Radii -->
+    <section id="spacing" class="space-y-6">
+      <h2 class="text-2xl font-semibold text-gray-900">Spacing &amp; Radii</h2>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+
+        <!-- Spacing scale -->
+        <div class="bg-white p-8 rounded-xl border border-gray-200">
+          <h3 class="text-lg font-medium text-gray-700 mb-4">Spacing scale ({{ density }})</h3>
+          <p class="text-xs text-gray-500 mb-4 font-mono">unit = {{ spacingUnit }}px</p>
+          <div class="space-y-3">
+            <!-- AGENT FILLS THIS for each value in spacing.scale (skip 0)
+              EXAMPLE:
+              <div>
+                <p class="text-xs text-gray-500 font-mono">{{VALUE}}px</p>
+                <div class="dst-spacing-bar" style="width:{{VALUE}}px; max-width:100%"></div>
+              </div>
+            -->
+            {{ SPACING_BARS }}
+          </div>
+        </div>
+
+        <!-- Radii scale -->
+        <div class="bg-white p-8 rounded-xl border border-gray-200">
+          <h3 class="text-lg font-medium text-gray-700 mb-4">Border radii</h3>
+          <div class="grid grid-cols-3 gap-4">
+            <!-- AGENT FILLS THIS for each entry in radii
+              EXAMPLE:
+              <div class="text-center">
+                <div class="bg-gray-300 mx-auto mb-2" style="width:64px; height:64px; border-radius:{{VALUE}}"></div>
+                <p class="text-xs text-gray-600 font-mono">{{KEY}}</p>
+                <p class="text-xs text-gray-400 font-mono">{{VALUE}}</p>
+              </div>
+            -->
+            {{ RADII_PREVIEWS }}
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- Elevation & Motion -->
+    <section id="elevation" class="space-y-6">
+      <h2 class="text-2xl font-semibold text-gray-900">Elevation &amp; Motion</h2>
+
+      <!-- Elevation -->
+      <div class="bg-white p-8 rounded-xl border border-gray-200 space-y-8">
+        <div class="flex items-baseline justify-between">
+          <h3 class="text-lg font-medium text-gray-700">Elevation</h3>
+          <p class="text-xs font-mono text-gray-500">{{ elevationLevelCount }} levels · light{{ elevationHasDark }}</p>
+        </div>
+
+        <!-- Light surfaces -->
+        <div>
+          <p class="text-xs uppercase tracking-wider text-gray-500 mb-4">Light surfaces</p>
+          <div class="grid grid-cols-5 gap-6 py-4">
+            <!-- AGENT: emit one .dst-elev-cell per entry in ds.json elevation.* (excluding nested `dark` object).
+              EXAMPLE:
+              <div class="text-center">
+                <div class="dst-elev-box dst-elev-{{KEY}} mx-auto mb-3"></div>
+                <p class="text-xs font-mono text-gray-700">{{KEY}}</p>
+                <p class="text-xs text-gray-500">{{USE_CASE}}</p>
+              </div>
+              USE_CASE is a 2-3 word role hint: none→"flat surface", low→"cards, list items", medium→"dropdowns, menus", high→"modals, sheets", xhigh→"floating action".
+            -->
+            {{ ELEVATION_LIGHT_CELLS }}
+          </div>
+        </div>
+
+        <!-- Dark surfaces (only if elevation.dark is defined) -->
+        {{ ELEVATION_DARK_BLOCK_OR_EMPTY }}
+      </div>
+
+      <!-- Motion -->
+      <div class="bg-white p-8 rounded-xl border border-gray-200 space-y-8">
+        <div class="flex items-baseline justify-between">
+          <h3 class="text-lg font-medium text-gray-700">Motion</h3>
+          <p class="text-xs font-mono text-gray-500">{{ motionDurationCount }} durations · {{ motionEasingCount }} easing curves · reduced-motion aware</p>
+        </div>
+
+        <!-- Durations -->
+        <div>
+          <p class="text-xs uppercase tracking-wider text-gray-500 mb-4">Durations <span class="normal-case text-gray-400">— watch the dot; each row moves at its own token speed</span></p>
+          <div class="space-y-3">
+            <!-- AGENT: emit one row per motion.durations entry.
+              The animation duration on-screen should be 2× the token value so the user reads one full round-trip at the declared speed.
+              EXAMPLE:
+              <div class="grid items-center gap-4" style="grid-template-columns: 80px 1fr 80px;">
+                <span class="text-sm font-mono text-gray-800">{{NAME}}</span>
+                <div class="dst-motion-track"><div class="dst-motion-dot dst-dur-{{NAME}}"></div></div>
+                <span class="text-xs font-mono text-gray-500 text-right">{{VALUE}}</span>
+              </div>
+              The per-row CSS class (.dst-dur-{{NAME}}) must be emitted in the inline <style> block with animation-duration = 2 × VALUE.
+            -->
+            {{ MOTION_DURATION_ROWS }}
+          </div>
+        </div>
+
+        <!-- Easing curves -->
+        <div>
+          <p class="text-xs uppercase tracking-wider text-gray-500 mb-4">Easing curves <span class="normal-case text-gray-400">— same duration, different shape of acceleration</span></p>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <!-- AGENT: emit one card per motion.easings entry.
+              EXAMPLE:
+              <div>
+                <div class="flex items-baseline justify-between mb-2">
+                  <span class="text-sm font-medium text-gray-900">{{NAME}}</span>
+                  <span class="text-xs font-mono text-gray-500">{{CURVE}}</span>
+                </div>
+                <div class="dst-motion-track"><div class="dst-motion-dot dst-ease-{{NAME}}"></div></div>
+                <p class="text-xs text-gray-500 mt-1">{{USE_CASE}}</p>
+              </div>
+              Emit matching .dst-ease-{{NAME}} rules in the inline <style> block with animation: 1.2s {{CURVE}}.
+              USE_CASE hints — standard:"Default — most UI transitions", decelerate:"Entering — things coming on screen", accelerate:"Leaving — things exiting screen", emphasized:"Hero moments — confident, deliberate".
+            -->
+            {{ MOTION_EASING_CARDS }}
+          </div>
+        </div>
+
+        <div class="rounded-lg p-3 flex items-start gap-3" style="background:#F0F9F1; border:1px solid #B7E1B8;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#205B25" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0; margin-top:2px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+          <p class="text-xs" style="color:#205B25;">
+            <strong>Reduced motion:</strong> honors <code class="font-mono px-1" style="background:rgba(255,255,255,0.6); border-radius:4px;">prefers-reduced-motion: reduce</code> — {{ reducedMotionBehavior }}.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Components (only render section if ds.json has components defined) -->
+    <section id="components" class="space-y-6">
+      <h2 class="text-2xl font-semibold text-gray-900">Components</h2>
+      <p class="text-sm text-gray-500">Variant matrices shown with live previews and spec sheets. Every component is declared in <code class="font-mono bg-gray-100 px-1 rounded">ds.json → components</code>; prototypes consume these specs.</p>
+
+      <!-- AGENT: emit one <div class="ds-component-group" id="components-{slug}"> per non-empty group, in this order:
+        actions → forms → feedback → navigation → display → overlays → charts
+        Inside each group, emit a header (label + one-line description) followed by the partial-rendered
+        component cards for every component present in that group's ds.json.components.* keys.
+
+        ── Partial-based render flow (Phase 4 — replaces inline ad-hoc rendering) ──
+
+        For each component, READ the partial file at:
+          templates/partials/components/{group-slug}/{component-slug}.html.tmpl
+
+        and paste its contents into the group wrapper. Partials are pre-rendered .html.tmpl snippets — no
+        string substitution needed (variants/sizes/states are canonical per-component, hardcoded inside
+        the partial). The 7 mini-UI partials (button / input / select / switch / card / chip / modal)
+        contain real visual examples that depend on the inline <style> block defining .pv-* classes;
+        the 35 spec-card partials use neutral .dst-* helpers from the shared styles.css.
+
+        Group slugs map to subdirectory names:
+          actions → partials/components/actions/
+          forms → partials/components/forms/
+          feedback → partials/components/feedback/
+          navigation → partials/components/navigation/
+          display → partials/components/display/
+          overlays → partials/components/overlays/
+          charts → partials/components/charts/
+
+        Component slug = ds.json key, kebab-case (e.g., button, icon-button, command-menu, date-picker).
+
+        ── Group skeleton ──
+
+        <div id="components-{slug}" class="ds-component-group">
+          <div class="ds-component-group-header">
+            <h3>{GROUP_LABEL}</h3>
+            <p>{ONE-LINE GROUP DESCRIPTION}</p>
+          </div>
+          {PASTED_PARTIAL_CONTENTS_FOR_EACH_COMPONENT_IN_THIS_GROUP}
+        </div>
+
+        ── Fallback: custom / new component without a partial ──
+
+        If a DS adds a custom component not in the catalog (or a brand-new component partial hasn't been
+        authored yet), fall back to inline spec-card generation following this layout:
+
+          <div class="dst-component-card">
+            <div class="flex items-baseline justify-between mb-2">
+              <h3 class="text-lg font-medium text-gray-900">{COMPONENT_DISPLAY_NAME}</h3>
+              <p class="text-xs text-gray-500 font-mono">{N} variant(s) · {M} size(s) · {K} state(s)</p>
+            </div>
+            <p class="dst-component-intro">{ONE-LINE INTENT}</p>
+            <div class="dst-spec-row"><span class="dst-spec-label">Variants</span><div class="dst-spec-values">{pills}</div></div>
+            <div class="dst-spec-row"><span class="dst-spec-label">Sizes</span><div class="dst-spec-values">{pills}</div></div>
+            <div class="dst-spec-row"><span class="dst-spec-label">States</span><div class="dst-spec-values">{pills}</div></div>
+            <div class="dst-spec-note"><strong>{key}:</strong> {value}</div>
+          </div>
+
+        Adding a partial for a recurring custom component is preferred — see template-rendering.md for the
+        partial authoring convention.
+
+        Skip groups with zero components — do NOT emit empty placeholders in production. -->
+
+      {{ COMPONENT_GROUPS }}
+    </section>
+
+    <!-- State Recipes (only render if ds.json has stateRecipes defined) -->
+    <section id="state-recipes" class="space-y-6">
+      <h2 class="text-2xl font-semibold text-gray-900">State Recipes</h2>
+      <p class="text-sm text-gray-500">Recipes for the non-happy-path states — empty, loading, error, success. Each pulls its default copy from <code class="font-mono bg-gray-100 px-1 rounded">voice.samples</code> and its motion from the motion tokens above. prototype-agent composes these into real screens.</p>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <!-- AGENT: emit one .dst-state-card per recipe in ds.json.stateRecipes.
+          Render each as: header strip (name + meta), preview area (actual visual treatment), useWhen footer strip.
+          Render variants of the same recipe as separate cards when visually distinct (e.g., Loading-skeleton and Loading-spinner are 2 cards; Error-inline and Error-toast are 2 cards; Success-toast and Success-inline are 2 cards).
+          EXAMPLE SHELL:
+          <div class="dst-state-card">
+            <div class="dst-state-card-label">
+              <h3 class="text-base font-semibold text-gray-900">{{RECIPE_NAME}}</h3>
+              <span class="text-xs font-mono text-gray-500">{{META}}</span>
+            </div>
+            <div class="dst-state-card-preview">{{ACTUAL_VISUAL_TREATMENT}}</div>
+            <div class="dst-state-card-usewhen"><strong>Use when:</strong> {{USE_WHEN_SENTENCE}}</div>
+          </div>
+          Visual treatments to render for real (not as specs):
+          - empty: circular icon badge (brand-tinted) + title + body + primary CTA, centered, max-width 280-320px
+          - loading-skeleton: 3 shimmering .dst-skeleton-row stacked with gap:16px, decreasing opacity
+          - loading-spinner: actual disabled button with .dst-spinner inside + label
+          - error-inline: circular icon badge (error-tinted) + title + body + secondary retry button, centered
+          - error-toast / success-toast: .dst-toast with .dst-toast-icon (success → .dst-toast-success, error → .dst-toast-error) on a neutral gray preview surface
+        -->
+        {{ STATE_RECIPE_CARDS }}
+      </div>
+
+      <!-- Footer — relation to other tokens -->
+      <div class="rounded-lg p-4 flex items-start gap-3" style="background:#FAFAF9; border:1px solid #E8E9E7;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#5B5F58" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0; margin-top:2px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <div class="text-xs text-gray-600 space-y-1">
+          <p><strong>Relation to voice:</strong> Each recipe's default copy references <code class="font-mono bg-gray-100 px-1 rounded">voice.samples.*</code> — tone changes propagate automatically.</p>
+          <p><strong>Relation to motion:</strong> Toast / error enter-exit animations use the motion tokens above (decelerate in, accelerate out) — no bespoke timing.</p>
+          <p><strong>Relation to iconography:</strong> State icons follow the declared icon family + stroke-width — same product language everywhere.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Patterns (only render if ds.json has patterns defined) -->
+    <section id="patterns" class="space-y-6">
+      <h2 class="text-2xl font-semibold text-gray-900">Patterns</h2>
+      <p class="text-sm text-gray-500">Reusable UI compositions that sit between individual components and full pages. Each pattern pulls components + state recipes + motion from above; prototype-agent uses them as the structural scaffolding when composing screens.</p>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <!-- AGENT: emit one pattern card per entry in ds.json.patterns.
+          Structural shell mirrors State Recipes: label strip + preview area + use-when strip.
+          The preview area must be a REAL mini-UI of the pattern using the DS's own components (e.g., for searchFilter render an actual search input + chip row + result grid; for masterDetail render a 40% list + 60% detail split with one selected row; for listPagination render 3 card rows + a numbered pager; for formComposition render 2 section headers with labeled inputs + one error state + right-aligned actions row).
+          EXAMPLE SHELL:
+          <div class="dst-state-card">
+            <div class="dst-state-card-label">
+              <h3 class="text-base font-semibold text-gray-900">{{PATTERN_DISPLAY_NAME}}</h3>
+              <span class="text-xs font-mono text-gray-500">{{COMPOSITION_SHORTHAND}}</span>
+            </div>
+            <div class="dst-pattern-preview">{{MINI_UI_FOR_THIS_PATTERN}}</div>
+            <div class="dst-state-card-usewhen"><strong>Use when:</strong> {{USE_WHEN_SENTENCE}}</div>
+          </div>
+          Required patterns v1: searchFilter, masterDetail, listPagination, formComposition.
+          Mini-UI helpers available in styles.css (dst-*): mini-card, mini-list-row, mini-chip, mini-pager. Per-DS brand colors for selected chip / active page go in inline <style> block.
+        -->
+        {{ PATTERN_CARDS }}
+      </div>
+
+      <div class="rounded-lg p-4 flex items-start gap-3" style="background:#FAFAF9; border:1px solid #E8E9E7;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#5B5F58" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0; margin-top:2px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <div class="text-xs text-gray-600 space-y-1">
+          <p><strong>Relation to components:</strong> Each pattern declares the component variants it composes — changes to <code class="font-mono bg-gray-100 px-1 rounded">components.*</code> propagate to every pattern that uses it.</p>
+          <p><strong>Relation to state recipes:</strong> Patterns reference empty/loading/error recipes by key — never re-invent them locally.</p>
+          <p><strong>Relation to responsive:</strong> Each pattern declares its mobile / tablet / desktop behavior so prototype-agent knows how the pattern reflows.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Page Templates (only render if ds.json has pageTemplates defined) -->
+    <section id="page-templates" class="space-y-6">
+      <h2 class="text-2xl font-semibold text-gray-900">Page Templates</h2>
+      <p class="text-sm text-gray-500">Whole-page composition blueprints. Each template names its regions and references the patterns it composes. These are <strong>wireframes, not mockups</strong> — prototype-agent renders them with real copy + components when producing an actual screen.</p>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <!-- AGENT: emit one blueprint card per entry in ds.json.pageTemplates.
+          CRITICAL — render as an ABSTRACT WIREFRAME, not a fake mini-UI. This is the key visual distinction from Patterns.
+          Each region in pageTemplates[name].regions becomes a .dst-blueprint-region (dashed-border box) with a data-label attribute showing the region name (and optional patternRef in parens).
+          Inside each region, use .dst-blueprint-sketch (horizontal bars) for text lines, .dst-blueprint-avatar for user images, .dst-blueprint-button for CTAs, .dst-blueprint-dots for step progress, .dst-blueprint-tab for tab rows, .dst-blueprint-navitem for sidebar items, .dst-blueprint-icon-hero for onboarding-style hero illustrations.
+          EXAMPLE SHELL:
+          <div class="dst-state-card">
+            <div class="dst-state-card-label">
+              <h3 class="text-base font-semibold text-gray-900">{{TEMPLATE_DISPLAY_NAME}}</h3>
+              <span class="text-xs font-mono text-gray-500">{{REGION_SUMMARY}}</span>
+            </div>
+            <div class="dst-blueprint">{{REGIONS_RENDERED_AS_BLUEPRINT}}</div>
+            <div class="dst-state-card-usewhen"><strong>Use when:</strong> {{USE_WHEN_SENTENCE}}</div>
+          </div>
+          Required templates v1: login, onboarding, profile, settings.
+          Brand-tinted overrides (active page-button color = brand.primary, active sidebar item background) go in the page's inline <style> block.
+          DO NOT use the Patterns-style .dst-pattern-preview here — page templates are wireframes, patterns are mini-UIs. That contrast is intentional: template blueprints communicate structure; pattern previews communicate instance.
+        -->
+        {{ PAGE_TEMPLATE_CARDS }}
+      </div>
+
+      <div class="rounded-lg p-4 flex items-start gap-3" style="background:#FAFAF9; border:1px solid #E8E9E7;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#5B5F58" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0; margin-top:2px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <div class="text-xs text-gray-600 space-y-1">
+          <p><strong>Relation to patterns:</strong> Each template names which <code class="font-mono bg-gray-100 px-1 rounded">patterns.*</code> it uses in each region. Change a pattern → every template that references it inherits the change.</p>
+          <p><strong>Relation to state recipes:</strong> Page-level errors/loading/success reference <code class="font-mono bg-gray-100 px-1 rounded">stateRecipes.*</code> — no bespoke page-error screens.</p>
+          <p><strong>Relation to responsive:</strong> Each region declares its mobile/desktop behavior. prototype-agent uses this to generate responsive real screens, not the other way around.</p>
+          <p><strong>Wireframe, not mockup:</strong> Blueprints are deliberately abstract (dashed boxes + labeled regions). Real copy + brand + components come when prototype-agent materializes the template into a screen.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Voice & Tone -->
+    <section id="voice" class="space-y-6">
+      <h2 class="text-2xl font-semibold text-gray-900">Voice &amp; Tone</h2>
+
+      <div class="bg-white p-8 rounded-xl border border-gray-200">
+        <p class="text-base text-gray-700 mb-6">{{ voiceTone }}</p>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+
+          <div>
+            <h3 class="text-lg font-medium text-gray-700 mb-3">✓ Do</h3>
+            <ul class="space-y-2">
+              <!-- AGENT: emit one <li> per voice.do entry
+                EXAMPLE: <li class="text-sm text-gray-700">• {{ITEM}}</li>
+              -->
+              {{ VOICE_DO_LIST }}
+            </ul>
+          </div>
+
+          <div>
+            <h3 class="text-lg font-medium text-gray-700 mb-3">✗ Don't</h3>
+            <ul class="space-y-2">
+              <!-- AGENT: emit one <li> per voice.dont entry -->
+              {{ VOICE_DONT_LIST }}
+            </ul>
+          </div>
+
+        </div>
+
+        <div class="mt-8 pt-8 border-t border-gray-200">
+          <h3 class="text-lg font-medium text-gray-700 mb-3">Sample copy</h3>
+          <div class="space-y-3">
+            <!-- AGENT: emit one .dst-voice-sample per voice.samples entry
+              EXAMPLE:
+              <div class="dst-voice-sample">
+                <p class="text-xs uppercase tracking-wider text-gray-500 mb-1 not-italic">{{KEY}}</p>
+                <p>{{TEXT}}</p>
+              </div>
+            -->
+            {{ VOICE_SAMPLES }}
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- Accessibility -->
+    <section id="accessibility" class="space-y-6">
+      <h2 class="text-2xl font-semibold text-gray-900">Accessibility</h2>
+
+      <div class="bg-white p-8 rounded-xl border border-gray-200 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+        <div>
+          <p class="text-xs uppercase tracking-wider text-gray-500 mb-1">WCAG Target</p>
+          <p class="text-2xl font-bold text-gray-900">{{ wcagLevel }}</p>
+        </div>
+        <div>
+          <p class="text-xs uppercase tracking-wider text-gray-500 mb-1">Min tap target</p>
+          <p class="text-2xl font-bold text-gray-900">{{ minTapTarget }}</p>
+        </div>
+        <div>
+          <p class="text-xs uppercase tracking-wider text-gray-500 mb-1">Body contrast min</p>
+          <p class="text-2xl font-bold text-gray-900">{{ minContrastBody }}:1</p>
+        </div>
+        <div>
+          <p class="text-xs uppercase tracking-wider text-gray-500 mb-1">Reduced motion</p>
+          <p class="text-2xl font-bold text-gray-900">{{ reducedMotionStatus }}</p>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="border-t border-gray-200 mt-16 lg:ml-56">
+    <div class="max-w-5xl mx-auto px-8 py-6 text-center text-sm text-gray-500">
+      <p>Update with <code class="bg-gray-100 px-2 py-1 rounded font-mono text-xs">/dst-edit-ds {{ name }} "&lt;change&gt;"</code></p>
+    </div>
+  </footer>
+
+  <!-- Floating theme toggle (settings entry-point) -->
+  <button id="ds-theme-toggle" class="ds-theme-toggle" aria-label="Toggle dark mode" title="Toggle dark / light theme">
+    <svg class="ds-theme-toggle-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="5" y1="12" x2="2" y2="12"/><line x1="22" y1="12" x2="19" y2="12"/><line x1="4.93" y1="4.93" x2="6.76" y2="6.76"/><line x1="17.24" y1="17.24" x2="19.07" y2="19.07"/><line x1="4.93" y1="19.07" x2="6.76" y2="17.24"/><line x1="17.24" y1="6.76" x2="19.07" y2="4.93"/></svg>
+    <svg class="ds-theme-toggle-moon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"/></svg>
+  </button>
+
+  <script>
+    // Theme toggle (light / dark) — persists via localStorage
+    (function () {
+      var KEY = 'ds-theme';
+      var btn = document.getElementById('ds-theme-toggle');
+      if (!btn) return;
+      try {
+        if (localStorage.getItem(KEY) === 'dark') {
+          document.body.classList.add('theme-dark');
+        }
+      } catch (e) { /* localStorage may be blocked */ }
+      btn.addEventListener('click', function () {
+        var on = document.body.classList.toggle('theme-dark');
+        try { localStorage.setItem(KEY, on ? 'dark' : 'light'); } catch (e) {}
+      });
+    })();
+
+    // Scroll-spy: highlight the sidebar link of the section currently in view.
+    (function () {
+      var links = Array.prototype.slice.call(document.querySelectorAll('#ds-sidebar a[href^="#"]'));
+      if (!links.length) return;
+      var anchorIds = links.map(function (a) { return a.getAttribute('href').slice(1); });
+      var targets = anchorIds
+        .map(function (id) { return document.getElementById(id); })
+        .filter(Boolean);
+      if (!targets.length) return;
+      function update() {
+        var y = window.scrollY + 120;
+        var current = targets[0];
+        for (var i = 0; i < targets.length; i++) {
+          if (targets[i].offsetTop <= y) current = targets[i];
+        }
+        var hash = '#' + current.id;
+        links.forEach(function (a) {
+          a.classList.toggle('is-active', a.getAttribute('href') === hash);
+        });
+      }
+      window.addEventListener('scroll', update, { passive: true });
+      window.addEventListener('hashchange', update);
+      update();
+    })();
+  </script>
+
+</body>
+</html>

@@ -1,0 +1,41 @@
+<!-- Chart — spec card render
+     Source spec: ds-architect-agent/children/components/charts.md#chart -->
+<div class="dst-component-card">
+  <div class="flex items-baseline justify-between mb-2">
+    <h3 class="text-lg font-medium text-gray-900">Chart</h3>
+    <p class="text-xs text-gray-500 font-mono">4 variants · 3 sizes · 5 states</p>
+  </div>
+  <p class="dst-component-intro">Primary chart primitive. Variant declares the chart type; data shape is consistent across.</p>
+
+  <div class="dst-spec-row">
+    <span class="dst-spec-label">Variants</span>
+    <div class="dst-spec-values">
+      <span class="dst-spec-pill dst-pill-variant">line · trend over time</span>
+      <span class="dst-spec-pill dst-pill-variant">bar · comparison</span>
+      <span class="dst-spec-pill dst-pill-variant">pie · part-of-whole</span>
+      <span class="dst-spec-pill dst-pill-variant">area · trend with magnitude</span>
+    </div>
+  </div>
+
+  <div class="dst-spec-row">
+    <span class="dst-spec-label">Sizes</span>
+    <div class="dst-spec-values">
+      <span class="dst-spec-pill dst-pill-size">sm · 200px tall</span>
+      <span class="dst-spec-pill dst-pill-size">md · 320px tall</span>
+      <span class="dst-spec-pill dst-pill-size">lg · 480px tall</span>
+    </div>
+  </div>
+
+  <div class="dst-spec-row">
+    <span class="dst-spec-label">States</span>
+    <div class="dst-spec-values">
+      <span class="dst-spec-pill dst-pill-state">idle</span>
+      <span class="dst-spec-pill dst-pill-state">loading</span>
+      <span class="dst-spec-pill dst-pill-state">hover · tooltip</span>
+      <span class="dst-spec-pill dst-pill-state">empty</span>
+      <span class="dst-spec-pill dst-pill-state">error</span>
+    </div>
+  </div>
+
+  <div class="dst-spec-note"><strong>Tokens:</strong> tooltip → <code>tooltip.default</code> · empty → <code>stateRecipes.empty</code> · axis font → <code>typography.scale.caption</code> · palette → <code>palette.brand.scale</code>. <strong>Accessibility:</strong> data-table fallback announced via aria-live.</div>
+</div>

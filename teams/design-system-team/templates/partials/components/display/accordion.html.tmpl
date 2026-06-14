@@ -1,0 +1,40 @@
+<!-- Accordion — spec card render
+     Source spec: ds-architect-agent/children/components/display.md#accordion -->
+<div class="dst-component-card">
+  <div class="flex items-baseline justify-between mb-2">
+    <h3 class="text-lg font-medium text-gray-900">Accordion</h3>
+    <p class="text-xs text-gray-500 font-mono">3 variants · 3 sizes · 5 states</p>
+  </div>
+  <p class="dst-component-intro">Toggleable collapsible sections. Each item has a header (always visible) and a body (revealed on expand).</p>
+
+  <div class="dst-spec-row">
+    <span class="dst-spec-label">Variants</span>
+    <div class="dst-spec-values">
+      <span class="dst-spec-pill dst-pill-variant">single · one-at-a-time</span>
+      <span class="dst-spec-pill dst-pill-variant">multiple · any-open</span>
+      <span class="dst-spec-pill dst-pill-variant">bordered · per-item card</span>
+    </div>
+  </div>
+
+  <div class="dst-spec-row">
+    <span class="dst-spec-label">Sizes</span>
+    <div class="dst-spec-values">
+      <span class="dst-spec-pill dst-pill-size">sm · 40px header</span>
+      <span class="dst-spec-pill dst-pill-size">md · 48px header</span>
+      <span class="dst-spec-pill dst-pill-size">lg · 56px header</span>
+    </div>
+  </div>
+
+  <div class="dst-spec-row">
+    <span class="dst-spec-label">States</span>
+    <div class="dst-spec-values">
+      <span class="dst-spec-pill dst-pill-state">collapsed</span>
+      <span class="dst-spec-pill dst-pill-state">expanded</span>
+      <span class="dst-spec-pill dst-pill-state">hover</span>
+      <span class="dst-spec-pill dst-pill-state">focus</span>
+      <span class="dst-spec-pill dst-pill-state">disabled</span>
+    </div>
+  </div>
+
+  <div class="dst-spec-note"><strong>Structure:</strong> header (chevron + label + optional trailing meta) | body (markdown / arbitrary content). <strong>Behavior:</strong> ↑/↓ moves focus between headers · Enter / Space toggles · <code>prefers-reduced-motion</code> disables slide animation.</div>
+</div>

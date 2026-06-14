@@ -1,0 +1,856 @@
+/*
+ * Design System Team — shared helper styles for .dst/ HTML pages.
+ *
+ * This file is copied (not symlinked) into .dst/styles.css by /dst-init.
+ * It complements .dst/tailwind.min.css (a self-contained Tailwind v2 build
+ * shipped alongside, so pages work over file:// without needing a server
+ * or CDN — browser security blocks remote scripts on file:// URLs).
+ */
+
+:root {
+  --dst-text-mono: 'JetBrains Mono', 'SF Mono', Menlo, monospace;
+}
+
+body {
+  font-family: 'Inter', -apple-system, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.font-mono {
+  font-family: var(--dst-text-mono);
+}
+
+/* Polished swatch presentation */
+.dst-swatch {
+  position: relative;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  border: 1px solid rgb(229 231 235);
+  background: white;
+  transition: transform 150ms ease;
+}
+
+.dst-swatch:hover {
+  transform: translateY(-2px);
+}
+
+.dst-swatch-color {
+  height: 8rem;
+}
+
+.dst-swatch-meta {
+  padding: 1rem;
+}
+
+.dst-swatch-name {
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+.dst-swatch-hex {
+  font-family: var(--dst-text-mono);
+  font-size: 0.875rem;
+  color: rgb(107 114 128);
+}
+
+/* Type ramp item */
+.dst-type-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: baseline;
+  gap: 1.5rem;
+  padding: 1rem 0;
+  border-bottom: 1px solid rgb(243 244 246);
+}
+
+.dst-type-row:last-child {
+  border-bottom: none;
+}
+
+.dst-type-meta {
+  font-family: var(--dst-text-mono);
+  font-size: 0.75rem;
+  color: rgb(107 114 128);
+  white-space: nowrap;
+}
+
+/* Spacing scale visualizer */
+.dst-spacing-bar {
+  background: rgb(45 95 63);
+  height: 0.5rem;
+  border-radius: 9999px;
+  margin-top: 0.5rem;
+}
+
+/* Component preview card */
+.dst-component-card {
+  border: 1px solid rgb(229 231 235);
+  border-radius: 0.75rem;
+  padding: 2rem;
+  background: white;
+}
+
+.dst-component-card + .dst-component-card {
+  margin-top: 1rem;
+}
+
+/* WCAG contrast badges */
+.dst-wcag-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.dst-wcag-badge.aaa {
+  background: rgb(220 252 231);
+  color: rgb(22 101 52);
+}
+
+.dst-wcag-badge.aa {
+  background: rgb(219 234 254);
+  color: rgb(30 64 175);
+}
+
+.dst-wcag-badge.fail {
+  background: rgb(254 226 226);
+  color: rgb(153 27 27);
+}
+
+/* Voice samples */
+.dst-voice-sample {
+  border-left: 4px solid rgb(45 95 63);
+  padding: 0.75rem 1rem;
+  background: rgb(248 250 252);
+  font-style: italic;
+  border-radius: 0 0.5rem 0.5rem 0;
+}
+
+/* Elevation preview cells — light surfaces (neutral; per-DS overrides can re-color) */
+.dst-elev-box {
+  width: 96px;
+  height: 72px;
+  border-radius: 12px;
+  background: #FFFFFF;
+  transition: transform 160ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+.dst-elev-box:hover {
+  transform: translateY(-2px);
+}
+.dst-elev-box-dark { background: #1A231E; }
+.dst-elev-none     { border: 1px dashed rgb(209 213 219); }
+.dst-elev-low      { box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06), 0 1px 1px rgba(15, 23, 42, 0.04); }
+.dst-elev-medium   { box-shadow: 0 4px 8px rgba(15, 23, 42, 0.08), 0 2px 4px rgba(15, 23, 42, 0.04); }
+.dst-elev-high     { box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12), 0 4px 8px rgba(15, 23, 42, 0.06); }
+.dst-elev-xhigh    { box-shadow: 0 24px 48px rgba(15, 23, 42, 0.16), 0 8px 16px rgba(15, 23, 42, 0.08); }
+/* Dark variants — black shadows at higher alpha because they cast on a deeper surface */
+.dst-elev-low-dark    { box-shadow: 0 1px 2px rgba(0, 0, 0, 0.32); }
+.dst-elev-medium-dark { box-shadow: 0 4px 8px rgba(0, 0, 0, 0.40), 0 2px 4px rgba(0, 0, 0, 0.24); }
+.dst-elev-high-dark   { box-shadow: 0 12px 24px rgba(0, 0, 0, 0.48), 0 4px 8px rgba(0, 0, 0, 0.28); }
+.dst-elev-xhigh-dark  { box-shadow: 0 24px 48px rgba(0, 0, 0, 0.56), 0 8px 16px rgba(0, 0, 0, 0.32); }
+
+/* Motion preview track + dot — per-DS inline <style> should brand the dot */
+@keyframes dst-travel { from { transform: translateX(0); } to { transform: translateX(100%); } }
+.dst-motion-track {
+  position: relative;
+  height: 40px;
+  background: rgb(245 245 244);
+  border-radius: 9999px;
+  overflow: hidden;
+  padding: 10px;
+}
+.dst-motion-dot {
+  width: 20px;
+  height: 20px;
+  background: rgb(75 85 99);
+  border-radius: 9999px;
+  animation-name: dst-travel;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+}
+@media (prefers-reduced-motion: reduce) {
+  .dst-motion-dot {
+    animation: none !important;
+    transform: translateX(40%);
+  }
+}
+
+/* State recipes — shimmer skeleton, spinner, toast, state-card layout */
+@keyframes dst-shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+@keyframes dst-spin    { to { transform: rotate(360deg); } }
+.dst-skeleton-line {
+  height: 16px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, rgb(232 233 231) 0%, rgb(245 245 244) 50%, rgb(232 233 231) 100%);
+  background-size: 200% 100%;
+  animation: dst-shimmer 1.2s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+.dst-skeleton-row {
+  height: 80px;
+  border-radius: 16px;
+  background: linear-gradient(90deg, rgb(245 245 244) 0%, rgb(250 250 249) 50%, rgb(245 245 244) 100%);
+  background-size: 200% 100%;
+  animation: dst-shimmer 1.2s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+.dst-spinner {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgb(219 234 254);
+  border-top-color: rgb(30 64 175);
+  border-radius: 9999px;
+  animation: dst-spin 0.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  vertical-align: middle;
+}
+.dst-toast {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: #FFFFFF;
+  border: 1px solid rgb(232 233 231);
+  border-radius: 12px;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12), 0 4px 8px rgba(15, 23, 42, 0.06);
+  min-width: 280px;
+  max-width: 420px;
+}
+.dst-toast-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 9999px;
+  flex-shrink: 0;
+}
+.dst-toast-success .dst-toast-icon { background: rgb(220 252 231); color: rgb(22 101 52); }
+.dst-toast-error   .dst-toast-icon { background: rgb(254 226 226); color: rgb(153 27 27); }
+.dst-toast-info    .dst-toast-icon { background: rgb(219 234 254); color: rgb(30 64 175); }
+.dst-state-card {
+  background: #FFFFFF;
+  border: 1px solid rgb(232 233 231);
+  border-radius: 16px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.dst-state-card-label {
+  padding: 12px 20px;
+  border-bottom: 1px solid rgb(232 233 231);
+  background: rgb(250 250 249);
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+.dst-state-card-preview {
+  padding: 32px 24px;
+  min-height: 260px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+}
+.dst-state-card-usewhen {
+  padding: 12px 20px;
+  border-top: 1px solid rgb(245 245 244);
+  background: rgb(250 250 249);
+  font-size: 12px;
+  color: rgb(91 95 88);
+}
+@media (prefers-reduced-motion: reduce) {
+  .dst-skeleton-line, .dst-skeleton-row, .dst-spinner { animation: none !important; }
+}
+
+/* Patterns — mini-UI preview helpers (pattern cards reuse .dst-state-card shell) */
+.dst-pattern-preview {
+  padding: 16px;
+  background: rgb(250 250 249);
+  flex: 1;
+  min-height: 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.dst-pattern-preview-split {
+  padding: 0;
+  flex-direction: row;
+  gap: 0;
+  background: #FFFFFF;
+  border: 1px solid rgb(232 233 231);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.dst-mini-card {
+  background: #FFFFFF;
+  border: 1px solid rgb(232 233 231);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 12px;
+}
+.dst-mini-card-title {
+  font-weight: 600;
+  color: rgb(21 25 21);
+  font-size: 13px;
+  margin-bottom: 2px;
+}
+.dst-mini-card-meta {
+  color: rgb(91 95 88);
+  font-size: 11px;
+}
+.dst-mini-list-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgb(245 245 244);
+  cursor: pointer;
+  font-size: 12px;
+}
+.dst-mini-list-row:last-child {
+  border-bottom: none;
+}
+/* Brand-tinted selected state goes in the page's inline <style> block */
+.dst-mini-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 500;
+  background: transparent;
+  border: 1px solid rgb(211 214 209);
+  color: rgb(21 25 21);
+  white-space: nowrap;
+}
+.dst-mini-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 12px 0 4px 0;
+}
+.dst-mini-pager button {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: transparent;
+  color: rgb(21 25 21);
+  font-size: 13px;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+}
+.dst-mini-pager button:hover {
+  background: rgb(245 245 244);
+}
+.dst-mini-pager button:disabled {
+  color: rgb(165 169 162);
+  cursor: not-allowed;
+}
+
+/* Page template blueprints — abstract wireframes (dashed boxes + labeled regions) */
+.dst-blueprint {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px;
+  min-height: 320px;
+  background: rgb(250 250 249);
+  flex: 1;
+}
+.dst-blueprint-region {
+  border: 1.5px dashed rgb(165 169 162);
+  border-radius: 10px;
+  padding: 14px;
+  background: #FFFFFF;
+  position: relative;
+}
+.dst-blueprint-region::before {
+  content: attr(data-label);
+  position: absolute;
+  top: -8px;
+  left: 12px;
+  background: rgb(250 250 249);
+  padding: 0 8px;
+  font-size: 10px;
+  font-family: var(--dst-text-mono);
+  color: rgb(121 127 118);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.dst-blueprint-sketch {
+  height: 10px;
+  background: rgb(232 233 231);
+  border-radius: 3px;
+  margin-bottom: 6px;
+}
+.dst-blueprint-sketch:last-child { margin-bottom: 0; }
+.dst-blueprint-sketch.is-title {
+  height: 14px;
+  background: rgb(211 214 209);
+  width: 50%;
+}
+.dst-blueprint-sketch.is-muted {
+  background: rgb(232 233 231);
+  opacity: 0.7;
+  width: 70%;
+}
+.dst-blueprint-avatar {
+  width: 44px;
+  height: 44px;
+  background: rgb(232 233 231);
+  border-radius: 9999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.dst-blueprint-button {
+  height: 34px;
+  background: rgb(55 65 81);
+  border-radius: 10px;
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 0 14px;
+}
+.dst-blueprint-button.is-ghost {
+  background: transparent;
+  color: rgb(55 65 81);
+  border: 1px solid rgb(55 65 81);
+}
+.dst-blueprint-dots {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+}
+.dst-blueprint-dots span {
+  width: 24px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgb(211 214 209);
+}
+.dst-blueprint-dots span.is-active {
+  background: rgb(55 65 81);
+  width: 32px;
+}
+.dst-blueprint-icon-hero {
+  width: 72px;
+  height: 72px;
+  background: rgb(243 244 246);
+  border-radius: 9999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;
+}
+.dst-blueprint-tab {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  font-size: 11px;
+  font-weight: 500;
+  color: rgb(91 95 88);
+  border-bottom: 2px solid transparent;
+}
+.dst-blueprint-tab.is-active {
+  color: rgb(55 65 81);
+  border-bottom-color: rgb(55 65 81);
+}
+.dst-blueprint-navitem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  font-size: 11px;
+  color: rgb(21 25 21);
+  border-radius: 8px;
+}
+.dst-blueprint-navitem.is-active {
+  background: rgb(243 244 246);
+  color: rgb(55 65 81);
+  font-weight: 500;
+}
+.dst-blueprint-navitem-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: currentColor;
+  opacity: 0.5;
+}
+
+/* Iconography grid tile */
+.dst-icon-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px 8px;
+  background: #FFFFFF;
+  border: 1px solid rgb(232 233 231);
+  border-radius: 12px;
+  transition: all 160ms;
+}
+.dst-icon-tile:hover {
+  border-color: rgb(211 214 209);
+  transform: translateY(-1px);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+}
+.dst-icon-tile svg {
+  width: 24px;
+  height: 24px;
+  stroke: rgb(21 25 21);
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+}
+.dst-icon-name {
+  font-family: var(--dst-text-mono);
+  font-size: 11px;
+  color: rgb(91 95 88);
+}
+
+/* ── Sticky sidebar TOC (Faz 2) ────────────────────────────────────── */
+#ds-sidebar {
+  font-family: var(--dst-text-sans);
+}
+#ds-sidebar .ds-sidebar-section {
+  padding: 0 12px;
+  margin-top: 4px;
+}
+#ds-sidebar .ds-sidebar-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgb(156 163 154);
+  padding: 12px 12px 6px 12px;
+}
+.ds-nav-link {
+  display: block;
+  padding: 6px 12px;
+  border-radius: 6px;
+  color: rgb(55 65 81);
+  font-size: 13.5px;
+  font-weight: 500;
+  transition: background 120ms, color 120ms;
+  text-decoration: none;
+}
+.ds-nav-link:hover {
+  background: rgb(243 244 246);
+  color: rgb(17 24 39);
+}
+.ds-nav-link.is-active {
+  background: rgb(241 243 240);
+  color: rgb(17 24 39);
+  font-weight: 600;
+}
+.ds-subnav {
+  margin-left: 8px;
+  padding-left: 12px;
+  border-left: 1px solid rgb(229 231 235);
+  margin-top: 2px;
+  margin-bottom: 4px;
+}
+.ds-subnav-link {
+  display: block;
+  padding: 4px 10px;
+  border-radius: 5px;
+  color: rgb(107 114 128);
+  font-size: 12.5px;
+  transition: background 120ms, color 120ms;
+  text-decoration: none;
+}
+.ds-subnav-link:hover {
+  color: rgb(17 24 39);
+  background: rgb(250 250 249);
+}
+.ds-subnav-link.is-active {
+  color: rgb(17 24 39);
+  font-weight: 600;
+}
+
+/* ── Components section grouping (Faz 2) ──────────────────────────── */
+.ds-component-group {
+  padding-top: 24px;
+  margin-top: 24px;
+  border-top: 1px solid rgb(232 233 231);
+}
+.ds-component-group:first-of-type {
+  padding-top: 0;
+  margin-top: 0;
+  border-top: none;
+}
+.ds-component-group-header {
+  margin-bottom: 16px;
+}
+.ds-component-group-header h3 {
+  font-size: 12.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgb(55 65 81);
+}
+.ds-component-group-header p {
+  color: rgb(91 95 88);
+  font-size: 13px;
+  line-height: 1.5;
+  margin-top: 4px;
+}
+.ds-component-group-empty {
+  padding: 24px;
+  background: rgb(250 250 249);
+  border: 1px dashed rgb(211 214 209);
+  border-radius: 12px;
+  color: rgb(121 127 118);
+  font-size: 13px;
+  text-align: center;
+}
+
+/* ── Spec-card helpers (Faz 2) ────────────────────────────────────── */
+.dst-spec-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 10px 0;
+  border-top: 1px solid rgb(245 245 244);
+}
+.dst-spec-row:first-of-type {
+  border-top: none;
+  padding-top: 0;
+}
+.dst-spec-label {
+  flex-shrink: 0;
+  width: 88px;
+  font-family: var(--dst-text-mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgb(121 127 118);
+  padding-top: 5px;
+}
+.dst-spec-values {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+.dst-spec-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.2;
+}
+.dst-pill-variant {
+  background: rgb(245 245 244);
+  color: rgb(55 65 81);
+  border: 1px solid rgb(229 231 235);
+}
+.dst-pill-size {
+  background: rgb(250 250 249);
+  color: rgb(91 95 88);
+  border: 1px solid rgb(232 233 231);
+  font-family: var(--dst-text-mono);
+  font-size: 11.5px;
+}
+.dst-pill-state {
+  background: white;
+  color: rgb(91 95 88);
+  border: 1px solid rgb(232 233 231);
+}
+.dst-spec-note {
+  padding: 10px 12px;
+  background: rgb(250 250 249);
+  border-radius: 8px;
+  font-size: 12px;
+  color: rgb(91 95 88);
+  line-height: 1.5;
+  margin-top: 12px;
+  border-left: 3px solid rgb(232 233 231);
+}
+.dst-spec-note strong {
+  color: rgb(17 24 39);
+  font-weight: 600;
+}
+.dst-component-intro {
+  font-size: 13px;
+  color: rgb(91 95 88);
+  line-height: 1.5;
+  margin-bottom: 14px;
+}
+
+/* ── Theme-aware visibility (Faz 2.5 — pure toggle model) ──────────── */
+/* Use these helpers anywhere the page has a per-theme version of a block.
+   The active theme's content shows; the other is hidden by the toggle. */
+body:not(.theme-dark) .theme-only-dark  { display: none !important; }
+body.theme-dark         .theme-only-light { display: none !important; }
+
+/* ── Brand lockup (single theme-aware stage) (Faz 2 — dark mode) ──── */
+.ds-lockup {
+  border-radius: 12px;
+  overflow: hidden;
+}
+.ds-lockup-stage {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 24px 18px;
+  min-height: 96px;
+  justify-content: center;
+}
+.ds-lockup-stage-light {
+  background: rgb(245 245 244);
+}
+.ds-lockup-stage-dark {
+  background: rgb(15 22 18);
+}
+.ds-lockup-warn {
+  font-size: 10.5px;
+  color: rgb(180 83 9);
+  padding: 6px 10px;
+  background: rgb(254 247 236);
+  border-top: 1px solid rgb(244 214 164);
+  line-height: 1.4;
+}
+.ds-lockup-warn code {
+  font-family: var(--dst-text-mono);
+  background: rgba(180, 83, 9, 0.08);
+  padding: 0 4px;
+  border-radius: 3px;
+}
+
+/* ── Floating theme toggle (Faz 2 — dark mode) ─────────────────────── */
+.ds-theme-toggle {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 200;
+  width: 48px;
+  height: 48px;
+  border-radius: 9999px;
+  background: white;
+  border: 1px solid rgb(232 233 231);
+  box-shadow: 0 8px 24px rgba(21, 25, 21, 0.18);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgb(21 25 21);
+  transition: transform 160ms cubic-bezier(0, 0, 0.2, 1), background 160ms;
+}
+.ds-theme-toggle:hover {
+  transform: translateY(-2px);
+}
+.ds-theme-toggle svg {
+  width: 22px;
+  height: 22px;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+}
+.ds-theme-toggle .ds-theme-toggle-moon {
+  display: none;
+}
+body.theme-dark .ds-theme-toggle {
+  background: rgb(26 35 30);
+  border-color: rgb(47 61 52);
+  color: rgb(241 245 241);
+}
+body.theme-dark .ds-theme-toggle .ds-theme-toggle-sun {
+  display: none;
+}
+body.theme-dark .ds-theme-toggle .ds-theme-toggle-moon {
+  display: block;
+}
+
+/* ── Body-level dark theme (Faz 2 — neutral coverage) ──────────────── */
+/* Per-DS brand-tinted dark overrides (e.g., button.primary in dark mode = brand.dark color) live in the page's inline <style> block. This generic coverage handles surfaces, text, and borders. */
+body.theme-dark {
+  background: rgb(15 22 18);
+  color: rgb(241 245 241);
+}
+body.theme-dark a { color: rgb(201 211 201); }
+body.theme-dark a:hover { color: rgb(241 245 241); }
+
+/* Sidebar */
+body.theme-dark #ds-sidebar {
+  background: rgb(26 35 30) !important;
+  border-right-color: rgb(47 61 52);
+}
+body.theme-dark #ds-sidebar .ds-sidebar-label { color: rgb(111 124 114); }
+body.theme-dark .ds-nav-link { color: rgb(201 211 201); }
+body.theme-dark .ds-nav-link:hover { background: rgb(36 48 42); color: rgb(241 245 241); }
+body.theme-dark .ds-nav-link.is-active { background: rgb(36 48 42); }
+body.theme-dark .ds-subnav { border-left-color: rgb(47 61 52); }
+body.theme-dark .ds-subnav-link { color: rgb(138 151 141); }
+body.theme-dark .ds-subnav-link:hover { color: rgb(241 245 241); background: rgb(36 48 42); }
+
+/* Component grouping */
+body.theme-dark .ds-component-group { border-top-color: rgb(47 61 52) !important; }
+body.theme-dark .ds-component-group-header p { color: rgb(181 191 181); }
+body.theme-dark .ds-component-group-empty {
+  background: rgb(36 48 42);
+  border-color: rgb(58 77 64);
+  color: rgb(138 151 141);
+}
+
+/* Spec-card pills */
+body.theme-dark .dst-component-card {
+  background: rgb(26 35 30) !important;
+  border-color: rgb(47 61 52) !important;
+}
+body.theme-dark .dst-spec-row { border-top-color: rgb(47 61 52) !important; }
+body.theme-dark .dst-spec-label { color: rgb(138 151 141); }
+body.theme-dark .dst-pill-variant {
+  background: rgb(36 48 42);
+  color: rgb(183 225 184);
+  border-color: rgb(47 61 52);
+}
+body.theme-dark .dst-pill-size,
+body.theme-dark .dst-pill-state {
+  background: rgb(26 35 30);
+  color: rgb(181 191 181);
+  border-color: rgb(47 61 52);
+}
+body.theme-dark .dst-spec-note {
+  background: rgb(36 48 42);
+  color: rgb(181 191 181);
+  border-left-color: rgb(47 61 52);
+}
+body.theme-dark .dst-component-intro { color: rgb(181 191 181); }
+
+/* Lockup pair */
+body.theme-dark .ds-lockup-light .ds-lockup-stage { background: rgb(36 48 42); }
+body.theme-dark .ds-lockup-dark  .ds-lockup-stage { background: rgb(11 15 13); }
+body.theme-dark .ds-lockup-warn {
+  background: rgba(180, 83, 9, 0.16);
+  border-top-color: rgba(180, 83, 9, 0.4);
+  color: rgb(252 211 77);
+}
+
+/* Print-friendly */
+@media print {
+  body {
+    background: white !important;
+  }
+  .dst-no-print {
+    display: none !important;
+  }
+}

@@ -1,0 +1,39 @@
+<!-- Tree — spec card render
+     Source spec: ds-architect-agent/children/components/display.md#tree -->
+<div class="dst-component-card">
+  <div class="flex items-baseline justify-between mb-2">
+    <h3 class="text-lg font-medium text-gray-900">Tree</h3>
+    <p class="text-xs text-gray-500 font-mono">2 variants · 2 sizes · 6 states</p>
+  </div>
+  <p class="dst-component-intro">Hierarchical list. Used for file trees, category trees, organizational hierarchies. Heavier than list — only when nesting matters.</p>
+
+  <div class="dst-spec-row">
+    <span class="dst-spec-label">Variants</span>
+    <div class="dst-spec-values">
+      <span class="dst-spec-pill dst-pill-variant">default · indent-only</span>
+      <span class="dst-spec-pill dst-pill-variant">connected · with guide lines</span>
+    </div>
+  </div>
+
+  <div class="dst-spec-row">
+    <span class="dst-spec-label">Sizes</span>
+    <div class="dst-spec-values">
+      <span class="dst-spec-pill dst-pill-size">sm · 32px row</span>
+      <span class="dst-spec-pill dst-pill-size">md · 40px row</span>
+    </div>
+  </div>
+
+  <div class="dst-spec-row">
+    <span class="dst-spec-label">States</span>
+    <div class="dst-spec-values">
+      <span class="dst-spec-pill dst-pill-state">idle</span>
+      <span class="dst-spec-pill dst-pill-state">hover</span>
+      <span class="dst-spec-pill dst-pill-state">selected</span>
+      <span class="dst-spec-pill dst-pill-state">expanded</span>
+      <span class="dst-spec-pill dst-pill-state">collapsed</span>
+      <span class="dst-spec-pill dst-pill-state">focus</span>
+    </div>
+  </div>
+
+  <div class="dst-spec-note"><strong>Row structure:</strong> chevron (or spacer for leaf) | (optional) icon | label | (optional) trailing meta. <strong>Expand:</strong> chevron rotates 90° (▶ → ▼) when expanded.</div>
+</div>

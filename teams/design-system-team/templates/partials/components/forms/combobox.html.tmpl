@@ -1,0 +1,41 @@
+<!-- Combobox — spec card render
+     Source spec: ds-architect-agent/children/components/forms.md#combobox -->
+<div class="dst-component-card">
+  <div class="flex items-baseline justify-between mb-2">
+    <h3 class="text-lg font-medium text-gray-900">Combobox</h3>
+    <p class="text-xs text-gray-500 font-mono">3 variants · 3 sizes · 6 states</p>
+  </div>
+  <p class="dst-component-intro">Searchable select. Filters as the user types — supports single-pick, multi-pick, or inline-tag-create modes.</p>
+
+  <div class="dst-spec-row">
+    <span class="dst-spec-label">Variants</span>
+    <div class="dst-spec-values">
+      <span class="dst-spec-pill dst-pill-variant">default · single-pick</span>
+      <span class="dst-spec-pill dst-pill-variant">multi · chips below</span>
+      <span class="dst-spec-pill dst-pill-variant">tags · allow-create</span>
+    </div>
+  </div>
+
+  <div class="dst-spec-row">
+    <span class="dst-spec-label">Sizes</span>
+    <div class="dst-spec-values">
+      <span class="dst-spec-pill dst-pill-size">sm · 36px</span>
+      <span class="dst-spec-pill dst-pill-size">md · 44px</span>
+      <span class="dst-spec-pill dst-pill-size">lg · 52px</span>
+    </div>
+  </div>
+
+  <div class="dst-spec-row">
+    <span class="dst-spec-label">States</span>
+    <div class="dst-spec-values">
+      <span class="dst-spec-pill dst-pill-state">idle</span>
+      <span class="dst-spec-pill dst-pill-state">focus</span>
+      <span class="dst-spec-pill dst-pill-state">open</span>
+      <span class="dst-spec-pill dst-pill-state">selecting</span>
+      <span class="dst-spec-pill dst-pill-state">error</span>
+      <span class="dst-spec-pill dst-pill-state">disabled</span>
+    </div>
+  </div>
+
+  <div class="dst-spec-note"><strong>Behavior:</strong> filters as user types · ↑/↓ navigation · Enter selects · Escape closes · Backspace removes last chip in multi mode · empty results: "No matches for {query}" (from <code>voice.samples.empty.searchEmpty</code>).</div>
+</div>

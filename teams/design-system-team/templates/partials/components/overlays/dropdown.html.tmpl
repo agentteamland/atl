@@ -1,0 +1,37 @@
+<!-- Dropdown — spec card render
+     Source spec: ds-architect-agent/children/components/overlays.md#dropdown -->
+<div class="dst-component-card">
+  <div class="flex items-baseline justify-between mb-2">
+    <h3 class="text-lg font-medium text-gray-900">Dropdown</h3>
+    <p class="text-xs text-gray-500 font-mono">3 variants · 2 sizes · 3 states</p>
+  </div>
+  <p class="dst-component-intro">Action menu triggered by a button. Architecturally a popover anchored below a trigger, with menu styling — kept as a separate spec because the trigger ↔ menu pairing is the contract.</p>
+
+  <div class="dst-spec-row">
+    <span class="dst-spec-label">Variants</span>
+    <div class="dst-spec-values">
+      <span class="dst-spec-pill dst-pill-variant">default · button trigger</span>
+      <span class="dst-spec-pill dst-pill-variant">icon · compact</span>
+      <span class="dst-spec-pill dst-pill-variant">split · primary + alt</span>
+    </div>
+  </div>
+
+  <div class="dst-spec-row">
+    <span class="dst-spec-label">Sizes</span>
+    <div class="dst-spec-values">
+      <span class="dst-spec-pill dst-pill-size">sm · 160px</span>
+      <span class="dst-spec-pill dst-pill-size">md · 200px</span>
+    </div>
+  </div>
+
+  <div class="dst-spec-row">
+    <span class="dst-spec-label">States</span>
+    <div class="dst-spec-values">
+      <span class="dst-spec-pill dst-pill-state">closed</span>
+      <span class="dst-spec-pill dst-pill-state">open</span>
+      <span class="dst-spec-pill dst-pill-state">focus</span>
+    </div>
+  </div>
+
+  <div class="dst-spec-note"><strong>Behavior:</strong> Tab cycles between trigger and menu items when open · Escape closes · click outside closes. <strong>Open visual:</strong> trigger gains pressed state; chevron rotates 180°.</div>
+</div>

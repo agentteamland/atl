@@ -1,0 +1,38 @@
+<!-- Badge — spec card render
+     Source spec: ds-architect-agent/children/components/display.md#badge -->
+<div class="dst-component-card">
+  <div class="flex items-baseline justify-between mb-2">
+    <h3 class="text-lg font-medium text-gray-900">Badge</h3>
+    <p class="text-xs text-gray-500 font-mono">6 variants · 2 sizes · 1 state</p>
+  </div>
+  <p class="dst-component-intro">Small status indicator. Distinct from chip (chip is interactive — filter / select; badge is non-interactive — count, status).</p>
+
+  <div class="dst-spec-row">
+    <span class="dst-spec-label">Variants</span>
+    <div class="dst-spec-values">
+      <span class="dst-spec-pill dst-pill-variant">neutral</span>
+      <span class="dst-spec-pill dst-pill-variant">brand</span>
+      <span class="dst-spec-pill dst-pill-variant">success</span>
+      <span class="dst-spec-pill dst-pill-variant">warning</span>
+      <span class="dst-spec-pill dst-pill-variant">error</span>
+      <span class="dst-spec-pill dst-pill-variant">dot · indicator-only</span>
+    </div>
+  </div>
+
+  <div class="dst-spec-row">
+    <span class="dst-spec-label">Sizes</span>
+    <div class="dst-spec-values">
+      <span class="dst-spec-pill dst-pill-size">sm · 16px height</span>
+      <span class="dst-spec-pill dst-pill-size">md · 20px height</span>
+    </div>
+  </div>
+
+  <div class="dst-spec-row">
+    <span class="dst-spec-label">States</span>
+    <div class="dst-spec-values">
+      <span class="dst-spec-pill dst-pill-state">idle</span>
+    </div>
+  </div>
+
+  <div class="dst-spec-note"><strong>Placement:</strong> often anchored to another element (avatar with notification dot, button with count). Anchor offset: 25% inset from top-right corner of the parent.</div>
+</div>

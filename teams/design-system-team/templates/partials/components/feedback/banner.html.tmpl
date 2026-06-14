@@ -1,0 +1,36 @@
+<!-- Banner — spec card render
+     Source spec: ds-architect-agent/children/components/feedback.md#banner -->
+<div class="dst-component-card">
+  <div class="flex items-baseline justify-between mb-2">
+    <h3 class="text-lg font-medium text-gray-900">Banner</h3>
+    <p class="text-xs text-gray-500 font-mono">4 variants · 1 size · 2 states</p>
+  </div>
+  <p class="dst-component-intro">Page-level message that occupies a full row. Used for system status (maintenance windows, upgrade prompts, cookie consent).</p>
+
+  <div class="dst-spec-row">
+    <span class="dst-spec-label">Variants</span>
+    <div class="dst-spec-values">
+      <span class="dst-spec-pill dst-pill-variant">info</span>
+      <span class="dst-spec-pill dst-pill-variant">promo</span>
+      <span class="dst-spec-pill dst-pill-variant">warning</span>
+      <span class="dst-spec-pill dst-pill-variant">critical</span>
+    </div>
+  </div>
+
+  <div class="dst-spec-row">
+    <span class="dst-spec-label">Sizes</span>
+    <div class="dst-spec-values">
+      <span class="dst-spec-pill dst-pill-size">md · 12px padding</span>
+    </div>
+  </div>
+
+  <div class="dst-spec-row">
+    <span class="dst-spec-label">States</span>
+    <div class="dst-spec-values">
+      <span class="dst-spec-pill dst-pill-state">idle</span>
+      <span class="dst-spec-pill dst-pill-state">dismissed</span>
+    </div>
+  </div>
+
+  <div class="dst-spec-note"><strong>Placement:</strong> always pinned to the top of the viewport (above the top nav) or the top of the affected region. Never inline within content. <strong>Structure:</strong> icon | message | (optional) action link | (optional) close icon-button.</div>
+</div>

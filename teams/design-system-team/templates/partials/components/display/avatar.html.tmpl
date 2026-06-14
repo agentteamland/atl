@@ -1,0 +1,39 @@
+<!-- Avatar — spec card render
+     Source spec: ds-architect-agent/children/components/display.md#avatar -->
+<div class="dst-component-card">
+  <div class="flex items-baseline justify-between mb-2">
+    <h3 class="text-lg font-medium text-gray-900">Avatar</h3>
+    <p class="text-xs text-gray-500 font-mono">4 variants · 5 sizes · 1 state</p>
+  </div>
+  <p class="dst-component-intro">Person or entity profile picture, fallback initials, or fallback icon.</p>
+
+  <div class="dst-spec-row">
+    <span class="dst-spec-label">Variants</span>
+    <div class="dst-spec-values">
+      <span class="dst-spec-pill dst-pill-variant">image</span>
+      <span class="dst-spec-pill dst-pill-variant">initials</span>
+      <span class="dst-spec-pill dst-pill-variant">icon</span>
+      <span class="dst-spec-pill dst-pill-variant">group · stacked</span>
+    </div>
+  </div>
+
+  <div class="dst-spec-row">
+    <span class="dst-spec-label">Sizes</span>
+    <div class="dst-spec-values">
+      <span class="dst-spec-pill dst-pill-size">xs · 20px</span>
+      <span class="dst-spec-pill dst-pill-size">sm · 28px</span>
+      <span class="dst-spec-pill dst-pill-size">md · 40px</span>
+      <span class="dst-spec-pill dst-pill-size">lg · 56px</span>
+      <span class="dst-spec-pill dst-pill-size">xl · 80px</span>
+    </div>
+  </div>
+
+  <div class="dst-spec-row">
+    <span class="dst-spec-label">States</span>
+    <div class="dst-spec-values">
+      <span class="dst-spec-pill dst-pill-state">idle</span>
+    </div>
+  </div>
+
+  <div class="dst-spec-note"><strong>Fallback ladder:</strong> image → initials → icon. Never blank circle. <strong>Presence indicator:</strong> optional 8px dot at bottom-right (success / neutral / warning).</div>
+</div>

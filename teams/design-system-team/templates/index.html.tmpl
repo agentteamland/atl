@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ projectName }} — Design Studio</title>
+  <link rel="stylesheet" href="tailwind.min.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+  <!-- Header -->
+  <header class="border-b border-gray-200 bg-white">
+    <div class="max-w-6xl mx-auto px-8 py-6">
+      <div class="flex items-center justify-between">
+        <div>
+          <h1 class="text-3xl font-semibold text-gray-900">{{ projectName }}</h1>
+          <p class="text-sm text-gray-500 mt-1">Design Studio · last updated {{ lastUpdated }}</p>
+        </div>
+        <div class="text-right">
+          <p class="text-xs text-gray-400 uppercase tracking-wider">Powered by</p>
+          <p class="text-sm font-mono text-gray-600">design-system-team</p>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-8 py-12 space-y-16">
+
+    <!-- Design Systems Section -->
+    <section>
+      <div class="flex items-center justify-between mb-6">
+        <h2 class="text-2xl font-semibold text-gray-900">Design Systems</h2>
+        <span class="text-sm text-gray-500">{{ designSystemsCount }} total</span>
+      </div>
+
+      <!-- AGENT FILLS THIS: one card per design system -->
+      <!-- EXAMPLE PATTERN for one DS card:
+        <a href="design-systems/{{DS_NAME}}/detail.html"
+           class="block bg-white rounded-xl border border-gray-200 p-6 hover:shadow-md transition-shadow">
+          <div class="flex items-start justify-between mb-3">
+            <h3 class="text-lg font-semibold text-gray-900">{{DS_DISPLAY_NAME}}</h3>
+            <span class="text-xs font-mono text-gray-400">v{{DS_VERSION}}</span>
+          </div>
+          <p class="text-sm text-gray-600 mb-4">{{DS_DESCRIPTION}}</p>
+          <div class="flex items-center gap-3">
+            <!-- mini palette preview -->
+            <div class="flex -space-x-1">
+              <div class="w-6 h-6 rounded-full border-2 border-white" style="background:{{COLOR1}}"></div>
+              <div class="w-6 h-6 rounded-full border-2 border-white" style="background:{{COLOR2}}"></div>
+              <div class="w-6 h-6 rounded-full border-2 border-white" style="background:{{COLOR3}}"></div>
+            </div>
+            <span class="text-xs text-gray-500">{{DS_PROTOTYPES_COUNT}} prototypes</span>
+          </div>
+        </a>
+      -->
+      <div id="design-systems-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {{ DESIGN_SYSTEMS_CARDS }}
+      </div>
+
+      <!-- Empty state (only emit when designSystemsCount === 0) -->
+      <!-- EXAMPLE:
+        <div class="bg-white border-2 border-dashed border-gray-200 rounded-xl p-12 text-center">
+          <p class="text-gray-500 mb-2">No design systems yet</p>
+          <p class="text-sm text-gray-400 font-mono">Run /dst-new-ds &lt;name&gt; in your Claude Code chat</p>
+        </div>
+      -->
+    </section>
+
+    <!-- Prototypes Section -->
+    <section>
+      <div class="flex items-center justify-between mb-6">
+        <h2 class="text-2xl font-semibold text-gray-900">Prototypes</h2>
+        <span class="text-sm text-gray-500">{{ prototypesCount }} total</span>
+      </div>
+
+      <!-- AGENT FILLS THIS: one row per prototype, grouped by DS -->
+      <!-- EXAMPLE PATTERN for one prototype card:
+        <a href="prototypes/{{PROTOTYPE_NAME}}/preview.html"
+           class="block bg-white rounded-xl border border-gray-200 p-4 hover:shadow-md transition-shadow">
+          <div class="aspect-video bg-gray-100 rounded-lg mb-3 flex items-center justify-center text-gray-400 text-sm">
+            <!-- thumbnail or first frame goes here later -->
+            preview
+          </div>
+          <h4 class="font-semibold text-gray-900">{{PROTOTYPE_DISPLAY_NAME}}</h4>
+          <p class="text-xs text-gray-500 mt-1">{{DS_NAME}} · updated {{LAST_MODIFIED}}</p>
+        </a>
+      -->
+      <div id="prototypes-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {{ PROTOTYPES_CARDS }}
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="border-t border-gray-200 mt-16">
+    <div class="max-w-6xl mx-auto px-8 py-6 text-center text-sm text-gray-500">
+      <p>Manage with <code class="bg-gray-100 px-2 py-1 rounded font-mono text-xs">/dst</code> skills in your Claude Code chat. Refresh this page after changes.</p>
+    </div>
+  </footer>
+
+</body>
+</html>

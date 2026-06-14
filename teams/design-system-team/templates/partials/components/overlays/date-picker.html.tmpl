@@ -1,0 +1,39 @@
+<!-- Date-picker — spec card render
+     Source spec: ds-architect-agent/children/components/overlays.md#date-picker -->
+<div class="dst-component-card">
+  <div class="flex items-baseline justify-between mb-2">
+    <h3 class="text-lg font-medium text-gray-900">Date-picker</h3>
+    <p class="text-xs text-gray-500 font-mono">3 variants · 2 sizes · 5 states</p>
+  </div>
+  <p class="dst-component-intro">Calendar-style date selection. Single date, range, or multi-select.</p>
+
+  <div class="dst-spec-row">
+    <span class="dst-spec-label">Variants</span>
+    <div class="dst-spec-values">
+      <span class="dst-spec-pill dst-pill-variant">single · one date</span>
+      <span class="dst-spec-pill dst-pill-variant">range · start + end</span>
+      <span class="dst-spec-pill dst-pill-variant">multi · non-contiguous</span>
+    </div>
+  </div>
+
+  <div class="dst-spec-row">
+    <span class="dst-spec-label">Sizes</span>
+    <div class="dst-spec-values">
+      <span class="dst-spec-pill dst-pill-size">sm · 32px cell</span>
+      <span class="dst-spec-pill dst-pill-size">md · 40px cell</span>
+    </div>
+  </div>
+
+  <div class="dst-spec-row">
+    <span class="dst-spec-label">States</span>
+    <div class="dst-spec-values">
+      <span class="dst-spec-pill dst-pill-state">closed</span>
+      <span class="dst-spec-pill dst-pill-state">open</span>
+      <span class="dst-spec-pill dst-pill-state">selecting</span>
+      <span class="dst-spec-pill dst-pill-state">selected</span>
+      <span class="dst-spec-pill dst-pill-state">disabled</span>
+    </div>
+  </div>
+
+  <div class="dst-spec-note"><strong>Behavior:</strong> popover anchored below select-styled trigger · arrow keys navigate days, Enter selects · range mode shows brand-tinted preview between start and hovered end. <strong>minDate / maxDate</strong> grey out unavailable days.</div>
+</div>

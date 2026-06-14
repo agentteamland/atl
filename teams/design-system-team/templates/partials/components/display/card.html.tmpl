@@ -1,0 +1,56 @@
+<!-- Card — mini-UI render
+     Source spec: ds-architect-agent/children/components/display.md#card
+     Per-DS: pv-card-* classes defined in detail.html inline <style> block. -->
+<div class="dst-component-card">
+  <div class="flex items-baseline justify-between mb-2">
+    <h3 class="text-lg font-medium text-gray-900">Card</h3>
+    <p class="text-xs text-gray-500 font-mono">4 variants · 3 sizes · 4 states</p>
+  </div>
+  <p class="dst-component-intro">Container for grouped content. The most-used surface in a typical product UI.</p>
+
+  <div class="dst-spec-row">
+    <span class="dst-spec-label">Variants</span>
+    <div class="dst-spec-values" style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+      <div class="pv-card pv-card-elevated" style="padding:16px;">
+        <p class="text-xs uppercase tracking-wider font-mono mb-2" style="color:#5B5F58;">elevated</p>
+        <p class="font-medium text-gray-900">Default surface</p>
+        <p class="text-sm text-gray-500 mt-1">Soft shadow, no border.</p>
+      </div>
+      <div class="pv-card pv-card-outlined" style="padding:16px;">
+        <p class="text-xs uppercase tracking-wider font-mono mb-2" style="color:#5B5F58;">outlined</p>
+        <p class="font-medium text-gray-900">Dense layout</p>
+        <p class="text-sm text-gray-500 mt-1">Border only, no shadow noise.</p>
+      </div>
+      <div class="pv-card pv-card-filled" style="padding:16px;">
+        <p class="text-xs uppercase tracking-wider font-mono mb-2" style="color:#5B5F58;">filled</p>
+        <p class="font-medium text-gray-900">Subtle grouping</p>
+        <p class="text-sm text-gray-500 mt-1">Inside a larger card or sheet.</p>
+      </div>
+      <div class="pv-card pv-card-interactive" style="padding:16px;">
+        <p class="text-xs uppercase tracking-wider font-mono mb-2" style="color:#5B5F58;">interactive</p>
+        <p class="font-medium text-gray-900">Tappable list item</p>
+        <p class="text-sm text-gray-500 mt-1">Hover lifts; click presses.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="dst-spec-row">
+    <span class="dst-spec-label">Sizes</span>
+    <div class="dst-spec-values" style="display:flex; gap:12px; align-items:flex-start;">
+      <div class="pv-card pv-card-outlined" style="padding:12px; flex:1;">
+        <p class="text-xs font-mono" style="color:#5B5F58;">compact · 12px</p>
+        <p class="text-sm font-medium mt-1">Dense rows</p>
+      </div>
+      <div class="pv-card pv-card-outlined" style="padding:20px; flex:1;">
+        <p class="text-xs font-mono" style="color:#5B5F58;">default · 20px</p>
+        <p class="text-sm font-medium mt-1">Standard card</p>
+      </div>
+      <div class="pv-card pv-card-outlined" style="padding:28px; flex:1;">
+        <p class="text-xs font-mono" style="color:#5B5F58;">spacious · 28px</p>
+        <p class="text-sm font-medium mt-1">Hero card</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="dst-spec-note"><strong>Structure:</strong> (optional) header | body | (optional) actions row (right-aligned). Interactive variant uses elevation transition (low → medium) + translateY(-1px) on hover.</div>
+</div>

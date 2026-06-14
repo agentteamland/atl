@@ -1,0 +1,38 @@
+<!-- Gauge — spec card render
+     Source spec: ds-architect-agent/children/components/charts.md#gauge -->
+<div class="dst-component-card">
+  <div class="flex items-baseline justify-between mb-2">
+    <h3 class="text-lg font-medium text-gray-900">Gauge</h3>
+    <p class="text-xs text-gray-500 font-mono">3 variants · 3 sizes · 3 states</p>
+  </div>
+  <p class="dst-component-intro">Radial progress / KPI dial. Distinct from <code>progress.circular</code> — gauge shows a value within a min-max range; progress shows movement toward 100%.</p>
+
+  <div class="dst-spec-row">
+    <span class="dst-spec-label">Variants</span>
+    <div class="dst-spec-values">
+      <span class="dst-spec-pill dst-pill-variant">default · 360° KPI dial</span>
+      <span class="dst-spec-pill dst-pill-variant">arc · 180° speedometer</span>
+      <span class="dst-spec-pill dst-pill-variant">ring · thin no-label</span>
+    </div>
+  </div>
+
+  <div class="dst-spec-row">
+    <span class="dst-spec-label">Sizes</span>
+    <div class="dst-spec-values">
+      <span class="dst-spec-pill dst-pill-size">sm · 80px</span>
+      <span class="dst-spec-pill dst-pill-size">md · 120px</span>
+      <span class="dst-spec-pill dst-pill-size">lg · 160px</span>
+    </div>
+  </div>
+
+  <div class="dst-spec-row">
+    <span class="dst-spec-label">States</span>
+    <div class="dst-spec-values">
+      <span class="dst-spec-pill dst-pill-state">idle</span>
+      <span class="dst-spec-pill dst-pill-state">loading</span>
+      <span class="dst-spec-pill dst-pill-state">animating · 0 → value</span>
+    </div>
+  </div>
+
+  <div class="dst-spec-note"><strong>colorByValue rule:</strong> optional prop maps value ranges to colors (e.g., red &lt;30%, yellow 30-70%, green &gt;70%). Without it, fill stays brand.primary regardless of value. <strong>Animation:</strong> on mount, fill animates 0 → declared value (decelerate, slow).</div>
+</div>
