@@ -19,6 +19,13 @@ var sessionStartCmd = &cobra.Command{
 		"so it stays quiet unless there's something worth surfacing.\n\n" +
 		"Never fails: a hook must not block the session.",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// Refresh the platform core (rules + skills) into the global layer — it
+		// ships in the binary, so this keeps ~/.claude in lockstep with the binary
+		// version. Non-blocking; a hook must never fail.
+		if n, _ := reflectCore(); n > 0 {
+			fmt.Printf("atl: refreshed %d core file(s)\n", n)
+		}
+
 		st, project, err := openQueue()
 		if err != nil {
 			return nil // non-blocking: never fail a hook

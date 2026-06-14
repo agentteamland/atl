@@ -38,6 +38,10 @@ atl install --project "$TEAM" || bad "project install errored"
 [ -d "$HOME/proj/.claude/agents" ] && ok "project agents reflected" || bad "project agents missing"
 ls "$HOME/.atl/installed/"*.json      >/dev/null 2>&1 && ok "global manifest written"  || bad "global manifest missing"
 ls "$HOME/proj/.atl/installed/"*.json >/dev/null 2>&1 && ok "project manifest written" || bad "project manifest missing"
+# core (platform rules + skills) ships in the binary and reflects to the global
+# layer on install
+[ -f "$HOME/.claude/rules/communication-style.md" ] && ok "core rules reflected to global"  || bad "core rules missing"
+[ -f "$HOME/.claude/skills/drain/SKILL.md" ]        && ok "core skills reflected to global" || bad "core skills missing"
 
 # Pick a project agent file to evolve (relative to the .claude dir).
 AGENT=$(find "$HOME/proj/.claude/agents" -name '*.md' | head -1)
