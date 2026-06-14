@@ -15,7 +15,7 @@ func TestParse(t *testing.T) {
 		},
 		{
 			name: "multi-line profile-fact",
-			in: "text\n<!-- profile-fact:\n  entity: ahmet\n  field: traits.fears\n-->\nmore",
+			in:   "text\n<!-- profile-fact:\n  entity: ahmet\n  field: traits.fears\n-->\nmore",
 			want: []Marker{{Channel: "profile-fact", Body: "entity: ahmet\n  field: traits.fears"}},
 		},
 		{

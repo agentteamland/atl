@@ -45,8 +45,8 @@ func TestReflectWithFanout(t *testing.T) {
 	w(src, "agents/b/edited.md", "NEW-B")
 	w(src, "agents/c/brandnew.md", "C")
 	// installed copy
-	w(claude, "agents/a/unchanged.md", "OLD-A")   // == baseline → refresh
-	w(claude, "agents/b/edited.md", "USER-EDIT")  // != baseline → preserve
+	w(claude, "agents/a/unchanged.md", "OLD-A")  // == baseline → refresh
+	w(claude, "agents/b/edited.md", "USER-EDIT") // != baseline → preserve
 	baseline := map[string]string{
 		"agents/a/unchanged.md": fanout.Hash([]byte("OLD-A")),
 		"agents/b/edited.md":    fanout.Hash([]byte("OLD-B")),
