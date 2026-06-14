@@ -5,19 +5,33 @@
 // the handle is the GitHub owner, so repo ownership IS authorship — to a source
 // (a standalone repo, or a subpath inside the atl monorepo for first-party
 // teams), plus the publisher's default scope and an optional verified badge.
-// v1 ships an embedded seed; a later step fetches a fresher index over the
-// network without changing this resolve surface.
+//
+// Resolution is offline-first: a binary ships an embedded seed, a throttled
+// network refresh keeps a ~/.atl/index.json cache fresh out of band, and Resolve
+// prefers the cache but always falls back to the seed — so install never depends
+// on the network being up.
 package index
 
 import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
+	"time"
 )
 
 //go:embed index.json
 var seedJSON []byte
+
+// RawURL is where the published index lives. Until CI generates a dedicated
+// artifact, it's the embedded seed's own repo path (public, so auth-free).
+const RawURL = "https://raw.githubusercontent.com/agentteamland/atl/main/cli/internal/index/index.json"
+
+var httpClient = &http.Client{Timeout: 30 * time.Second}
 
 // Source locates a team's files. Subpath is "" for a standalone repo (the
 // third-party idiom); for a first-party team it points inside the atl monorepo.
@@ -61,6 +75,73 @@ func Load(b []byte) (*Index, error) {
 // Seed returns the embedded index shipped with this binary.
 func Seed() (*Index, error) {
 	return Load(seedJSON)
+}
+
+// CachePath returns ~/.atl/index.json — the network-refreshed index cache.
+func CachePath() (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(home, ".atl", "index.json"), nil
+}
+
+// Resolve returns the best index available WITHOUT touching the network: the
+// refreshed cache if present and non-empty, otherwise the embedded seed. Install
+// and update resolve handles through this; RefreshCache keeps the cache fresh
+// out of band (throttled), so a stale or absent cache degrades to the seed
+// rather than failing.
+func Resolve() (*Index, error) {
+	if path, err := CachePath(); err == nil {
+		if b, rerr := os.ReadFile(path); rerr == nil {
+			if ix, lerr := Load(b); lerr == nil && len(ix.Teams) > 0 {
+				return ix, nil
+			}
+		}
+	}
+	return Seed()
+}
+
+// Fetch downloads and parses an index from url.
+func Fetch(url string) (*Index, error) {
+	resp, err := httpClient.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("fetch index: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("fetch index: HTTP %d", resp.StatusCode)
+	}
+	b, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	return Load(b)
+}
+
+// RefreshCache fetches the index from url and writes it to CachePath atomically.
+// Best-effort: callers treat a failure as non-fatal (Resolve falls back).
+func RefreshCache(url string) error {
+	ix, err := Fetch(url)
+	if err != nil {
+		return err
+	}
+	path, err := CachePath()
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	b, err := json.MarshalIndent(ix, "", "  ")
+	if err != nil {
+		return err
+	}
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, append(b, '\n'), 0o644); err != nil {
+		return err
+	}
+	return os.Rename(tmp, path)
 }
 
 // Lookup finds the entry for "<handle>/<name>".
