@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/agentteamland/atl/cli/internal/generation"
 	"github.com/agentteamland/atl/cli/internal/index"
 	"github.com/agentteamland/atl/cli/internal/manifest"
 	"github.com/agentteamland/atl/cli/internal/scope"
@@ -80,6 +81,9 @@ var installCmd = &cobra.Command{
 		for _, target := range targets {
 			if err := installAt(target, projectRoot, handle, name, entry, tm, srcDir); err != nil {
 				return err
+			}
+			if target == scope.Global {
+				_ = generation.Bump() // global layer changed → other projects fan out
 			}
 		}
 
