@@ -33,6 +33,8 @@ func init() {
 		installCmd,
 		updateCmd,
 		promoteCmd,
+		pinCmd,
+		unpinCmd,
 		publishCmd,
 		learningsCmd,
 		tickCmd,
