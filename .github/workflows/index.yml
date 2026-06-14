@@ -1,0 +1,37 @@
+name: index
+
+on:
+  schedule:
+    - cron: "17 * * * *" # hourly; topic-discovery is eventual by design
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build index from the atl-team topic
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash .github/scripts/build-index.sh
+      - name: Commit if the team set changed
+        run: |
+          # Compare the teams list only — a new generatedAt alone must not trigger
+          # an empty commit every run.
+          old="$(git show HEAD:cli/internal/index/index.json | jq -S '.teams' 2>/dev/null || echo null)"
+          new="$(jq -S '.teams' cli/internal/index/index.json)"
+          if [ "$old" != "$new" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add cli/internal/index/index.json
+            git commit -m "chore(index): regenerate from atl-team topic"
+            git push
+          else
+            echo "index teams unchanged"
+          fi
