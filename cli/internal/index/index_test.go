@@ -1,6 +1,11 @@
 package index
 
-import "testing"
+import (
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"testing"
+)
 
 func TestSeedLoads(t *testing.T) {
 	ix, err := Seed()
@@ -56,4 +61,75 @@ func TestParseRef(t *testing.T) {
 			t.Errorf("ParseRef(%q) expected error, got nil", bad)
 		}
 	}
+}
+
+func TestFetch(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"schemaVersion":1,"teams":[{"handle":"h","name":"n","source":{"repo":"h/n","ref":"v1"}}]}`))
+	}))
+	defer srv.Close()
+	ix, err := Fetch(srv.URL)
+	if err != nil {
+		t.Fatalf("Fetch: %v", err)
+	}
+	if len(ix.Teams) != 1 || ix.Teams[0].Ref() != "h/n" {
+		t.Errorf("fetched index = %+v", ix.Teams)
+	}
+}
+
+func TestFetchHTTPError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+	if _, err := Fetch(srv.URL); err == nil {
+		t.Error("expected error on HTTP 404")
+	}
+}
+
+func TestResolveFallsBackToSeed(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	// no cache present → embedded seed
+	ix, err := Resolve()
+	if err != nil {
+		t.Fatalf("Resolve: %v", err)
+	}
+	if len(ix.Teams) < 2 {
+		t.Errorf("expected seed (>=2 teams), got %d", len(ix.Teams))
+	}
+}
+
+func TestRefreshCacheThenResolveUsesCache(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"schemaVersion":1,"teams":[{"handle":"only","name":"cached","source":{"repo":"only/cached","ref":"v9"}}]}`))
+	}))
+	defer srv.Close()
+
+	if err := RefreshCache(srv.URL); err != nil {
+		t.Fatalf("RefreshCache: %v", err)
+	}
+	if _, err := os.Stat(mustCachePath(t)); err != nil {
+		t.Fatalf("cache not written: %v", err)
+	}
+	ix, err := Resolve()
+	if err != nil {
+		t.Fatalf("Resolve: %v", err)
+	}
+	if len(ix.Teams) != 1 || ix.Teams[0].Ref() != "only/cached" {
+		t.Errorf("Resolve should use the cache, got %+v", ix.Teams)
+	}
+}
+
+func mustCachePath(t *testing.T) string {
+	t.Helper()
+	p, err := CachePath()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return p
 }

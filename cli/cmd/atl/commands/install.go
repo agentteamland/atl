@@ -45,7 +45,7 @@ var installCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		ix, err := index.Seed()
+		ix, err := index.Resolve()
 		if err != nil {
 			return err
 		}

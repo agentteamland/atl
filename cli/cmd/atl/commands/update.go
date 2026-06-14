@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/agentteamland/atl/cli/internal/fanout"
+	"github.com/agentteamland/atl/cli/internal/index"
 	"github.com/agentteamland/atl/cli/internal/manifest"
 	"github.com/agentteamland/atl/cli/internal/scope"
 	"github.com/agentteamland/atl/cli/internal/teampkg"
@@ -24,6 +25,9 @@ var updateCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+		// Best-effort network refresh of the index cache; Resolve falls back to
+		// cache/embedded on failure, so being offline is fine.
+		_ = index.RefreshCache(index.RawURL)
 		refreshed, err := fanOut(projectRoot)
 		if err != nil {
 			return err
