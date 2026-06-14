@@ -1,0 +1,91 @@
+version: 2
+
+project_name: atl
+
+builds:
+  - id: atl
+    dir: cli # the Go module lives in the cli/ subdir of the monorepo
+    main: ./cmd/atl
+    binary: atl
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X github.com/agentteamland/atl/cli/internal/buildinfo.Version={{.Version}}
+      - -X github.com/agentteamland/atl/cli/internal/buildinfo.Commit={{.Commit}}
+      - -X github.com/agentteamland/atl/cli/internal/buildinfo.Date={{.Date}}
+
+archives:
+  - id: default
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files:
+      - README.md
+      - LICENSE
+
+checksum:
+  name_template: "{{ .ProjectName }}_{{ .Version }}_checksums.txt"
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+# No brew / scoop / winget blocks: v2 distributes via GitHub Releases +
+# install.sh / install.ps1 only (decision doc: atl-v2, distribution). goreleaser
+# stays as the cross-platform builder; the package-manager channels are retired.
+
+changelog:
+  sort: asc
+  use: github
+  groups:
+    - title: Features
+      regexp: "^.*feat[(\\w)]*:+.*$"
+      order: 0
+    - title: Bug fixes
+      regexp: "^.*fix[(\\w)]*:+.*$"
+      order: 1
+    - title: Documentation
+      regexp: "^.*docs[(\\w)]*:+.*$"
+      order: 2
+    - title: Others
+      order: 999
+
+release:
+  github:
+    owner: agentteamland
+    name: atl
+  draft: false
+  prerelease: auto
+  header: |
+    ## atl {{.Version}}
+
+    AgentTeamLand — the agent-team platform CLI.
+
+    ### Install (macOS / Linux)
+
+    ```bash
+    curl -fsSL https://raw.githubusercontent.com/agentteamland/atl/main/scripts/install.sh | sh
+    ```
+
+    ### Install (Windows, PowerShell)
+
+    ```powershell
+    irm https://raw.githubusercontent.com/agentteamland/atl/main/scripts/install.ps1 | iex
+    ```
+
+    ### Manual
+
+    Download the archive for your OS/arch below, extract `atl`, and put it on your `PATH`.
+  footer: |
+    ---
+
+    **Full changelog:** https://github.com/agentteamland/atl/compare/{{.PreviousTag}}...{{.Tag}}

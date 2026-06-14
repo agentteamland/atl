@@ -4,18 +4,15 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/agentteamland/atl/cli/internal/buildinfo"
 	"github.com/spf13/cobra"
 )
-
-// version is the platform version. v2 is pre-release until feature-parity
-// cutover (decision doc, migration step 5).
-const version = "2.0.0-dev"
 
 var rootCmd = &cobra.Command{
 	Use:           "atl",
 	Short:         "AgentTeamLand — the agent-team platform CLI",
 	Long:          "atl is the AgentTeamLand platform CLI: install teams, keep them updated,\ncirculate the gains your agents learn, and let the platform run itself in the\nbackground so you can focus on your project.",
-	Version:       version,
+	Version:       buildinfo.Version,
 	SilenceErrors: true,
 	SilenceUsage:  true,
 }
