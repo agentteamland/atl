@@ -1,0 +1,37 @@
+<!-- Spinner — spec card render
+     Source spec: ds-architect-agent/children/components/feedback.md#spinner -->
+<div class="dst-component-card">
+  <div class="flex items-baseline justify-between mb-2">
+    <h3 class="text-lg font-medium text-gray-900">Spinner</h3>
+    <p class="text-xs text-gray-500 font-mono">2 variants · 4 sizes · 2 states</p>
+  </div>
+  <p class="dst-component-intro">Indeterminate loader for short waits (&lt; 3s). For longer waits, prefer skeleton (sets expectations) or progress (sets measurable expectations).</p>
+
+  <div class="dst-spec-row">
+    <span class="dst-spec-label">Variants</span>
+    <div class="dst-spec-values">
+      <span class="dst-spec-pill dst-pill-variant">default</span>
+      <span class="dst-spec-pill dst-pill-variant">inverse</span>
+    </div>
+  </div>
+
+  <div class="dst-spec-row">
+    <span class="dst-spec-label">Sizes</span>
+    <div class="dst-spec-values">
+      <span class="dst-spec-pill dst-pill-size">xs · 12px</span>
+      <span class="dst-spec-pill dst-pill-size">sm · 16px</span>
+      <span class="dst-spec-pill dst-pill-size">md · 20px</span>
+      <span class="dst-spec-pill dst-pill-size">lg · 32px</span>
+    </div>
+  </div>
+
+  <div class="dst-spec-row">
+    <span class="dst-spec-label">States</span>
+    <div class="dst-spec-values">
+      <span class="dst-spec-pill dst-pill-state">spinning</span>
+      <span class="dst-spec-pill dst-pill-state">static</span>
+    </div>
+  </div>
+
+  <div class="dst-spec-note"><strong>Animation:</strong> <code>spin 0.8s linear infinite</code>. <strong>Inverse variant:</strong> for use on colored surfaces (inside primary button). <strong>Reduced motion:</strong> spinner replaced with static indeterminate progress dots fallback.</div>
+</div>

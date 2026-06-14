@@ -1,0 +1,40 @@
+<!-- Modal — mini-UI render
+     Source spec: ds-architect-agent/children/components/overlays.md#modal
+     Per-DS: pv-modal-* classes defined in detail.html inline <style> block. -->
+<div class="dst-component-card">
+  <div class="flex items-baseline justify-between mb-2">
+    <h3 class="text-lg font-medium text-gray-900">Modal</h3>
+    <p class="text-xs text-gray-500 font-mono">2 variants · 5 sizes · 4 states</p>
+  </div>
+  <p class="dst-component-intro">Centered, blocking dialog. Used for confirmations, focused tasks, content that demands attention.</p>
+
+  <div class="dst-spec-row">
+    <span class="dst-spec-label">Preview</span>
+    <div class="dst-spec-values" style="display:block;">
+      <div style="position:relative; height:240px; background:rgba(21,25,21,0.48); border-radius:12px; padding:24px; display:flex; align-items:center; justify-content:center;">
+        <div class="pv-modal" style="background:white; border-radius:16px; padding:24px; width:100%; max-width:360px; box-shadow:0 24px 48px rgba(15,23,42,0.32);">
+          <h4 class="text-base font-semibold text-gray-900 mb-2">Delete this list?</h4>
+          <p class="text-sm text-gray-600 mb-5">This list and the 12 places inside it will be removed. This action can't be undone.</p>
+          <div style="display:flex; justify-content:flex-end; gap:8px;">
+            <button class="pv-btn pv-btn-ghost pv-btn-sm">Cancel</button>
+            <button class="pv-btn pv-btn-danger pv-btn-sm">Delete</button>
+          </div>
+        </div>
+      </div>
+      <p class="text-xs text-gray-500 mt-3 font-mono">scrim · centered · md size · 24px padding</p>
+    </div>
+  </div>
+
+  <div class="dst-spec-row">
+    <span class="dst-spec-label">Sizes</span>
+    <div class="dst-spec-values">
+      <span class="dst-spec-pill dst-pill-size">sm · 360px</span>
+      <span class="dst-spec-pill dst-pill-size">md · 480px</span>
+      <span class="dst-spec-pill dst-pill-size">lg · 640px</span>
+      <span class="dst-spec-pill dst-pill-size">xl · 800px</span>
+      <span class="dst-spec-pill dst-pill-size">full · 100vw-64px</span>
+    </div>
+  </div>
+
+  <div class="dst-spec-note"><strong>Behavior:</strong> scrim click + Escape close (unless <code>dismissible: false</code>) · focus trap mandatory · body scroll locked while open · first interactive element focused on open.</div>
+</div>

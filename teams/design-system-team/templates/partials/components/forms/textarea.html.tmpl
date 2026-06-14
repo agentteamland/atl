@@ -1,0 +1,39 @@
+<!-- Textarea — spec card render
+     Source spec: ds-architect-agent/children/components/forms.md#textarea -->
+<div class="dst-component-card">
+  <div class="flex items-baseline justify-between mb-2">
+    <h3 class="text-lg font-medium text-gray-900">Textarea</h3>
+    <p class="text-xs text-gray-500 font-mono">2 variants · 3 sizes · 5 states</p>
+  </div>
+  <p class="dst-component-intro">Multi-line text field. Uses input's variant tokens; adds minRows / maxRows and resize behavior.</p>
+
+  <div class="dst-spec-row">
+    <span class="dst-spec-label">Variants</span>
+    <div class="dst-spec-values">
+      <span class="dst-spec-pill dst-pill-variant">default</span>
+      <span class="dst-spec-pill dst-pill-variant">filled</span>
+    </div>
+  </div>
+
+  <div class="dst-spec-row">
+    <span class="dst-spec-label">Sizes</span>
+    <div class="dst-spec-values">
+      <span class="dst-spec-pill dst-pill-size">sm · 2-4 rows</span>
+      <span class="dst-spec-pill dst-pill-size">md · 3-6 rows</span>
+      <span class="dst-spec-pill dst-pill-size">lg · 5-10 rows</span>
+    </div>
+  </div>
+
+  <div class="dst-spec-row">
+    <span class="dst-spec-label">States</span>
+    <div class="dst-spec-values">
+      <span class="dst-spec-pill dst-pill-state">idle</span>
+      <span class="dst-spec-pill dst-pill-state">focus</span>
+      <span class="dst-spec-pill dst-pill-state">filled</span>
+      <span class="dst-spec-pill dst-pill-state">error</span>
+      <span class="dst-spec-pill dst-pill-state">disabled</span>
+    </div>
+  </div>
+
+  <div class="dst-spec-note"><strong>Resize:</strong> vertical · <strong>Character counter:</strong> optional — show when <code>maxLength</code> enforced; format <code>{used}/{max}</code>; warn at 90%.</div>
+</div>

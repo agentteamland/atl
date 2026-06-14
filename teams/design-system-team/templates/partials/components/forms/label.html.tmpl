@@ -1,0 +1,35 @@
+<!-- Label — spec card render
+     Source spec: ds-architect-agent/children/components/forms.md#label -->
+<div class="dst-component-card">
+  <div class="flex items-baseline justify-between mb-2">
+    <h3 class="text-lg font-medium text-gray-900">Label</h3>
+    <p class="text-xs text-gray-500 font-mono">3 variants · 1 size · 2 states</p>
+  </div>
+  <p class="dst-component-intro">Form-field label primitive. Not interactive on its own; pairs with input / select / checkbox / etc.</p>
+
+  <div class="dst-spec-row">
+    <span class="dst-spec-label">Variants</span>
+    <div class="dst-spec-values">
+      <span class="dst-spec-pill dst-pill-variant">default</span>
+      <span class="dst-spec-pill dst-pill-variant">inline</span>
+      <span class="dst-spec-pill dst-pill-variant">required</span>
+    </div>
+  </div>
+
+  <div class="dst-spec-row">
+    <span class="dst-spec-label">Sizes</span>
+    <div class="dst-spec-values">
+      <span class="dst-spec-pill dst-pill-size">default · 20px line, 6px marginBottom</span>
+    </div>
+  </div>
+
+  <div class="dst-spec-row">
+    <span class="dst-spec-label">States</span>
+    <div class="dst-spec-values">
+      <span class="dst-spec-pill dst-pill-state">idle</span>
+      <span class="dst-spec-pill dst-pill-state">disabled</span>
+    </div>
+  </div>
+
+  <div class="dst-spec-note"><strong>Helper pairing:</strong> helper text sits below the field (4px gap), uses caption type, color <code>text.muted</code> (or <code>text.error</code> when state=error).</div>
+</div>

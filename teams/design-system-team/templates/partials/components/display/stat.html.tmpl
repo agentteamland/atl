@@ -1,0 +1,37 @@
+<!-- Stat (KPI / metric card) — spec card render
+     Source spec: ds-architect-agent/children/components/display.md#stat -->
+<div class="dst-component-card">
+  <div class="flex items-baseline justify-between mb-2">
+    <h3 class="text-lg font-medium text-gray-900">Stat</h3>
+    <p class="text-xs text-gray-500 font-mono">3 variants · 3 sizes · 2 states</p>
+  </div>
+  <p class="dst-component-intro">KPI / metric card. Numeric value + label, with optional delta indicator and / or sparkline.</p>
+
+  <div class="dst-spec-row">
+    <span class="dst-spec-label">Variants</span>
+    <div class="dst-spec-values">
+      <span class="dst-spec-pill dst-pill-variant">default · label + value</span>
+      <span class="dst-spec-pill dst-pill-variant">withDelta · arrow + %</span>
+      <span class="dst-spec-pill dst-pill-variant">withSparkline · mini-chart</span>
+    </div>
+  </div>
+
+  <div class="dst-spec-row">
+    <span class="dst-spec-label">Sizes</span>
+    <div class="dst-spec-values">
+      <span class="dst-spec-pill dst-pill-size">sm · 96px tall</span>
+      <span class="dst-spec-pill dst-pill-size">md · 128px tall</span>
+      <span class="dst-spec-pill dst-pill-size">lg · 160px tall</span>
+    </div>
+  </div>
+
+  <div class="dst-spec-row">
+    <span class="dst-spec-label">States</span>
+    <div class="dst-spec-values">
+      <span class="dst-spec-pill dst-pill-state">idle</span>
+      <span class="dst-spec-pill dst-pill-state">loading</span>
+    </div>
+  </div>
+
+  <div class="dst-spec-note"><strong>Delta colors:</strong> ↑ green (success), ↓ red (error), → muted (neutral). <strong>Sparkline variant:</strong> uses <code>charts.sparkline</code>. <strong>Loading:</strong> skeleton matches shape of value + delta + sparkline.</div>
+</div>

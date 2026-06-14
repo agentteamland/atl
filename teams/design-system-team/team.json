@@ -1,0 +1,87 @@
+{
+  "schemaVersion": 1,
+  "name": "design-system-team",
+  "version": "0.8.1",
+  "description": "Local file-based design systems + UI prototypes inside any project. /dst skills produce ds.json state and Tailwind-rendered HTML pages under .dst/.",
+  "author": {
+    "name": "AgentTeamLand",
+    "url": "https://github.com/agentteamland"
+  },
+  "license": "MIT",
+  "keywords": [
+    "design-system",
+    "prototyping",
+    "ui",
+    "tailwind",
+    "tokens",
+    "claude-design-alternative"
+  ],
+  "repository": "https://github.com/agentteamland/design-system-team",
+  "homepage": "https://github.com/agentteamland",
+  "agents": [
+    {
+      "name": "ds-architect-agent",
+      "description": "Design system architect \u2014 comprehensive token/brand/component/state-recipe/pattern/page-template definition. Reads project context, produces ds.json + rendered HTML detail pages."
+    },
+    {
+      "name": "prototype-agent",
+      "description": "Screen prototype designer \u2014 produces token-aligned, multi-state HTML prototypes within a chosen design system. Token-fidelity, state coverage, accessibility \u2014 non-negotiable."
+    }
+  ],
+  "skills": [
+    {
+      "name": "dst-init",
+      "description": "/dst-init \u2014 bootstrap or refresh .dst/ in the current project. Self-healing: fresh projects get a full init; existing projects re-render templates+CSS+HTML from preserved JSON state."
+    },
+    {
+      "name": "dst-new-ds",
+      "description": "/dst-new-ds <name> \u2014 create a new design system (interactive Q&A \u2192 ds.json + detail.html). Honors any existing project tokens."
+    },
+    {
+      "name": "dst-edit-ds",
+      "description": "/dst-edit-ds <name> \"<change>\" \u2014 apply a textual change to an existing DS; cascades to linked prototypes if structural."
+    },
+    {
+      "name": "dst-delete-ds",
+      "description": "/dst-delete-ds <name> \u2014 remove a design system; refuses if prototypes depend on it (use --force to orphan them)."
+    },
+    {
+      "name": "dst-new-prototype",
+      "description": "/dst-new-prototype --ds <ds-name> <prototype-name> \u2014 create a screen prototype linked to a DS; renders all applicable states as labeled frames."
+    },
+    {
+      "name": "dst-edit-prototype",
+      "description": "/dst-edit-prototype <name> \"<change>\" \u2014 apply a textual change to an existing prototype; preserves token fidelity."
+    },
+    {
+      "name": "dst-delete-prototype",
+      "description": "/dst-delete-prototype <name> \u2014 remove a prototype; updates state.json and decrements DS prototype count."
+    },
+    {
+      "name": "dst-open",
+      "description": "/dst-open \u2014 open .dst/index.html in the default browser (cross-platform)."
+    },
+    {
+      "name": "dst-handoff",
+      "description": "/dst-handoff <prototype-name> [--target ...] \u2014 bundle prototype + linked DS, brief flutter/react agent to integrate into source code. Design-to-code in one step."
+    },
+    {
+      "name": "dst-questions",
+      "description": "/dst-questions [init|sync|add|resolve|list] \u2014 maintain .atl/wiki/open-questions.md (questions blocking screen work) and auto-pin the active list into CLAUDE.md so every session sees them."
+    }
+  ],
+  "rules": [
+    {
+      "name": "open-questions-pinning",
+      "description": "Convention: .atl/wiki/open-questions.md holds screen-blocking product questions; active list pinned into CLAUDE.md via marker block. Mirrors brainstorm pin pattern."
+    }
+  ],
+  "extends": null,
+  "excludes": [],
+  "dependencies": {
+    "core": "^1.0.0"
+  },
+  "requires": {
+    "atl": ">=0.1.2"
+  }
+}

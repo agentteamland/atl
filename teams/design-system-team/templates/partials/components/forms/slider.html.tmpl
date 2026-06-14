@@ -1,0 +1,38 @@
+<!-- Slider — spec card render
+     Source spec: ds-architect-agent/children/components/forms.md#slider -->
+<div class="dst-component-card">
+  <div class="flex items-baseline justify-between mb-2">
+    <h3 class="text-lg font-medium text-gray-900">Slider</h3>
+    <p class="text-xs text-gray-500 font-mono">2 variants · 2 sizes · 5 states</p>
+  </div>
+  <p class="dst-component-intro">Continuous numeric input. Used for values where exact precision is less important than range awareness — volume, brightness, distance.</p>
+
+  <div class="dst-spec-row">
+    <span class="dst-spec-label">Variants</span>
+    <div class="dst-spec-values">
+      <span class="dst-spec-pill dst-pill-variant">default · single thumb</span>
+      <span class="dst-spec-pill dst-pill-variant">range · two thumbs</span>
+    </div>
+  </div>
+
+  <div class="dst-spec-row">
+    <span class="dst-spec-label">Sizes</span>
+    <div class="dst-spec-values">
+      <span class="dst-spec-pill dst-pill-size">sm · 4px track</span>
+      <span class="dst-spec-pill dst-pill-size">md · 6px track</span>
+    </div>
+  </div>
+
+  <div class="dst-spec-row">
+    <span class="dst-spec-label">States</span>
+    <div class="dst-spec-values">
+      <span class="dst-spec-pill dst-pill-state">idle</span>
+      <span class="dst-spec-pill dst-pill-state">hover</span>
+      <span class="dst-spec-pill dst-pill-state">focus</span>
+      <span class="dst-spec-pill dst-pill-state">dragging</span>
+      <span class="dst-spec-pill dst-pill-state">disabled</span>
+    </div>
+  </div>
+
+  <div class="dst-spec-note"><strong>Tick marks:</strong> optional — declare <code>step</code> and <code>showTicks: true</code>; tick marks render every <code>step</code> along the track. <strong>Dragging:</strong> tooltip with current value appears 8px above thumb.</div>
+</div>
