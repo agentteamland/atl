@@ -34,8 +34,11 @@ func TestLookup(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Lookup: %v", err)
 	}
-	if e.Source.Repo != "agentteamland/software-project-team" {
+	if e.Source.Repo != "agentteamland/atl" {
 		t.Errorf("source repo = %q", e.Source.Repo)
+	}
+	if e.Source.Subpath != "teams/software-project-team" {
+		t.Errorf("source subpath = %q", e.Source.Subpath)
 	}
 	if e.Ref() != "agentteamland/software-project-team" {
 		t.Errorf("Ref() = %q", e.Ref())

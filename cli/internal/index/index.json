@@ -10,7 +10,7 @@
       "keywords": ["dotnet", "docker", "full-stack", "flutter", "react", "microservices"],
       "scope": "project",
       "verified": true,
-      "source": { "repo": "agentteamland/software-project-team", "subpath": "", "ref": "v1.2.1" }
+      "source": { "repo": "agentteamland/atl", "subpath": "teams/software-project-team", "ref": "v2.0.0-alpha.1" }
     },
     {
       "handle": "agentteamland",
@@ -20,7 +20,7 @@
       "keywords": ["design-system", "prototyping", "ui", "tailwind", "tokens"],
       "scope": "project",
       "verified": true,
-      "source": { "repo": "agentteamland/design-system-team", "subpath": "", "ref": "v0.8.1" }
+      "source": { "repo": "agentteamland/atl", "subpath": "teams/design-system-team", "ref": "v2.0.0-alpha.1" }
     }
   ]
 }
