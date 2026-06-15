@@ -55,6 +55,11 @@ var updateCmd = &cobra.Command{
 		default:
 			fmt.Println("atl update: everything up to date")
 		}
+
+		// F4: this is the throttled network pass, which already re-fetched above,
+		// so surface any team whose global gains aren't upstream yet. Suggestion
+		// only — publishing stays an explicit, consent-gated act. Best-effort.
+		suggestPublishable()
 		return nil
 	},
 }
