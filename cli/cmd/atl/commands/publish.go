@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path"
 	"sort"
 	"strings"
 
@@ -25,8 +26,8 @@ var publishCmd = &cobra.Command{
 		"best-effort contribution (a gh fork + PR) the owner can accept — your own\n" +
 		"local + global gains never block on acceptance.\n\n" +
 		"publish is deliberate by design (it crosses the author boundary); it never\n" +
-		"runs automatically. This surfaces the plan; the apply step (re-publish /\n" +
-		"propose-upstream) lands in a follow-up.",
+		"runs automatically. By default it shows the plan; --apply forks and opens\n" +
+		"the PR (propose-upstream). Own-team re-publish is coming in a follow-up.",
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		handle, name, err := index.ParseRef(args[0])
@@ -63,12 +64,31 @@ var publishCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
+		// --only restricts to the skill's kept subset (its judgment step drops
+		// project/user-specific gains before applying).
+		if only, _ := cmd.Flags().GetStringSlice("only"); len(only) > 0 {
+			keep := make(map[string]bool, len(only))
+			for _, o := range only {
+				keep[o] = true
+			}
+			filtered := changes[:0:0]
+			for _, c := range changes {
+				if keep[c.Rel] {
+					filtered = append(filtered, c)
+				}
+			}
+			changes = filtered
+		}
+
 		if len(changes) == 0 {
 			fmt.Printf("atl publish: nothing to publish — your global %s/%s matches the published %s\n", handle, name, m.Source.Ref)
 			return nil
 		}
 
 		owns := publish.Owns(m.Source.Repo, ghLogin())
+
+		// Always show the plan first — publish is a deliberate, visible act.
 		fmt.Printf("atl publish: %d publishable gain(s) in %s/%s (vs published %s):\n", len(changes), handle, name, m.Source.Ref)
 		for _, c := range changes {
 			kind := "modified"
@@ -77,14 +97,57 @@ var publishCmd = &cobra.Command{
 			}
 			fmt.Printf("  %-9s %s\n", kind, c.Rel)
 		}
-		if owns {
-			fmt.Printf("\nYou own %s — these would re-publish to it (commit + version bump + tag).\n", m.Source.Repo)
-		} else {
-			fmt.Printf("\nYou don't own %s — these would be proposed upstream (a gh fork + PR; the /publish skill writes the PR body).\n", m.Source.Repo)
+
+		apply, _ := cmd.Flags().GetBool("apply")
+		if !apply {
+			if owns {
+				fmt.Printf("\nYou own %s — these would re-publish to it (commit + version bump + tag).\n", m.Source.Repo)
+			} else {
+				fmt.Printf("\nYou don't own %s — these would be proposed upstream (a gh fork + PR).\n", m.Source.Repo)
+			}
+			fmt.Println("\nRe-run with --apply to act (the /publish skill authors the PR body and passes it via --body-file).")
+			return nil
 		}
-		fmt.Println("(The apply step lands in a follow-up — this is the plan.)")
+
+		// --- apply ---
+		if owns {
+			return fmt.Errorf("own-team re-publish is not implemented yet — only propose-upstream (a team you don't own) is available in this release")
+		}
+
+		if dryRun, _ := cmd.Flags().GetBool("dry-run"); dryRun {
+			branch := publish.BranchName(handle, name)
+			fmt.Printf("\nDRY RUN — would propose upstream to %s:\n", m.Source.Repo)
+			fmt.Printf("  fork %s → your account, branch %s off the default branch\n", m.Source.Repo, branch)
+			fmt.Printf("  stage %d file(s) under %q:\n", len(changes), m.Source.Subpath)
+			for _, c := range changes {
+				fmt.Printf("    %s\n", path.Join(m.Source.Subpath, c.Rel))
+			}
+			fmt.Println("  push to your fork, then open a PR against the source repo")
+			return nil
+		}
+
+		bodyFile, _ := cmd.Flags().GetString("body-file")
+		if bodyFile == "" {
+			return fmt.Errorf("--apply needs --body-file (the /publish skill authors the PR body); pass --dry-run to preview without it")
+		}
+		if _, err := os.Stat(bodyFile); err != nil {
+			return fmt.Errorf("--body-file %q: %w", bodyFile, err)
+		}
+
+		url, err := publish.ProposeUpstream(publish.NewGH(), m, globalClaude, bodyFile, changes)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("\natl publish: opened %s\n", url)
 		return nil
 	},
+}
+
+func init() {
+	publishCmd.Flags().Bool("apply", false, "apply the plan (fork + open the PR), not just show it")
+	publishCmd.Flags().String("body-file", "", "file holding the PR body (the /publish skill authors it); required with --apply")
+	publishCmd.Flags().StringSlice("only", nil, "restrict to these .claude-relative paths (the skill's kept subset)")
+	publishCmd.Flags().Bool("dry-run", false, "with --apply, print what would happen without forking or pushing")
 }
 
 // ghLogin returns the authenticated GitHub login via gh, or "" if unavailable.
