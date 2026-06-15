@@ -23,8 +23,10 @@ echo ">> image ready"
 
 if [ "$#" -gt 0 ]; then
   names="$*"
+  echo ">> running selected blueprints: $names"
 else
   names="$(ls "$BPDIR"/*.sh | xargs -n1 basename | sed 's/\.sh$//' | sort)"
+  echo ">> running ALL blueprints (full suite — the default; pass names to run a subset)"
 fi
 
 # Resolve auth once (host side).
