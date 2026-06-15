@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "name": "atl-e2e-team",
+  "version": "0.1.0",
+  "description": "Minimal fixture team for the atl e2e harness (propose-upstream scenario). Not for real use.",
+  "scope": "global"
+}

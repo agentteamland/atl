@@ -92,9 +92,14 @@ func ProposeUpstream(gh GH, m *manifest.Manifest, globalClaude, bodyFile string,
 		return "", fmt.Errorf("clone fork %s: %w", fork, err)
 	}
 	// Branch off the upstream default so the diff is clean even if the fork is
-	// stale (an old fork's default can lag the source).
-	if _, err := gh.Git(dir, "remote", "add", "upstream", "https://github.com/"+m.Source.Repo+".git"); err != nil {
-		return "", err
+	// stale (an old fork's default can lag the source). gh clones a fork with an
+	// "upstream" remote already configured, so set-url is the idempotent path,
+	// falling back to add for a non-fork clone.
+	upstreamURL := "https://github.com/" + m.Source.Repo + ".git"
+	if _, err := gh.Git(dir, "remote", "set-url", "upstream", upstreamURL); err != nil {
+		if _, err := gh.Git(dir, "remote", "add", "upstream", upstreamURL); err != nil {
+			return "", err
+		}
 	}
 	if _, err := gh.Git(dir, "fetch", "upstream", base); err != nil {
 		return "", err
@@ -115,7 +120,10 @@ func ProposeUpstream(gh GH, m *manifest.Manifest, globalClaude, bodyFile string,
 	if _, err := gh.Git(dir, "commit", "-m", subject); err != nil {
 		return "", err
 	}
-	if _, err := gh.Git(dir, "push", "-u", "origin", branch); err != nil {
+	// Force-push: the branch name is deterministic, so re-publishing the same
+	// team updates its own fork branch (and any open PR) rather than colliding
+	// with a stale one — the contribution stays a single, current branch.
+	if _, err := gh.Git(dir, "push", "-f", "-u", "origin", branch); err != nil {
 		return "", err
 	}
 	title := fmt.Sprintf("Contribute usage gains to %s", m.Name)
