@@ -5,6 +5,8 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/agentteamland/atl/cli/internal/manifest"
@@ -122,4 +124,93 @@ func ProposeUpstream(gh GH, m *manifest.Manifest, globalClaude, bodyFile string,
 		return "", fmt.Errorf("open PR: %w", err)
 	}
 	return url, nil
+}
+
+// RePublish re-publishes the global-layer gains for a team you own: clone the
+// repo, stage the gains under its subpath, bump team.json's patch version, then
+// commit + tag + push and ensure the atl-team topic so index CI reindexes.
+// Returns the new "vX.Y.Z" tag. msgFile holds the commit message (skill-authored).
+func RePublish(gh GH, m *manifest.Manifest, globalClaude, msgFile string, changes []Change) (string, error) {
+	base, err := gh.DefaultBranch(m.Source.Repo)
+	if err != nil {
+		return "", fmt.Errorf("resolve default branch of %s: %w", m.Source.Repo, err)
+	}
+	dir, err := os.MkdirTemp("", "atl-republish-*")
+	if err != nil {
+		return "", err
+	}
+	defer os.RemoveAll(dir)
+	if err := gh.Clone(m.Source.Repo, dir); err != nil {
+		return "", fmt.Errorf("clone %s: %w", m.Source.Repo, err)
+	}
+
+	paths, err := Stage(globalClaude, dir, m.Source.Subpath, changes)
+	if err != nil {
+		return "", err
+	}
+	_, newV, err := BumpVersion(dir, m.Source.Subpath)
+	if err != nil {
+		return "", err
+	}
+	addArgs := append([]string{"add", "--"}, paths...)
+	addArgs = append(addArgs, path.Join(m.Source.Subpath, "team.json"))
+	if _, err := gh.Git(dir, addArgs...); err != nil {
+		return "", err
+	}
+	if _, err := gh.Git(dir, "commit", "-F", msgFile); err != nil {
+		return "", err
+	}
+	tag := "v" + newV
+	if _, err := gh.Git(dir, "tag", tag); err != nil {
+		return "", err
+	}
+	if _, err := gh.Git(dir, "push", "origin", base); err != nil {
+		return "", err
+	}
+	if _, err := gh.Git(dir, "push", "origin", tag); err != nil {
+		return "", err
+	}
+	if err := gh.EnsureTopic(m.Source.Repo, "atl-team"); err != nil {
+		return "", err
+	}
+	return tag, nil
+}
+
+var versionRe = regexp.MustCompile(`("version"\s*:\s*")([^"]+)(")`)
+
+// BumpVersion patch-bumps the "version" field in <repoRoot>/<subpath>/team.json
+// in place (string-level, so field order + formatting are preserved) and returns
+// (old, new).
+func BumpVersion(repoRoot, subpath string) (string, string, error) {
+	p := filepath.Join(repoRoot, filepath.FromSlash(path.Join(subpath, "team.json")))
+	b, err := os.ReadFile(p)
+	if err != nil {
+		return "", "", err
+	}
+	mm := versionRe.FindSubmatch(b)
+	if mm == nil {
+		return "", "", fmt.Errorf("no version field in %s", p)
+	}
+	oldV := string(mm[2])
+	newV, err := bumpPatch(oldV)
+	if err != nil {
+		return "", "", err
+	}
+	out := versionRe.ReplaceAll(b, []byte("${1}"+newV+"${3}"))
+	if err := os.WriteFile(p, out, 0o644); err != nil {
+		return "", "", err
+	}
+	return oldV, newV, nil
+}
+
+func bumpPatch(v string) (string, error) {
+	parts := strings.Split(v, ".")
+	if len(parts) != 3 {
+		return "", fmt.Errorf("version %q is not MAJOR.MINOR.PATCH", v)
+	}
+	n, err := strconv.Atoi(parts[2])
+	if err != nil {
+		return "", fmt.Errorf("non-numeric patch in version %q", v)
+	}
+	return parts[0] + "." + parts[1] + "." + strconv.Itoa(n+1), nil
 }

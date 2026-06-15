@@ -110,11 +110,32 @@ var publishCmd = &cobra.Command{
 		}
 
 		// --- apply ---
+		dryRun, _ := cmd.Flags().GetBool("dry-run")
+		bodyFile, _ := cmd.Flags().GetString("body-file")
+
 		if owns {
-			return fmt.Errorf("own-team re-publish is not implemented yet — only propose-upstream (a team you don't own) is available in this release")
+			if dryRun {
+				fmt.Printf("\nDRY RUN — would re-publish to %s (you own it):\n", m.Source.Repo)
+				fmt.Printf("  stage %d file(s) under %q, bump team.json version, commit + tag + push\n", len(changes), m.Source.Subpath)
+				for _, c := range changes {
+					fmt.Printf("    %s\n", path.Join(m.Source.Subpath, c.Rel))
+				}
+				fmt.Println("  ensure the atl-team topic so index CI reindexes")
+				return nil
+			}
+			if err := requireBodyFile(bodyFile); err != nil {
+				return err
+			}
+			tag, err := publish.RePublish(publish.NewGH(), m, globalClaude, bodyFile, changes)
+			if err != nil {
+				return err
+			}
+			fmt.Printf("\natl publish: re-published %s as %s\n", m.Source.Repo, tag)
+			return nil
 		}
 
-		if dryRun, _ := cmd.Flags().GetBool("dry-run"); dryRun {
+		// not owned → propose upstream
+		if dryRun {
 			branch := publish.BranchName(handle, name)
 			fmt.Printf("\nDRY RUN — would propose upstream to %s:\n", m.Source.Repo)
 			fmt.Printf("  fork %s → your account, branch %s off the default branch\n", m.Source.Repo, branch)
@@ -125,15 +146,9 @@ var publishCmd = &cobra.Command{
 			fmt.Println("  push to your fork, then open a PR against the source repo")
 			return nil
 		}
-
-		bodyFile, _ := cmd.Flags().GetString("body-file")
-		if bodyFile == "" {
-			return fmt.Errorf("--apply needs --body-file (the /publish skill authors the PR body); pass --dry-run to preview without it")
+		if err := requireBodyFile(bodyFile); err != nil {
+			return err
 		}
-		if _, err := os.Stat(bodyFile); err != nil {
-			return fmt.Errorf("--body-file %q: %w", bodyFile, err)
-		}
-
 		url, err := publish.ProposeUpstream(publish.NewGH(), m, globalClaude, bodyFile, changes)
 		if err != nil {
 			return err
@@ -141,6 +156,18 @@ var publishCmd = &cobra.Command{
 		fmt.Printf("\natl publish: opened %s\n", url)
 		return nil
 	},
+}
+
+// requireBodyFile validates the --body-file flag for an apply: it must be set
+// (the /publish skill authors the PR body / commit message) and exist.
+func requireBodyFile(bodyFile string) error {
+	if bodyFile == "" {
+		return fmt.Errorf("--apply needs --body-file (the /publish skill authors it); pass --dry-run to preview without it")
+	}
+	if _, err := os.Stat(bodyFile); err != nil {
+		return fmt.Errorf("--body-file %q: %w", bodyFile, err)
+	}
+	return nil
 }
 
 func init() {

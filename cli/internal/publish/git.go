@@ -68,3 +68,10 @@ func (g GH) PRCreate(baseRepo, base, head, title, bodyFile string) (string, erro
 		"--repo", baseRepo, "--base", base, "--head", head,
 		"--title", title, "--body-file", bodyFile)
 }
+
+// EnsureTopic adds topic to repo's GitHub topics (idempotent). The atl-team
+// topic is what the index CI's topic-discovery scan keys off.
+func (g GH) EnsureTopic(repo, topic string) error {
+	_, err := g.out("gh", "repo", "edit", repo, "--add-topic", topic)
+	return err
+}
