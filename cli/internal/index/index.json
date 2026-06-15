@@ -1,26 +1,61 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-06-14T00:00:00Z",
+  "generatedAt": "2026-06-15T14:33:51Z",
   "teams": [
     {
       "handle": "agentteamland",
       "name": "software-project-team",
       "version": "1.2.1",
       "description": "13 agents for full-stack projects: .NET 9 + Flutter + React + Postgres + RabbitMQ + Redis + Elasticsearch + MinIO.",
-      "keywords": ["dotnet", "docker", "full-stack", "flutter", "react", "microservices"],
+      "keywords": [
+        "dotnet",
+        "docker",
+        "full-stack",
+        "flutter",
+        "react",
+        "microservices"
+      ],
       "scope": "project",
       "verified": true,
-      "source": { "repo": "agentteamland/atl", "subpath": "teams/software-project-team", "ref": "v2.0.0-alpha.1" }
+      "source": {
+        "repo": "agentteamland/atl",
+        "subpath": "teams/software-project-team",
+        "ref": "v2.0.0-alpha.1"
+      }
     },
     {
       "handle": "agentteamland",
       "name": "design-system-team",
       "version": "0.8.1",
       "description": "Local file-based design systems + UI prototypes for any project. /dst-* skills produce ds.json + Tailwind HTML under .dst/.",
-      "keywords": ["design-system", "prototyping", "ui", "tailwind", "tokens"],
+      "keywords": [
+        "design-system",
+        "prototyping",
+        "ui",
+        "tailwind",
+        "tokens"
+      ],
       "scope": "project",
       "verified": true,
-      "source": { "repo": "agentteamland/atl", "subpath": "teams/design-system-team", "ref": "v2.0.0-alpha.1" }
+      "source": {
+        "repo": "agentteamland/atl",
+        "subpath": "teams/design-system-team",
+        "ref": "v2.0.0-alpha.1"
+      }
+    },
+    {
+      "handle": "mkurak",
+      "name": "atl-e2e-owned",
+      "version": "0.1.1",
+      "description": "Minimal fixture team for the atl e2e harness (own-team re-publish scenario). Not for real use.",
+      "keywords": [],
+      "scope": "global",
+      "verified": false,
+      "source": {
+        "repo": "mkurak/atl-e2e-owned",
+        "subpath": "",
+        "ref": "{\"message\":\"Not Found\",\"documentation_url\":\"https://docs.github.com/rest/releases/releases#get-the-latest-release\",\"status\":\"404\"}main"
+      }
     }
   ]
 }
