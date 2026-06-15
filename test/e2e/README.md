@@ -1,49 +1,60 @@
 # atl end-to-end test harness
 
-Container-based e2e tests that exercise `atl` on a simulated brand-new user's
-machine. The image builds `atl` from source (multi-stage, no host Go needed) and
-installs Claude Code, so the container is a faithful stand-in for a real user.
+Container-based e2e tests. Each **blueprint** (one scenario) runs in a FRESH
+container (`docker run --rm` — kill + recreate per scenario, so blueprints never
+share state). The image builds `atl` from source (multi-stage, no host Go needed)
+and installs Claude Code + gh, so the container is a faithful stand-in for a real
+user's machine.
 
-## Layer A — deterministic (no Claude session)
-
-Drives the `atl` binary over the golden paths and asserts on files + manifests:
-
-- install at both scopes
-- **promote** a project gain to global (modified file + new child)
-- promote idempotency
-- **pin** keeps a gain project-only; **unpin** re-enables it
-- **doctor** self-heals a deleted installed file
-- **update** fans an unmodified project file out from global
-
-Auth-free; this is the always-on regression backbone. Run from anywhere:
+## Run
 
 ```bash
-test/e2e/run.sh
+test/e2e/run.sh                       # every blueprint (auth-gated; missing-auth ones skip)
+test/e2e/run.sh install publish-own   # named blueprints only
 ```
 
-Network is required once per run (install fetches a real, ref-pinned team —
-`design-system-team@v0.8.1` — from the index). Each scenario then restores a
-local snapshot, so the suite is isolated and fast.
+Auth is passed into the container only when present on the host:
 
-## Layer B — full loop (real Claude session)
+- **gh** — `GH_TOKEN` (from your `gh auth token`) — the publish blueprints
+- **Claude** — `CLAUDE_CODE_OAUTH_TOKEN` (from `claude setup-token`) or `ANTHROPIC_API_KEY` — the learning-loop blueprint
 
-Real `claude -p` (headless) sessions so hooks fire, `/drain` runs, and the
-capture → queue → drain → KB loop closes for real. Asserts:
+A blueprint whose auth is absent is skipped, so the same script is CI-safe (only
+the auth-free core runs) and local-full (everything runs when you're authed).
 
-- install reflects the `learning-capture` rule + the `/drain` skill and binds the hooks
-- **capture** — a real session drops a `<!-- learning: … -->` marker (verified in the transcript)
-- **tick** — `atl tick` enqueues the marker into the durable queue
-- **drain** — the `/drain` skill folds the queue into the KB (wiki / journal / agent KB)
-- **ack** — the processed item is deleted from the queue (the v1 re-report bug class stays dead)
+## Blueprints
 
-Needs a Claude Code token in the container:
+Each lives in `blueprints/<name>.sh`, declares its auth need on a `# needs:` line,
+sources `lib.sh`, and asserts on file / manifest / queue **state** (never an exact
+filename or a command's "did work" message — so the non-deterministic publish +
+learning blueprints stay non-flaky).
 
-```bash
-claude setup-token                                    # once, where you can log in
-CLAUDE_CODE_OAUTH_TOKEN=<token> test/e2e/run.sh --layer-b
-```
+| Blueprint | needs | What it proves |
+|---|---|---|
+| `install` | none | install at both scopes; assets + manifests + embedded core reflect |
+| `promote` | none | a project gain lifts to global; second pass is a no-op |
+| `pin` | none | a pinned file is held back from promote; unpin re-enables it |
+| `doctor` | none | a deleted installed file is self-healed from the pinned source |
+| `update` | none | a global change fans out to an unmodified project copy |
+| `list-remove` | none | list shows the team; remove deletes its files + manifest |
+| `learning-loop` | token | real `claude -p`: marker → tick → queue → /drain → KB → ack |
+| `publish-propose` | gh | a gain in a team you don't own → real fork + PR (then cleanup) |
+| `publish-own` | gh | a team you own → real commit + version bump + tag |
 
-Subscription OAuth cannot run inside a container, so `setup-token` (a 1-year
-token) is the supported path; `ANTHROPIC_API_KEY` also works. The assertions key
-off queue + file **state**, never a command's "did work" message or an exact KB
-filename, so the non-determinism of a real LLM turn doesn't make them flaky.
+## Fixtures
+
+`fixtures/` holds two minimal teams; two real GitHub repos mirror them so the
+publish blueprints exercise actual GitHub:
+
+- `agentteamland/atl-e2e-team` — propose-upstream upstream (not owned by the tester)
+- `<your-login>/atl-e2e-owned` — own-team re-publish target (the `publish-own`
+  blueprint force-resets it to the fixture baseline each run, so it's repeatable)
+
+The blueprints inject a test-only `~/.atl/index.json` (via `write_test_index` in
+`lib.sh`) so `atl install` resolves the fixtures offline — the production index is
+never touched.
+
+## CI
+
+Not wired into CI yet (atl's CI runs Go build/vet/test only). The auth-free
+blueprints are CI-ready as-is; the publish + learning-loop blueprints need
+secrets (a gh token, a Claude token) — a follow-on.

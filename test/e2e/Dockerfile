@@ -20,13 +20,21 @@ RUN CGO_ENABLED=0 go build -o /out/atl ./cmd/atl
 # --- Stage 2: runtime — a brand-new user's machine ---
 FROM node:22-slim
 RUN apt-get update \
- && apt-get install -y --no-install-recommends git ca-certificates jq \
+ && apt-get install -y --no-install-recommends git ca-certificates jq curl \
  && rm -rf /var/lib/apt/lists/* \
  && npm install -g @anthropic-ai/claude-code
+# gh CLI (arch-aware) — the publish blueprints drive real fork/PR/commit/tag
+RUN ARCH=$(dpkg --print-architecture) \
+ && curl -fsSL "https://github.com/cli/cli/releases/download/v2.62.0/gh_2.62.0_linux_${ARCH}.tar.gz" | tar xz -C /tmp \
+ && mv /tmp/gh_*/bin/gh /usr/local/bin/gh \
+ && rm -rf /tmp/gh_*
 COPY --from=build /out/atl /usr/local/bin/atl
 COPY test/e2e/ /e2e/
 # a non-root user with a clean home simulates a first-time install
 RUN useradd -m -s /bin/bash testuser
 USER testuser
+# a real user has a git identity configured; simulate it so publish's commits work
+RUN git config --global user.email "e2e@atl.local" \
+ && git config --global user.name "atl-e2e"
 WORKDIR /home/testuser
 CMD ["bash"]
