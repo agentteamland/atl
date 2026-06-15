@@ -66,6 +66,13 @@ type fakeGH struct {
 
 func (f *fakeGH) runner(name string, args ...string) ([]byte, error) {
 	f.calls = append(f.calls, append([]string{name}, args...))
+	// Simulate `gh repo clone <repo> <dir>`: seed the dir with a team.json so
+	// RePublish's BumpVersion has a real file to bump.
+	if name == "gh" && len(args) >= 4 && args[0] == "repo" && args[1] == "clone" {
+		dir := args[3]
+		_ = os.MkdirAll(dir, 0o755)
+		_ = os.WriteFile(filepath.Join(dir, "team.json"), []byte(`{"name":"x","version":"0.1.0"}`+"\n"), 0o644)
+	}
 	key := name
 	if len(args) > 0 {
 		key = name + " " + args[0]
@@ -116,6 +123,67 @@ func TestProposeUpstreamArgv(t *testing.T) {
 	// The fork is created without cloning (idempotent), and the PR is opened.
 	if findCall(f.calls, "gh", "repo") == nil {
 		t.Error("no gh repo (fork/view/clone) calls recorded")
+	}
+}
+
+func TestBumpVersion(t *testing.T) {
+	repo := t.TempDir()
+	writeF(t, filepath.Join(repo, "team.json"), "{\n  \"name\": \"x\",\n  \"version\": \"1.2.9\",\n  \"scope\": \"global\"\n}\n")
+	old, nw, err := BumpVersion(repo, "")
+	if err != nil {
+		t.Fatalf("BumpVersion: %v", err)
+	}
+	if old != "1.2.9" || nw != "1.2.10" {
+		t.Errorf("bump = (%q, %q), want (1.2.9, 1.2.10)", old, nw)
+	}
+	b, _ := os.ReadFile(filepath.Join(repo, "team.json"))
+	if !strings.Contains(string(b), `"version": "1.2.10"`) {
+		t.Errorf("version not bumped in file:\n%s", b)
+	}
+	if !strings.Contains(string(b), `"name": "x"`) || !strings.Contains(string(b), `"scope": "global"`) {
+		t.Errorf("other fields/format not preserved:\n%s", b)
+	}
+}
+
+func TestRePublishArgv(t *testing.T) {
+	glob := t.TempDir()
+	writeF(t, filepath.Join(glob, "agents/a/agent.md"), "GAIN")
+
+	f := &fakeGH{out: map[string]string{"gh repo": "main"}} // DefaultBranch -> main
+	m := &manifest.Manifest{
+		Handle: "octocat", Name: "my-team",
+		Source: manifest.Source{Repo: "octocat/my-team", Subpath: "", Ref: "v0.1.0"},
+	}
+	msgFile := filepath.Join(t.TempDir(), "msg.txt")
+	writeF(t, msgFile, "chore: re-publish e2e gains")
+
+	tag, err := RePublish(GH{Run: f.runner}, m, glob, msgFile, []Change{{Rel: "agents/a/agent.md"}})
+	if err != nil {
+		t.Fatalf("RePublish: %v", err)
+	}
+	if tag != "v0.1.1" {
+		t.Errorf("tag = %q, want v0.1.1 (patch bump of the cloned 0.1.0)", tag)
+	}
+	// Staged both the gain and the version-bumped team.json.
+	add := findGitCall(f.calls, "add")
+	if add == nil || !containsArg(add, "agents/a/agent.md") || !containsArg(add, "team.json") {
+		t.Errorf("git add missing gain or team.json: %v", add)
+	}
+	// Committed from the skill's message file, tagged, pushed branch + tag.
+	commit := findGitCall(f.calls, "commit")
+	if commit == nil || !containsArg(commit, msgFile) {
+		t.Errorf("git commit not from --body-file: %v", commit)
+	}
+	tagCall := findGitCall(f.calls, "tag")
+	if tagCall == nil || !containsArg(tagCall, "v0.1.1") {
+		t.Errorf("git tag call: %v", tagCall)
+	}
+	if findGitCall(f.calls, "push") == nil {
+		t.Error("no git push call")
+	}
+	// Topic ensured (gh repo edit) — index CI's discovery key.
+	if findCall(f.calls, "gh", "repo") == nil {
+		t.Error("no gh repo (view/clone/edit) calls recorded")
 	}
 }
 
