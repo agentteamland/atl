@@ -29,8 +29,10 @@ else
   echo ">> running ALL blueprints (full suite — the default; pass names to run a subset)"
 fi
 
-# Resolve auth once (host side).
+# Resolve auth once (host side). Prefer gh's configured token; fall back to a
+# GH_TOKEN env so CI can pass a PAT (there is no interactive `gh auth login`).
 GH_TOKEN_VAL="$(gh auth token 2>/dev/null || true)"
+: "${GH_TOKEN_VAL:=${GH_TOKEN:-}}"
 CLAUDE_TOK="${CLAUDE_CODE_OAUTH_TOKEN:-}"
 API_KEY="${ANTHROPIC_API_KEY:-}"
 

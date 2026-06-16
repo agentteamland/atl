@@ -27,3 +27,14 @@ jobs:
       - name: Test
         working-directory: cli
         run: go test ./...
+
+  e2e-auth-free:
+    # The auth-free blueprints (install/promote/pin/doctor/update/list-remove)
+    # run on every PR. run.sh skips the publish + learning-loop blueprints when
+    # their auth is absent, and no gh/Claude token is provided here — so this job
+    # never touches real GitHub. The full suite runs nightly (e2e-nightly.yml).
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run auth-free e2e blueprints
+        run: bash test/e2e/run.sh

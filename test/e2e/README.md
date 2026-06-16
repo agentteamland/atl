@@ -55,6 +55,11 @@ never touched.
 
 ## CI
 
-Not wired into CI yet (atl's CI runs Go build/vet/test only). The auth-free
-blueprints are CI-ready as-is; the publish + learning-loop blueprints need
-secrets (a gh token, a Claude token) — a follow-on.
+- **Per-PR** (`.github/workflows/ci.yml`, `e2e-auth-free` job): the auth-free
+  blueprints run on every PR. No secrets are passed, so this job never touches
+  real GitHub — run.sh skips the publish + learning-loop blueprints.
+- **Nightly** (`.github/workflows/e2e-nightly.yml`): the full suite, including
+  publish + learning-loop, on a cron + manual dispatch. Needs two repo secrets —
+  `E2E_GH_TOKEN` (a PAT that can fork/PR/push the publish fixtures) and
+  `CLAUDE_CODE_OAUTH_TOKEN` (for the learning-loop's `claude -p`). A missing
+  secret just skips that blueprint, so it degrades gracefully.
