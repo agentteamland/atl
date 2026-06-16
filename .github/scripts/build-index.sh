@@ -17,15 +17,26 @@ ALLOWLIST=() # extra owners granted verified, beyond agentteamland
 # 1. Preserve first-party entries (handle == agentteamland) from the current index.
 firstparty="$(jq '[.teams[] | select(.handle == "agentteamland")]' "$INDEX")"
 
-# 2. Discover third-party repos via the atl-team topic (skip the org's own repos).
+# 2. Discover third-party repos via the atl-team topic. Skip the org's own repos
+#    (first-party entries are preserved above) and the e2e harness fixtures: the
+#    own-team publish blueprint adds the real atl-team topic to its fixture repo
+#    (correct behaviour under test), so without this the test fixture would leak
+#    into the real catalog. Fixtures follow the atl-e2e-* naming convention.
 thirdparty="[]"
-repos="$(gh search repos --topic atl-team --limit 200 --json fullName,owner \
-  -q '.[] | select(.owner.login != "agentteamland") | .fullName' 2>/dev/null || true)"
+repos="$(gh search repos --topic atl-team --limit 200 --json fullName,name,owner \
+  -q '.[] | select(.owner.login != "agentteamland") | select(.name | startswith("atl-e2e-") | not) | .fullName' 2>/dev/null || true)"
 for repo in $repos; do
   tj="$(gh api "repos/$repo/contents/team.json" -q '.content' 2>/dev/null | base64 -d 2>/dev/null || true)"
   [ -n "$tj" ] || continue
   owner="${repo%%/*}"
-  ref="$(gh api "repos/$repo/releases/latest" -q '.tag_name' 2>/dev/null || echo main)"
+  # Prefer the latest release tag; fall back to the default branch. gh prints the
+  # 404 body to stdout for a release-less repo and exits non-zero, so trust the
+  # exit status and a non-empty tag — never the captured stdout, or the JSON
+  # error string ends up embedded in ref.
+  ref=main
+  if tag="$(gh api "repos/$repo/releases/latest" -q '.tag_name' 2>/dev/null)" && [ -n "$tag" ]; then
+    ref="$tag"
+  fi
   verified=false
   for v in agentteamland "${ALLOWLIST[@]:-}"; do [ "$owner" = "$v" ] && verified=true; done
   entry="$(printf '%s' "$tj" | jq --arg repo "$repo" --arg owner "$owner" --arg ref "$ref" --argjson verified "$verified" '{
