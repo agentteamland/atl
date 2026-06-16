@@ -33,4 +33,21 @@ FOUND=$(find "$PROJ/.atl/wiki" "$PROJ/.atl/journal" "$PROJ/.claude/agents" -type
 PEEK2=$(cd "$PROJ" && atl learnings peek --channel learning --json 2>/dev/null)
 echo "$PEEK2" | jq -e 'length == 0' >/dev/null 2>&1 && ok "queue drained (processed-then-deleted)" || bad "queue still has items -- [$PEEK2]"
 
+# On failure, surface what's otherwise lost when the container is torn down: the
+# claude turn output (turns.log), which content block the marker landed in
+# (text vs thinking — atl tick only reads text), and a verbose tick re-run.
+if [ "$FAIL" -gt 0 ]; then
+  echo "===== DEBUG (learning-loop failed) ====="
+  echo "--- claude --version ---"; claude --version 2>&1 | head -1
+  echo "--- turns.log ---"; cat "$HOME/turns.log" 2>/dev/null
+  echo "--- newest transcript: ${T:-none} ---"
+  if [ -n "${T:-}" ]; then
+    echo "  assistant content types:"; jq -c 'select(.message.role=="assistant") | [.message.content[]?.type]' "$T" 2>/dev/null
+    echo "  block(s) carrying the marker (type + snippet):"
+    jq -c 'select(.message.role=="assistant") | .message.content[]? | select((.text // .thinking // "") | test("<!-- learning:")) | {type, snippet: ((.text // .thinking)[0:140])}' "$T" 2>/dev/null
+  fi
+  echo "--- atl tick (verbose re-run) ---"; ( cd "$PROJ" && atl tick 2>&1 )
+  echo "========================================"
+fi
+
 finish
