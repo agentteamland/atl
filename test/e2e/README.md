@@ -55,11 +55,17 @@ never touched.
 
 ## CI
 
-- **Per-PR** (`.github/workflows/ci.yml`, `e2e-auth-free` job): the auth-free
-  blueprints run on every PR. No secrets are passed, so this job never touches
-  real GitHub — run.sh skips the publish + learning-loop blueprints.
-- **Nightly** (`.github/workflows/e2e-nightly.yml`): the full suite, including
-  publish + learning-loop, on a cron + manual dispatch. Needs two repo secrets —
-  `E2E_GH_TOKEN` (a PAT that can fork/PR/push the publish fixtures) and
-  `CLAUDE_CODE_OAUTH_TOKEN` (for the learning-loop's `claude -p`). A missing
-  secret just skips that blueprint, so it degrades gracefully.
+atl's CI (`.github/workflows/ci.yml`) runs Go build/vet/test only. **The e2e
+harness is deliberately not wired into CI — it runs locally, on demand:**
+
+```bash
+test/e2e/run.sh        # run the full suite before shipping; everything must pass
+```
+
+Why local-only: the `learning-loop` blueprint needs a real `claude -p` turn, and
+a `claude setup-token` subscription OAuth token is **rejected (HTTP 401) from
+datacenter/CI IPs** — it only authenticates from a developer machine. The
+pay-per-use `ANTHROPIC_API_KEY` alternative was declined (no extra billing). So
+the whole suite runs on the maintainer's machine, where the subscription token
+works and the gh/publish fixtures are reachable. Run it before a release; fix
+anything red there.
