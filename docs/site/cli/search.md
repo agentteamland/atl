@@ -1,53 +1,54 @@
 # `atl search`
 
-Search the public registry.
+Search the team catalog — the GitHub-backed index that [`atl install`](/cli/install) resolves against.
 
 ## Usage
 
 ```bash
-atl search <query>
+atl search [keyword]
 ```
 
-`<query>` matches against team names, descriptions, and keywords. It's case-insensitive and substring-based; no regex.
+`[keyword]` matches against team handles, names, descriptions, and keywords. Matching is case-insensitive and substring-based; no regex. Run `atl search` with no keyword to browse the whole catalog.
 
 ## Example
 
 ```bash
-atl search dotnet
+atl search flutter
 ```
 
 ```
-Found 1 team(s) matching "dotnet":
+1 team(s) matching "flutter":
 
-  software-project-team@1.2.1 [verified]
-    .NET 9 API + Flutter + React + full Docker stack
-    https://github.com/agentteamland/software-project-team
-    keywords: dotnet, csharp, flutter, react
+  agentteamland/software-project-team@1.2.1 [verified]
+    13 agents for full-stack projects: .NET 9 + Flutter + React + Postgres + RabbitMQ + Redis + Elasticsearch + MinIO.
+    keywords: dotnet, docker, full-stack, flutter, react, microservices
+    install: atl install agentteamland/software-project-team
 ```
 
-Status badges (in brackets after `name@version`):
+Each result shows:
 
-- **`[verified]`** — reviewed by AgentTeamLand maintainers. Expected to install cleanly and follow conventions.
-- **`[community]`** — listed in the registry, not yet reviewed. Works, but use at your own risk.
-- **`[deprecated]`** — still installable, but no longer maintained. Migrate when convenient.
+- the `<handle>/<name>@<version>` reference (the handle is the team's GitHub owner — ownership is authorship),
+- the description and keywords,
+- the exact `atl install` command to copy.
 
-## A query is required
+The **`[verified]`** badge marks teams reviewed by AgentTeamLand maintainers (`agentteamland/*` plus a maintainer allowlist). Its absence just means the team is self-published — not that it's unsafe.
 
-`atl search` requires exactly one positional argument. Running it with no query exits with a usage error — to browse the full catalog, see [the registry on GitHub](https://github.com/agentteamland/registry/blob/main/teams.json) or use a broad keyword like `atl search team`.
+## Browse the whole catalog
+
+Omit the keyword to list every catalogued team:
+
+```bash
+atl search
+```
 
 ## Offline behavior
 
-The registry is cached locally after the first fetch. `atl search` works offline using the cached copy; it prints a note so you know the results may be stale.
+`atl search` never blocks on the network. It resolves the index offline-first: the network-refreshed cache at `~/.atl/index.json` when present, otherwise the copy embedded in the binary. The cache is refreshed out of band (by `atl update`), so results stay current without `search` ever waiting on a fetch.
 
 ## No results?
 
-The registry is PR-driven and young — if your domain isn't covered, that's likely just "not yet." Consider:
-
-- Using a Git URL directly: `atl install https://github.com/you/your-team.git`
-- Publishing your own team: [Creating a team](/authoring/creating-a-team)
-- Submitting it to the registry: [Registry submission](/authoring/registry-submission)
+The catalog is generated from public GitHub repositories tagged with the [`atl-team`](https://github.com/topics/atl-team) topic, and it's young — if your domain isn't covered yet, that's likely just "not yet." To get a team listed, tag its repo with `atl-team` (or run `atl publish` from the team repo) and the catalog picks it up. See [Creating a team](/authoring/creating-a-team).
 
 ## Related
 
 - [`atl install`](/cli/install) — install what you find.
-- [Registry submission](/authoring/registry-submission) — get your team listed.

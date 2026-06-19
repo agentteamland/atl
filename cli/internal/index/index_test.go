@@ -48,6 +48,39 @@ func TestLookup(t *testing.T) {
 	}
 }
 
+func TestSearch(t *testing.T) {
+	ix, err := Seed()
+	if err != nil {
+		t.Fatalf("Seed: %v", err)
+	}
+	// Blank query browses the whole catalog.
+	if got := ix.Search(""); len(got) != len(ix.Teams) {
+		t.Errorf("Search(\"\") = %d, want all %d teams", len(got), len(ix.Teams))
+	}
+	// A keyword unique to one seed team matches exactly it, case-insensitively.
+	for _, q := range []string{"flutter", "FLUTTER"} {
+		if hits := ix.Search(q); len(hits) != 1 || hits[0].Ref() != "agentteamland/software-project-team" {
+			t.Errorf("Search(%q) = %v, want [software-project-team]", q, refs(hits))
+		}
+	}
+	// Description text matches too (only design-system-team mentions prototypes).
+	if hits := ix.Search("prototyp"); len(hits) != 1 || hits[0].Ref() != "agentteamland/design-system-team" {
+		t.Errorf("Search(prototyp) = %v, want [design-system-team]", refs(hits))
+	}
+	// A miss returns nothing.
+	if hits := ix.Search("no-such-team-xyz"); len(hits) != 0 {
+		t.Errorf("Search(miss) = %v, want none", refs(hits))
+	}
+}
+
+func refs(es []Entry) []string {
+	out := make([]string, len(es))
+	for i, e := range es {
+		out[i] = e.Ref()
+	}
+	return out
+}
+
 func TestLoadInvalid(t *testing.T) {
 	if _, err := Load([]byte("{not json")); err == nil {
 		t.Error("expected parse error on malformed JSON")
