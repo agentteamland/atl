@@ -39,6 +39,7 @@ func init() {
 		setupHooksCmd,
 		doctorCmd,
 		listCmd,
+		searchCmd,
 		removeCmd,
 	)
 }

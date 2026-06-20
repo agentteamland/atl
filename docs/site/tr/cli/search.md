@@ -1,53 +1,54 @@
 # `atl search`
 
-Herkese açık kayıt defterinde arama yapar.
+Takım kataloğunda arama yapar — [`atl install`](/tr/cli/install) komutunun çözümlediği, GitHub tabanlı index.
 
 ## Kullanım
 
 ```bash
-atl search <query>
+atl search [anahtar-sözcük]
 ```
 
-`<query>`, takım adlarına, açıklamalara ve anahtar sözcüklere karşı eşleşir. Büyük-küçük harf duyarsızdır ve alt-dize tabanlıdır; düzenli ifade değildir.
+`[anahtar-sözcük]`, takım handle'larına, adlarına, açıklamalarına ve anahtar sözcüklerine karşı eşleşir. Eşleşme büyük-küçük harf duyarsız ve alt-dize tabanlıdır; düzenli ifade (regex) değildir. Anahtar sözcük vermeden `atl search` çalıştırmak kataloğun tamamına göz attırır.
 
 ## Örnek
 
 ```bash
-atl search dotnet
+atl search flutter
 ```
 
 ```
-Found 1 team(s) matching "dotnet":
+1 team(s) matching "flutter":
 
-  software-project-team@1.2.1 [verified]
-    .NET 9 API + Flutter + React + full Docker stack
-    https://github.com/agentteamland/software-project-team
-    keywords: dotnet, csharp, flutter, react
+  agentteamland/software-project-team@1.2.1 [verified]
+    13 agents for full-stack projects: .NET 9 + Flutter + React + Postgres + RabbitMQ + Redis + Elasticsearch + MinIO.
+    keywords: dotnet, docker, full-stack, flutter, react, microservices
+    install: atl install agentteamland/software-project-team
 ```
 
-Durum rozetleri (`name@version` sonrasındaki köşeli parantez içinde):
+Her sonuç şunları gösterir:
 
-- **`[verified]`** — AgentTeamLand bakımcıları tarafından incelenmiştir. Temiz kurulup sözleşmelere uyması beklenir.
-- **`[community]`** — kayıt defterinde listelidir, henüz incelenmemiştir. Çalışır, ama kullanım riski sana aittir.
-- **`[deprecated]`** — hâlâ kurulabilir ama artık bakım görmemektedir. Uygun olduğunda başkasına geç.
+- `<handle>/<ad>@<sürüm>` referansı (handle, takımın GitHub sahibidir — sahiplik, yazarlıktır),
+- açıklama ve anahtar sözcükler,
+- kopyalanabilir tam `atl install` komutu.
 
-## Sorgu zorunludur
+**`[verified]`** rozeti, AgentTeamLand bakımcılarınca incelenmiş takımları işaretler (`agentteamland/*` artı bir bakımcı izin listesi). Rozetin yokluğu yalnızca takımın kendi-yayımı olduğu anlamına gelir — güvensiz olduğu değil.
 
-`atl search` tam olarak bir konumsal argüman ister. Sorgu vermeden çalıştırmak kullanım hatasıyla çıkar — kataloğun tamamına göz atmak için [GitHub'daki kayıt defterine](https://github.com/agentteamland/registry/blob/main/teams.json) bak ya da `atl search team` gibi geniş bir anahtar sözcük kullan.
+## Kataloğun tamamına göz at
+
+Anahtar sözcüğü atlayarak kataloglanmış her takımı listele:
+
+```bash
+atl search
+```
 
 ## Çevrimdışı davranış
 
-Kayıt defteri ilk çekimden sonra yerelde önbelleklenir. `atl search` önbelleklenmiş kopyayı kullanarak çevrimdışı çalışır; sonuçların bayat olabileceğini sana belirten bir not yazdırır.
+`atl search` ağ için asla beklemez. Index'i çevrimdışı-öncelikli çözer: varsa `~/.atl/index.json` konumundaki ağdan tazelenen önbellek, yoksa ikiliye gömülü kopya. Önbellek bant dışında (`atl update` ile) tazelenir; böylece `search`, bir çekim için hiç beklemeden sonuçlar güncel kalır.
 
 ## Sonuç yok mu?
 
-Kayıt defteri PR güdümlü ve gençtir — alanın henüz kapsanmıyorsa büyük olasılıkla bu yalnızca "henüz değil" demektir. Seçenekler:
-
-- Bir Git URL'sini doğrudan kullan: `atl install https://github.com/you/your-team.git`.
-- Kendi takımını yayımla: [Bir takım yazma](/tr/authoring/creating-a-team).
-- Kayıt defterine gönder: [Kayıt defteri başvurusu](/tr/authoring/registry-submission).
+Katalog, [`atl-team`](https://github.com/topics/atl-team) topic'iyle etiketlenmiş herkese açık GitHub depolarından üretilir ve gençtir — alanın henüz kapsanmıyorsa, bu büyük olasılıkla yalnızca "henüz değil" demektir. Bir takımı listeletmek için deposunu `atl-team` ile etiketle (ya da takım deposundan `atl publish` çalıştır); katalog onu alır. Bkz. [Bir takım yazma](/tr/authoring/creating-a-team).
 
 ## İlgili
 
 - [`atl install`](/tr/cli/install) — bulduğunu kur.
-- [Kayıt defteri başvurusu](/tr/authoring/registry-submission) — takımını listele.

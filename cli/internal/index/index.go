@@ -154,6 +154,34 @@ func (ix *Index) Lookup(handle, name string) (*Entry, error) {
 	return nil, fmt.Errorf("team %q not found in index", handle+"/"+name)
 }
 
+// Search returns every entry whose handle, name, description, or one of its
+// keywords contains query (case-insensitive). A blank query matches all teams,
+// so the catalog can be browsed. Results keep the index's order.
+func (ix *Index) Search(query string) []Entry {
+	q := strings.ToLower(strings.TrimSpace(query))
+	var out []Entry
+	for _, e := range ix.Teams {
+		if q == "" || entryMatchesQuery(e, q) {
+			out = append(out, e)
+		}
+	}
+	return out
+}
+
+func entryMatchesQuery(e Entry, q string) bool {
+	if strings.Contains(strings.ToLower(e.Handle), q) ||
+		strings.Contains(strings.ToLower(e.Name), q) ||
+		strings.Contains(strings.ToLower(e.Description), q) {
+		return true
+	}
+	for _, k := range e.Keywords {
+		if strings.Contains(strings.ToLower(k), q) {
+			return true
+		}
+	}
+	return false
+}
+
 // ParseRef splits a "<handle>/<name>" reference.
 func ParseRef(s string) (handle, name string, err error) {
 	parts := strings.Split(s, "/")
