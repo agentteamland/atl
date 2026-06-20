@@ -27,3 +27,5 @@ jobs:
       - name: Test
         working-directory: cli
         run: go test ./...
+      - name: English-only (no non-English text outside /tr/ mirrors)
+        run: bash scripts/scan-non-english.sh

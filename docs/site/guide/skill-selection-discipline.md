@@ -27,21 +27,21 @@ A vague prompt forces the assistant to guess, and guessing is where wrong-team s
 
 | Vague | Specific |
 |---|---|
-| "Ne yapmam lazım?" | "Yarın Ahmet'le toplantım var, ne sormam lazım?" (clearly personal) |
-| "Şuna bir bak" | "API endpoint'inde validation yazalım" (clearly software) |
-| "Yardım et" | "Bu hafta finansal durumumu gözden geçirelim" (clearly personal-advisory) |
+| "What should I do?" | "I have a meeting with Alex tomorrow — what should I ask?" (clearly personal) |
+| "Take a look at this" | "Let's add validation to the API endpoint" (clearly software) |
+| "Help me out" | "Let's review my finances this week" (clearly personal-advisory) |
 
 The more your prompt names the domain, the less the assistant has to infer.
 
 ### 2. Name the skill if you know it
 
-If you know which slash command to use, invoking it directly is faster and more reliable than waiting for the assistant to remember. `"/save-learnings yap"` runs immediately; "save my learnings" requires the assistant to map intent to skill name.
+If you know which slash command to use, invoking it directly is faster and more reliable than waiting for the assistant to remember. Typing `/save-learnings` runs immediately; "save my learnings" requires the assistant to map intent to skill name.
 
 ### 3. Correct mid-turn if the wrong team gets picked
 
 If the assistant starts answering with the wrong team's frame ("software response to a personal question" or vice versa), say so:
 
-> "Bu konu personal değil, software" — the assistant will switch and remember the correction within the session.
+> "This isn't personal — it's software" — the assistant will switch and remember the correction within the session.
 
 Mid-turn correction is normal and fast. A wrong skill running to completion is what costs time.
 
