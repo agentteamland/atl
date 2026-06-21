@@ -47,4 +47,3 @@ Run: atl install <team-name>
 - [`atl install`](/cli/install)
 - [`atl remove`](/cli/remove)
 - [`atl update`](/cli/update)
-- [Inheritance](/authoring/inheritance)

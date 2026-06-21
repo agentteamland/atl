@@ -1,50 +1,40 @@
 # Learning marker lifecycle
 
-End-to-end picture of how knowledge flows from a conversation into the project's knowledge base. The pattern is **inline markers + scan on next session start** — cheap to write, automatic to process.
+End-to-end picture of how knowledge flows from a conversation into the project's knowledge base. The v2 pattern is **inline markers → durable queue → drain → ack** — cheap to write, captured automatically, processed exactly once, and impossible to re-report.
 
-The canonical rule lives at [`core/rules/learning-capture.md`](https://github.com/agentteamland/core/blob/main/rules/learning-capture.md). This page is the user-facing summary.
+The canonical rule lives at [`core/rules/learning-capture.md`](https://github.com/agentteamland/atl/blob/main/core/rules/learning-capture.md). This page is the user-facing summary.
 
 ## The flow at a glance
 
 ```
-[Session N]                                    Claude drops <!-- learning -->
-                                               markers inline as it speaks.
-                                               No tool call, no extra cost.
+[mid-conversation]          Claude drops <!-- learning: ... --> markers inline
+                            as it speaks. No tool call, no extra cost.
         ↓
-[Session N ends]                               Markers sit in the transcript.
-                                               No hook fires at session end.
+atl tick                    A hook runs `atl tick` on every prompt (throttled)
+(hook-run, every few min    and at session start. It parses markers from this
+ + at session start)        project's transcripts and enqueues each into the
+                            durable queue — exactly once, deduped by content hash.
         ↓
-[Session N+1 starts]                           SessionStart hook fires:
-                                               atl session-start --silent-if-clean
+~/.atl/queue.db             One embedded bbolt file, per-project buckets keyed
+                            by the working directory. No server, no daemon.
         ↓
-   step 3: atl learning-capture                Reads ~/.claude/state/
-           --previous-transcripts              learning-capture-state.json,
-                                               enumerates project transcripts
-                                               modified after the cutoff,
-                                               grep-scans for marker blocks.
+[session start]             The SessionStart hook surfaces a count:
+                            "N learning(s) pending" + a /drain signal.
         ↓
-[Output reaches Claude]                        🧠 learning-capture: N markers
-                                               → Run: /save-learnings ...
+[your first turn]           You invoke /drain. It reads the pending items
+                            (atl learnings peek --json), routes each one to the
+                            wiki / journal / agent knowledge base, and acks it.
         ↓
-[Claude's first turn]                          Invokes /save-learnings
-                                               --from-markers --transcripts ...
+atl learnings ack <id>      An acked item is DELETED from the queue.
         ↓
-[/save-learnings persists]                     Journal entry, wiki page(s),
-                                               agent children, skill learnings.
-                                               Calls atl learning-capture
-                                               --commit-from-transcripts
-                                               to advance state file.
-        ↓
-[Loop closed]                                  Next SessionStart sees
-                                               zero unprocessed markers.
+[loop closed]              A processed item is gone — it can never re-report.
+                            There is no state file to advance.
 ```
 
-End-to-end automatic except for **two human touch points**:
+The split is deliberate: **capture is automatic and deterministic** (markers → queue, exactly once, done by the CLI), and **integration is the LLM half** ([`/drain`](/skills/drain) — deciding where each learning belongs). The only human touch points are:
 
-1. **You (the agent)** invoke `/save-learnings --from-markers --transcripts ...` after seeing the additionalContext recommendation. Per the maintainer's design, that's a single command call — no manual marker-by-marker review.
-2. **The user** answers the AskUserQuestion gate when new structures (skill / rule / agent / identity / skill core change) are proposed. One multi-select prompt per run.
-
-Everything else (journal, wiki, children, learnings, KB rebuilds, state advance) happens silently.
+1. **You (the agent)** invoke [`/drain`](/skills/drain) after seeing the session-start "N pending" signal — one command.
+2. **The user** answers an `AskUserQuestion` gate only when `/drain` proposes a *structural* change (a new agent / skill / rule, or an identity expansion). Routine writes to wiki / journal / agent KB happen silently.
 
 ## What counts as a learning moment
 
@@ -61,123 +51,135 @@ Routine Q&A, file lookups, and mechanical edits are NOT learning moments. Don't 
 
 ## The marker format
 
-Drop an HTML comment in the response text when a learning moment occurs. Invisible in rendered output, preserved in the transcript the hook scans, ~40 tokens:
+Drop an HTML comment in the response text when a learning moment occurs. Invisible in rendered output, preserved in the transcript the hook scans, ~20 tokens:
 
 ```html
-<!-- learning
-topic: auth-refresh
-kind: decision
-doc-impact: readme
-body: 7-day JWT refresh chosen because we want long sessions; user logs in once a week max.
+<!-- learning: 7-day JWT refresh chosen — we want long sessions; the user logs in about once a week. -->
+```
+
+That is the **whole** format:
+
+```
+<!-- learning: <one to three sentences, always including the WHY> -->
+```
+
+No fields, no schema — just the fact and its reason in plain text. The [`/drain`](/skills/drain) skill reads the payload and infers where it belongs (a wiki topic, a journal entry, or an agent's knowledge base) and derives a kebab-case topic from the content. Multi-line is fine for a longer thought:
+
+```html
+<!-- learning:
+Redis pool exhausted under load because each request opened its own client.
+Fix: one shared pool. Symptom was intermittent timeouts at ~200 rps.
 -->
 ```
 
-### Fields
+**Always include the WHY.** A six-month-old "we chose X" with no reasoning is useless. One marker per learning — don't bundle unrelated learnings; each deserves its own.
 
-| Field | Required | Description |
-|---|---|---|
-| `topic` | ✅ | kebab-case, one concept (becomes the wiki page name). Example: `auth-refresh`, `redis-ttl`, `build-pipeline`. |
-| `kind` | ✅ | One of `bug-fix \| decision \| pattern \| anti-pattern \| discovery \| convention`. |
-| `doc-impact` | ✅ | One of `none \| readme \| docs \| both \| breaking`. Default `none` when unsure. Drives the [docs-sync rule](https://github.com/agentteamland/core/blob/main/rules/docs-sync.md). |
-| `body` | ✅ | One to three sentences. **Always include the WHY.** A 6-month-old "we chose X" without reasoning is useless. |
+> **Changed from v1.** The old marker carried structured YAML fields (`topic`, `kind`, `doc-impact`, `body`). v2 drops all of them: the payload is plain prose, and `/drain` does the routing the fields used to encode. The `doc-impact` field is gone because v2 has no docs-sync step.
 
-### Multiple markers per response
+### The `profile-fact` channel
 
-Fine when multiple learnings happen. Do **not** bundle unrelated learnings into one marker — each topic deserves its own.
+The queue is multi-channel. A second channel, `profile-fact`, captures durable facts about the user or the people they work with — same comment shape, `profile-fact:` prefix:
+
+```html
+<!-- profile-fact: Prefers TypeScript over JavaScript for all new services. -->
+```
+
+[`/drain`](/skills/drain) processes only the `learning` channel; `profile-fact` is reserved for a future first-party profile team's own drain and is not handled here.
 
 ## Why inline markers, not a tool call
 
-A tool call per learning would double token cost and slow the conversation. Inline markers are embedded in text the agent was going to produce anyway. A grep-level hook finds them at ~0 cost; the AI-heavy `/save-learnings` work only runs when markers exist — boring sessions stay free.
+A tool call per learning would double token cost and slow the conversation. Inline markers are embedded in text the agent was going to produce anyway. A grep-level pass inside [`atl tick`](/cli/tick) finds them at ~0 cost; the AI-heavy [`/drain`](/skills/drain) work only runs when items are queued — boring sessions stay free.
 
 ## When to skip marking
 
 - Purely conversational turns (greetings, clarifications, status questions)
 - Reading a file and summarizing its contents (no decision, no discovery)
 - Routine edits where nothing surprising happened
-- A learning already captured by a recent marker in the same session (don't duplicate)
+- A learning already captured by a marker earlier in the same session (don't duplicate)
 
 ## Step-by-step under the hood
 
-### 1. SessionStart hook
+### 1. `atl tick` captures the markers
 
-The hook ([`atl setup-hooks`](/cli/setup-hooks) installs it) wires:
+[`atl setup-hooks`](/cli/setup-hooks) wires [`atl tick`](/cli/tick) to the `UserPromptSubmit` hook (throttled, e.g. `--throttle=10m`), and `atl session-start` runs a pass at session start. On each run, `tick`:
+
+- discovers this project's Claude Code transcripts modified since the last tick,
+- extracts the assistant text and parses `<!-- learning: ... -->` (and `<!-- profile-fact: ... -->`) markers,
+- **enqueues each into the durable queue exactly once** — idempotency comes from the queue's content-hash dedup, so re-draining the same text enqueues nothing new.
+
+`tick` only **enqueues**. It never integrates — folding a learning into the knowledge base is LLM work, so it stays on the skill side of the CLI/Skill boundary.
+
+### 2. The durable queue
+
+The queue is one embedded [bbolt](https://github.com/etcd-io/bbolt) file at `~/.atl/queue.db` — no server, no daemon. Every project's queue lives in that one file, isolated into per-project buckets keyed by the working directory. [`atl learnings`](/cli/learnings) is the deterministic read/ack surface:
+
+```bash
+atl learnings status                    # pending counts per channel (this project)
+atl learnings peek                      # list pending items (human-readable)
+atl learnings peek --channel learning --json   # the machine-readable list /drain consumes
+atl learnings ack <id>                  # mark an item processed (delete it)
+```
+
+### 3. Session start surfaces the count
+
+When you open a new session, the `SessionStart` hook ([`atl session-start`](/cli/setup-hooks)) runs a `tick` pass and reports the pending count — the same number [`atl doctor`](/cli/doctor) reports — as a short signal in Claude's `additionalContext`:
 
 ```
-SessionStart → atl session-start --silent-if-clean
+🧠 2 learning(s) pending → run /drain
 ```
 
-`atl session-start` runs three boot-time tasks in order:
+When nothing is queued, output is empty (zero token cost).
 
-1. **Auto-update**: pull every cached agentteamland repo
-2. **Previous-transcript marker scan**: the step that surfaces unprocessed learnings
-3. **`atl` self-version check**: GitHub Releases API, throttled to 24h
+### 4. `/drain` processes the queue
 
-### 2. Marker scan
-
-The marker scan inside `atl session-start` is exactly:
+The agent (you) reads the signal and invokes:
 
 ```
-atl learning-capture --previous-transcripts
-```
-
-What it does:
-
-- Reads `~/.claude/state/learning-capture-state.json` for the per-project `lastProcessedAt` cutoff (or last 7 days on first run)
-- Enumerates transcripts modified after that cutoff
-- Grep-scans for `<!-- learning -->` blocks emitted by **assistant** turns only (the v1.1.1 noise filter rejects prose mentions, tool inputs/outputs, summary events, and topics that fail the kebab-case regex)
-- Per-marker hash dedup against the state file's `processedMarkers` set (FIFO-capped at 5000 entries) — this closes the long-session re-report bug fixed in `atl v1.1.3` + `core@1.10.0`
-- Prints a compact report
-
-### 3. Output reaches Claude
-
-`SessionStart` and `UserPromptSubmit` are the only Claude Code hooks whose stdout reaches Claude's `additionalContext` (per [Claude Code v2.1.x docs](https://docs.claude.com/en/docs/claude-code/hooks)). The previous v0.2.0 design used `SessionEnd` + `PreCompact` for marker scanning — and silently lost output for ~7 weeks because those events don't deliver to additionalContext.
-
-The current SessionStart-only design fixes that gap. See the [`atl setup-hooks` History note](/cli/setup-hooks#history-from-four-hooks-to-two) for the full migration story.
-
-### 4. `/save-learnings` processes
-
-The agent (you) reads the additionalContext report and invokes:
-
-```
-/save-learnings --from-markers --transcripts <path1>,<path2>,...
+/drain
 ```
 
 The skill:
 
-1. Extracts each `<!-- learning -->` block from the listed transcripts
-2. Hashes by `(kind + topic + body)` and skips anything already in journal for the same date
-3. Categorizes each learning by `kind` + body shape
-4. Writes journal + wiki + agent children + skill learnings as appropriate
-5. (If any of 5 gated changes are proposed) batches one `AskUserQuestion`
-6. Calls `atl learning-capture --commit-from-transcripts` to record per-marker hashes in the state file
-7. Reports a single summary block
+1. Runs `atl learnings peek --channel learning --json` to read the pending items (`{id, channel, payload, enqueued_at}`).
+2. Routes each item by the shape of its payload, deriving a kebab-case topic from the content:
+   - **Topic-shaped current truth** → wiki page (`<proj>/.atl/wiki/<topic>.md`, replace/merge) + journal
+   - **Time-stamped narrative** → journal only (`<proj>/.atl/journal/<YYYY-MM-DD>.md`, append)
+   - **Domain knowledge for an installed agent** → that agent's `children/<topic>.md` + rebuild its `## Knowledge Base` section + journal
+   - **Structural** (repeating workflow, crystallized convention, a new domain with no owning agent, an identity expansion) → propose via `AskUserQuestion`; never author autonomously
+3. Writes each non-structural item silently, then **acks only after the write succeeds**.
+4. For structural items, collects them and proposes each through one `AskUserQuestion` (the reactive-creation boundary — a human confirms structural growth).
+5. Reports a short summary of what landed where.
 
-### 5. State advances; loop closes
+### 5. ack = delete; the loop closes structurally
 
-The state-file write at step 6 is what closes the loop. The next `atl session-start` reads the same state and sees zero unprocessed markers when nothing new has happened. Boring sessions stay free.
+`atl learnings ack <id>` **deletes** the item from the queue. There is no state file to advance and nothing to dedup against later — a processed marker physically cannot come back.
 
-If `/save-learnings` fails partway, the state file is **not** updated — markers re-report on the next session and processing retries. Failure modes don't lose data.
+This is what structurally kills v1's long-session re-report bug class: in v1, reports came from re-scanning an ever-growing transcript filtered against `~/.claude/state/learning-capture-state.json`, and the filter could mis-fire. In v2, reports come from the queue, and processing removes the item. Re-running `/drain` on an empty queue is a no-op.
+
+If `/drain` can't integrate an item, it leaves it un-acked and notes it in the report — failure modes don't lose data.
 
 ## When the hook isn't installed
 
-Markers are harmless without a processing hook — they're HTML comments, invisible in rendered output, inert as text. The capture habit is still valuable (markers are legible even to a human reader of the transcript).
+Markers are harmless without the hook — they're HTML comments, invisible in rendered output, inert as text. The capture habit is still valuable (markers are legible even to a human reading the transcript).
 
-For automatic processing, the user runs `atl setup-hooks`. Without those hooks, the user must invoke `/save-learnings` manually at session boundaries; markers still accumulate in transcripts and remain available for whenever processing happens.
+For automatic capture, run [`atl setup-hooks`](/cli/setup-hooks). Without it, nothing enqueues automatically; you can still force a capture pass yourself with [`atl tick`](/cli/tick) (no `--throttle`) and then run [`/drain`](/skills/drain). The markers accumulate in transcripts and remain available for whenever a `tick` pass runs.
 
 ## History
 
-This rule has gone through three shapes:
+This flow has gone through three shapes:
 
-1. **Original (pre-`atl` versions):** "Claude should proactively save learnings at the end of every session." Worked sometimes; depended on Claude remembering a prose instruction. Unreliable.
-2. **First `atl` version (v0.2.0 — `core@1.3.0`):** Inline markers + `atl learning-capture` registered on `SessionEnd` and `PreCompact` hooks. **Silently broken** — those events don't deliver hook stdout to Claude's additionalContext. 324 markers across 9 sessions in the maintainer workspace produced **zero** auto-processing during the month it was in production. All actual `/save-learnings` work in that period was triggered by manual user invocation, not hook output.
-3. **Current (v1.1.0+ — `core@1.8.0`):** Hook moved to `SessionStart` via the new `atl session-start` wrapper, scanning the previous session's transcripts via the new `--previous-transcripts` mode. Output reaches additionalContext. State file tracks per-project `lastProcessedAt` and per-marker hashes (the latter shipped in `atl v1.1.3` + `core@1.10.0` to fix a long-session re-report bug). The loop closes deterministically.
+1. **Original (pre-`atl`):** "Claude should proactively save learnings at the end of every session." Depended on Claude remembering a prose instruction. Unreliable.
+2. **v1 (transcript scan + `/save-learnings`):** Inline markers carried structured YAML fields; a `SessionStart` hook re-scanned the previous session's transcripts, filtered against a JSON state file, and reported unprocessed markers for the `/save-learnings` skill to process. The state file was advanced on success. The model worked, but re-scanning an ever-growing transcript against a filter was the source of a long-session re-report bug class, and the marker schema (`topic`/`kind`/`doc-impact`/`body`) coupled capture to a docs-sync step.
+3. **Current (v2 — marker → bbolt queue → `/drain` → ack):** The marker is plain prose. [`atl tick`](/cli/tick) enqueues each one into a durable [bbolt](https://github.com/etcd-io/bbolt) queue exactly once; [`/drain`](/skills/drain) folds each into the knowledge base and acks it (deletes it). No transcript re-scan, no state file, no docs-sync coupling — and the re-report bug class is gone by construction.
 
 ## Related
 
-- [`atl learning-capture`](/cli/learning-capture) — the CLI scanner
-- [`atl setup-hooks`](/cli/setup-hooks) — wires the SessionStart hook
-- [`/save-learnings`](/skills/save-learnings) — processes the markers
+- [`atl tick`](/cli/tick) — the in-session pass that parses markers and enqueues them
+- [`atl learnings`](/cli/learnings) — inspect and drain the durable queue (`status` / `peek` / `ack`)
+- [`/drain`](/skills/drain) — the LLM half: routes each queued learning into the knowledge base, then acks it
+- [`atl setup-hooks`](/cli/setup-hooks) — wires the `UserPromptSubmit` + `SessionStart` hooks that run `tick`
+- [`atl doctor`](/cli/doctor) — surfaces the same pending count on demand
 - [Knowledge system](/guide/knowledge-system) — where journal and wiki live
 - [Children + learnings](/guide/children-and-learnings) — where agent / skill domain knowledge lands
 - [Claude Code conventions](/guide/claude-code-conventions) — the marker block conventions used throughout
-- Canonical rule: [`core/rules/learning-capture.md`](https://github.com/agentteamland/core/blob/main/rules/learning-capture.md)
+- Canonical rule: [`core/rules/learning-capture.md`](https://github.com/agentteamland/atl/blob/main/core/rules/learning-capture.md)

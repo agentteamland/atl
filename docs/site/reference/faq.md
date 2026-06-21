@@ -62,7 +62,7 @@ No. AgentTeamLand is an independent open-source project that works with Anthropi
 
 ### How do I contribute?
 
-- **Publish a team** to the registry — [Registry submission](/authoring/registry-submission).
+- **Publish a team** to the registry — [Registry submission](/cli/publish).
 - **Improve the CLI** — PRs welcome at [`agentteamland/cli`](https://github.com/agentteamland/cli).
 - **Improve these docs** — PRs welcome at [`agentteamland/docs`](https://github.com/agentteamland/docs). Every page has an "Edit this page on GitHub" link.
 - **Open issues** — bug reports and feature requests go on the relevant repo.

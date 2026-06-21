@@ -64,7 +64,7 @@ gh pr create
 # Bakımcının inceleyip birleştirmesini bekle
 ```
 
-Her eş depo kendi uzak deposu olan kendi Git klonudur. 16 deponun 12'sinde dal koruması (sürüm yayım hattı + .github hariç) PR akışını zorunlu kılar. Tüm disiplin için bkz. [Takım deposu bakımı](../authoring/team-repo-maintenance).
+Her eş depo kendi uzak deposu olan kendi Git klonudur. Genel üretim depolarındaki dal koruması PR akışını zorunlu kılar.
 
 ## Çalışma alanını Claude Code ile kullanmak
 
@@ -105,6 +105,4 @@ Daha kapsamlı bir oturum sonu geçişi için [`/repo-cleanup`](https://github.c
 ## İlgili
 
 - [`atl` CLI'yi kur](../guide/install) — yalnızca `atl`'yi KULLANMAK istiyorsan çalışma alanını atla.
-- [Takım deposu bakımı](../authoring/team-repo-maintenance) — her eş depo PR'ının izlediği disiplin.
-- [Yönetişim](../guide/governance) — dal koruması ile team-repo-maintenance kuralı eşi.
 - [Bilgi sistemi](../guide/knowledge-system) — çalışma alanının `.claude/` dizinindeki journal ve wiki katmanları.

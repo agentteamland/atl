@@ -1,6 +1,6 @@
 # `/create-pr`
 
-Çalışma ağacı değişikliklerini al (commit edilmemiş ya da yakın zamanda varsayılan dala commit edilmiş), farktan uygun bir dal adı + commit mesajı + PR başlığı türet, [`/save-learnings`](/tr/skills/save-learnings) komutunu çalıştır ki birikmiş deneyim aynı PR'ın içinde yolculuk etsin, AI inceleme zincirini çalıştır (genel temel + takım tarafından bildirilen uzmanlar), commit + push yap, bir PR aç. İsteğe bağlı olarak GitHub auto-merge düzeneğini, sınırlı bir yoklama ve kendiliğinden düzeltme döngüsüyle etkinleştir. İş bitiminde kullanıcıyı daima hedef dala döndür.
+Çalışma ağacı değişikliklerini al (commit edilmemiş ya da yakın zamanda varsayılan dala commit edilmiş), farktan uygun bir dal adı + commit mesajı + PR başlığı türet, [`/save-learnings`](/tr/skills/drain) komutunu çalıştır ki birikmiş deneyim aynı PR'ın içinde yolculuk etsin, AI inceleme zincirini çalıştır (genel temel + takım tarafından bildirilen uzmanlar), commit + push yap, bir PR aç. İsteğe bağlı olarak GitHub auto-merge düzeneğini, sınırlı bir yoklama ve kendiliğinden düzeltme döngüsüyle etkinleştir. İş bitiminde kullanıcıyı daima hedef dala döndür.
 
 Bu beceri, "bir parça işi yayımla" akışının belirlenimci hâlidir — `team-repo-maintenance`, `branch-hygiene`, `learning-capture`, `docs-sync` ve `karpathy-guidelines` ile tanımlı disiplinleri tüketir; kullanıcı bunları her PR'da yeniden üretmek zorunda kalmaz.
 
@@ -51,7 +51,7 @@ Beceri kullanıcıya ad onayı için **sormaz** — adları üretir ve devam ede
 
 ### Adım 4 — Öğrenmeleri kaydet (`--no-learning` verilmedikçe)
 
-[`/save-learnings`](/tr/skills/save-learnings) komutunu elle kipte çalıştırır (canlı konuşmayı çözümler):
+[`/save-learnings`](/tr/skills/drain) komutunu elle kipte çalıştırır (canlı konuşmayı çözümler):
 
 - Wiki / journal / ajan children / beceri learnings güncellemelerini yazar (proje-yerel).
 - Her `<!-- learning doc-impact: readme/docs/breaking -->` işaretçisi için bir doküman taslağı hazırlar.
@@ -189,7 +189,7 @@ Kullanıcı beceriyi hedef dalda, birleştirilmiş değişiklik dahil edilmiş h
 
 ## İlgili
 
-- [`/save-learnings`](/tr/skills/save-learnings) — Adım 4'te çağrılır.
+- [`/save-learnings`](/tr/skills/drain) — Adım 4'te çağrılır.
 - [team-repo-maintenance kuralı](https://github.com/agentteamland/core/blob/main/rules/team-repo-maintenance.md) — paylaşılan depolar için yönetişim.
 - [karpathy-guidelines kuralı](https://github.com/agentteamland/core/blob/main/rules/karpathy-guidelines.md) — inceleme isteminin temeli.
 

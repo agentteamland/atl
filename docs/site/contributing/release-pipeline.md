@@ -127,11 +127,10 @@ The three-channel split is **standard for cross-platform CLIs**. Each platform h
 
 The two automated channels (brew + scoop) keep maintenance cost ~zero. The winget channel needs a manual PR per release because Microsoft requires it — that's the cost of being in the official Windows catalog.
 
-The release-pipeline repos (`homebrew-tap`, `scoop-bucket`, `winget-pkgs`) are intentionally NOT branch-protected. Goreleaser force-pushes; protection would block it. See [Governance](../guide/governance) for which repos are protected and which aren't.
+The release-pipeline repos (`homebrew-tap`, `scoop-bucket`, `winget-pkgs`) are intentionally NOT branch-protected. Goreleaser force-pushes; protection would block it.
 
 ## Related
 
 - [Install `atl`](../guide/install) — the user-facing install instructions for all three channels
 - [winget upstream-PR process](winget-process) — the manual step in the winget pipeline
-- [Governance](../guide/governance) — branch protection across the org
 - The cli repo's [`.goreleaser.yaml`](https://github.com/agentteamland/cli/blob/main/.goreleaser.yaml) — the goreleaser config that orchestrates this whole pipeline

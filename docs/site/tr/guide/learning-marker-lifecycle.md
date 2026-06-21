@@ -1,183 +1,186 @@
 # Öğrenme işaretçisi yaşam döngüsü
 
-Bilginin bir konuşmadan projenin bilgi tabanına nasıl aktığının uçtan uca resmi. Desen şudur: **satır içi işaretçiler + bir sonraki oturum başında tarama** — yazması ucuz, işlenmesi otomatik.
+Bilginin bir konuşmadan projenin bilgi tabanına nasıl aktığının uçtan uca resmi. v2 deseni **satır içi işaretçiler → kalıcı kuyruk → drain → ack** — yazması ucuz, kendiliğinden yakalanan, tam olarak bir kez işlenen ve yeniden raporlanması imkânsız.
 
-Kanonik kural [`core/rules/learning-capture.md`](https://github.com/agentteamland/core/blob/main/rules/learning-capture.md) dosyasında yaşar. Bu sayfa kullanıcıya yönelik özettir.
+Kanonik kural [`core/rules/learning-capture.md`](https://github.com/agentteamland/atl/blob/main/core/rules/learning-capture.md) dosyasında yaşar. Bu sayfa kullanıcıya yönelik özettir.
 
 ## Akışa bir bakış
 
 ```
-[Oturum N]                                     Claude konuştukça satır içi
-                                               <!-- learning --> işaretçileri düşürür.
-                                               Araç çağrısı yok, ek maliyet yok.
+[konuşma ortasında]         Claude konuştukça <!-- learning: ... --> işaretçilerini
+                            satır içi düşürür. Araç çağrısı yok, ek maliyet yok.
         ↓
-[Oturum N biter]                               İşaretçiler transkriptte oturur.
-                                               Oturum sonunda hiçbir hook tetiklenmez.
+atl tick                    Bir hook her promptta (kısıtlanmış) ve oturum başında
+(hook-run, birkaç dakikada  `atl tick` çalıştırır. Bu projenin transkriptlerinden
+ bir + oturum başında)      işaretçileri ayrıştırır ve her birini kalıcı kuyruğa
+                            sokar — içerik hash'iyle yinelenenler ayıklanarak,
+                            tam olarak bir kez.
         ↓
-[Oturum N+1 başlar]                            SessionStart hook tetiklenir:
-                                               atl session-start --silent-if-clean
+~/.atl/queue.db             Tek bir gömülü bbolt dosyası, çalışma dizinine göre
+                            anahtarlanmış proje başına kovalar. Sunucu yok, daemon yok.
         ↓
-   adım 3: atl learning-capture                ~/.claude/state/
-           --previous-transcripts              learning-capture-state.json dosyasını okur,
-                                               kesim noktasından sonra değişen proje
-                                               transkriptlerini sıralar,
-                                               işaretçi bloklarını grep ile tarar.
+[oturum başında]            SessionStart hook'u bir sayı yüzeye çıkarır:
+                            "N öğrenme bekliyor" + bir /drain sinyali.
         ↓
-[Çıktı Claude'a ulaşır]                        🧠 learning-capture: N işaretçi
-                                               → Çalıştır: /save-learnings ...
+[ilk turun]                 /drain komutunu çağırırsın. Bekleyen maddeleri okur
+                            (atl learnings peek --json), her birini wiki / journal /
+                            ajan bilgi tabanına yönlendirir ve ack'ler.
         ↓
-[Claude'un ilk turu]                           /save-learnings çağrılır
-                                               --from-markers --transcripts ...
+atl learnings ack <id>      Ack'lenmiş bir madde kuyruktan SİLİNİR.
         ↓
-[/save-learnings kalıcılaştırır]               Journal kaydı, wiki sayfa(ları),
-                                               ajan children'ı, beceri learnings'i.
-                                               Durum dosyasını ilerletmek için
-                                               atl learning-capture
-                                               --commit-from-transcripts çağrılır.
-        ↓
-[Döngü kapandı]                                Bir sonraki SessionStart sıfır
-                                               işlenmemiş işaretçi görür.
+[döngü kapandı]             İşlenmiş bir madde gitmiştir — asla yeniden raporlanamaz.
+                            İlerletilecek bir durum dosyası yoktur.
 ```
 
-Uçtan uca otomatiktir; yalnızca **iki insan dokunuş noktası** vardır:
+Bu bölünme bilinçlidir: **yakalama kendiliğinden ve deterministiktir** (işaretçiler → kuyruk, tam olarak bir kez, CLI tarafından yapılır) ve **entegrasyon LLM yarısıdır** ([`/drain`](/tr/skills/drain) — her öğrenmenin nereye ait olduğuna karar verir). Tek insan dokunuş noktaları şunlardır:
 
-1. **Sen (ajan)** `additionalContext` önerisini gördükten sonra `/save-learnings --from-markers --transcripts ...` komutunu çalıştırırsın. Bakımcının tasarımı gereği, bu tek bir komut çağrısıdır — işaretçi başına elle inceleme yoktur.
-2. **Kullanıcı**, yeni yapılar (beceri / kural / ajan / kimlik / beceri çekirdek değişikliği) önerildiğinde `AskUserQuestion` onay kapısını yanıtlar. Çalışma başına tek bir çoklu seçim sorusu.
-
-Geri kalan her şey (journal, wiki, children, learnings, dizin yeniden inşaları, durum ilerlemesi) sessizce gerçekleşir.
+1. **Sen (ajan)**, oturum başındaki "N bekliyor" sinyalini gördükten sonra [`/drain`](/tr/skills/drain) komutunu çağırırsın — tek bir komut.
+2. **Kullanıcı**, yalnızca `/drain` *yapısal* bir değişiklik önerdiğinde (yeni bir ajan / beceri / kural ya da bir kimlik genişletmesi) bir `AskUserQuestion` kapısını yanıtlar. Wiki / journal / ajan bilgi tabanına yapılan sıradan yazmalar sessizce gerçekleşir.
 
 ## Ne öğrenme anı sayılır?
 
 Şunlardan herhangi biri bir konuşma sırasında olduğunda öğrenme anıdır:
 
-- **Hata düzeltme** — gerçek bir hata yeniden üretildi ve düzeltildi.
-- **Karar** — alternatifler arasında bir seçim yapıldı (JWT vs oturum, Redis vs memcached, 7 günlük vs 15 günlük yenileme).
-- **Desen** — bir yaklaşım temiz ve yeniden kullanılabilir çıktı.
-- **Anti-desen** — bir şey denendi, başarısız oldu, nedenini biliyoruz.
-- **Keşif** — sistem, kütüphane ya da dış servis hakkında apaçık olmayan bir gerçek.
-- **Sözleşme** — "şu andan itibaren X'i daima / asla yapmayız."
+- **Hata düzeltme** — gerçek bir hata yeniden üretildi ve düzeltildi
+- **Karar** — alternatifler arasında bir seçim yapıldı (JWT vs oturum, Redis vs memcached, 7 günlük vs 15 günlük yenileme)
+- **Desen** — bir yaklaşım temiz ve yeniden kullanılabilir çıktı
+- **Anti-desen** — bir şey denendi, başarısız oldu ve nedenini biliyoruz
+- **Keşif** — sistem, kütüphane ya da dış servis hakkında apaçık olmayan bir gerçek
+- **Sözleşme** — "şu andan itibaren X'i daima / asla yaparız"
 
 Sıradan soru-yanıt, dosya bakışları ve mekanik düzenlemeler öğrenme anı DEĞİLDİR. Her yanıtı işaretçileme.
 
 ## İşaretçi biçimi
 
-Bir öğrenme anı meydana geldiğinde yanıt metnine bir HTML yorumu düşür. Görüntülenmiş çıktıda görünmez, hook'un taradığı transkriptte korunur, ~40 jeton:
+Bir öğrenme anı meydana geldiğinde yanıt metnine bir HTML yorumu düşür. Görüntülenmiş çıktıda görünmez, hook'un taradığı transkriptte korunur, ~20 jeton:
 
 ```html
-<!-- learning
-topic: auth-refresh
-kind: decision
-doc-impact: readme
-body: 7 günlük JWT yenilemesi seçildi çünkü uzun oturum istiyoruz; kullanıcı haftada en fazla bir kez giriş yapar.
+<!-- learning: 7-day JWT refresh chosen — we want long sessions; the user logs in about once a week. -->
+```
+
+**Bütün** biçim bundan ibarettir:
+
+```
+<!-- learning: <her zaman NEDEN'i içeren bir-üç cümle> -->
+```
+
+Alan yok, şema yok — yalnızca düz metinle olgunun kendisi ve gerekçesi. [`/drain`](/tr/skills/drain) becerisi yükü okur ve nereye ait olduğunu (bir wiki konusu, bir journal kaydı ya da bir ajanın bilgi tabanı) çıkarsar, içerikten kebab-case bir konu türetir. Daha uzun bir düşünce için çok satırlı kullanım da olur:
+
+```html
+<!-- learning:
+Redis pool exhausted under load because each request opened its own client.
+Fix: one shared pool. Symptom was intermittent timeouts at ~200 rps.
 -->
 ```
 
-### Alanlar
+**Her zaman NEDEN'i ekle.** Gerekçesi olmayan, altı aylık bir "X seçtik" işe yaramaz. Öğrenme başına tek işaretçi — ilişkisiz öğrenmeleri tek pakette toplama; her biri kendi işaretçisini hak eder.
 
-| Alan | Zorunlu | Açıklama |
-|---|---|---|
-| `topic` | ✅ | kebab-case, tek kavram (wiki sayfasının adı olur). Örnek: `auth-refresh`, `redis-ttl`, `build-pipeline`. |
-| `kind` | ✅ | Şunlardan biri: `bug-fix \| decision \| pattern \| anti-pattern \| discovery \| convention`. |
-| `doc-impact` | ✅ | Şunlardan biri: `none \| readme \| docs \| both \| breaking`. Emin değilsen varsayılan `none`. [docs-sync kuralını](https://github.com/agentteamland/core/blob/main/rules/docs-sync.md) tetikler. |
-| `body` | ✅ | Bir-üç cümle. **Daima NEDEN'ini içer.** "X seçtik" diyen, gerekçesi olmayan altı aylık bir not işe yaramaz. |
+> **v1'den değişti.** Eski işaretçi yapılandırılmış YAML alanları taşıyordu (`topic`, `kind`, `doc-impact`, `body`). v2 bunların hepsini bırakır: yük düz nesirdir ve eskiden alanların kodladığı yönlendirmeyi `/drain` yapar. `doc-impact` alanı kalktı çünkü v2'de docs-sync adımı yoktur.
 
-### Yanıt başına birden çok işaretçi
+### `profile-fact` kanalı
 
-Birden çok öğrenme aynı yanıtta gerçekleşiyorsa olur. İlişkisiz öğrenmeleri tek bir işaretçide **toplama** — her konu kendi işaretçisini hak eder.
+Kuyruk çok kanallıdır. İkinci bir kanal, `profile-fact`, kullanıcı ya da birlikte çalıştığı kişiler hakkındaki kalıcı olguları yakalar — aynı yorum şekli, `profile-fact:` öneki:
+
+```html
+<!-- profile-fact: Prefers TypeScript over JavaScript for all new services. -->
+```
+
+[`/drain`](/tr/skills/drain) yalnızca `learning` kanalını işler; `profile-fact`, gelecekteki bir birinci-taraf profil takımının kendi drain'ine ayrılmıştır ve burada ele alınmaz.
 
 ## Neden satır içi işaretçi, araç çağrısı değil?
 
-Öğrenme başına bir araç çağrısı, jeton maliyetini ikiye katlar ve konuşmayı yavaşlatır. Satır içi işaretçiler, ajanın zaten üretmek üzere olduğu metnin içine gömülüdür. Grep düzeyindeki bir hook bunları sıfıra yakın maliyetle bulur; AI yoğun olan `/save-learnings` işi yalnızca işaretçi varsa çalışır — sıkıcı oturumlar bedava kalır.
+Öğrenme başına bir araç çağrısı, jeton maliyetini ikiye katlar ve konuşmayı yavaşlatır. Satır içi işaretçiler, ajanın zaten üretecek olduğu metnin içine gömülüdür. [`atl tick`](/tr/cli/tick) içindeki grep düzeyinde bir geçiş onları sıfıra yakın maliyetle bulur; AI yoğun olan [`/drain`](/tr/skills/drain) işi yalnızca kuyrukta madde olduğunda çalışır — sıkıcı oturumlar bedava kalır.
 
 ## İşaretçilemeyi ne zaman atla?
 
-- Salt sohbet niteliğindeki turlar (selamlaşma, netleştirme, durum soruları).
-- Bir dosyayı okuyup içeriğini özetlemek (karar yok, keşif yok).
-- Hiçbir sürpriz olmayan sıradan düzenlemeler.
-- Aynı oturumda yakın bir işaretçi tarafından zaten yakalanmış öğrenmeler (yinelenenleri yazma).
+- Salt sohbet niteliğindeki turlar (selamlaşma, netleştirme, durum soruları)
+- Bir dosyayı okuyup içeriğini özetlemek (karar yok, keşif yok)
+- Hiçbir sürpriz olmayan sıradan düzenlemeler
+- Aynı oturumda daha önce bir işaretçiyle zaten yakalanmış öğrenmeler (yineleme)
 
 ## Adım adım sahne arkası
 
-### 1. SessionStart hook
+### 1. `atl tick` işaretçileri yakalar
 
-Hook'u [`atl setup-hooks`](/tr/cli/setup-hooks) komutu kurar:
+[`atl setup-hooks`](/tr/cli/setup-hooks), [`atl tick`](/tr/cli/tick) komutunu `UserPromptSubmit` hook'una bağlar (kısıtlanmış, ör. `--throttle=10m`) ve `atl session-start` oturum başında bir geçiş çalıştırır. Her çalıştırmada `tick`:
+
+- bu projenin son tick'ten beri değişen Claude Code transkriptlerini keşfeder,
+- assistant metnini çıkarır ve `<!-- learning: ... -->` (ve `<!-- profile-fact: ... -->`) işaretçilerini ayrıştırır,
+- **her birini kalıcı kuyruğa tam olarak bir kez sokar** — idempotenlik kuyruğun içerik-hash yineleme ayıklamasından gelir, dolayısıyla aynı metni yeniden drain etmek yeni hiçbir şey eklemez.
+
+`tick` yalnızca **kuyruğa sokar**. Asla entegre etmez — bir öğrenmeyi bilgi tabanına katlamak LLM işidir, bu yüzden CLI/Beceri sınırının beceri tarafında kalır.
+
+### 2. Kalıcı kuyruk
+
+Kuyruk, `~/.atl/queue.db` konumundaki tek bir gömülü [bbolt](https://github.com/etcd-io/bbolt) dosyasıdır — sunucu yok, daemon yok. Her projenin kuyruğu o tek dosyada yaşar, çalışma dizinine göre anahtarlanmış proje başına kovalara yalıtılır. [`atl learnings`](/tr/cli/learnings) deterministik okuma/ack yüzeyidir:
+
+```bash
+atl learnings status                    # kanal başına bekleyen sayıları (bu proje)
+atl learnings peek                      # bekleyen maddeleri listele (insan okunur)
+atl learnings peek --channel learning --json   # /drain'in tükettiği makine-okunur liste
+atl learnings ack <id>                  # bir maddeyi işlenmiş olarak işaretle (sil)
+```
+
+### 3. Oturum başlangıcı sayıyı yüzeye çıkarır
+
+Yeni bir oturum açtığında, `SessionStart` hook'u ([`atl session-start`](/tr/cli/setup-hooks)) bir `tick` geçişi çalıştırır ve bekleyen sayıyı — [`atl doctor`](/tr/cli/doctor) komutunun raporladığı sayının aynısını — Claude'un `additionalContext` alanında kısa bir sinyal olarak bildirir:
 
 ```
-SessionStart → atl session-start --silent-if-clean
+🧠 2 learning(s) pending → run /drain
 ```
 
-`atl session-start`, açılış zamanında üç görevi sırayla çalıştırır:
+Kuyrukta hiçbir şey yokken çıktı boştur (sıfır jeton maliyeti).
 
-1. **Otomatik güncelleme**: önbelleklenmiş her agentteamland deposunu çek.
-2. **Önceki transkript işaretçi taraması**: işlenmemiş öğrenmeleri yüzeye çıkaran adım.
-3. **`atl` kendi sürüm denetimi**: GitHub Releases API, 24 saatlik kısıtlamayla.
+### 4. `/drain` kuyruğu işler
 
-### 2. İşaretçi taraması
-
-`atl session-start` içindeki işaretçi taraması tam olarak şudur:
+Ajan (sen) sinyali okur ve şunu çağırır:
 
 ```
-atl learning-capture --previous-transcripts
-```
-
-Yaptığı:
-
-- `~/.claude/state/learning-capture-state.json` dosyasını proje başına `lastProcessedAt` kesim noktası için okur (ilk çalıştırmada son 7 gün).
-- O kesim noktasından sonra değişen transkriptleri sıralar.
-- Yalnızca **assistant** turları tarafından üretilen `<!-- learning -->` blokları için grep ile tarama yapar (v1.1.1 gürültü filtresi düz metindeki anmaları, araç girdi ve çıktılarını, özet olaylarını ve kebab-case düzenli ifadesini geçemeyen konuları reddeder).
-- Durum dosyasının `processedMarkers` kümesine karşı işaretçi başına hash karşılaştırmasıyla yinelenenleri ayıklar (5000 girişle FIFO sınırlı) — bu, `atl v1.1.3` ve `core@1.10.0` sürümlerinde düzeltilen uzun-oturum tekrar-raporlama hatasını kapatır.
-- Derli toplu bir rapor yazdırır.
-
-### 3. Çıktı Claude'a ulaşır
-
-`SessionStart` ve `UserPromptSubmit`, stdout çıktısı Claude'un `additionalContext` alanına ulaşan tek Claude Code hook'larıdır ([Claude Code v2.1.x belgeleri](https://docs.claude.com/en/docs/claude-code/hooks) gereği). Önceki v0.2.0 tasarımı işaretçi taraması için `SessionEnd` ve `PreCompact` hook'larını kullanıyordu — ve yaklaşık 7 hafta boyunca sessizce çıktı kaybetti çünkü o olaylar `additionalContext` alanına ulaştırılmaz.
-
-Mevcut yalnızca `SessionStart`'a dayalı tasarım bu boşluğu kapatır. Tüm geçiş öyküsü için bkz. [`atl setup-hooks` Tarihçe notu](/tr/cli/setup-hooks#history-from-four-hooks-to-two).
-
-### 4. `/save-learnings` işler
-
-Ajan (sen) `additionalContext` raporunu okur ve şunu çağırır:
-
-```
-/save-learnings --from-markers --transcripts <path1>,<path2>,...
+/drain
 ```
 
 Beceri:
 
-1. Listelenen transkriptlerden her `<!-- learning -->` bloğunu çıkarır.
-2. `(kind + topic + body)` üçlüsünü hashler ve aynı tarihte journal'da bulunanları atlar.
-3. Her öğrenmeyi `kind` ve gövde biçimine göre sınıflandırır.
-4. Gerekli yerlere journal + wiki + ajan children'ı + beceri learnings'i yazar.
-5. (5 onay kapılı değişiklikten herhangi biri öneriliyorsa) tek bir `AskUserQuestion` içinde toplar.
-6. Durum dosyasına işaretçi başına hash kaydetmek için `atl learning-capture --commit-from-transcripts` çağrısı yapar.
-7. Tek bir özet bloğu raporlar.
+1. Bekleyen maddeleri okumak için `atl learnings peek --channel learning --json` çalıştırır (`{id, channel, payload, enqueued_at}`).
+2. Her maddeyi yükünün biçimine göre yönlendirir, içerikten kebab-case bir konu türeterek:
+   - **Konu biçimli güncel doğru** → wiki sayfası (`<proj>/.atl/wiki/<topic>.md`, yerine yaz/birleştir) + journal
+   - **Zaman damgalı anlatı** → yalnızca journal (`<proj>/.atl/journal/<YYYY-MM-DD>.md`, ekle)
+   - **Kurulu bir ajan için alan bilgisi** → o ajanın `children/<topic>.md` dosyası + `## Knowledge Base` bölümünü yeniden inşa et + journal
+   - **Yapısal** (tekrarlayan bir iş akışı, kristalleşmiş bir sözleşme, sahibi ajan olmayan yeni bir alan, bir kimlik genişletmesi) → `AskUserQuestion` ile öner; asla otonom yazma
+3. Her yapısal olmayan maddeyi sessizce yazar, ardından **yalnızca yazma başarılı olduktan sonra ack'ler**.
+4. Yapısal maddeler için onları toplar ve her birini tek bir `AskUserQuestion` üzerinden önerir (reaktif-oluşturma sınırı — yapısal büyümeyi bir insan onaylar).
+5. Neyin nereye indiğine dair kısa bir özet bildirir.
 
-### 5. Durum ilerler; döngü kapanır
+### 5. ack = sil; döngü yapısal olarak kapanır
 
-6. adımdaki durum dosyası yazımı, döngüyü kapatan adımdır. Bir sonraki `atl session-start` aynı durumu okur ve yeni bir şey olmadığında sıfır işlenmemiş işaretçi görür. Sıkıcı oturumlar bedava kalır.
+`atl learnings ack <id>` maddeyi kuyruktan **siler**. İlerletilecek bir durum dosyası ve sonradan karşılaştırılacak bir şey yoktur — işlenmiş bir işaretçi fiziksel olarak geri dönemez.
 
-`/save-learnings` yarı yolda başarısız olursa durum dosyası **güncellenmez** — işaretçiler bir sonraki oturumda yeniden raporlanır ve işleme yeniden denenir. Başarısızlık biçimleri veri kaybettirmez.
+v1'in uzun-oturum tekrar-raporlama hata sınıfını yapısal olarak öldüren şey budur: v1'de raporlar, sürekli büyüyen bir transkripti `~/.claude/state/learning-capture-state.json` dosyasına karşı süzerek yeniden taramaktan geliyordu ve süzgeç hatalı tetiklenebiliyordu. v2'de raporlar kuyruktan gelir ve işleme maddeyi kaldırır. Boş bir kuyrukta `/drain` komutunu yeniden çalıştırmak bir no-op'tur.
+
+`/drain` bir maddeyi entegre edemezse, onu ack'lenmemiş bırakır ve raporda not eder — başarısızlık biçimleri veri kaybettirmez.
 
 ## Hook kurulu değilken
 
-İşaretçiler işleme yapacak bir hook olmadan da zararsızdır — HTML yorumlarıdır, görüntülenmiş çıktıda görünmezler, metin olarak etkisizdirler. Yakalama alışkanlığı yine de değerlidir (işaretçiler transkriptin bir insan okuyucusu için bile okunaklıdır).
+İşaretçiler hook olmadan da zararsızdır — HTML yorumlarıdır, görüntülenmiş çıktıda görünmezler, metin olarak etkisizdirler. Yakalama alışkanlığı yine de değerlidir (işaretçiler transkripti okuyan bir insan için bile okunaklıdır).
 
-Otomatik işleme için kullanıcı `atl setup-hooks` komutunu çalıştırır. Bu hook'lar olmadan, kullanıcının oturum sınırlarında `/save-learnings` komutunu elle çağırması gerekir; işaretçiler yine de transkriptlerde birikir ve işleme ne zaman yapılırsa yapılsın kullanılabilir kalır.
+Otomatik yakalama için [`atl setup-hooks`](/tr/cli/setup-hooks) çalıştır. Onsuz hiçbir şey kendiliğinden kuyruğa girmez; bir yakalama geçişini yine de kendin [`atl tick`](/tr/cli/tick) ile (`--throttle` olmadan) zorlayabilir, ardından [`/drain`](/tr/skills/drain) çalıştırabilirsin. İşaretçiler transkriptlerde birikir ve bir `tick` geçişi ne zaman çalışırsa kullanılabilir kalır.
 
 ## Tarihçe
 
-Bu kural üç biçimden geçti:
+Bu akış üç biçimden geçti:
 
-1. **Özgün hâl (`atl`'den önceki sürümler):** "Claude her oturum sonunda öngörülü biçimde öğrenmeleri kaydetmeli." Zaman zaman işe yaradı; Claude'un bir düz metin yönergesini hatırlamasına bağlıydı. Güvenilmez.
-2. **İlk `atl` sürümü (v0.2.0 — `core@1.3.0`):** Satır içi işaretçiler + `SessionEnd` ve `PreCompact` hook'larına bağlı `atl learning-capture`. **Sessizce kırık** — o olaylar hook stdout çıktısını Claude'un `additionalContext` alanına ulaştırmaz. Bakımcının çalışma alanında 9 oturum boyunca 324 işaretçi, üretimde olduğu ay süresince **sıfır** otomatik işleme üretti. O dönemdeki tüm gerçek `/save-learnings` işi kullanıcının elle yaptığı çağrılarla tetiklendi, hook çıktısıyla değil.
-3. **Mevcut hâl (v1.1.0+ — `core@1.8.0`):** Hook, yeni `atl session-start` sarmalayıcısı üzerinden `SessionStart`'a taşındı; önceki oturumun transkriptlerini yeni `--previous-transcripts` kipi üzerinden tarıyor. Çıktı `additionalContext` alanına ulaşıyor. Durum dosyası proje başına `lastProcessedAt` ve işaretçi başına hash'leri tutuyor (sonuncusu, uzun-oturum tekrar-raporlama hatasını düzeltmek için `atl v1.1.3` + `core@1.10.0` sürümlerinde yayımlandı). Döngü kararlı biçimde kapanıyor.
+1. **Özgün hâl (`atl` öncesi):** "Claude her oturum sonunda öngörülü biçimde öğrenmeleri kaydetmeli." Claude'un bir düz metin yönergesini hatırlamasına bağlıydı. Güvenilmez.
+2. **v1 (transkript taraması + `/save-learnings`):** Satır içi işaretçiler yapılandırılmış YAML alanları taşıyordu; bir `SessionStart` hook'u önceki oturumun transkriptlerini yeniden tarıyor, bir JSON durum dosyasına karşı süzüyor ve işlenmemiş işaretçileri `/save-learnings` becerisinin işlemesi için raporluyordu. Durum dosyası başarıda ilerletiliyordu. Model çalışıyordu, ama sürekli büyüyen bir transkripti bir süzgece karşı yeniden taramak uzun-oturum tekrar-raporlama hata sınıfının kaynağıydı ve işaretçi şeması (`topic`/`kind`/`doc-impact`/`body`) yakalamayı bir docs-sync adımına bağlıyordu.
+3. **Mevcut hâl (v2 — işaretçi → bbolt kuyruğu → `/drain` → ack):** İşaretçi düz nesirdir. [`atl tick`](/tr/cli/tick) her birini kalıcı bir [bbolt](https://github.com/etcd-io/bbolt) kuyruğuna tam olarak bir kez sokar; [`/drain`](/tr/skills/drain) her birini bilgi tabanına katlar ve ack'ler (siler). Transkript yeniden-taraması yok, durum dosyası yok, docs-sync bağlaması yok — ve tekrar-raporlama hata sınıfı tasarım gereği yok oldu.
 
 ## İlgili
 
-- [`atl learning-capture`](/tr/cli/learning-capture) — CLI tarayıcısı.
-- [`atl setup-hooks`](/tr/cli/setup-hooks) — `SessionStart` hook'unu bağlar.
-- [`/save-learnings`](/tr/skills/save-learnings) — işaretçileri işler.
+- [`atl tick`](/tr/cli/tick) — işaretçileri ayrıştıran ve kuyruğa sokan oturum içi geçiş.
+- [`atl learnings`](/tr/cli/learnings) — kalıcı kuyruğu incele ve drain et (`status` / `peek` / `ack`).
+- [`/drain`](/tr/skills/drain) — LLM yarısı: her kuyruktaki öğrenmeyi bilgi tabanına yönlendirir, sonra ack'ler.
+- [`atl setup-hooks`](/tr/cli/setup-hooks) — `tick` çalıştıran `UserPromptSubmit` + `SessionStart` hook'larını bağlar.
+- [`atl doctor`](/tr/cli/doctor) — aynı bekleyen sayıyı talep üzerine yüzeye çıkarır.
 - [Bilgi sistemi](/tr/guide/knowledge-system) — journal ve wiki nerede yaşar.
 - [Children + learnings](/tr/guide/children-and-learnings) — ajan / beceri alan bilgisi nereye iner.
 - [Claude Code sözleşmeleri](/tr/guide/claude-code-conventions) — boyunca kullanılan işaretçi blok sözleşmeleri.
-- Kanonik kural: [`core/rules/learning-capture.md`](https://github.com/agentteamland/core/blob/main/rules/learning-capture.md).
+- Kanonik kural: [`core/rules/learning-capture.md`](https://github.com/agentteamland/atl/blob/main/core/rules/learning-capture.md).

@@ -8,7 +8,7 @@ Aynı deseni kendi `CLAUDE.md` dosyalarında sen de kullanabilirsin. Bloklar yal
 
 | Blok | Yazan | Amaç |
 |---|---|---|
-| `<!-- wiki:index -->` | [`/save-learnings`](/tr/skills/save-learnings) | `.atl/wiki/` sayfaları için kendiliğinden yeniden inşa edilen içindekiler tablosu. Proje bağlamıyla yüklenir, Claude'a sıfır maliyetle bilgi haritasını sunar. |
+| `<!-- wiki:index -->` | [`/save-learnings`](/tr/skills/drain) | `.atl/wiki/` sayfaları için kendiliğinden yeniden inşa edilen içindekiler tablosu. Proje bağlamıyla yüklenir, Claude'a sıfır maliyetle bilgi haritasını sunar. |
 | `<!-- brainstorm:active -->` | [`/brainstorm start`](/tr/skills/brainstorm) ve [`/brainstorm done`](/tr/skills/brainstorm) | Etkin beyin fırtınası konularını proje bağlamına sabitler; bir sonraki oturum bunları kaçıramaz. |
 | `<!-- pending-implementation -->` | Beyin fırtınası `done` akışı | Bir beyin fırtınasının X kararını verdiğini ama uygulamasının henüz yayımlanmadığını bir sonraki oturuma anımsatır. |
 
@@ -151,6 +151,6 @@ HTML yorumları:
 ## İlgili
 
 - [`/brainstorm`](/tr/skills/brainstorm) — `<!-- brainstorm:active -->` bloğunu yazar ve kaldırır.
-- [`/save-learnings`](/tr/skills/save-learnings) — `<!-- wiki:index -->` bloğunu yazar.
+- [`/save-learnings`](/tr/skills/drain) — `<!-- wiki:index -->` bloğunu yazar.
 - [Bilgi sistemi](/tr/guide/knowledge-system) — wiki:index bloğunun neyi indekslediği.
 - [Kavramlar: Beceri](/tr/guide/concepts#skill) — bu sözleşmelerin geniş resme nereye oturduğu.

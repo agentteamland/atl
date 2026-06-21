@@ -35,7 +35,6 @@ That's enough to install. The CLI will clone the repo, copy `agents/web-agent.md
 | `agents` | object[] | — | Each: `{ name, description, tags? }`. Names must match files/directories under `agents/` and be lowercase kebab-case. |
 | `skills` | object[] | — | Each: `{ name, description, tags? }`. Names must match directories under `skills/`. |
 | `rules` | object[] | — | Each: `{ name, description, tags? }`. Names must match files under `rules/`. |
-| `extends` | string | — | Parent team spec: `"name"` or `"name@version-constraint"`. See [Inheritance](./inheritance). |
 | `excludes` | string[] | — | Names (agent/skill/rule) from inherited parents to drop. |
 | `dependencies` | object | — | Map of `team-name → version-constraint` for additional teams the CLI must install alongside. |
 | `requires.atl` | string | — | Minimum `atl` version. E.g. `">=1.0.0"`. |
@@ -87,5 +86,4 @@ Every team repo ships with a GitHub Action that validates `team.json` on every p
 ## Next
 
 - **[Creating a team](./creating-a-team)** — step by step.
-- **[Inheritance](./inheritance)** — `extends`, `excludes`, override rules.
 - **[Schema reference](/reference/schema)** — machine-readable contract.

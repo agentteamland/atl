@@ -64,7 +64,7 @@ gh pr create
 # Wait for review + merge by the maintainer
 ```
 
-Each peer repo is its own git clone with its own remote. Branch protection on every public production repo (12 of the 16 — release-pipeline + .github excluded) enforces the PR flow. See [Team-repo maintenance](../authoring/team-repo-maintenance) for the full discipline.
+Each peer repo is its own git clone with its own remote. Branch protection on the public production repos enforces the PR flow.
 
 ## Using the workspace with Claude Code
 
@@ -105,6 +105,4 @@ For a more thorough end-of-session pass, [`/repo-cleanup`](https://github.com/ag
 ## Related
 
 - [Install the `atl` CLI](../guide/install) — if you only want to USE atl, skip the workspace
-- [Team-repo maintenance](../authoring/team-repo-maintenance) — the discipline every peer-repo PR follows
-- [Governance](../guide/governance) — branch protection + the team-repo-maintenance rule pair
 - [Knowledge system](../guide/knowledge-system) — the journal + wiki layers the workspace's `.claude/` directory uses

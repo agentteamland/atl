@@ -5,16 +5,15 @@ export default defineConfig({
   title: 'AgentTeamLand',
   description: 'AI agent teams, installed like packages.',
 
-  // Served from github.com/agentteamland/docs → agentteamland.github.io/docs/
-  // When the docs.agentteamland.com custom domain is wired up, change to '/'.
-  base: '/docs/',
+  // Served at docs.agentteamland.com via a GitHub Pages custom domain (root path).
+  base: '/',
 
   lastUpdated: true,
   cleanUrls: true,
   metaChunk: true,
 
   head: [
-    ['link', { rel: 'icon', type: 'image/svg+xml', href: '/docs/favicon.svg' }],
+    ['link', { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' }],
     ['meta', { name: 'theme-color', content: '#3b6df7' }],
     ['meta', { property: 'og:type', content: 'website' }],
     ['meta', { property: 'og:title', content: 'AgentTeamLand' }],
@@ -33,7 +32,7 @@ export default defineConfig({
         nav: [
           { text: 'Guide', link: '/guide/what-is-atl', activeMatch: '/guide/' },
           { text: 'CLI', link: '/cli/overview', activeMatch: '/cli/' },
-          { text: 'Skills', link: '/skills/save-learnings', activeMatch: '/skills/' },
+          { text: 'Skills', link: '/skills/drain', activeMatch: '/skills/' },
           { text: 'Teams', link: '/teams/', activeMatch: '/teams/' },
           { text: 'Team Authoring', link: '/authoring/team-json', activeMatch: '/authoring/' },
           { text: 'Contributing', link: '/contributing/workspace', activeMatch: '/contributing/' },
@@ -42,8 +41,7 @@ export default defineConfig({
             text: 'Ecosystem',
             items: [
               { text: 'GitHub org', link: 'https://github.com/agentteamland' },
-              { text: 'CLI repo', link: 'https://github.com/agentteamland/cli' },
-              { text: 'Registry', link: 'https://github.com/agentteamland/registry' },
+              { text: 'atl monorepo', link: 'https://github.com/agentteamland/atl' },
               { text: 'Workspace', link: 'https://github.com/agentteamland/workspace' }
             ]
           }
@@ -71,12 +69,6 @@ export default defineConfig({
               ]
             },
             {
-              text: 'Configuration',
-              items: [
-                { text: 'atl config', link: '/guide/configuration' }
-              ]
-            },
-            {
               text: 'Operations',
               items: [
                 { text: 'Governance', link: '/guide/governance' }
@@ -89,12 +81,17 @@ export default defineConfig({
               items: [
                 { text: 'Overview', link: '/cli/overview' },
                 { text: 'atl install', link: '/cli/install' },
+                { text: 'atl search', link: '/cli/search' },
                 { text: 'atl list', link: '/cli/list' },
                 { text: 'atl remove', link: '/cli/remove' },
                 { text: 'atl update', link: '/cli/update' },
-                { text: 'atl search', link: '/cli/search' },
-                { text: 'atl setup-hooks', link: '/cli/setup-hooks' },
-                { text: 'atl learning-capture', link: '/cli/learning-capture' }
+                { text: 'atl promote', link: '/cli/promote' },
+                { text: 'atl pin / unpin', link: '/cli/pin' },
+                { text: 'atl tick', link: '/cli/tick' },
+                { text: 'atl learnings', link: '/cli/learnings' },
+                { text: 'atl doctor', link: '/cli/doctor' },
+                { text: 'atl publish', link: '/cli/publish' },
+                { text: 'atl setup-hooks', link: '/cli/setup-hooks' }
               ]
             }
           ],
@@ -102,7 +99,7 @@ export default defineConfig({
             {
               text: 'Global Skills',
               items: [
-                { text: '/save-learnings', link: '/skills/save-learnings' },
+                { text: '/drain', link: '/skills/drain' },
                 { text: '/wiki', link: '/skills/wiki' },
                 { text: '/brainstorm', link: '/skills/brainstorm' },
                 { text: '/rule', link: '/skills/rule' },
@@ -128,11 +125,7 @@ export default defineConfig({
               items: [
                 { text: 'team.json', link: '/authoring/team-json' },
                 { text: 'Creating a team', link: '/authoring/creating-a-team' },
-                { text: 'Inheritance', link: '/authoring/inheritance' },
-                { text: 'Worked example: starter-extended', link: '/authoring/starter-extended-example' },
-                { text: 'Scaffolder spec', link: '/authoring/scaffolder-spec' },
-                { text: 'Registry submission', link: '/authoring/registry-submission' },
-                { text: 'Team-repo maintenance', link: '/authoring/team-repo-maintenance' }
+                { text: 'Scaffolder spec', link: '/authoring/scaffolder-spec' }
               ]
             }
           ],
@@ -141,8 +134,7 @@ export default defineConfig({
               text: 'Contributing',
               items: [
                 { text: 'Workspace (maintainer hub)', link: '/contributing/workspace' },
-                { text: 'Release pipeline', link: '/contributing/release-pipeline' },
-                { text: 'winget upstream-PR process', link: '/contributing/winget-process' }
+                { text: 'Release pipeline', link: '/contributing/release-pipeline' }
               ]
             }
           ],
@@ -167,7 +159,7 @@ export default defineConfig({
         nav: [
           { text: 'Rehber', link: '/tr/guide/what-is-atl', activeMatch: '/tr/guide/' },
           { text: 'CLI', link: '/tr/cli/overview', activeMatch: '/tr/cli/' },
-          { text: 'Skill\'ler', link: '/tr/skills/save-learnings', activeMatch: '/tr/skills/' },
+          { text: 'Skill\'ler', link: '/tr/skills/drain', activeMatch: '/tr/skills/' },
           { text: 'Takımlar', link: '/tr/teams/', activeMatch: '/tr/teams/' },
           { text: 'Takım Yazımı', link: '/tr/authoring/team-json', activeMatch: '/tr/authoring/' },
           { text: 'Katkı', link: '/tr/contributing/workspace', activeMatch: '/tr/contributing/' },
@@ -176,8 +168,7 @@ export default defineConfig({
             text: 'Ekosistem',
             items: [
               { text: 'GitHub org', link: 'https://github.com/agentteamland' },
-              { text: 'CLI repo', link: 'https://github.com/agentteamland/cli' },
-              { text: 'Registry', link: 'https://github.com/agentteamland/registry' },
+              { text: 'atl monorepo', link: 'https://github.com/agentteamland/atl' },
               { text: 'Workspace', link: 'https://github.com/agentteamland/workspace' }
             ]
           }
@@ -205,12 +196,6 @@ export default defineConfig({
               ]
             },
             {
-              text: 'Yapılandırma',
-              items: [
-                { text: 'atl config', link: '/tr/guide/configuration' }
-              ]
-            },
-            {
               text: 'İşletim',
               items: [
                 { text: 'Yönetişim', link: '/tr/guide/governance' }
@@ -223,12 +208,17 @@ export default defineConfig({
               items: [
                 { text: 'Genel bakış', link: '/tr/cli/overview' },
                 { text: 'atl install', link: '/tr/cli/install' },
+                { text: 'atl search', link: '/tr/cli/search' },
                 { text: 'atl list', link: '/tr/cli/list' },
                 { text: 'atl remove', link: '/tr/cli/remove' },
                 { text: 'atl update', link: '/tr/cli/update' },
-                { text: 'atl search', link: '/tr/cli/search' },
-                { text: 'atl setup-hooks', link: '/tr/cli/setup-hooks' },
-                { text: 'atl learning-capture', link: '/tr/cli/learning-capture' }
+                { text: 'atl promote', link: '/tr/cli/promote' },
+                { text: 'atl pin / unpin', link: '/tr/cli/pin' },
+                { text: 'atl tick', link: '/tr/cli/tick' },
+                { text: 'atl learnings', link: '/tr/cli/learnings' },
+                { text: 'atl doctor', link: '/tr/cli/doctor' },
+                { text: 'atl publish', link: '/tr/cli/publish' },
+                { text: 'atl setup-hooks', link: '/tr/cli/setup-hooks' }
               ]
             }
           ],
@@ -236,7 +226,7 @@ export default defineConfig({
             {
               text: 'Global Skill\'ler',
               items: [
-                { text: '/save-learnings', link: '/tr/skills/save-learnings' },
+                { text: '/drain', link: '/tr/skills/drain' },
                 { text: '/wiki', link: '/tr/skills/wiki' },
                 { text: '/brainstorm', link: '/tr/skills/brainstorm' },
                 { text: '/rule', link: '/tr/skills/rule' },
@@ -262,11 +252,7 @@ export default defineConfig({
               items: [
                 { text: 'team.json', link: '/tr/authoring/team-json' },
                 { text: 'Takım oluşturma', link: '/tr/authoring/creating-a-team' },
-                { text: 'Miras (inheritance)', link: '/tr/authoring/inheritance' },
-                { text: 'Uygulamalı örnek: starter-extended', link: '/tr/authoring/starter-extended-example' },
-                { text: 'İskele belirtimi', link: '/tr/authoring/scaffolder-spec' },
-                { text: 'Registry başvurusu', link: '/tr/authoring/registry-submission' },
-                { text: 'Takım deposu bakımı', link: '/tr/authoring/team-repo-maintenance' }
+                { text: 'İskele belirtimi', link: '/tr/authoring/scaffolder-spec' }
               ]
             }
           ],
@@ -275,8 +261,7 @@ export default defineConfig({
               text: 'Katkı',
               items: [
                 { text: 'Workspace (maintainer hub)', link: '/tr/contributing/workspace' },
-                { text: 'Release pipeline', link: '/tr/contributing/release-pipeline' },
-                { text: 'winget upstream-PR süreci', link: '/tr/contributing/winget-process' }
+                { text: 'Release pipeline', link: '/tr/contributing/release-pipeline' }
               ]
             }
           ],
@@ -337,7 +322,7 @@ export default defineConfig({
     },
 
     editLink: {
-      pattern: 'https://github.com/agentteamland/docs/edit/main/site/:path',
+      pattern: 'https://github.com/agentteamland/atl/edit/main/docs/site/:path',
       text: 'Edit this page on GitHub'
     },
 

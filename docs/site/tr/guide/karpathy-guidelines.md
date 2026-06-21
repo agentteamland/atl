@@ -111,5 +111,4 @@ Kural her oturum başında Claude'un bağlamına yüklenir (bkz. [knowledge-syst
 
 ## İlgili
 
-- [team-repo-maintenance](/tr/authoring/team-repo-maintenance) — paylaşılan depo işlerinde bu kodlama rehberleriyle birlikte uygulanan yönetişim disiplini.
 - [Kavramlar: Kural](/tr/guide/concepts#rule) — kuralların ne olduğu ve nasıl yüklendiği.

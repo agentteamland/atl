@@ -1,117 +1,83 @@
 # Install
 
-`atl` ships as a single static Go binary (~7 MB, zero runtime dependencies). Pick the channel that matches your platform.
+`atl` ships as a single static Go binary (~7 MB, zero runtime dependencies). One script per platform — no package manager to set up first.
 
 ---
 
-## macOS / Linux — Homebrew (recommended)
+## macOS / Linux
 
 ```bash
-brew install agentteamland/tap/atl
+curl -fsSL https://raw.githubusercontent.com/agentteamland/atl/main/scripts/install.sh | sh
 ```
 
-Equivalent two-step form:
+That's the whole thing. The script:
+
+- Resolves the latest release from GitHub
+- Downloads the matching `atl` binary for your OS + arch (`darwin`/`linux`, `amd64`/`arm64`)
+- Extracts it and moves it to `/usr/local/bin/atl` (prompts for `sudo` only if that directory isn't writable)
+
+No-sudo install — point it at a directory you own:
 
 ```bash
-brew tap agentteamland/tap
-brew install atl
+ATL_INSTALL_DIR="$HOME/.local/bin" curl -fsSL https://raw.githubusercontent.com/agentteamland/atl/main/scripts/install.sh | sh
 ```
 
-Upgrading:
+Upgrading: rerun the same command — it always pulls the latest release. (You rarely need to: once hooks are set up, `atl` keeps itself and your teams current in the background. See [auto-update hooks](#recommended-next-step-auto-update-hooks).)
+
+Pinning a specific version:
 
 ```bash
-brew update && brew upgrade atl
+ATL_VERSION=v2.0.0 curl -fsSL https://raw.githubusercontent.com/agentteamland/atl/main/scripts/install.sh | sh
 ```
-
-### macOS / Linux — one-liner fallback
-
-If you don't have brew (or prefer a stdlib install):
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/agentteamland/cli/main/scripts/install.sh | sh
-```
-
-Downloads the latest `atl` binary, extracts it, and moves it to `/usr/local/bin/atl` (prompts for sudo if needed). Override with `ATL_INSTALL_DIR=$HOME/.local/bin` for a no-sudo install.
 
 ---
 
-## Windows — PowerShell one-liner (recommended)
+## Windows — PowerShell
 
 ```powershell
-irm https://raw.githubusercontent.com/agentteamland/cli/main/scripts/install.ps1 | iex
+irm https://raw.githubusercontent.com/agentteamland/atl/main/scripts/install.ps1 | iex
 ```
 
-That's the whole thing. Open PowerShell, paste, Enter. The script:
+Open PowerShell, paste, Enter. The script:
 
-- Downloads the latest `atl.exe` from GitHub Releases
+- Downloads the latest `atl.exe` from GitHub Releases (`amd64` or `arm64`)
 - Installs it to `%LOCALAPPDATA%\Programs\atl\` (no admin needed)
 - Adds that folder to your **user PATH**
 - Verifies the install by running `atl --version`
 
 Zero admin rights, zero package-manager prerequisites, works on a fresh Windows machine.
 
-::: tip Why this over scoop/winget?
-If you're comfortable with a package manager, scoop and winget below are fine. But if you don't already have scoop or winget configured (and many devs doing "vibe coding" don't), the one-liner skips that whole rabbit hole.
-:::
-
 Upgrading: rerun the same command. It always pulls the latest release.
+
+Custom install directory:
+
+```powershell
+$env:ATL_INSTALL_DIR = 'C:\Users\<you>\bin'
+irm https://raw.githubusercontent.com/agentteamland/atl/main/scripts/install.ps1 | iex
+```
 
 Pinning a specific version:
 
 ```powershell
-$env:ATL_VERSION = 'v1.1.4'
-irm https://raw.githubusercontent.com/agentteamland/cli/main/scripts/install.ps1 | iex
+$env:ATL_VERSION = 'v2.0.0'
+irm https://raw.githubusercontent.com/agentteamland/atl/main/scripts/install.ps1 | iex
 ```
-
-### Windows — Scoop
-
-For users who already have scoop installed:
-
-```powershell
-scoop bucket add agentteamland https://github.com/agentteamland/scoop-bucket
-scoop install atl
-```
-
-Upgrading:
-
-```powershell
-scoop update atl
-```
-
-Don't have scoop yet? Use the PowerShell one-liner above — simpler and faster than installing scoop first.
-
-### Windows — winget
-
-```powershell
-winget install agentteamland.atl
-```
-
-::: tip May lag the latest release
-`atl` has been in the winget catalog since 2026-04-24. Each new release goes through a manual review step on `microsoft/winget-pkgs`, so winget may lag one or two `v*` tags behind. If you need the absolute latest, use the PowerShell one-liner or scoop above.
-:::
-
-### Windows — Manual ZIP
-
-Most hands-on way, zero automation, works anywhere:
-
-1. Open [**GitHub Releases**](https://github.com/agentteamland/cli/releases/latest) → download `atl_<version>_windows_amd64.zip` (or `arm64`).
-2. Extract the ZIP to a folder you control, e.g. `C:\Users\<you>\tools\atl\`.
-3. Add that folder to your user PATH: **Settings → System → About → Advanced system settings → Environment Variables → Path → Edit → New**, paste the folder path, OK.
-4. Open a new PowerShell / cmd window → `atl --version` → should print the version.
-
-Good for locked-down machines where PowerShell scripts are restricted.
 
 ---
 
 ## Manual download (any platform)
 
-Grab a pre-built binary from [**GitHub Releases**](https://github.com/agentteamland/cli/releases/latest). Artifacts ship for:
+For locked-down machines (or if you'd rather not pipe a script), grab a pre-built binary straight from [**GitHub Releases**](https://github.com/agentteamland/atl/releases/latest). Artifacts ship for:
 
 - `darwin` (macOS): `amd64`, `arm64`
 - `linux`: `amd64`, `arm64`
 - `windows`: `amd64`, `arm64`
 
-Extract, drop `atl` somewhere on your `PATH`, and you're done.
+Extract the archive (`.tar.gz` on macOS/Linux, `.zip` on Windows), drop `atl` somewhere on your `PATH`, and you're done. On Windows, add the folder to your user PATH via **Settings → System → About → Advanced system settings → Environment Variables → Path**, then open a fresh terminal.
+
+::: tip No brew / scoop / winget
+`atl` v2 distributes through the install scripts and GitHub Releases only. The Homebrew, Scoop, and winget channels were retired in the v2 rebuild — the one-liner skips the package-manager setup entirely, and there's no third-party tap to keep in sync.
+:::
 
 ---
 
@@ -122,16 +88,21 @@ atl --version
 atl --help
 ```
 
-You should see the installed version and the command list (`install`, `list`, `remove`, `update`, `search`, `setup-hooks`).
+You should see the installed version and the command list: `install`, `update`, `promote`, `pin`, `unpin`, `publish`, `learnings`, `tick`, `session-start`, `setup-hooks`, `doctor`, `list`, `search`, `remove`.
 
 ## What got installed
 
-A single binary. `atl` keeps its team cache under:
+A single binary. `atl` keeps its own state — the index cache, the durable learning queue, throttle stamps, and your global-layer gains — under:
 
-- macOS / Linux: `~/.claude/repos/agentteamland/`
-- Windows: `%USERPROFILE%\.claude\repos\agentteamland\`
+- macOS / Linux: `~/.atl/`
+- Windows: `%USERPROFILE%\.atl\`
 
-Installed teams live as cloned Git repos under that cache and are copied into each project's `.claude/` directory.
+Team assets (agents, skills, rules) are copied into Claude Code's own directory, where the editor picks them up:
+
+- **Global layer:** `~/.claude/`
+- **Project layer:** `<project>/.claude/` (this shadows the global layer for the current project)
+
+So `.atl/` is ATL's operational store and `.claude/` is where the agents/skills/rules actually live for Claude Code to load.
 
 ## Recommended next step — auto-update hooks
 
@@ -141,10 +112,16 @@ Once `atl` is on your PATH, run:
 atl setup-hooks
 ```
 
-This wires Claude Code's SessionStart + UserPromptSubmit hooks so that every session (and every message, throttled to once per 30m) silently checks for team/core/`atl` updates in the background. You don't have to run `atl update` manually — your teams stay fresh automatically. See [`atl setup-hooks`](/cli/setup-hooks) for details.
+This wires Claude Code's hooks so the platform runs itself in the background:
+
+- **`SessionStart` → `atl session-start`** — drains the previous session's learnings and runs `doctor` to self-heal.
+- **`UserPromptSubmit` → `atl tick --throttle=10m`** — an in-session maintenance tick (throttled), so updates, fan-out, and learning capture happen without you lifting a finger.
+
+In v2 this is meant to be on, not opt-in — automation is the point. You don't run `atl update` by hand; your teams and `atl` itself stay current automatically. See [`atl setup-hooks`](/cli/setup-hooks) for details.
 
 ## Next
 
 - **[Quickstart](/guide/quickstart)** — install your first team.
-- **[Concepts](/guide/concepts)** — teams, agents, skills, rules, inheritance.
-- **[Creating a team](/authoring/creating-a-team)** — author your own team (public, private, or local).
+- **[Concepts](/guide/concepts)** — teams, agents, skills, rules, and the global/project scope axis.
+- **[CLI reference](/cli/overview)** — every command in detail.
+- **[Creating a team](/authoring/creating-a-team)** — author and publish your own team.

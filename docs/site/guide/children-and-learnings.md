@@ -16,7 +16,7 @@ Without it, complex agents and skills end up as one of two anti-shapes:
 The children + learnings pattern resolves both:
 
 - **Topic-per-file** — update one piece without touching others
-- **Auto-rebuilt index** — the top-level file's "Knowledge Base" / "Accumulated Learnings" section is regenerated from frontmatter on every [`/save-learnings`](/skills/save-learnings) run. Hand edits are overwritten — the source of truth is each child's frontmatter.
+- **Auto-rebuilt index** — the top-level file's "Knowledge Base" / "Accumulated Learnings" section is regenerated from frontmatter on every [`/save-learnings`](/skills/drain) run. Hand edits are overwritten — the source of truth is each child's frontmatter.
 
 Result: knowledge accumulates frictionlessly, the top-level file stays tight, and the index never goes stale.
 
@@ -148,7 +148,7 @@ Without a blueprint, the agent guesses how to create new units. With a blueprint
 ## Related
 
 - [Knowledge system](/guide/knowledge-system) — the project-side mirror (journal + wiki) of this team-side pattern
-- [`/save-learnings`](/skills/save-learnings) — writes children/ and learnings/ files; rebuilds parent index sections
+- [`/save-learnings`](/skills/drain) — writes children/ and learnings/ files; rebuilds parent index sections
 - [Concepts: Skill](/guide/concepts#skill) — where the learnings/ pattern fits
 - Canonical rule: [`core/rules/agent-structure.md`](https://github.com/agentteamland/core/blob/main/rules/agent-structure.md)
 

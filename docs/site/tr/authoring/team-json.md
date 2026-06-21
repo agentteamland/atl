@@ -35,7 +35,6 @@ Bu kadarı kuruluma yeter. CLI depoyu klonlar, `agents/web-agent.md` (ya da `age
 | `agents` | nesne[] | — | Her biri: `{ name, description, tags? }`. Adlar `agents/` altındaki dosya / dizinlerle eşleşmeli ve küçük harf kebab-case olmalıdır. |
 | `skills` | nesne[] | — | Her biri: `{ name, description, tags? }`. Adlar `skills/` altındaki dizinlerle eşleşmelidir. |
 | `rules` | nesne[] | — | Her biri: `{ name, description, tags? }`. Adlar `rules/` altındaki dosyalarla eşleşmelidir. |
-| `extends` | dize | — | Üst takım belirtimi: `"name"` ya da `"name@version-constraint"`. Bkz. [Kalıtım](./inheritance). |
 | `excludes` | dize[] | — | Miras alınan üst takımlardan dışarıda bırakılacak ajan / beceri / kural adları. |
 | `dependencies` | nesne | — | CLI'nin yan yana kurması gereken ek takımlar için `team-name → version-constraint` eşlemesi. |
 | `requires.atl` | dize | — | En düşük `atl` sürümü. Örneğin `">=1.0.0"`. |
@@ -87,5 +86,4 @@ Her takım deposu, her push ve PR'da `team.json` dosyasını [`agentteamland/cor
 ## Sıradaki
 
 - **[Bir takım yazma](./creating-a-team)** — adım adım.
-- **[Kalıtım](./inheritance)** — `extends`, `excludes`, bastırma kuralları.
 - **[Şema başvurusu](/tr/reference/schema)** — makine okunabilir sözleşme.
