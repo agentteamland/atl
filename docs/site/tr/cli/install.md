@@ -1,128 +1,87 @@
 # `atl install`
 
-Mevcut projeye bir takım kur.
+GitHub tabanlı katalogdan bir takımı çözümle ve bir kapsama kur.
 
 ## Kullanım
 
 ```bash
-atl install <team>                # idempotent, yalnızca ilk kurulumda iş yapar (atl ≥ 1.0.0)
-atl install <team> --refresh      # zorla üzerine yaz (yerel değişiklikleri uyarıyla siler)
+atl install <handle>/<team>              # yayıncının varsayılan kapsamında kur
+atl install <handle>/<team> --global     # kullanıcı-global kapsam (her proje)
+atl install <handle>/<team> --project    # proje kapsamı (yalnızca bu proje)
 ```
 
-`<team>` şu olabilir:
-
-- **Kayıt defterindeki kısa ad** — `software-project-team`.
-- **Kayıt defteri adı + sürüm** — `software-project-team@^1.2.0` (caret, tilde ya da kesin sabitleme).
-- **GitHub `owner/repo` kısa biçimi** — `agentteamland/starter-extended`.
-- **Git URL'si** — `https://github.com/you/your-team.git`, `git@github.com:you/team.git`, `ssh://...`, `file:///abs/path.git`.
-- **Yerel dosya sistemi yolu** — `./my-team`, `~/projects/my-team`, `/abs/path/to/team` (atl ≥ 0.1.4; yol, kökünde `team.json` ve içinde `.git/` bulunan bir dizin olmalı).
-
-## Örnekler
-
-### Kayıt defteri (herkese açık, doğrulanmış)
+`<handle>/<team>`, katalog referansıdır — handle takımın GitHub sahibidir (sahiplik, yazarlıktır) ve team o handle içindeki addır. `@version` sabitleme, Git URL'si ya da yerel dosya sistemi yolu yoktur: install her zaman katalog üzerinden çözümlenir. Bir referans bulmak için [`atl search`](/tr/cli/search) komutunu kullan.
 
 ```bash
-atl install software-project-team
-atl install software-project-team@^1.2.0
+atl install agentteamland/software-project-team
 ```
 
-### GitHub kısa biçimi
-
-```bash
-atl install agentteamland/starter-extended
-```
-
-### Tam Git URL'si (herkese açık ya da özel)
-
-```bash
-atl install https://github.com/acme/acme-starter.git
-atl install git@github.com:you/private-team.git          # SSH; senin git kimlik bilgilerini kullanır
-atl install https://gitea.example.com/you/team.git       # kendi barındırdığın
-```
-
-### Yerel dosya sistemi — uzak depo gerekmez (atl ≥ 0.1.4)
-
-Özel-yerel iş akışı: takımı dizüstüne kur, hiçbir Git sunucusuna push yapmadan kendi projene yükle.
-
-```bash
-# Tek seferlik: takımı bir Git deposuna dönüştür
-cd ~/projects/my-team
-git init -b main && git add . && git commit -m "init"
-
-# Herhangi bir projeye kur:
-cd ~/projects/some-app
-atl install ~/projects/my-team                   # mutlak yol
-atl install ./my-team                            # göreli yol
-atl install file:///Users/you/projects/my-team   # açık file:// URL'si
-```
-
-Üç biçim de tıpatıp aynı çalışır. Kaynak, `team.json` içeren bir dizin ve bir Git deposu olmalı (en az bir commit'i bulunan). Tüm adım adım anlatım için bkz. [Bir takım yazma](/tr/authoring/creating-a-team).
-
-## Çoklu takım kurulumu
-
-Birden çok takım aynı projede yan yana yaşayabilir — `atl` v0.1.2+ bunu yerel olarak destekler. Her kaynak (ajan, kural, beceri) projenin `.claude/` dizinine **kopyalanır**; `~/.claude/repos/agentteamland/{team}/` adresindeki global önbellek kaynak doğruluktur, `atl update` ise değiştirilmemiş kopyaları eşzamanlı tutar.
-
-```bash
-atl install software-project-team
-atl install design-system-team
-
-atl list
-# ✓ software-project-team@1.2.1
-# ✓ design-system-team@0.8.1
-```
-
-İki takım aynı adda bir öğe bildirdiğinde (örneğin ikisinde de bir `code-reviewer` ajanı varsa), en son kurulan kazanır. `atl` tek satırlık bir uyarı yazdırır:
-
-```
-⚠ overriding agent "code-reviewer" (was from team-a, now from team-b)
-```
-
-Bu, npm / pip / GNU Stow sözleşmelerini yansıtır. Bir takımı kaldırmak güvenlidir — `atl remove` o takımın kopyalanmış kaynaklarını siler ve geriye kalan takımların kopyalarını yeniden uygular. Kaldırılan takımın çakışma yoluyla "kazandığı" öğeler doğru biçimde özgün sahibine geri düşer.
-
-## Proje-yerel kopya kurulumu (atl v1.0.0+)
-
-Her takım kaynağı — ajan, kural, beceri — `<project>/.claude/` dizinine bir **proje-yerel kopya** olarak kurulur. `~/.claude/repos/agentteamland/{team}/` adresindeki global önbellek, makinedeki tüm projeler arasında paylaşılan kaynak doğruluktur; her proje kendine yeten kopyasını tutar.
-
-Bu, [install-mechanism-redesign kararının](https://github.com/agentteamland/workspace/blob/main/.atl/docs/install-mechanism-redesign.md) seçtiği topolojidir; v1.0.0 öncesi karışımın (ajan ve kural için sembolik bağ, yalnızca beceri için kopya) yerine geçti. İki neden bu değişikliği zorunlu kıldı:
-
-1. **Değişimler yerelde kalır.** `/save-learnings` ve [kendini güncelleyen öğrenme döngüsünün](https://github.com/agentteamland/workspace/blob/main/.atl/docs/self-updating-learning-loop.md) kendiliğinden büyüyen `children/` ve `learnings/` dizinleri projenin `.claude/` içine yazar. Sembolik bağlar olsaydı bu yazımlar global önbelleği kirletir ve bir sonraki `atl update` çekiminde çakışırdı. Kopyalarla, değişimler kendisini doğuran projeye yalıtık kalır.
-2. **Claude Code'un beceri yükleyicisi.** Topoloji kararından bağımsız olarak Claude Code'un proje düzeyindeki beceri yükleyicisi `.claude/skills/` altındaki sembolik bağları izlemez (üst akış sorunları [#14836](https://github.com/anthropics/claude-code/issues/14836), [#25367](https://github.com/anthropics/claude-code/issues/25367), [#37590](https://github.com/anthropics/claude-code/issues/37590)). Beceriler nasıl olsa kopyalanmak zorundaydı; v1.0.0 yeniden tasarımı bunu tüm kaynaklara genelleştirdi.
-
-`atl update` eşzamanlama düzeneğidir — aşağıya bak.
-
-## İdempotenlik (atl v1.0.0+) {#idempotency-atl-v100}
-
-Zaten kurulu bir takım üzerinde `atl install <team>` komutunu ikinci kez çalıştırmak, eskiden olduğu gibi sessizce yeniden kurmaz; tek satırlık bir bilgi mesajıyla **işlem yapmaz**. v1.0.0 öncesinde her kurulum yerel düzenlemelerin üzerine sessizce yazardı; v1.0.0+ bunu yapmak için `--refresh` ister.
-
-```bash
-atl install software-project-team           # ilk kez → kurar
-atl install software-project-team           # yeniden → işlem yok + bilgi satırı
-atl install software-project-team --refresh # zorla yeniden kurma (yerel düzenlemeler varsa uyarır)
-```
-
-Bu, `atl install`'ı yeniden çalıştırmanın betiklerde bile güvenli olduğu anlamına gelir. Kurulu bir takıma üst akış değişikliklerini almak için `atl update` komutunu kullan (değiştirilmemiş kopyaları kendiliğinden yeniler).
+`--global` ve `--project` birbirini dışlar. İkisi de verilmezse takım, yayıncısının bildirdiği kapsamda kurulur (aşağıdaki [Kapsam](#kapsam) bölümüne bak).
 
 ## Ne olur?
 
-1. **Çözümleme.** Handle, GitHub tabanlı index'te aranır — first-party takım monorepo alt-yoluna, third-party takım kendi bağımsız deposuna çözülür. Git URL doğrudan kullanılır.
-2. **Getirme.** Takım, ref'e sabitlenmiş bir HTTP tarball olarak (bir `git` binary'si gerekmeden) yerel önbelleğe indirilir.
-3. **Doğrulama.** `team.json` [şemaya](/tr/reference/schema) göre denetlenir. Geçersiz takımlar burada başarısız olur.
-4. **Yazma.** Ajanlar, kurallar ve beceriler kapsamın `.claude/` dizinine **kopyalanır** — global kurulum için `~/.claude`, proje kurulumu için `<project>/.claude`. Mevcut kopyalar korunur (idempotent varsayılan); üzerine yazmak için `--refresh`.
-5. **Kaydetme.** `<layer>/.atl/installed/<handle>__<name>.json` konumundaki takım başına manifest, kaynak ref'i + `atl update`'in kendiliğinden yenilemesinin ve `atl doctor`'ın bütünlük denetiminin dayandığı dosya başına SHA-256 referans hat'larını kaydeder.
+1. **Çözümleme.** `<handle>/<team>` referansı, GitHub'daki [`atl-team`](https://github.com/topics/atl-team) konusuyla etiketlenmiş herkese açık depolardan üretilen GitHub tabanlı katalogda aranır. Katalog, `~/.atl/index.json` önbelleğinden çevrimdışı-önce (offline-first) çözümlenir; bu nedenle arama asla ağı beklemez. First-party bir takım `agentteamland/atl` monoreposundaki bir alt yola, bağımsız bir takım kendi deposunun köküne çözümlenir.
+2. **Getirme.** Takımın kaynağı, **`git` binary'si gerekmeden** doğrudan GitHub'dan ref'e sabitlenmiş tek bir HTTPS tarball olarak geçici bir dizine indirilir; kurulum tamamlanır tamamlanmaz bu dizin silinir. Diskte kalıcı bir klon önbelleği yoktur.
+3. **Okuma.** `team.json` ayrıştırılır. Doğrulama minimaldir: geçerli JSON olmalı ve bir `name` alanı içermelidir. JSON-Schema doğrulayıcısı yoktur — CLI'nin tam olarak neyi denetlediği için [Şema](/tr/reference/schema), tam alan sözleşmesi için [`team.json`](/tr/authoring/team-json) sayfalarına bak.
+4. **Varlıkları yaz.** Takımın `agents/`, `skills/` ve `rules/` ağaçları doğrudan kapsamın Claude Code dizinine kopyalanır — global kurulum için `~/.claude`, proje kurulumu için `<project>/.claude`. Depodan başka hiçbir şey (`team.json`, `README`, `LICENSE`) kopyalanmaz.
+5. **Manifest kaydet.** Kapsam katmanının `.atl/` dizinine `<layer>/.atl/installed/<handle>__<name>.json` konumunda takım başına bir manifest yazılır. Çözümlenen kaynak ref'ini ve kopyalanan her dosyanın SHA-256 temel değerini kaydeder; `atl update`'in yenileme ve `atl doctor`'ın bütünlük denetimi bu bilgilere dayanır.
+6. **Otomasyon hook'larını bağla.** Otomasyon hook'ları (`SessionStart → atl session-start`, `UserPromptSubmit → atl tick`) kurulumun zorunlu bir parçası olarak Claude Code'a eklenir — otomasyon varsayılan olarak açıktır, isteğe bağlı değil. Hook bağlama başarısız olursa uyarı olarak gösterilir; kurulum başarısız olmaz.
+7. **Platform çekirdeğini yansıt.** Platformun kendi kuralları ve becerileri (`/drain`, `/create-pr`, `/brainstorm` ve diğerleri) binary içinde taşınır ve global katmana yansıtılarak her projede kullanılabilir hale getirilir. En iyi çaba esasıyla çalışır; bir hata fatal değildir.
 
-## Çevrimdışı davranış
+Başarıda CLI şunu yazdırır:
 
-Ağ erişilemezse `atl install` paylaşılan önbelleğe geri çekilir. En son çekilen sürüm ne ise onu alırsın. CLI bunu açıkça günlüğe yazar — sessiz bayatlama olmaz.
+```
+atl: installed <handle>/<name>@<version> at <scope> scope
+```
+
+`<scope>` değeri `global`, `project` ya da `both` olabilir.
+
+## Kapsam {#kapsam}
+
+Bir takım iki katmandan birinde yaşar:
+
+- **global** — varlıklar `~/.claude` altında, ATL durumu `~/.atl` altında. Makinedeki her projede kullanılabilir.
+- **project** — varlıklar `<project>/.claude` altında, ATL durumu `<project>/.atl` altında. Yalnızca o projede kullanılabilir.
+
+Her takımın yayıncısı `team.json`'da varsayılan bir kapsam bildirir — `project` (varsayılan), `global` ya da `both`. Bunu kurulum sırasında `--global` veya `--project` ile geçersiz kılabilirsin; geçersiz kılma her zaman kazanır. `both` kurulumu **iki** katmana da yazar.
+
+Aynı yetenek her iki katmanda da mevcutsa **proje katmanı global'i gölgeler** — en yakın kazanır; bu zihniyet modeli Claude Code'un kendi `CLAUDE.md` katmanlamasıyla aynıdır. Tam kapsam eksenini [Kavramlar](/tr/guide/concepts#scope-global-and-project) sayfasında incele.
+
+```bash
+atl install agentteamland/software-project-team            # yayıncı varsayılanı (project)
+atl install agentteamland/software-project-team --global   # makinedeki her proje
+```
+
+## Kurulum manifestası
+
+Her kurulum, `<layer>/.atl/installed/<handle>__<name>.json` konumunda kapsam başına takım başına bir JSON dosyası yazar (`<layer>`, global için `~/.atl`, proje için `<project>/.atl`'dir). Şunları kaydeder:
+
+- `schemaVersion`, `handle`, `name`, `version` ve geçerli `scope`,
+- `source` — kurulumun çözümlendiği `repo`, `subpath` ve `ref`; tam olarak getirilen byte'lara sabitlenmiş,
+- `installedAt`,
+- `files` — kopyalanan her dosyanın (`.claude` dizinine göreli yol) kurulum anındaki SHA-256 değeriyle eşleşmesi.
+
+`files` haritası çift amaçlıdır: `atl update`, geçerli byte'ları bununla karşılaştırarak düzenlemelerini upstream değişikliklerden ayırt eder (bu sayede güncellemeler yerel değişikliklerinizi asla ezmez); `atl doctor` ise silinen ya da bozulan bir kopyayı tespit edip geri yüklemek için bu bütünlük kümesini kullanır.
+
+## Bir projede birden çok takım
+
+Bir projede birkaç takım birlikte yaşayabilir — her kurulum varlıklarını aynı `.claude/` dizinine kopyalar ve kendi manifestasını yazar. Kurulu iki takım aynı adda bir varlık getirirse en son yazılan kopya diskte kalır. Bir takımı [`atl remove`](/tr/cli/remove) ile kaldır; yalnızca o takımın manifesta kayıtlı dosyaları silinir.
+
+Bir takım ayrıca `team.json`'da başka takımları `dependencies` (bağımlılıklar) olarak bildirebilir; bunlar birlikte kurulur. Bağımlılık alanı için [`team.json`](/tr/authoring/team-json) sayfasına bak.
 
 ## Sorun giderme
 
-- **"team not found"** — handle index'te yok. `atl search` ile dene.
-- **"schema validation failed"** — takımın `team.json` dosyası bozuk. Yazardan düzeltmesini iste ya da daha eski bir sürüme sabitle.
-- **"invalid team slug"** — ad, güvenlik düzenli ifadesini geçemeyen bir slug'a çözüldü (örneğin `-` ile başlıyor). Takımı `owner/repo` biçiminde geç ya da bir Git URL'si kullan.
+- **`team … not found in index`** — referans katalogda yok. [`atl search`](/tr/cli/search) ile kontrol et. Katalog, `atl-team` konusuyla etiketlenmiş herkese açık depolardan üretilir; yeni eklenen bir takım henüz listelenmemiş olabilir.
+- **`invalid team reference`** — argüman `<handle>/<team>` biçiminde değil (her iki parça da gerekli).
+- **`fetch … HTTP 404`** — takımın kaynak deposu ya da ref'i erişilemez durumda. Tarball getirme ağa ihtiyaç duyar; katalog çözümlemenin aksine çevrimdışı geri düşme yoktur.
+- **`team ships no installable assets`** — çözümlenen takımda `agents/`, `skills/` veya `rules/` dizini yok.
+- **`team.json has no name`** — takımın `team.json` dosyası hatalı biçimlendirilmiş. Yazardan düzeltmesini iste.
 
 ## İlgili
 
-- [`atl search`](/tr/cli/search) — bir takımın adını bul.
-- [`atl list`](/tr/cli/list) — neyin kurulu olduğunu gör.
-- [`atl update`](/tr/cli/update) — önbellek çekiminden sonra değiştirilmemiş kopyaları yenile.
-- [`atl remove`](/tr/cli/remove) — kaldır (etkileşimsiz çalıştırmak için `--force`).
+- [`atl search`](/tr/cli/search) — bir takımın `<handle>/<team>` referansını bul.
+- [`atl list`](/tr/cli/list) — kurulu takımları kapsama göre gruplandırılmış gör.
+- [`atl update`](/tr/cli/update) — kurulu takımları yenile; değiştirilmemiş kopyalar yerinde güncellenir, yerel düzenlemeler korunur.
+- [`atl remove`](/tr/cli/remove) — bir takımı kapsamdan kaldır.
+- [`atl setup-hooks`](/tr/cli/setup-hooks) — kurulumun otomatik olarak bağladığı otomasyon hook'ları.
+- [Kavramlar](/tr/guide/concepts#scope-global-and-project) — global/proje kapsam ekseni.

@@ -1,8 +1,8 @@
 # Workspace — bakımcı merkezi
 
-[`agentteamland/workspace`](https://github.com/agentteamland/workspace) deposu, AgentTeamLand ekosisteminin **bakımcı merkezidir**. Bir meta-depodur: klonlayıp tek bir betiği çalıştırınca her eş depo (cli, core, registry, software-project-team vb.) tek bir ağaç altında, `./repos/` dizininde, kontrol edilmiş hâle gelir. Platformun her hareketli parçası bir `cd repos/<name>` uzaklıktadır.
+[`agentteamland/workspace`](https://github.com/agentteamland/workspace) deposu, AgentTeamLand ekosisteminin **bakımcı merkezidir**. Bir meta-depodur: klonlayıp tek bir betiği çalıştırınca her eş depo (`atl`, `docs`, `.github` vb.) tek bir ağaç altında, `./repos/` dizininde, kontrol edilmiş hâle gelir. Platformun her hareketli parçası bir `cd repos/<name>` uzaklıktadır.
 
-Çalışma alanını, **birden çok depoyu kapsayan bakım işi** yaparken kullan: depolar arası yeniden tasarımlar, çoklu PR yayımları, yönetişim denetimleri ya da yalnızca 14 ayrı `cd` komutu olmadan organizasyon genelinde `git status` çalıştırmak.
+Çalışma alanını, **birden çok depoyu kapsayan bakım işi** yaparken kullan: depolar arası yeniden tasarımlar, çoklu PR yayımları, yönetişim denetimleri ya da yalnızca birçok ayrı `cd` komutu olmadan organizasyon genelinde `git status` çalıştırmak.
 
 `atl`'yi yalnızca KULLANMAK istiyorsan (kendi projelerine takım kurmak için) çalışma alanına ihtiyacın yoktur — `brew install agentteamland/tap/atl` yeterlidir. Çalışma alanı, ekosistem tarafındaki iş içindir.
 
@@ -16,25 +16,25 @@ cd workspace
 
 `sync.sh`, `agentteamland/` altındaki her eş depoyu `./repos/<name>/` dizinine klonlar. İdempotent çalışır — yeniden çalıştırmak var olan klonları ileri-sarmalı çekimle günceller ve son çalıştırmadan bu yana organizasyona eklenen yeni depoları klonlar.
 
-Eşzamanlamadan sonra `./repos/`, organizasyonun tam anlık görüntüsünü içerir (2026-05-03 itibarıyla 16 depo):
+Eşzamanlamadan sonra `./repos/`, v2 aktif depolarını ve arşivlenmiş v1 depolarını içerir (tarih için salt okunur olarak saklanmıştır):
 
 ```
 repos/
-├── cli/                       # atl ikilisi (Go) — kullanıcıların kurduğu CLI
-├── core/                      # global beceriler + kurallar + JSON şemalar
-├── brainstorm/                # /brainstorm becerisi + kuralı
-├── rule/                      # /rule + /rule-wizard becerileri
-├── team-manager/              # bootstrap install.sh (v1.0.0 sonrası atl'ye devreder)
-├── software-project-team/     # 13 ajan + 3 beceri (.NET + Flutter + React yığını)
-├── design-system-team/        # 2 ajan + 10 /dst-* becerisi (yerel tasarım + prototip)
-├── starter-extended/          # kalıtım örnek takımı
-├── create-project/            # 🗄 ARCHIVED 2026-05-04 — iskele takımlara taşındı; tarih için saklandı
-├── registry/                  # teams.json — kanonik takım kataloğu
-├── docs/                      # bu belgeler sitesi (VitePress, EN + TR)
-├── homebrew-tap/              # goreleaser tarafından kendiliğinden yönetilir
-├── scoop-bucket/              # goreleaser tarafından kendiliğinden yönetilir
-├── winget-pkgs/               # microsoft/winget-pkgs çatallaması
+├── atl/                       # v2 monorepo — cli + core + takımlar + belgeler
+├── docs/                      # VitePress belgeler sitesi (EN + TR) — v2 yeniden yayımı bekleniyor
 └── .github/                   # organizasyon profili
+
+# Arşivlenmiş v1 depoları (salt okunur, tarih için saklanmış):
+├── cli/                       # 🗄 ARCHIVED 2026-06-21 — atl monoreposuna aktarıldı
+├── core/                      # 🗄 ARCHIVED 2026-06-21 — atl monoreposuna aktarıldı
+├── brainstorm/                # 🗄 ARCHIVED 2026-06-21 — atl monoreposuna aktarıldı
+├── rule/                      # 🗄 ARCHIVED 2026-06-21 — atl monoreposuna aktarıldı
+├── team-manager/              # 🗄 ARCHIVED 2026-06-21 — önyükleme sarmalayıcısı; kurulum artık atl'de
+├── software-project-team/     # 🗄 ARCHIVED 2026-06-21 — atl monoreposuna aktarıldı
+├── design-system-team/        # 🗄 ARCHIVED 2026-06-21 — atl monoreposuna aktarıldı
+├── starter-extended/          # 🗄 ARCHIVED 2026-06-21 — kalıtım v2'de kaldırıldı
+├── registry/                  # 🗄 ARCHIVED 2026-06-21 — GitHub konu kataloğuyla değiştirildi
+└── homebrew-tap/ scoop-bucket/ # 🗄 ARCHIVED 2026-06-21 — dağıtım artık yalnızca GitHub Releases üzerinden
 ```
 
 ## Günlük komutlar
@@ -78,7 +78,7 @@ claude    # ya da Claude Code'u nasıl çağırıyorsan
 Claude Code burada başladığında kendiliğinden şunları görür:
 
 - **`./repos/` altındaki her eş depo** doğrudan düzenleme için — ayrı `cd` gerekmez.
-- **Tüm etkin beyin fırtınaları** ([brainstorm kuralı](https://github.com/agentteamland/brainstorm/blob/main/rules/brainstorm.md) gereği `CLAUDE.md`'ye kendiliğinden sabitlenmiş).
+- **Tüm etkin beyin fırtınaları** ([brainstorm kuralı](https://github.com/agentteamland/atl/blob/main/core/rules/brainstorm.md) gereği `CLAUDE.md`'ye kendiliğinden sabitlenmiş).
 - **Çalışma alanının `CLAUDE.md` dosyası** — platform düzeyinde yönlendirme belgesi.
 - **Yerleşmiş kararlar** `.atl/docs/` altında (tamamlanmış beyin fırtınalarından türeyen mimari kararlar).
 - **Wiki + journal** — `.atl/wiki/` ve `.atl/journal/` içinde ([bilgi sistemi](../guide/knowledge-system) gereği).
@@ -100,9 +100,9 @@ Toparlanırken:
 ./scripts/push-all.sh      # push'lanmamış ne var, gör
 ```
 
-Daha kapsamlı bir oturum sonu geçişi için [`/repo-cleanup`](https://github.com/agentteamland/workspace/blob/main/.claude/skills/repo-cleanup/skill.md) şunları otomatikleştirir: save-learnings → dal + commit + push + PR + auto-merge → etiket + kayıt defteri + dal budama. Çalışma alanında Claude Code'un içinden çalıştır.
+Daha kapsamlı bir oturum sonu geçişi için [`/repo-cleanup`](https://github.com/agentteamland/workspace/blob/main/.claude/skills/repo-cleanup/skill.md) şunları otomatikleştirir: `/drain` → dal + commit + push + PR + auto-merge → etiket + dal budama. Çalışma alanında Claude Code'un içinden çalıştır.
 
 ## İlgili
 
 - [`atl` CLI'yi kur](../guide/install) — yalnızca `atl`'yi KULLANMAK istiyorsan çalışma alanını atla.
-- [Bilgi sistemi](../guide/knowledge-system) — çalışma alanının `.claude/` dizinindeki journal ve wiki katmanları.
+- [Bilgi sistemi](../guide/knowledge-system) — çalışma alanının `.atl/` dizinindeki journal ve wiki katmanları.

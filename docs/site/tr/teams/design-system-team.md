@@ -14,10 +14,10 @@ Claude Design tarzı tasarım sistemi ve ekran prototipi çalışmasını her pr
 
 ```bash
 cd your-project
-atl install design-system-team
+atl install agentteamland/design-system-team
 ```
 
-[`atl`](/tr/cli/overview) ≥ 0.1.2 gerekir (`team.json` içindeki `requires.atl` alanı). Mevcut davranış için pratik temel `atl ≥ 1.0.0`'dır — daha eski sürümler proje-yerel kopya kurulum modelinden öncedir.
+[`atl`](/tr/cli/overview) ≥ 0.1.2 gerekir (`team.json` içindeki `requires.atl` alanı).
 
 ## Hızlı başlangıç
 

@@ -16,25 +16,25 @@ cd workspace
 
 `sync.sh` clones every peer repo under `agentteamland/` into `./repos/<name>/`. It's idempotent — re-running fast-forward-pulls existing clones and clones any new ones added to the org since last run.
 
-After sync, `./repos/` contains the full org snapshot (16 repos as of 2026-05-03):
+After sync, `./repos/` contains the v2 active repos plus the archived v1 repos (kept read-only for history):
 
 ```
 repos/
-├── cli/                       # atl binary (Go) — the CLI users install
-├── core/                      # global skills + rules + JSON schemas
-├── brainstorm/                # /brainstorm skill + its rule
-├── rule/                      # /rule + /rule-wizard skills
-├── team-manager/              # bootstrap install.sh (delegates to atl post-v1.0.0)
-├── software-project-team/     # 13 agents + 3 skills (.NET + Flutter + React stack)
-├── design-system-team/        # 2 agents + 10 /dst-* skills (native design + prototype)
-├── starter-extended/          # inheritance example team
-├── create-project/            # 🗄 ARCHIVED 2026-05-04 — scaffolder moved into teams; kept for history
-├── registry/                  # teams.json — canonical team catalog
-├── docs/                      # this docs site (VitePress, EN + TR)
-├── homebrew-tap/              # auto-managed by goreleaser
-├── scoop-bucket/              # auto-managed by goreleaser
-├── winget-pkgs/               # fork of microsoft/winget-pkgs
+├── atl/                       # v2 monorepo — cli + core + teams + docs
+├── docs/                      # VitePress docs site (EN + TR) — pending v2 redeploy
 └── .github/                   # organization profile
+
+# Archived v1 repos (read-only, kept for history):
+├── cli/                       # 🗄 ARCHIVED 2026-06-21 — ported into atl monorepo
+├── core/                      # 🗄 ARCHIVED 2026-06-21 — ported into atl monorepo
+├── brainstorm/                # 🗄 ARCHIVED 2026-06-21 — ported into atl monorepo
+├── rule/                      # 🗄 ARCHIVED 2026-06-21 — ported into atl monorepo
+├── team-manager/              # 🗄 ARCHIVED 2026-06-21 — bootstrap wrapper; atl is the installer now
+├── software-project-team/     # 🗄 ARCHIVED 2026-06-21 — ported into atl monorepo
+├── design-system-team/        # 🗄 ARCHIVED 2026-06-21 — ported into atl monorepo
+├── starter-extended/          # 🗄 ARCHIVED 2026-06-21 — inheritance dropped from v2
+├── registry/                  # 🗄 ARCHIVED 2026-06-21 — replaced by GitHub topic catalog
+└── homebrew-tap/ scoop-bucket/ # 🗄 ARCHIVED 2026-06-21 — distribution via GitHub Releases only
 ```
 
 ## Daily commands
@@ -78,7 +78,7 @@ claude    # or however you invoke Claude Code
 When Claude Code starts here, it automatically sees:
 
 - **Every peer repo under `./repos/`** for direct editing — no separate `cd` needed
-- **All active brainstorms** (auto-pinned into `CLAUDE.md` per the [brainstorm rule](https://github.com/agentteamland/brainstorm/blob/main/rules/brainstorm.md))
+- **All active brainstorms** (auto-pinned into `CLAUDE.md` per the [brainstorm rule](https://github.com/agentteamland/atl/blob/main/core/rules/brainstorm.md))
 - **Workspace `CLAUDE.md`** — the platform-level orientation document
 - **Final decisions** in `.atl/docs/` (settled architecture decisions derived from completed brainstorms)
 - **Wiki + journal** in `.atl/wiki/` and `.atl/journal/` (per the [knowledge system](../guide/knowledge-system))
@@ -100,7 +100,7 @@ When wrapping up:
 ./scripts/push-all.sh      # see what's unpushed
 ```
 
-For a more thorough end-of-session pass, [`/repo-cleanup`](https://github.com/agentteamland/workspace/blob/main/.claude/skills/repo-cleanup/skill.md) automates: save-learnings → branch + commit + push + PR + auto-merge → tag + registry + branch prune. Run it from inside Claude Code in the workspace.
+For a more thorough end-of-session pass, [`/repo-cleanup`](https://github.com/agentteamland/workspace/blob/main/.claude/skills/repo-cleanup/skill.md) automates: `/drain` → branch + commit + push + PR + auto-merge → tag + branch prune. Run it from inside Claude Code in the workspace.
 
 ## Related
 

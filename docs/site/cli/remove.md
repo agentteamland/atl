@@ -1,57 +1,61 @@
 # `atl remove`
 
-Uninstall a team from the current project.
+Uninstall a team, deleting only the files it installed.
 
 ## Usage
 
 ```bash
-atl remove <team>             # interactive — prompts before destroying local modifications (atl ≥ 1.0.0)
-atl remove <team> --force     # non-interactive — skips the confirmation prompt
+atl remove <handle>/<team>            # remove from the project scope (default)
+atl remove <handle>/<team> --global   # remove from the user-global layer
 ```
 
-`<team>` is the team's registry name (not a URL). You can see installed names via `atl list`.
+`<handle>/<team>` is the team's reference — the GitHub owner plus the team name, the same form you pass to [`atl install`](/cli/install). Run [`atl list`](/cli/list) to see what's installed and at which scope.
 
 ## Example
 
 ```bash
-atl remove starter-extended
+$ atl remove agentteamland/software-project-team
+atl remove: removed agentteamland/software-project-team (17 files) from project scope
+```
+
+If the team isn't installed at that scope:
+
+```bash
+$ atl remove agentteamland/software-project-team
+agentteamland/software-project-team is not installed at project scope
 ```
 
 ## What happens
 
-1. The team is located in `.claude/.team-installs.json`.
-2. Every project-local copy under `.claude/agents/`, `.claude/skills/`, `.claude/rules/` that this team installed is identified by consulting the manifest's per-resource SHA-256 baselines.
-3. **Modification check**: each resource's current SHA-256 is compared with the install-time baseline. If any resource has been locally modified, the CLI prints a `⚠ N resources have local modifications` summary and prompts for confirmation. `--force` bypasses the prompt.
-4. **Manifest-driven allowlist**: only files this team registered are removed. Any user-authored files under `.claude/` (including auto-grown `children/`, `learnings/`, custom skills, journal entries, wiki pages) are **preserved** — they were never registered with `atl`, so they survive the uninstall.
-5. `.claude/.team-installs.json` is updated atomically (tmp + rename).
-6. The shared cache is **not** touched. The team's Git clone stays in `~/.claude/repos/agentteamland/` for reuse. To reclaim disk, delete the cache directory manually.
+1. The install manifest for the team at the chosen scope is read from `<layer>/.atl/installed/<handle>__<name>.json` — `<layer>` is `~/.atl` for `--global`, `<project>/.atl` for the project scope.
+2. Every file the manifest recorded (under `.claude/agents/`, `.claude/skills/`, `.claude/rules/`) is deleted.
+3. The directories that held those files are pruned, deepest first — but only the ones that are now empty. A directory still holding another team's files or your own content is left in place.
+4. The manifest itself is removed.
 
-::: warning Inheritance is not enforced at remove time
-`atl remove` does NOT refuse to remove a team that another installed team extends. If you remove a parent team while a child team still references it, the child's effective resource set will become inconsistent on the next `atl update` or `atl list`. Run `atl list` first to see the inheritance chain — and remove children before parents.
+The output reports how many files were deleted and from which scope:
+
+```
+atl remove: removed <handle>/<name> (N files) from <scope> scope
+```
+
+::: tip Only manifest-recorded files are removed
+`atl remove` deletes exactly the files the team registered when it was installed — nothing more. Anything else under `.claude/` is left untouched: auto-grown agent `children/` and `learnings/`, your own skills, wiki pages, journal entries, and any other content you authored. None of it was recorded in the manifest, so it survives the uninstall.
 :::
+
+## Scope
+
+`atl remove` operates on the **project scope** by default — the `.claude/` and `.atl/` of the directory you run it in. Pass `--global` to remove a team from the user-global layer (`~/.claude` assets, `~/.atl` manifest) instead.
+
+A team can be installed at both scopes independently; removing one leaves the other in place. Run [`atl list`](/cli/list) to see which scope a team lives at before removing it.
 
 ## Flags
 
 | Flag | Effect |
 |---|---|
-| `--force` | Skip the modification-check confirmation prompt for projects with locally modified copies. Useful in CI / scripted teardown. |
-
-## Example — forced removal in CI
-
-```bash
-atl remove software-project-team --force
-```
-
-Use `--force` for non-interactive contexts (CI, scripted teardown). In interactive use, prefer the default — the prompt protects you from accidentally discarding hours of `/save-learnings`-grown content or hand edits.
-
-## Behavior changes from pre-v1.0.0
-
-Pre-`atl v1.0.0`, `atl remove` used a heuristic that could accidentally delete user-authored files alongside the team's resources. The v1.0.0 manifest-driven allowlist closes that latent bug — every removed file is one the team explicitly installed.
-
-The interactive confirmation prompt + `--force` flag also arrived in v1.0.0 (was unconditionally destructive before).
+| `--global` | Remove from the user-global layer instead of the project. |
 
 ## Related
 
-- [`atl list`](/cli/list) — see what you can remove.
+- [`atl list`](/cli/list) — see what's installed and at which scope.
 - [`atl install`](/cli/install) — reinstall if you change your mind.
-- [`atl update`](/cli/update) — auto-refreshes unmodified copies; relevant when deciding whether to `--force` remove (you may not realize a copy is unmodified if you have not touched it in a while).
+- [`atl update`](/cli/update) — refresh installed teams to the latest catalog version.

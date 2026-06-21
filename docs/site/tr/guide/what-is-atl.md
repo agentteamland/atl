@@ -10,17 +10,13 @@ Claude Code'u iyi kullanabilmek yapılandırma gerektirir: modelin kod tabanın 
 
 Bir **takım**, belirli bir iş türünün etrafında kurulmuş ajan, beceri ve kural paketidir. Bir takım, Docker Compose üretim düzeniyle bir .NET + Flutter + React yığınına yönelik olabilir. Bir başkası, Next.js + Sanity + Vercel blog yığınına yönelik olabilir. Üçüncüsü, Airflow ve dbt ile veri boru hatlarına.
 
-`atl install some-team` takımı indirir, önbelleğe alır ve içindeki ajanları, becerileri ve kuralları içinde bulunduğun projenin `.claude/` dizinine kopyalar. Editörü açtığın an Claude Code takımı görür.
+`atl install some-team` takımı GitHub destekli bir katalog üzerinden çözümler, kaynağını getirir ve içindeki ajanları, becerileri ve kuralları içinde bulunduğun projenin `.claude/` dizinine kopyalar. Editörü açtığın an Claude Code takımı görür.
 
 Takımın yazarı bir düzeltme yayımladığında `atl update` komutunu çalıştırırsın; o takımı kullanan her proje değişikliği alır. Projelerinin birbirinden uzaklaşması durur.
 
-## Çatallama (fork) değil
+## Kapalı bir bahçe değil
 
-Takımlar başka takımları **genişletebilir**. `software-project-team`'in %95'ini istiyor ama tek bir ajanı farklı olsun ve bir beceri daha eklensin diyorsan, onu `extends` ile genişleten küçük bir takım yazarsın, o tek ajanı bastırırsın ve beceriyi eklersin. Üst takım kendi deposunda gelişmeye devam eder; alt takım güncellemeleri bedava alır.
-
-## Kapalı bir bahçe de değil
-
-Her takım, kök dizininde `team.json` dosyası bulunan bir Git deposundan ibarettir. Takımlara `software-project-team` gibi kısa adlar verilebilmesi için herkese açık bir [kayıt defteri](https://github.com/agentteamland/registry) var, ama istediğin herhangi bir Git URL'sinden de kurulum yapabilirsin. Şema herkese açık. CLI, MIT lisanslı Go ile yazıldı. Spesifikasyonun tamamı burada belgelenmiş durumda.
+Her takım, kök dizininde `team.json` dosyası bulunan herkese açık bir GitHub deposundan ibarettir. Başvurulacak merkezi bir kayıt defteri yoktur: bir depoyu [`atl-team`](https://github.com/topics/atl-team) GitHub konusuyla etiketle, oluşturulan **katalogda** görünsün; oradan herkes `<handle>/<name>` biçimiyle bulup kurabilsin. `atl search` o katalogu sorgular; `atl install` onu çözümler. CLI, MIT lisanslı Go ile yazıldı. Takım sözleşmesi burada belgelenmiş — bkz. [`team.json` referansı](/tr/authoring/team-json).
 
 ## Kim için?
 
@@ -30,9 +26,9 @@ Her takım, kök dizininde `team.json` dosyası bulunan bir Git deposundan ibare
 
 ## Bugün nerede?
 
-`atl` **v1.1.x** sürümünde — kararlı sürüm. Kurulum topolojisi proje-yerel kopyalardan oluşur (kaynak doğruluk olarak global önbellek kullanılır), otomatik güncelleme yolu Claude Code'un `SessionStart` ve `UserPromptSubmit` hook'larından geçer, kendini güncelleyen öğrenme döngüsü oturum bilgisini günlük, wiki, ajan çocukları ve beceri öğrenimleri katmanlarına yazar.
+`atl` **v2** sürümünde — tek bir monorepo ([`agentteamland/atl`](https://github.com/agentteamland/atl)), şu an **alpha** aşamasında. Kurulum topolojisi proje-yerel kopyalardan oluşur (diskte kalıcı klon önbelleği yoktur — kaynaklar kurulumdan sonra atılır), otomatik güncelleme yolu Claude Code'un `SessionStart` ve `UserPromptSubmit` hook'larından geçer, öğrenme döngüsü ise oturum bilgisini kalıcı biçimde saklar: satır içi işaretçiler (marker) kuyruğa alınır ve `/drain` becerisi her birini günlük, wiki ve ajan bilgi tabanlarına işler.
 
-Kayıt defterinde bugün iki doğrulanmış takım yayında: `software-project-team` (13 ajan — .NET API + Flutter + React + Docker yığını) ve `design-system-team` (2 ajan + tasarım sistemi ve prototip araçları için 10 `/dst-*` becerisi). Ekosistemin tamamı MIT lisanslı ve PR'lara açık.
+Katalogda bugün iki doğrulanmış takım yayında: `software-project-team` (13 ajan — .NET API + Flutter + React + Docker yığını) ve `design-system-team` (2 ajan + tasarım sistemi ve prototip araçları için `/dst-*` becerileri). Platformun tamamı MIT lisanslı ve katkılara açık.
 
 Sıradakiler:
 - **[`atl`'yi kur](/tr/guide/install)**

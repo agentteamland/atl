@@ -8,17 +8,17 @@ Aynı deseni kendi `CLAUDE.md` dosyalarında sen de kullanabilirsin. Bloklar yal
 
 | Blok | Yazan | Amaç |
 |---|---|---|
-| `<!-- wiki:index -->` | [`/save-learnings`](/tr/skills/drain) | `.atl/wiki/` sayfaları için kendiliğinden yeniden inşa edilen içindekiler tablosu. Proje bağlamıyla yüklenir, Claude'a sıfır maliyetle bilgi haritasını sunar. |
+| `<!-- wiki:index -->` | [`/drain`](/tr/skills/drain) | `.atl/wiki/` sayfaları için kendiliğinden yeniden inşa edilen içindekiler tablosu. Proje bağlamıyla yüklenir, Claude'a sıfır maliyetle bilgi haritasını sunar. |
 | `<!-- brainstorm:active -->` | [`/brainstorm start`](/tr/skills/brainstorm) ve [`/brainstorm done`](/tr/skills/brainstorm) | Etkin beyin fırtınası konularını proje bağlamına sabitler; bir sonraki oturum bunları kaçıramaz. |
 | `<!-- pending-implementation -->` | Beyin fırtınası `done` akışı | Bir beyin fırtınasının X kararını verdiğini ama uygulamasının henüz yayımlanmadığını bir sonraki oturuma anımsatır. |
 
 Üçü de aynı `<!-- block:start --> ... <!-- block:end -->` sınırlayıcı desenini kullanır. Hiçbirinin katı anlamda bir ayrıştırıcısı yoktur — sözdizim değil, sözleşmedir. Ama sözleşme, gerektiğinde basit `sed` ya da düzenli ifadeyle bulmak, güncellemek ve kaldırmak için yeterince tutarlıdır.
 
-> **Not — bu sayfadaki örnek blok içerikleri neden İngilizce?** Aşağıdaki üç şablon (`wiki:index`, `brainstorm:active`, `pending-implementation`) `/save-learnings` ve `/brainstorm` becerileri tarafından otomatik üretilir. Bu beceriler `feedback_speak_turkish` kuralı gereği her zaman İngilizce çıktı verir (taahhüt edilen tüm dosyalar İngilizce olmalıdır). Bu nedenle TR projelerde bile `CLAUDE.md` içindeki bu bloklar İngilizce görünür — örneklerin İngilizce gösterilmesi fiili çıktıyı yansıtır.
+> **Not — bu sayfadaki örnek blok içerikleri neden İngilizce?** Aşağıdaki üç şablon (`wiki:index`, `brainstorm:active`, `pending-implementation`) `/drain` ve `/brainstorm` becerileri tarafından otomatik üretilir. Bu beceriler `feedback_speak_turkish` kuralı gereği her zaman İngilizce çıktı verir (taahhüt edilen tüm dosyalar İngilizce olmalıdır). Bu nedenle TR projelerde bile `CLAUDE.md` içindeki bu bloklar İngilizce görünür — örneklerin İngilizce gösterilmesi fiili çıktıyı yansıtır.
 
 ## `<!-- wiki:index -->` — bilgi haritası
 
-`.atl/wiki/` dizinindeki her değişiklikten sonra `/save-learnings` tarafından yeniden inşa edilir. `CLAUDE.md` dosyasının üst kısmına yakın, H1 ve giriş paragrafından sonra yaşar:
+`.atl/wiki/` dizinindeki her değişiklikten sonra `/drain` tarafından yeniden inşa edilir. `CLAUDE.md` dosyasının üst kısmına yakın, H1 ve giriş paragrafından sonra yaşar:
 
 ```markdown
 <!-- wiki:index:start -->
@@ -38,7 +38,7 @@ Knowledge lives in `.atl/wiki/` (current truth, topic-organized) and `.atl/journ
 
 Her madde tek satırdır: `- [topic](.atl/wiki/topic.md) — tek satırlık özet` (dosya adına göre alfabetik sıralı). Özet, her wiki sayfasının frontmatter ve başlık dışındaki ilk satırından alınır.
 
-**Neden normal bir bölüm değil de işaretçi bloku:** blok program yoluyla yeniden inşa ediliyor. İşaretçilerin içine yapılan elle düzenlemeler bir sonraki `/save-learnings` çalıştırmasında üzerine yazılır. Bir konu eklemek için: `CLAUDE.md` dosyasını doğrudan DÜZENLEME — wiki sayfasını konu başlığıyla oluştur; ardından `/save-learnings` dizini yeniden inşa eder.
+**Neden normal bir bölüm değil de işaretçi bloku:** blok program yoluyla yeniden inşa ediliyor. İşaretçilerin içine yapılan elle düzenlemeler bir sonraki `/drain` çalıştırmasında üzerine yazılır. Bir konu eklemek için: `CLAUDE.md` dosyasını doğrudan DÜZENLEME — wiki sayfasını konu başlığıyla oluştur; ardından `/drain` dizini yeniden inşa eder.
 
 ## `<!-- brainstorm:active -->` — etkin konu sabitleyici
 
@@ -108,7 +108,7 @@ Kısa giriş paragrafı.
 
 Sıra, görsel hiyerarşi için önemlidir (en aciliyle başla: etkin beyin fırtınaları → kararı verilmiş ama yayımlanmamış kuyruğu → genel bilgi haritası → serbest biçimli içerik), ama ayrıştırıcı için sıranın önemi yoktur — yalnızca yorum sınırlayıcıları sayılır.
 
-Takım depolarında (`~/.claude/repos/agentteamland/{team}/`) aynı bloklar `CLAUDE.md` yerine `README.md` dosyasında yaşayabilir (takım kapsamlı iş için takım `README.md`, Claude tarafından yüklenen aynı rolü üstlenir).
+Takım depolarında (ilgili kapsamda `.claude/` altına yüklenen varlıklar) aynı bloklar `CLAUDE.md` yerine `README.md` dosyasında yaşayabilir (takım kapsamlı iş için takım `README.md`, Claude tarafından yüklenen aynı rolü üstlenir).
 
 ## Kendi işaretçi bloğunu ekle
 
@@ -151,6 +151,6 @@ HTML yorumları:
 ## İlgili
 
 - [`/brainstorm`](/tr/skills/brainstorm) — `<!-- brainstorm:active -->` bloğunu yazar ve kaldırır.
-- [`/save-learnings`](/tr/skills/drain) — `<!-- wiki:index -->` bloğunu yazar.
+- [`/drain`](/tr/skills/drain) — `<!-- wiki:index -->` bloğunu yazar.
 - [Bilgi sistemi](/tr/guide/knowledge-system) — wiki:index bloğunun neyi indekslediği.
 - [Kavramlar: Beceri](/tr/guide/concepts#skill) — bu sözleşmelerin geniş resme nereye oturduğu.

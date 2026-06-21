@@ -8,17 +8,17 @@ You can use the same pattern in your own `CLAUDE.md` files. The blocks are just 
 
 | Block | Written by | Purpose |
 |---|---|---|
-| `<!-- wiki:index -->` | [`/save-learnings`](/skills/drain) | Auto-rebuilt table of contents for `.atl/wiki/` pages. Loads with project context, gives Claude the knowledge map at zero cost. |
+| `<!-- wiki:index -->` | [`/drain`](/skills/drain) | Auto-rebuilt table of contents for `.atl/wiki/` pages. Loads with project context, gives Claude the knowledge map at zero cost. |
 | `<!-- brainstorm:active -->` | [`/brainstorm start`](/skills/brainstorm) and [`/brainstorm done`](/skills/brainstorm) | Pins active brainstorm topics into project context so the next session cannot miss them. |
 | `<!-- pending-implementation -->` | Brainstorm `done` flow | Reminds the next session that a brainstorm decided X but the implementation hasn't shipped yet. |
 
 All three use the same `<!-- block:start --> ... <!-- block:end -->` delimiter pattern. None of them have a parser in the strict sense — they're convention, not syntax. But the convention is consistent enough to find/update/remove with simple `sed`/regex when needed.
 
-> **Note — why the example block contents below are in English (even on the Turkish mirror of this page):** The three templates (`wiki:index`, `brainstorm:active`, `pending-implementation`) are produced verbatim by `/save-learnings` and `/brainstorm`. Per the `feedback_speak_turkish` rule, these skills always write English (committed files must be English regardless of project language). So in a Turkish project, the `CLAUDE.md` blocks still appear in English — the examples reflect the actual output.
+> **Note — why the example block contents below are in English (even on the Turkish mirror of this page):** The three templates (`wiki:index`, `brainstorm:active`, `pending-implementation`) are produced verbatim by `/drain` and `/brainstorm`. Per the `feedback_speak_turkish` rule, these skills always write English (committed files must be English regardless of project language). So in a Turkish project, the `CLAUDE.md` blocks still appear in English — the examples reflect the actual output.
 
 ## `<!-- wiki:index -->` — knowledge map
 
-Auto-rebuilt by `/save-learnings` after every change to `.atl/wiki/`. Lives near the top of `CLAUDE.md`, after the H1 + intro:
+Auto-rebuilt by `/drain` after every change to `.atl/wiki/`. Lives near the top of `CLAUDE.md`, after the H1 + intro:
 
 ```markdown
 <!-- wiki:index:start -->
@@ -38,7 +38,7 @@ Knowledge lives in `.atl/wiki/` (current truth, topic-organized) and `.atl/journ
 
 Each entry is one line: `- [topic](.atl/wiki/topic.md) — one-line summary` (sorted alphabetically by filename). The summary comes from the first non-frontmatter, non-heading line of each wiki page.
 
-**Why it's a marker block, not just a normal section:** the block is rebuilt programmatically. Hand-edits inside the markers are overwritten on the next `/save-learnings` run. To add a topic: don't edit `CLAUDE.md` directly — create the wiki page with the topic title, then `/save-learnings` rebuilds the index.
+**Why it's a marker block, not just a normal section:** the block is rebuilt programmatically. Hand-edits inside the markers are overwritten on the next `/drain` run. To add a topic: don't edit `CLAUDE.md` directly — create the wiki page with the topic title, then `/drain` rebuilds the index.
 
 ## `<!-- brainstorm:active -->` — active topics pin
 
@@ -108,7 +108,7 @@ Short intro paragraph.
 
 Order matters for visual hierarchy (active brainstorms most urgent → pending implementation queue → general knowledge map → free-form content), but the parser doesn't care about order — only the comment delimiters.
 
-In team repos (`~/.claude/repos/agentteamland/{team}/`), the same blocks can live in `README.md` instead of `CLAUDE.md` (the team `README.md` plays the same loaded-by-Claude role for team-scope work).
+In team repos (assets installed under `.claude/` at the relevant scope), the same blocks can live in `README.md` instead of `CLAUDE.md` (the team `README.md` plays the same loaded-by-Claude role for team-scope work).
 
 ## Add your own marker block
 
@@ -151,6 +151,6 @@ HTML comments are:
 ## Related
 
 - [`/brainstorm`](/skills/brainstorm) — writes/removes the `<!-- brainstorm:active -->` block
-- [`/save-learnings`](/skills/drain) — writes the `<!-- wiki:index -->` block
+- [`/drain`](/skills/drain) — writes the `<!-- wiki:index -->` block
 - [Knowledge system](/guide/knowledge-system) — what the wiki:index block indexes
 - [Concepts: Skill](/guide/concepts#skill) — where these conventions fit in the broader picture

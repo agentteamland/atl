@@ -1,128 +1,87 @@
 # `atl install`
 
-Install a team into the current project.
+Resolve a team from the GitHub-backed catalog and install it into a scope.
 
 ## Usage
 
 ```bash
-atl install <team>                # idempotent first-time-only no-op (atl ≥ 1.0.0)
-atl install <team> --refresh      # force overwrite (discards local modifications with warning)
+atl install <handle>/<team>              # install at the publisher's default scope
+atl install <handle>/<team> --global     # force user-global scope (every project)
+atl install <handle>/<team> --project    # force project scope (this project only)
 ```
 
-`<team>` can be:
-
-- A **registry short name** — `software-project-team`
-- A **registry name with version** — `software-project-team@^1.2.0` (caret, tilde, or exact pin)
-- A **GitHub `owner/repo` shorthand** — `agentteamland/starter-extended`
-- A **Git URL** — `https://github.com/you/your-team.git`, `git@github.com:you/team.git`, `ssh://...`, `file:///abs/path.git`
-- A **local filesystem path** — `./my-team`, `~/projects/my-team`, `/abs/path/to/team` (atl ≥ 0.1.4; the path must be a directory with `team.json` at its root AND a `.git/`)
-
-## Examples
-
-### Registry (public, verified)
+`<handle>/<team>` is the catalog reference — the handle is the team's GitHub owner (ownership is authorship) and the team is its name within that handle. There is no `@version` pin, no Git URL, no local filesystem path: install always resolves through the catalog. Find a reference with [`atl search`](/cli/search).
 
 ```bash
-atl install software-project-team
-atl install software-project-team@^1.2.0
+atl install agentteamland/software-project-team
 ```
 
-### GitHub shorthand
-
-```bash
-atl install agentteamland/starter-extended
-```
-
-### Full Git URL (public or private)
-
-```bash
-atl install https://github.com/acme/acme-starter.git
-atl install git@github.com:you/private-team.git          # SSH, uses your git credentials
-atl install https://gitea.example.com/you/team.git       # self-hosted
-```
-
-### Local filesystem — no remote required (atl ≥ 0.1.4)
-
-The private-local workflow: build a team on your laptop, install it into your own project without pushing to any git server.
-
-```bash
-# One-time: set up the team as a git repo
-cd ~/projects/my-team
-git init -b main && git add . && git commit -m "init"
-
-# Install into any project:
-cd ~/projects/some-app
-atl install ~/projects/my-team                   # absolute path
-atl install ./my-team                            # relative path
-atl install file:///Users/you/projects/my-team   # explicit file:// URL
-```
-
-All three forms work identically. The source must be a directory containing `team.json` and must be a git repo (at least one commit). See [Creating a team](/authoring/creating-a-team) for the full walk-through.
-
-## Multi-team installation
-
-Multiple teams can coexist in the same project — `atl` v0.1.2+ supports this natively. Every resource (agents, rules, skills) is **copied** into the project's `.claude/` directory; the global cache at `~/.claude/repos/agentteamland/{team}/` is the source-of-truth, and `atl update` keeps unmodified copies in sync.
-
-```bash
-atl install software-project-team
-atl install design-system-team
-
-atl list
-# ✓ software-project-team@1.2.1
-# ✓ design-system-team@0.8.1
-```
-
-When two teams declare an item with the same name (e.g., both have a `code-reviewer` agent), the most recently installed one wins. atl prints a one-line warning:
-
-```
-⚠ overriding agent "code-reviewer" (was from team-a, now from team-b)
-```
-
-This mirrors npm / pip / GNU Stow conventions. Removing a team is safe — `atl remove` deletes its copied resources and replays the remaining teams' copies. Any item the removed team was "winning" by collision falls back to its original owner correctly.
-
-## Project-local copy install (atl v1.0.0+)
-
-Every team resource — agents, rules, skills — installs as a **project-local copy** under `<project>/.claude/`. The global cache at `~/.claude/repos/agentteamland/{team}/` is the source-of-truth shared across all projects on the machine; each project keeps its own self-contained copy.
-
-This is the topology that the [install-mechanism-redesign decision](https://github.com/agentteamland/workspace/blob/main/.atl/docs/install-mechanism-redesign.md) settled on, replacing the pre-v1.0.0 mix of symlinks (for agents + rules) and copies (for skills only). Two reasons drove the change:
-
-1. **Mutations stay local.** `/save-learnings` and the auto-grown `children/` and `learnings/` directories from the [self-updating learning loop](https://github.com/agentteamland/workspace/blob/main/.atl/docs/self-updating-learning-loop.md) write into the project's `.claude/`. With symlinks, those writes would have polluted the global cache and collided on the next `atl update` pull. With copies, mutations stay isolated to the project that produced them.
-2. **Claude Code's skill loader.** Independent of the topology decision, Claude Code's project-level skill loader does NOT follow symlinks under `.claude/skills/` (upstream issues [#14836](https://github.com/anthropics/claude-code/issues/14836), [#25367](https://github.com/anthropics/claude-code/issues/25367), [#37590](https://github.com/anthropics/claude-code/issues/37590)). Skills had to be copied anyway; the v1.0.0 redesign generalized that to all resources.
-
-`atl update` is the synchronization mechanism — see below.
-
-## Idempotency (atl v1.0.0+)
-
-Running `atl install <team>` a second time on an already-installed team is a **no-op** with a one-line info message — not the silent reinstall it used to be. Pre-v1.0.0 every install silently overwrote local edits; v1.0.0+ requires `--refresh` to do that.
-
-```bash
-atl install software-project-team           # first time → installs
-atl install software-project-team           # again → no-op + info line
-atl install software-project-team --refresh # force-reinstall (warns if local edits exist)
-```
-
-This means re-running `atl install` is safe even in scripts. To pick up upstream changes for a team you have installed, use `atl update` (it auto-refreshes unmodified copies).
+`--global` and `--project` are mutually exclusive. With neither flag, the team installs at the scope its publisher declared (see [Scope](#scope) below).
 
 ## What happens
 
-1. **Resolve.** The handle is looked up in the GitHub-backed index — a first-party team resolves to a monorepo subpath, a third-party team to its standalone repo. A Git URL is used directly.
-2. **Fetch.** The team is downloaded as a ref-pinned HTTP tarball (no `git` binary required) into a local cache.
-3. **Validate.** `team.json` is checked against the [schema](/reference/schema). Invalid teams fail here.
-4. **Write.** Agents, rules, and skills are **copied** into the scope's `.claude/` — `~/.claude` for a global install, `<project>/.claude` for a project install. Existing copies are kept (idempotent default); use `--refresh` to overwrite.
-5. **Record.** A per-team manifest at `<layer>/.atl/installed/<handle>__<name>.json` records the source ref + per-file SHA-256 baselines that `atl update`'s auto-refresh and `atl doctor`'s integrity check rely on.
+1. **Resolve.** The `<handle>/<team>` reference is looked up in the GitHub-backed catalog — generated from public repos tagged with the [`atl-team`](https://github.com/topics/atl-team) topic. The catalog resolves offline-first from `~/.atl/index.json` (the out-of-band-refreshed cache), falling back to the copy embedded in the binary, so the lookup never blocks on the network. A first-party team resolves to a subpath inside the `agentteamland/atl` monorepo; a standalone team resolves to its own repo root.
+2. **Fetch.** The team's source is downloaded as a single ref-pinned HTTPS tarball straight from GitHub — **no `git` binary required** — into a temporary directory that is deleted as soon as the install finishes. There is no persistent clone cache on disk.
+3. **Read.** `team.json` is parsed. Validation is minimal: it must be valid JSON and have a `name`. There is no JSON-Schema validator — see [Schema](/reference/schema) for exactly what the CLI checks and [`team.json`](/authoring/team-json) for the full field contract.
+4. **Write assets.** The team's `agents/`, `skills/`, and `rules/` subtrees are copied straight into the scope's Claude Code directory — `~/.claude` for a global install, `<project>/.claude` for a project install. Nothing else from the repo (`team.json`, `README`, `LICENSE`) is copied.
+5. **Record a manifest.** A per-team manifest is written under the scope's `.atl/` directory at `<layer>/.atl/installed/<handle>__<name>.json`. It records the resolved source ref and a SHA-256 baseline for every copied file, which `atl update`'s refresh and `atl doctor`'s integrity check rely on.
+6. **Bind automation hooks.** The automation hooks (`SessionStart → atl session-start`, `UserPromptSubmit → atl tick`) are installed into Claude Code as a mandatory part of install — automation is on by default, not opt-in. A hook-binding failure is surfaced as a warning and does not fail the install.
+7. **Reflect platform core.** The platform's own rules and skills (`/drain`, `/create-pr`, `/brainstorm`, and the rest) ship inside the binary and are reflected into the global layer so they're available in every project. Best-effort — a failure is surfaced, not fatal.
 
-## Offline behavior
+On success the CLI prints:
 
-If the network is unreachable, `atl install` falls back to the shared cache. You'll get whatever version was last pulled. The CLI logs this explicitly — no silent staleness.
+```
+atl: installed <handle>/<name>@<version> at <scope> scope
+```
+
+where `<scope>` is `global`, `project`, or `both`.
+
+## Scope
+
+A team lives at one of two layers:
+
+- **global** — assets under `~/.claude`, ATL state under `~/.atl`. Available in every project on the machine.
+- **project** — assets under `<project>/.claude`, ATL state under `<project>/.atl`. Available only in that project.
+
+Each team's publisher declares a default scope in `team.json` — `project` (the default), `global`, or `both`. You override it at install time with `--global` or `--project`; the override always wins. A `both` install writes to **both** layers.
+
+When the same capability exists at both layers, the **project layer shadows global** — nearest wins, the same mental model as Claude Code's own `CLAUDE.md` layering. See [Concepts](/guide/concepts#scope-global-and-project) for the full scope axis.
+
+```bash
+atl install agentteamland/software-project-team            # publisher default (project)
+atl install agentteamland/software-project-team --global   # every project on this machine
+```
+
+## The install manifest
+
+Each install records one JSON file per team per scope at `<layer>/.atl/installed/<handle>__<name>.json` (`<layer>` is `~/.atl` for global, `<project>/.atl` for project). It captures:
+
+- `schemaVersion`, `handle`, `name`, `version`, and the effective `scope`,
+- `source` — the `repo`, `subpath`, and `ref` the install resolved from, pinned to the exact bytes fetched,
+- `installedAt`,
+- `files` — a map of every copied file (path relative to the `.claude` directory) to its SHA-256 at install time.
+
+That `files` map is a dual-purpose record: `atl update` compares the current bytes against it to tell your edits apart from upstream changes (so updates never clobber your local modifications), and `atl doctor` uses it as the integrity set to detect and restore a deleted or corrupted copy.
+
+## Multiple teams in one project
+
+Several teams can coexist in one project — each install copies its assets into the same `.claude/` directory and writes its own manifest. If two installed teams ship an asset with the same name, the most recently written copy is the one on disk. Remove a team with [`atl remove`](/cli/remove); it deletes only that team's manifest-recorded files.
+
+A team can also declare other teams as `dependencies` in its `team.json`; those are installed alongside it. See [`team.json`](/authoring/team-json) for the dependency field.
 
 ## Troubleshooting
 
-- **"team not found"** — the handle isn't in the index. Try `atl search`.
-- **"schema validation failed"** — the team's `team.json` is malformed. Ask the author to fix it, or pin to an earlier version.
-- **"invalid team slug"** — the name resolved to a slug that fails the safety regex (e.g., starts with `-`). Pass the team in `owner/repo` form or use a Git URL.
+- **`team … not found in index`** — the reference isn't in the catalog. Check it with [`atl search`](/cli/search). The catalog is generated from public repos tagged [`atl-team`](https://github.com/topics/atl-team), so a brand-new team may not be listed yet.
+- **`invalid team reference`** — the argument isn't in `<handle>/<team>` form (both parts required).
+- **`fetch … HTTP 404`** — the team's source repo or ref is unreachable. Tarball fetch needs the network; unlike catalog resolution it has no offline fallback.
+- **`team ships no installable assets`** — the resolved team has no `agents/`, `skills/`, or `rules/` directory.
+- **`team.json has no name`** — the team's `team.json` is malformed. Ask the author to fix it.
 
 ## Related
 
-- [`atl search`](/cli/search) — find a team's name.
-- [`atl list`](/cli/list) — see what's installed.
-- [`atl update`](/cli/update) — refresh unmodified copies after the cache pulls.
-- [`atl remove`](/cli/remove) — uninstall (with `--force` for non-interactive).
+- [`atl search`](/cli/search) — find a team's `<handle>/<team>` reference.
+- [`atl list`](/cli/list) — see what's installed, by scope.
+- [`atl update`](/cli/update) — refresh installed teams; unmodified copies update in place, local edits are kept.
+- [`atl remove`](/cli/remove) — uninstall a team from a scope.
+- [`atl setup-hooks`](/cli/setup-hooks) — the automation hooks install binds for you.
+- [Concepts](/guide/concepts#scope-global-and-project) — the global/project scope axis.

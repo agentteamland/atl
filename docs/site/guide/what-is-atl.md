@@ -10,17 +10,13 @@ Using Claude Code well requires configuration: agents, skills, and rules that sh
 
 A **team** is a package of agents, skills, and rules, built around a particular kind of work. One team might be geared for a .NET + Flutter + React stack with a Docker-compose production layout. Another might be for a Next.js + Sanity + Vercel blog stack. A third for data pipelines with Airflow and dbt.
 
-`atl install some-team` fetches the team, caches it, and copies its agents, skills, and rules into your current project's `.claude/` directory. Claude Code sees the team the moment you open the editor.
+`atl install some-team` resolves the team against a GitHub-backed catalog, fetches its source, and copies its agents, skills, and rules into your current project's `.claude/` directory. Claude Code sees the team the moment you open the editor.
 
 When the team author ships a fix, you run `atl update` and every project that uses that team picks up the change. Your projects stop drifting.
 
-## Not a fork
-
-Teams can **extend** other teams. If you want 95 % of `software-project-team` but one different agent and one extra skill, you write a tiny team that `extends` it, overrides the one agent, and adds the skill. The parent keeps evolving in its own repo; your child inherits updates for free.
-
 ## Not a walled garden
 
-Every team is just a Git repository with a `team.json` file at the root. There's a public [registry](https://github.com/agentteamland/registry) so teams get short names like `software-project-team`, but you can install from any Git URL. The schema is public. The CLI is MIT-licensed Go. The spec is documented here.
+Every team is just a public GitHub repository with a `team.json` file at the root. There's no central registry to submit to: tag a repo with the [`atl-team`](https://github.com/topics/atl-team) topic and it shows up in a generated **catalog**, where anyone can find it by handle and install it by `<handle>/<name>`. `atl search` queries that catalog; `atl install` resolves against it. The CLI is MIT-licensed Go. The team contract is documented here — see [the `team.json` reference](/authoring/team-json).
 
 ## Who is this for?
 
@@ -30,9 +26,9 @@ Every team is just a Git repository with a `team.json` file at the root. There's
 
 ## Where it stands
 
-`atl` is at **v1.1.x** — production. The install topology is project-local copies (with a global cache as source-of-truth), the auto-update path runs through Claude Code `SessionStart` + `UserPromptSubmit` hooks, and a self-updating learning loop persists session knowledge into journal/wiki/agent-children/skill-learnings layers.
+`atl` is **v2** — a single monorepo ([`agentteamland/atl`](https://github.com/agentteamland/atl)), currently in **alpha**. The install topology is project-local copies fetched from the catalog (no persistent on-disk clone cache — sources are fetched fresh and discarded after each install), the auto-update path runs through Claude Code `SessionStart` + `UserPromptSubmit` hooks, and the learning loop persists session knowledge: inline markers are queued durably, and the `/drain` skill folds each into the journal, wiki, and agent knowledge bases.
 
-Two verified teams ship in the registry today: `software-project-team` (13 agents — .NET API + Flutter + React + Docker stack) and `design-system-team` (2 agents + 10 `/dst-*` skills for design-system + prototype tooling). The full ecosystem is MIT-licensed and open for PRs.
+Two verified teams ship in the catalog today: `software-project-team` (13 agents — .NET API + Flutter + React + Docker stack) and `design-system-team` (2 agents + `/dst-*` skills for design-system + prototype tooling). The whole platform is MIT-licensed and open for contributions.
 
 Next up:
 - **[Install `atl`](/guide/install)**

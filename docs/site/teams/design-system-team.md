@@ -14,10 +14,10 @@ Brings Claude Design–style design-system + screen-prototype work natively into
 
 ```bash
 cd your-project
-atl install design-system-team
+atl install agentteamland/design-system-team
 ```
 
-Requires [`atl`](/cli/overview) ≥ 0.1.2 (per `team.json`'s `requires.atl`). Practical baseline for current behavior is `atl ≥ 1.0.0` — earlier versions predate the project-local copy install model.
+Requires [`atl`](/cli/overview) ≥ 0.1.2 (per `team.json`'s `requires.atl`).
 
 ## Quickstart
 

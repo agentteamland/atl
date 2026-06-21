@@ -1,43 +1,35 @@
 # Bir takım yazma
 
-Bir takım, `atl install` ile bir projeye kurduğun, yeniden kullanılabilir bir AI **ajanı**, **becerisi** ve **kuralı** paketidir. Bu sayfa, boş bir dizinden kurulu bir takıma kadar gerekli olan her şeyi anlatır — "Dizüstüne kuruyorum, henüz bir yere push'lamadım" durumu da dâhil.
+Bir takım, `atl install` ile kurulabilen, yeniden kullanılabilir bir AI **ajanı**, **becerisi** ve **kuralı** paketidir. Bu sayfa, boş bir dizinden kataloglanmış bir takıma kadar her şeyi adım adım anlatır.
 
 ## Bir takım nedir (ve ne değildir)?
 
-Bir takım, yalnızca bir `team.json` dosyası ve birkaç Markdown içeren bir Git deposudur. `atl install` çalıştırdığında CLI o depoyu yerel önbelleğine klonlar ve içeriğini projendeki `.claude/` dizinine kopyalar. Hepsi bu — eklenti sistemi yok, JavaScript çalışma zamanı yok, özel ikili yok. Her şey metin dosyaları ve kopyalardır.
+Bir takım, yalnızca bir `team.json` dosyası ve birkaç Markdown içeren bir Git deposudur. `atl install <handle>/<team>` çalıştırdığında CLI, handle'ı GitHub tabanlı katalog (catalog) ile eşleştirir, depoyu geçici bir HTTPS tarball'ı olarak indirir ve takımın `agents/`, `skills/`, `rules/` içeriğini hedef `.claude/` dizinine kopyalar. Hepsi bu — eklenti sistemi yok, JavaScript çalışma zamanı yok, özel ikili yok. Her şey metin dosyaları ve kopyalardır.
 
 Bir takımın içinde şunlar olabilir:
 
-- **Tek bir ajan** (Claude'un izleyeceği yönergeleri içeren tek bir Markdown dosyası).
-- **Bir ya da daha çok beceri** (Claude'un çağırabileceği eğik çizgili komutlar).
-- **Kurallar** (global yüklenen, davranışı biçimlendiren yönergeler).
-- **Yukarıdakilerin herhangi bir bileşimi.**
+- **Tek bir ajan** (Claude'un izleyeceği yönergeleri içeren tek bir Markdown dosyası)
+- **Bir ya da daha çok beceri** (Claude'un çağırabileceği eğik çizgili komutlar)
+- **Kurallar** (her oturumda yüklenen, davranışı biçimlendiren yönergeler)
+- **Yukarıdakilerin herhangi bir bileşimi**
 
-Bir takımı şuralardan kurabilirsin:
-
-1. Herkese açık **AgentTeamLand kayıt defteri** (`atl install software-project-team`).
-2. Herhangi bir **GitHub deposu** (`atl install agentteamland/starter-extended` ya da tam URL).
-3. **Herhangi bir Git URL'si** — GitHub, GitLab, Bitbucket, kendi barındırılan (herkese açık ya da SSH anahtarıyla özel).
-4. **Yerel dosya sistemin** (`atl install ./my-team` ya da mutlak yol) — uzak depo gerekmez; takım dizininde bir `git init` yeterlidir.
-
-Sonuncusu, kendi takımını yazan çoğu kişinin ilk uzandığı yoldur. Aşağıda ayrıntılı olarak ele alınıyor.
+Bir takım, **kataloglandığında** kurulabilir hâle gelir: herkese açık GitHub deposunu [`atl-team`](https://github.com/topics/atl-team) konusuyla etiketle ya da repodan [`atl publish`](/tr/cli/publish) çalıştır; oluşturulan dizin (index) bunu alır. Artık herkes `atl install <handle>/<team>` ile kurabilir — handle, reponun GitHub sahibidir. Kayıt defteri deposu ve gönderim PR'ı yoktur.
 
 ---
 
-## Bölüm 1 — Tam adım adım anlatım
+## Tam adım adım anlatım
 
-Sıfırdan küçük gerçek bir takım kuralım. Makinende bir `my-team` dizini oluşturacaksın, bir ajan ekleyeceksin ve onu hiçbir Git sunucusuna push'lamadan bir test projesine kuracaksın.
+Sıfırdan küçük gerçek bir takım kuralım. Bir `my-team` deposu oluşturacaksın, bir ajan ekleyeceksin ve onu yayımlamaya hazır hâle getireceksin.
 
-### Adım 1 — Takım dizinini oluştur
+### Adım 1 — Takım deposunu oluştur
 
 ```bash
 mkdir ~/projects/my-team
 cd ~/projects/my-team
-
-git init -b main                    # atl kurulum hattı bir Git deposu gerektirir
+git init -b main
 ```
 
-Konum önemli değil. Klasör adının takımın kayıt defteri adıyla aynı olması da gerekmez — o aşağıdaki `team.json` dosyasında belirlenir.
+Klasör adının takımın katalog adıyla aynı olması gerekmez — o aşağıdaki `team.json` dosyasında belirlenir.
 
 ### Adım 2 — `team.json` yaz
 
@@ -56,9 +48,7 @@ Bu, takımın manifesto dosyasıdır. En küçük geçerli hâli:
     { "name": "web-agent", "description": "Reviews and builds Next.js pages." }
   ],
   "skills": [],
-  "rules": [],
-  "extends": null,
-  "excludes": []
+  "rules": []
 }
 ```
 
@@ -66,9 +56,9 @@ Tüm alanlar için: [team.json](./team-json).
 
 **Dikkat edilecek tuzaklar:**
 
-- `name`, **kayıt defterindeki kısa addır**. Bir kez belirlendiğinde değiştirme — kullanıcılar buna göre başvuracak. Kebab-case olmalıdır (küçük harfler, rakamlar, tireler).
-- `version`, SemVer biçimindedir (major.minor.patch). Yerelde yinelerken bile değişiklik yayımladığında artır — `atl update` çekim yapıp yapmayacağına buna göre karar verir.
-- `author` bir **nesnedir**, dize değildir. En azından `{ "name": "Your Name" }`. Kayıt defteri başvuruları ayrıca `url` ister.
+- `name`, takımın kısa adıdır. Bir kez belirlendiğinde değiştirme — kullanıcılar buna göre başvuracak. Kebab-case olmalıdır (küçük harfler, rakamlar, tireler).
+- `version`, SemVer biçimindedir (major.minor.patch). Değişiklik yayımladığında artır — `atl update` bu alana bakarak çekim yapıp yapmayacağına karar verir.
+- `author` bir **nesnedir**, dize değildir. En azından `{ "name": "Your Name" }`. `"author": "You"` gibi düz dize ayrıştırma hatasına neden olur.
 - `agents`, **üst bilgi** dizisidir, ajan içeriği değildir. Asıl ajan Markdown'ı `agents/<name>/agent.md` altında yaşar (bkz. Adım 3).
 
 ### Adım 3 — Ajanını ekle
@@ -87,7 +77,7 @@ my-team/
             └── testing.md
 ```
 
-`agent.md`, giriş noktasıdır — Claude her çağrıda onu okur. Kısa tut. Ayrıntılı desenleri `children/*.md` dosyalarına koy; ajanın `## Knowledge Base` bölümü onlara bağ verir ve Claude gerektiğinde okur.
+`agent.md`, giriş noktasıdır — Claude her çağrıda onu okur. Kısa tut. Ayrıntılı desenleri `children/*.md` dosyalarına koy; ajanın `## Knowledge Base` bölümü onlara bağlantı verir ve Claude gerektiğinde okur.
 
 En küçük `agent.md`:
 
@@ -120,55 +110,71 @@ I do NOT touch:
 
 İşte çalışan bir ajan. Ajan büyüdükçe `children/` dizinine daha fazla ayrıntı ekle.
 
-> 📘 **Derinlemesine:** çocuklar deseni, `agentteamland/core` deposundaki [agent-structure kuralında](https://github.com/agentteamland/core/blob/main/rules/agent-structure.md) anlatılır. Ana fikir: `agent.md` kısa kalır, konuya özgü ayrıntı her konu bir dosyada olmak üzere `children/*.md` dosyalarına gider.
+::: tip Derinlemesine
+Çocuklar deseni, [`core/rules/agent-structure.md`](https://github.com/agentteamland/atl/blob/main/core/rules/agent-structure.md) kuralında anlatılır; özeti [Children + learnings](/tr/guide/children-and-learnings) sayfasındadır. Ana fikir: `agent.md` kısa kalır, konuya özgü ayrıntı her konu bir dosyada olmak üzere `children/*.md` dosyalarına gider.
+:::
 
 ### Adım 4 — Commit at
 
-`atl`'nin kurulum hattı arka planda `git clone` kullanır; bu nedenle takım dizini en az bir commit'i olan bir Git deposu olmalıdır:
+Çalışmanı commit'le — `atl` kurulumları commit'lenmiş ref üzerinden yapar, çalışma ağacından değil:
 
 ```bash
 git add .
 git commit -m "feat: initial team"
 ```
 
-Bu noktada uzak depo gerekmez.
+### Adım 5 — Başkalarının kurabilmesi için yayımla
 
-### Adım 5 — Test projesine kur
+`atl install` handle'ları katalog üzerinden çözer, dolayısıyla bir takımın handle ile kurulabilmesi için önce kataloglanması gerekir. Repoyu herkese açık bir GitHub deposuna push'la ve `atl-team` konusuyla etiketle:
+
+```bash
+# Hesabın ya da org'un altında herkese açık bir GitHub deposuna push'la:
+gh repo create you/my-team --public --source=. --push
+
+# Katalogun dizine alması için etiketle:
+gh repo edit you/my-team --add-topic atl-team
+```
+
+Dizin herkese açık `atl-team` etiketli depolardan yeniden oluşturulur; kısa süre içinde takımın `you/my-team` olarak keşfedilebilir olur.
+
+### Adım 6 — Kur
 
 ```bash
 mkdir /tmp/demo-app && cd /tmp/demo-app
-atl install ~/projects/my-team         # mutlak yol ✓
-# ya da:  atl install ../my-team       # göreli yol ✓
-# ya da:  atl install file:///Users/you/projects/my-team   # açık file:// URL'si ✓
+atl install you/my-team
+# → atl: installed you/my-team@0.1.0 at project scope
 
 atl list
-# → my-team@0.1.0    (effective: 1 agents, 0 skills, 0 rules)
+# project:
+#   you/my-team@0.1.0
 
 ls -la .claude/agents/
-# → web-agent.md → ~/.claude/repos/agentteamland/my-team/agents/web-agent/agent.md
+# → web-agent.md
 ```
 
 Çıktı buna uyuyorsa takımın kurulmuştur. Ajan artık `/tmp/demo-app/` içinde Claude tarafından kullanılabilir.
 
-> 💡 **Özel takımımın önbellek yolunda neden "agentteamland" var?** `atl`, takımın nereden geldiğine bakmaksızın tek bir paylaşılan yerel önbellek dizini kullanır. Özel takımın, herkese açık olanların yanında `~/.claude/repos/agentteamland/` altında yaşar; onları ayıran `team.json` içindeki `name` alanıdır. Bu, takımının organizasyona push'landığı ya da paylaşıldığı anlamına GELMEZ — yalnızca bir önbellek sözleşmesidir.
+Takım, yayıncısının bildirdiği kapsamda (scope) kurulur (varsayılan project — bkz. [team.json](./team-json) içindeki `scope` alanı). Her kurulum için `--global` ya da `--project` ile geçersiz kılabilirsin.
 
-### Adım 6 — Yinele
+### Adım 7 — Yinele
 
-`~/projects/my-team/` altındaki dosyaları düzenle, commit at (`atl` çalışma ağacını değil commit'leri okur), ardından kurulu takımı yenile:
+`~/projects/my-team/` altındaki dosyaları düzenle, `team.json` içindeki `version` alanını artır, sonra commit'le ve push'la. Katalog yeni sürüme göre yeniden dizinlenir ve takımı kurulu olan her proje `atl update` ile alır:
 
 ```bash
 cd ~/projects/my-team
 vim agents/web-agent/agent.md           # ya da herhangi bir düzenleme
+# team.json içindeki "version" alanını artır, sonra:
 git commit -am "tweak web-agent guidance"
+git push
 
 cd /tmp/demo-app
-atl update my-team
-# → atl yeniden çekim yapar, kopyaları yeniler
+atl update
+# → atl yayımlanmış sürümü yeniden çeker, değiştirilmemiş kopyaları yeniler
 ```
 
-Gidiş-dönüş yaklaşık 1 saniye sürer. Test projesine karşı hızla yinelersin.
+`atl update`, yerel olarak değiştirmediğin kopyaları yeniler; kendi düzenlemelerine dokunmaz.
 
-### Adım 7 — (İsteğe bağlı) Beceri ve kural ekle
+### Adım 8 — (İsteğe bağlı) Beceri ve kural ekle
 
 **Beceriler** eğik çizgili komutlardır. Her biri bir frontmatter ile birlikte `skills/<skill-name>/skill.md` dosyasına yazılır:
 
@@ -199,7 +205,7 @@ Lint a single Next.js page file using the project's ESLint + Prettier.
 ]
 ```
 
-**Kurallar**, Claude'un davranışını biçimlendiren, global olarak yüklenen Markdown dosyalarıdır. `rules/<rule-name>.md` konumuna koy:
+**Kurallar**, Claude'un davranışını biçimlendiren, her oturumda yüklenen Markdown dosyalarıdır. `rules/<rule-name>.md` konumuna koy:
 
 ```markdown
 # React 19 defaults
@@ -217,70 +223,17 @@ Bildir:
 ]
 ```
 
-Herhangi bir değişiklikten sonra — ajan, beceri ya da kural — commit at ve test projesinde `atl update` çalıştırarak değişikliği al.
+Herhangi bir değişiklikten sonra — ajan, beceri ya da kural — sürümü artır, commit at, push'la; ardından `atl update` ile değişikliği al.
 
-### Adım 8 — Sonraki adımlar
+### Adım 9 — Sonraki adımlar
 
-Takımın yerelde çalıştığına göre:
-
-- **Özel olarak tut.** Sonsuza dek bu şekilde kullanabilirsin — `atl install`'u yerel yola yönlendir ya da özel bir Git sunucusuna push'la (GitHub özel deposu, GitLab, kendi barındırılan Gitea). Başvuru gerekmez.
-- **Bir takımla paylaş.** Özel bir depoya push'la ve takımdaşlarına URL'yi ver: `atl install git@github.com:your-org/your-team.git`. SSH üzerinden kurarlar (kayıt defteri işin içinde değildir).
-- **Herkese açık kayıt defterine başvur.** Yalnızca başkalarının kısa adıyla bulmasını istiyorsan. Bkz. [Kayıt defteri başvurusu](/cli/publish).
-- **Bir iskele becerisi ekle.** Takımın yeni proje açma amacındaysa bir `/create-*` becerisi ekle. Bkz. [İskele belirtimi](./scaffolder-spec).
+- **İskele becerisi ekle.** Takımın yeni proje açma amacındaysa bir `/create-new-project` becerisi ekle. Bkz. [İskele belirtimi](./scaffolder-spec).
+- **Başka bir takıma bağımlı ol.** Takımın başka birinin takımı üzerine inşa ediliyorsa `team.json` içindeki `dependencies` altında bildir — `atl install`, bağımlılığı seninki ile birlikte indirir.
+- **Doğrulanmış rozet kazan.** AgentTeamLand maintainer'larınca incelenen takımlar (ve `agentteamland/*` altındaki her şey) `atl search` çıktısında `[verified]` rozeti gösterir. Rozetin olmaması yalnızca takımın kendi kendine yayımlandığı anlamına gelir.
 
 ---
 
-## Bölüm 2 — Kurulum kipleri
-
-Hepsi çalışır. Takımın nerede yaşadığına uygun olanı seç.
-
-### Kayıt defteri (herkese açık, doğrulanmış)
-
-```bash
-atl install software-project-team
-```
-
-Kısa ad [herkese açık kayıt defterinde](https://github.com/agentteamland/registry) aranır. Yalnızca başvurusu yapılmış ve doğrulanmış takımlar için işe yarar.
-
-### GitHub `owner/repo` kısa biçimi
-
-```bash
-atl install agentteamland/starter-extended
-```
-
-`https://github.com/agentteamland/starter-extended.git` adresine genişler. Kayıt defterinde olmayan herkese açık GitHub takımları için kullanışlıdır.
-
-### Tam Git URL'si (herhangi bir barındırıcı, herkese açık ya da özel)
-
-```bash
-atl install https://github.com/you/your-team.git      # herkese açık, HTTPS
-atl install git@github.com:you/your-team.git          # özel, SSH
-atl install ssh://git@gitlab.com/you/your-team.git    # GitLab SSH
-atl install https://gitea.example.com/you/team.git    # kendi barındırılan Gitea
-```
-
-Özel depolar için barındırıcıda Git kimlik bilgileri / SSH anahtarları kurulu olmalıdır (`atl` `git clone`'a kabuk üzerinden devreder, o da Git yapılandırmanı kullanır). `atl`'ye özgü bir kimlik doğrulama yoktur.
-
-### Yerel dosya sistemi (uzak depo gerekmez)
-
-```bash
-atl install ~/projects/my-team                   # mutlak ya da ev dizini yolu
-atl install ./my-team                            # göreli
-atl install file:///Users/you/projects/my-team   # açık file:// URL'si
-```
-
-Gereksinimler:
-
-- Hedef, kökünde `team.json` bulunan bir dizin olmalı.
-- Dizin, en az bir commit'i olan bir Git deposu olmalı (`git init` + `git add . && git commit` yeterli).
-
-Uzak push gerekmez. Yerelde yineleme, özel takımlar ya da henüz paylaşmaya hazır olmadığın takımlar için idealdir.
-
-> ⚠️ **Sürüm:** yerel dosya sistemi kurulumu `atl` ≥ 0.1.4 gerektirir. Daha eski sürümler yalnızca URL kabul ediyordu.
-
----
-
-## Bölüm 3 — Takım düzeni başvurusu
+## Takım düzeni başvurusu
 
 ```
 my-team/
@@ -305,164 +258,71 @@ my-team/
 │   └── run-e2e/
 │       └── skill.md
 │
-├── rules/                         ← kural başına bir .md (düz, dizin değil)
-│   ├── react-19-defaults.md
-│   └── file-naming.md
-│
-├── schemas/                       ← isteğe bağlı: takımının doğruladığı JSON şemalar
-│   └── config.schema.json
-│
-└── .github/workflows/
-    └── validate.yml               ← her push'ta team.json'u şemayla doğrula
+└── rules/                         ← kural başına bir .md (düz, dizin değil)
+    ├── react-19-defaults.md
+    └── file-naming.md
 ```
 
 `team.json` tarafından listelenen `agents/`, `skills/` ve `rules/` altındaki her dosya, kullanıcı kurulum yaptığında onun `.claude/` dizinine bir kopya olarak gelir. Listelenmeyen dosyalar yok sayılır.
 
 ---
 
-## Bölüm 4 — CI'de şema doğrulaması (önerilir)
+## Kurulum arka planda nasıl çalışır?
 
-Bunu `.github/workflows/validate.yml` dosyasına yerleştir; bozuk bir `team.json` kuruluma kadar gitmeden yakalanır:
+`atl install you/my-team` çalıştırıldığında:
 
-```yaml
-name: Validate team.json
-on:
-  push:
-  pull_request:
+1. **Çöz.** Handle, GitHub tabanlı katalogda aranır (herkese açık `atl-team` etiketli depolardan üretilen dizin). Birinci parti takım, monorepo'nun bir alt yoluna; üçüncü parti takım kendi bağımsız deposuna çözülür.
+2. **İndir.** Takım, geçici bir dizine ref-sabitli HTTPS tarball'ı olarak indirilir — `git` ikili dosyası gerekmez. Geçici dizin kurulumdan sonra silinir.
+3. **Doğrula.** `atl`, `team.json` dosyasını ayrıştırır, bir `name` alanı olduğunu kontrol eder ve bildirilen her ajan/beceri/kuralın diskte gerçekten var olduğunu doğrular. Eksik olan varsa burada hata verir.
+4. **Yaz.** Ajanlar, beceriler ve kurallar kapsamın `.claude/` dizinine **kopyalanır** — global kurulum için `~/.claude`, proje kurulumu için `<proje>/.claude`.
+5. **Kaydet.** `<katman>/.atl/installed/<handle>__<name>.json` konumundaki takıma özgü manifesto, kaynak ref ve dosya başına SHA-256 değerlerini kaydeder; `atl update`'in otomatik yenileme ve `atl doctor`'ın bütünlük denetimi bu verilere dayanır.
 
-jobs:
-  validate:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      - run: npm install -g ajv-cli
-
-      - name: Download schema
-        run: curl -sSfL https://raw.githubusercontent.com/agentteamland/core/main/schemas/team.schema.json -o team.schema.json
-
-      - name: Validate
-        run: ajv -s team.schema.json -d team.json --strict=false
-```
-
-İsteğe bağlıdır ama `team.json` hatalarının çoğunu kurulumda değil PR sırasında yakalar.
+Kalıcı klonlama önbelleği yoktur, ayrı bir ATL varlık deposu da yoktur. Takım varlıkları `.claude/` altında yaşar; ATL'nin kendi durum verisi (katalog önbelleği, öğrenme kuyruğu, pin'ler, kurulum manifestoları) `~/.atl` ve `<proje>/.atl` altında yaşar.
 
 ---
 
-## Bölüm 5 — Özel takım iş akışları
-
-Üç tür "özel takım" vardır ve her birinin en temiz yolu farklıdır:
-
-### 🟢 (a) Tümüyle yerel, yalnızca ben
-
-Tek kullanıcı sensin. Takım dizüstünde yaşıyor.
-
-```bash
-# Yaz:
-mkdir ~/projects/my-team && cd ~/projects/my-team
-git init -b main
-vim team.json agents/main-agent/agent.md
-git add . && git commit -m "init"
-
-# Herhangi bir projeye kur:
-cd ~/projects/my-real-app
-atl install ~/projects/my-team
-
-# Yinele (düzenle → commit → yenile):
-cd ~/projects/my-team
-vim agents/main-agent/agent.md
-git commit -am "tighter scope"
-
-cd ~/projects/my-real-app
-atl update my-team
-```
-
-Tüm iş akışı budur. Uzak depo işin içinde değildir.
-
-### 🟡 (b) Birkaç takımdaşla paylaşılan
-
-2-10 kişinin kurmasını istersin, ama herkese açık OLMASIN.
-
-```bash
-# Özel bir GitHub (ya da GitLab / Gitea) deposuna push'la:
-gh repo create you/your-team --private --source=. --push
-
-# Takımdaşlar SSH ile kursun (SSH anahtarları depoya eklenmiş olmalı):
-atl install git@github.com:you/your-team.git
-
-# Güncellemeler:
-atl update your-team
-```
-
-Kayıt defteri başvurusu yok; yabancılar tarafından bulunamaz. SSH her güncel Git barındırıcısında çalışır.
-
-### 🔵 (c) Şirket içi / kurumsal, kendi barındırılan Git sunucusunun arkasında
-
-(b) ile aynı; URL kendi barındırdığın Git'i gösterir:
-
-```bash
-atl install git@git.your-company.com:platform/your-team.git
-```
-
-`atl` barındırıcıyı umursamaz; `git clone` kimlik doğrulamayı senin yapılandırdığın SSH anahtarları ya da kimlik yardımcılarıyla halleder.
-
-### 🟣 (d) Tüm dünyaya açık
-
-Herkesin `atl install your-team` diyebilmesi için [AgentTeamLand kayıt defterine](https://github.com/agentteamland/registry) gönder. Bkz. [Kayıt defteri başvurusu](/cli/publish).
-
----
-
-## Bölüm 6 — Sık karşılaşılan tuzaklar
-
-**`atl install ./my-team` "could not find team" diyor**
-→ `./my-team` yerel yol olarak tanınmadı. Şunu denetle: bu bir dizin mi? Kökünde `team.json` var mı? `atl` sürümü ≥ 0.1.4 mü? (`atl --version`).
+## Sık karşılaşılan tuzaklar
 
 **`Error: agent source missing: .../agents/foo/agent.md`**
-→ `team.json` dosyan `agents: [{"name": "foo"}]` olarak listeliyor ama dosya sisteminde `agents/foo.md` (düz) var, `agents/foo/agent.md` (çocuklar deseni) yok. `atl`, çocuklar deseni yapısını gerektirir.
+→ `team.json` dosyan `agents: [{"name": "foo"}]` olarak listeliyor ama dosya sisteminde `agents/foo.md` (düz) var; çocuklar deseni `agents/foo/agent.md` bekler. Bildirilen varlıkları disktekiyle eşleştir.
 
 **`Error: parse team.json: json: cannot unmarshal string into Go struct field TeamManifest.author`**
-→ `author` bir nesne olmalı, dize değil. `"author": "You"` yerine `"author": { "name": "You" }`.
+→ `author` bir nesne olmalı, dize değil. `"author": "You"` yerine `"author": { "name": "You" }` yaz.
 
-**Takımı düzenledim, `atl update` çalıştırdım ama etki yok**
-→ Commit attın mı? `atl update` Git üzerinden çekim yapar; commit'lenmemiş düzenlemeler akmaz. Takıma commit at, ardından `atl update`.
+**Takımı düzenledim ve `atl update` çalıştırdım ama etki yok**
+→ Commit attın mı, sürümü artırdın mı, push'ladın mı? `atl update`, yayımlanmış sürümü çeker; commit'lenmemiş veya push'lanmamış düzenlemeler akmaz. Commit at + sürümü artır + push'la, sonra `atl update`.
+
+**`atl install` "team not found" diyor**
+→ Handle henüz katalogda yok. Depo herkese açık olmalı ve `atl-team` konusuyla etiketlenmiş olmalı (ya da `atl publish` çalıştırılmış olmalı). Neyin dizinde olduğunu `atl search` ile doğrula.
 
 **Bir takımı temiz biçimde silmek istiyorum**
-→ Projede `atl remove my-team` çalıştırmak `.claude/` dizinindeki kopyaları kaldırır ama önbelleklenmiş depoyu korur. Önbelleği de silmek için: `rm -rf ~/.claude/repos/agentteamland/my-team`.
-
-**Takım `extends` kullanıyor; üst takımı yerelde değiştirdim ama `atl install` yanlış üst takımı çekiyor**
-→ `extends`, alt takımın `team.json` dosyasında yazılı olan kayıt defteri / URL belirtimine göre çözülür. Alt takımın `extends` alanı bir yerel yola işaret etmedikçe yerel üst takımını okumaz. Tümüyle yerel zincirler için `"extends": "/abs/path/to/parent-team"` gibi bir yerel yolla sabitle.
+→ `atl remove you/my-team` çalıştırmak, takımın manifest kayıtlı dosyalarını kapsamdan kaldırır (varsayılan olarak project; global katman için `--global`) ve artık boş olan dizinleri temizler.
 
 ---
 
-## Bölüm 7 — Sıkça sorulan sorular
+## Sıkça sorulan sorular
 
 **Kullanmak için takımı bir yere push'lamak zorunda mıyım?**
-Hayır. `atl install`'u yerel yoluna yönlendir (atl ≥ 0.1.4). Yerel Git deponda commit'lerin olması yeterlidir.
-
-**Kayıt defterine başvurmak zorunda mıyım?**
-Hayır. Kayıt defteri yalnızca kısa adla bulunabilirlik içindir. Çoğu özel / kurumsal takım hiç başvurmaz.
+Evet. `atl install`, handle'ları GitHub tabanlı katalog üzerinden çözer; dolayısıyla takımın `atl-team` etiketli herkese açık bir deposu olması (ya da `atl publish` çalıştırılmış olması) gerekir.
 
 **Tek bir projede birden çok takım yan yana yaşayabilir mi?**
-Evet — `atl install a && atl install b && atl install c`. Her takımın öğeleri paylaşılan `.claude/` dizinine kopyalanır. Adlar çakışırsa `atl` seni uyarır (alt takım üst takımı bastırır; sonraki kurulumlar öncekileri bastırır).
+Evet — istediğin kadar kur. Her takımın öğeleri paylaşılan `.claude/` dizinine kopyalanır. İki takım aynı adda bir öğe bildirirse en son kurulan kazanır ve `atl` tek satırlık bir uyarı yazdırır.
 
 **`atl` hangi Markdown biçimini kullanır?**
-İsteğe bağlı YAML frontmatter ile düz Markdown. Claude'un ajan ve beceri biçimi yerel olarak desteklenir.
+İsteğe bağlı YAML frontmatter ile düz Markdown. Claude Code'un ajan ve beceri biçimi yerel olarak desteklenir.
 
 **Becerileri takımdan bağımsız sürümleyebilir miyim?**
-Bugün hayır. Sürümleme takım düzeyindedir; `team.json.version` üzerinden yapılır. Beceri başına sürümleme önerilen bir gelecek özelliğidir.
+Bugün hayır. Sürümleme takım düzeyindedir; `team.json` içindeki `version` alanı üzerinden yapılır.
 
 **Boyut sınırları var mı?**
-Sert sınır yoktur. Pratikte takım depoları 10 MB'ın altındadır. Büyük ikili dosyalar (CSS paketleri, SVG sprite'lar) gömerseniz README'de söyleyin ki kullanıcı ne çektiğini bilsin.
+Sert sınır yoktur. Pratikte takım depoları 10 MB'ın altındadır. Büyük ikili dosyalar eklerseniz README'de belirtin ki kullanıcılar ne indirdiklerini bilsin.
 
 ---
 
 ## Ayrıca bkz.
 
-- [team.json alan başvurusu](./team-json).
-- [İskele belirtimi](./scaffolder-spec) — `/create-new-*` becerileri ekleme.
-- [Kayıt defteri başvurusu](/cli/publish) — herkese açık yayımlama.
-- [`atl install` komutu](../cli/install) — tam CLI başvurusu.
-- [Başvuru şeması](../reference/schema) — `team.json` için JSON Şeması.
+- [team.json alan başvurusu](./team-json)
+- [İskele belirtimi](./scaffolder-spec) — `/create-new-project` becerileri ekleme
+- [`atl install`](/tr/cli/install) — tam CLI başvurusu
+- [`atl publish`](/tr/cli/publish) — takımının biriken kazanımlarını upstream'e taşı
+- [Children + learnings](/tr/guide/children-and-learnings) — ajan/beceri bilgi tabanı deseni

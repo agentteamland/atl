@@ -1,111 +1,112 @@
 # `atl update`
 
-Bir tane veya kurulu / önbelleklenmiş tüm agentteamland depolarının son sürümünü çek **ve** yerel olarak değiştirilmemiş proje-yerel kopyaları kendiliğinden yenile.
+Kurulu takımları yenile: güncel bir katalog indeksi çek, yeni sürüm yayınlanmış her takımı yükselt, global katmandaki kazanımları proje kopyalarına yay ve platform çekirdeğinin son sürümünü global katmana yansıt — yerel olarak düzenlediğin dosyalara her zaman dokunmadan (çek, asla itme).
+
+`atl update`, ağ yenilemesinin **elle** çalıştırılan yüzeyidir. Günlük iş [oturum içi kadans](#otomatik-güncellemeler-oturum-içi-kadans) aracılığıyla otomatik olarak yürütülür; bu komutu yalnızca bir geçişi zorlamak istediğinde ya da ikili dosyayı elle kurduğunda çalıştırmak gerekir.
 
 ## Kullanım
 
 ```bash
-atl update                          # her önbelleklenmiş depoyu güncelle + değiştirilmemiş kopyaları kendiliğinden yenile
-atl update <team>                   # yalnızca tek takımın zincirini güncelle (eski kullanım)
-atl update --silent-if-clean        # bir şey değişmediyse çıktı vermez (hook'ların kullandığı)
-atl update --check-only             # kuru çalıştırma: ne güncellenirdi raporla, hiçbir şey çekme
-atl update --throttle=30m           # son başarılı çalışma 30 dk'dan yakınsa atla
-atl update --skip-self-check        # daha yeni atl sürüm yayınını denetleme
-atl update -v                       # ayrıntılı (her git komutunu yazdır)
+atl update
 ```
 
-## Neyi günceller {#what-it-updates}
+Hiçbir argüman ve bayrak almaz. Her zaman **mevcut proje** (çalıştırdığın dizin) ile **global** katman üzerinde çalışır.
 
-Takım adı verilmediğinde `atl update` üç adım uygular:
+## Ne yapar {#what-it-does}
 
-1. **Önbellek çekimi.** `~/.claude/repos/agentteamland/` altındaki her Git deposunda dolaşır (`core`, `brainstorm`, `rule`, `team-manager` ve kurulu her takım) — `git fetch origin main` → geride kaldıysa ileri-sarmalı `git pull` → güncelse işlem yapmaz.
-2. **Sembolik bağdan kopyaya sessiz geçiş (atl ≥ 1.0.0).** Proje başına, `.claude/agents/` ve `.claude/rules/` altındaki global önbelleğe işaret eden v1.0.0 öncesi sembolik bağlar proje-yerel kopyalarla değiştirilir. Proje başına tek bir bilgi satırı olarak görünür; yıkıcı değildir (önce sembolik bağın hedefi okunur, ardından bağ aynı içeriği taşıyan gerçek bir dosyayla değiştirilir).
-3. **Değiştirilmemiş kopyaların kendiliğinden yenilenmesi (atl ≥ 1.0.0).** Her kurulu takım için her ajan / kural / beceri kaynağının proje-yerel kopyası üç-yönlü SHA-256 karşılaştırmasıyla denetlenir:
-   - **kurulum zamanındaki referans hat** (kurulum sırasında `.team-installs.json` dosyasına işlenmiş).
-   - **mevcut proje kopyası** (şu an `.claude/...` içinde olan).
-   - **mevcut önbellek içeriği** (az önce çekilmiş olan).
+`atl update` sırayla dört adım çalıştırır:
 
-   `mevcut proje = referans hat ≠ önbellek` olduğunda kaynak yerelde değiştirilmemiştir → sessizce yeni önbellek içeriğiyle üzerine yazılır. `mevcut proje ≠ referans hat` olduğunda kullanıcı düzenleme yapmıştır → atlanır, takım başına bir ipucu açık zorla üzerine yazma için `atl install <team> --refresh` komutuna işaret eder.
+1. **İndeks önbelleğini yeniler.** Katalogdan (GitHub destekli takım indeksi) `~/.atl/index.json` konumuna en iyi çaba ağ çekimi yapar. Çevrimdışıysan çekim sessizce başarısız olur ve çözümleme önbelleğe alınmış ya da gömülü indekse geri döner — çevrimdışı olmak normaldir; başka hiçbir şey engellenmez.
+2. **Takımları daha yeni yayınlanan sürümlere yükseltir.** **Proje** ve **global** katmanlarda kurulu her takım için `atl update`, takımı çözümlenen indekste arar. Yayınlanan sürüm kurulu olandan yeniyse takımın kaynağını tek kullanımlık bir HTTPS tar dosyası olarak yeniden çeker, açar ve kurulu kopyaya [yayma disiplini](#yayma-disiplini-düzenlemelerinin-nasıl-korunur) kapsamında yansıtır: değiştirilmemiş dosyalar yeni sürüme yenilenir, düzenlediğin dosyalar korunur, sürümde bulunan yeni dosyalar eklenir. Ardından kurulum bildirimi yeni sürümle yeniden yazılır. İndekste bulunmayan takımlar (örneğin yerel bir takım) olduğu gibi bırakılır.
+3. **Global kazanımları projeye yayar.** Hem **global** hem **proje** katmanında kurulu her takım için proje-yerel dosyaların her biri üç yönlü karşılaştırmayla denetlenir (aşağıya bkz.). Değiştirilmemiş proje kopyaları global kopyadan yenilenir; yerel olarak düzenlediğin dosyalar korunur. Bir kazanımın global katmana yükseltildikten sonra projelerine ulaşması böyle sağlanır.
+4. **Platform çekirdeğini global katmana yansıtır.** Çekirdek kurallar ve beceriler `atl` ikili dosyasının içinde paketlenir; bu adım onları `~/.claude` konumuna yenileyerek global katmanı ikili sürüm numaranla eşzamanlı tutar.
 
-Ayrıca daha yeni bir `atl` ikili sürüm yayını için denetim yapar (GitHub Releases API'si, 24 saatlik kısıtlamayla):
+Yükseltme veya yayma işleminin ardından, global katmana kurulu olup global kopyasında henüz yukarı akışa gönderilmemiş kazanımı bulunan her takım için bir satırlık bir öneri de gösterir (bkz. [Yayınlama önerileri](#yayınlama-önerileri)).
 
+### Çıktı
+
+Özet satırı ne olduğunu yansıtır:
+
+```text
+atl update: upgraded 1 team(s), refreshed 14 file(s) from global
 ```
-⬆  atl 1.1.1 → 1.1.2 available — run: brew upgrade atl
+
+```text
+atl update: upgraded 1 team(s)
 ```
 
-İkili kendiliğinden yükseltilmez — mesaj, `atl`'yi nasıl kurduğuna göre doğru paket yöneticisi komutuna işaret eder.
+```text
+atl update: refreshed 14 file(s) from the global layer
+```
 
-## Örnek — silent-if-clean (hook'larda kullanılan)
+Bekleyen bir şey yoksa:
 
-Hiçbir şey değişmemiş:
+```text
+atl update: everything up to date
+```
+
+Çekirdek dosyalar değiştiyse özetten önce ayrı bir satır görünür:
+
+```text
+atl update: refreshed 3 core file(s)
+```
+
+## Yayma disiplini — düzenlemelerinin nasıl korunur {#yayma-disiplini-düzenlemelerinin-nasıl-korunur}
+
+Hem sürüm yükseltmesi (2. adım) hem de global→proje yayması (3. adım), her dosyayı **kurulum anındaki** hash ile karşılaştıran ([kurulum bildirimi](#kurulum-bildirimi) içinde kayıtlı) aynı üç yönlü SHA-256 karşılaştırmasıyla değerlendirir:
+
+| Karşılaştırma | Anlam | İşlem |
+|---|---|---|
+| yerel **=** yukarı akış | zaten güncel | yapılacak bir şey yok |
+| yerel **=** kurulum referans hattı | hiç dokunmadın | yukarı akış/global sürüme **yenile** |
+| yerel **≠** referans hattı | düzenledin | **koru** — kopyat saklanır |
+
+"Değiştirilmiş" demek "kurduğumuzdan bu yana ayrışmış" demektir, salt "yukarı akıştan farklı" değil. Hiç değiştirmediğin dosya yenilenir; değiştirdiğin dosya hiçbir zaman sessizce üzerine yazılmaz. Bir kopya yenilendiğinde referans hattı yeni içeriğe ilerler; böylece bir sonraki geçiş temiz başlar.
+
+Zorla üzerine yazma bayrağı yoktur. Yerel düzenlemeleri kasıtlı olarak atmak ve yayınlanan sürümü almak istersen takımı kaldırıp yeniden kurabilirsin:
 
 ```bash
-$ atl update --silent-if-clean
-$                               # sıfır çıktı, çıkış kodu 0
+atl remove <handle>/<team>
+atl install <handle>/<team>
 ```
 
-Bir şeyler değişmiş:
+## Kurulum bildirimi {#kurulum-bildirimi}
 
-```bash
-$ atl update --silent-if-clean
-🔄 software-project-team 1.2.0 → 1.2.1 (auto-updated)
-🔄 core 1.8.0 → 1.9.0 (auto-updated)
-   ↪ refreshed 14 unmodified copies in current project
+Yaymanın karşılaştırdığı referans hattı takımın **kurulum bildirimi**nde yaşar — kapsam başına bir JSON dosyasında:
+
+- `~/.atl/installed/<handle>__<name>.json` (global)
+- `<project>/.atl/installed/<handle>__<name>.json` (proje)
+
+Her bildirim `schemaVersion`, `handle`, `name`, `version`, `scope`, çekildiği `source` (`repo`, `subpath`, `ref`), `installedAt` ve kurulum anındaki SHA-256 değerleriyle her kurulu yolun eşlendiği `files` haritasını kaydeder. `atl update` bu haritayı "değiştirilmemiş" ile "düzenlenmiş" arasında ayrım yapmak için okur ve bir takımı değiştirdiğinde onu (sürümü, kaynak ref'ini ve referans hash'lerini ilerleterek) yeniden yazar.
+
+## Otomatik güncellemeler — oturum içi kadans {#otomatik-güncellemeler-oturum-içi-kadans}
+
+`atl update`'i elle nadiren çalıştırsın çünkü ATL her şeyi otomatik güncel tutar. [`atl setup-hooks`](/tr/cli/setup-hooks) ([`atl install`](/tr/cli/install)'ın zorunlu bir parçası olarak çalıştırılır) iki Claude Code hook'u bağlar:
+
+- `SessionStart` → [`atl session-start`](/tr/cli/setup-hooks) — önceki oturumun öğrenmelerini boşaltır, doktor öz denetimini çalıştırır ve platform çekirdeğini global katmana yansıtır.
+- `UserPromptSubmit` → [`atl tick --throttle=10m`](/tr/cli/tick) — ucuz bir istem başına **yayma** (global→proje) işlemi; kısıtlamalı bir boşaltma + doktor + yükseltme geçişi içerir.
+
+İstem başına [`atl tick`](/tr/cli/tick), yerel yaymayı sürekli halleder; bu sayede global katmanına yükseltilen kazanımlar sen hiçbir şey yapmadan projelerine ulaşır. `atl update` ağ kısmını ekler — indeksi yeniden çözerek ve daha yeni *yayınlanmış* takım sürümlerini çekerek — bu daha ağır geçişi elle (ya da yeni sürümleri şimdi kontrol etmek istediğinde) çalıştırsın.
+
+## Yayınlama önerileri {#yayınlama-önerileri}
+
+Bittikten sonra `atl update`, **global** olarak kurulu her takımda global kopyanda henüz yayınlanan sürüme geçmemiş kazanımları denetler ve takım başına bir uyarı yazdırır:
+
+```text
+atl update: gains in <handle>/<team> not yet upstream (3 file(s)) — run `atl publish <handle>/<team>` to contribute them
 ```
 
-## Örnek — kuru çalıştırma
+Bu yalnızca bir öneridir — hiçbir şey otomatik olarak yayınlanmaz. Yayınlamak açık, onay gerektiren bir eylem olarak kalır; bkz. [`atl publish`](/tr/cli/publish). Denetim en iyi çaba bazındadır ve takımın yayınlanan kaynağı çekilemezse sessiz kalır.
 
-```bash
-$ atl update --check-only
-🔄 software-project-team 1.2.0 → 1.2.1 (auto-updated)
-   ↪ would refresh 14 unmodified copies in current project
-   ↪ would skip 2 modified copies (run: atl install software-project-team --refresh)
-```
+## Çevrimdışı davranış {#çevrimdışı-davranış}
 
-Neyin güncellenebileceğini yazdırır; `git pull` çalıştırmaz, hiçbir kopyaya dokunmaz.
-
-## Hook'lar üzerinden kendiliğinden güncelleme (önerilen)
-
-Bir kez ayarla, sonsuza kadar unut:
-
-```bash
-atl setup-hooks                 # varsayılan: UserPromptSubmit 30 dakikaya kısıtlanır
-atl setup-hooks --throttle=5m   # daha sıkı
-atl setup-hooks --remove        # devre dışı bırak
-```
-
-Bu komut `~/.claude/settings.json` dosyasına iki Claude Code hook'u ekler:
-
-- `SessionStart` → `atl session-start --silent-if-clean` (birleşik: güncelleme + önceki transkript işaretçi taraması + `atl` kendi sürüm denetimi).
-- `UserPromptSubmit` → `atl update --silent-if-clean --throttle=30m` (mesaj başına yenileme, kısıtlamalı).
-
-Claude Code bir oturum başlattığında ya da bir istem gönderdiğinde hook, her önbelleklenmiş depoyu sessizce yeniler ve değiştirilmemiş proje kopyalarını kendiliğinden tazeler. Bir şey değiştiyse Claude tek bir `🔄` satırı görür ve güncellemeye göre davranır. Hiçbir şey değişmediyse hook anında geri döner (~1 ms, yalnızca dosya bilgisi denetimi).
-
-İlk `atl install` çalıştırmasında bunu açmak isteyip istemediğin sorulur. Evet de; istediğin zaman `atl setup-hooks --remove` ile geri alabilirsin.
-
-Ayrıntılar için bkz. [`atl setup-hooks`](/tr/cli/setup-hooks).
-
-## Sürüm kısıtları (takım başına) yine geçerli
-
-`software-project-team@^1.0.0` kurduysan, `atl update` en son `1.x.x` sürümüne kadar çeker — `2.0.0` sürümüne **çekmez**. Ana sürüm artırımları açık biçimde `atl install software-project-team@^2.0.0` çalıştırmanı gerektirir.
-
-## Kısıtlama iç işleyişi
-
-İki zaman damgası dosyası şurada yaşar:
-
-- `~/.claude/cache/atl-last-repo-check` — depo çekimi kısıtlaması.
-- `~/.claude/cache/atl-last-self-check` — `atl` sürüm yayını API kısıtlaması (24 saat, sabit).
-
-`--throttle=<dur>` depo çekimi zaman damgasını denetler. Dosyanın değiştirilme zamanı `<dur>` içindeyse depo taraması tamamen atlanır (hızlı yol ~1 ms). Aksi durumda tarama çalışır ve başarıda dosyaya damga vurulur. Başarısız olursa (örneğin çevrimdışı), damga güncellenmez; bir sonraki çağrı yeniden dener.
-
-## Çevrimdışı davranış
-
-Ağ erişilemezse tek tek `git fetch` çağrıları sessizce başarısız olur ve o depo `⚠ <name>: fetch: <error>` olarak raporlanır (`--silent-if-clean` bunu susturmaz — bilmen gerekir). Denetimin geri kalanı sürer. Çevrimdışı çalıştırmalarda proje kopyalarına asla dokunulmaz.
+`atl update` çevrimdışında sorunsuz degrade eder. İndeks yenilemesi ve tüm tar dosyası çekimleri sessizce başarısız olur, çözümleme önbelleğe alınmış/gömülü indekse geri döner ve yeniden çekimi yapılamayan takımlar yükseltilmez. Yerel global→proje yayması (3. adım) ağ bağlantısı gerektirmez ve yine de çalışır.
 
 ## İlgili
 
-- [`atl install`](/tr/cli/install) — ilk kurulum (kendiliğinden güncelleme onayı sorulur).
-- [`atl install <team> --refresh`](/tr/cli/install#idempotency-atl-v100) — bir proje için açık zorla üzerine yazma (yerel değişiklikler nedeniyle kendiliğinden yenileme seni atladığında).
-- [`atl setup-hooks`](/tr/cli/setup-hooks) — hook'ları elle yapılandır.
-- [`atl list`](/tr/cli/list) — neyin kurulu olduğunu gör.
-- [Sürüm kısıtları](/tr/authoring/team-json#version-constraints) — `^`, `~` ve kesin sabitlemelerin nasıl çözüldüğü.
+- [`atl install`](/tr/cli/install) — takımın ilk kurulumu
+- [`atl tick`](/tr/cli/tick) — projeleri otomatik güncel tutan istem başına yayma + boşaltma geçişi
+- [`atl setup-hooks`](/tr/cli/setup-hooks) — otomasyon hook'larını bağla
+- [`atl promote`](/tr/cli/promote) — projenin kazanımlarını global katmana yükselt (yaymanın dağıttığı içeriğin kaynağı)
+- [`atl publish`](/tr/cli/publish) — global kazanımları yukarı akışa gönder
+- [`atl list`](/tr/cli/list) — neyin kurulu olduğunu ve hangi kapsamda olduğunu gör

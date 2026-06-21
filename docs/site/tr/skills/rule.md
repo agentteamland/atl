@@ -4,7 +4,7 @@ Bir kodlama ya da mimari kuralı ekle. Kullanıcı kuralı doğal dilde (herhang
 
 Birden çok ifadenin olası olduğu karmaşık ya da belirsiz kurallar için doğrudan [`/rule-wizard`](/tr/skills/rule-wizard) kullan — son biçimi yazmak için `/rule` becerisini çağırmadan önce seçenek tabanlı soru-yanıt turlarından geçirir.
 
-Global beceri olarak [rule](https://github.com/agentteamland/rule) içinde yayımlanır.
+Global beceri olarak [atl monorepo](https://github.com/agentteamland/atl) içinde yayımlanır.
 
 ## Üç kapsam
 
@@ -12,9 +12,9 @@ Global beceri olarak [rule](https://github.com/agentteamland/rule) içinde yayı
 |---|---|---|
 | *(yok)* | Proje `.claude/` dosyaları | Bu projeye özgü kurallar (varsayılan). |
 | `--global` | `~/.claude/rules/` | Her projeye uygulanan kişisel kurallar. |
-| `--team` | `~/.claude/repos/agentteamland/{team}/` dosyaları | Takım deposundaki ajan ya da takım kuralı dosyaları. |
+| `--team` | Etkin kapsamın `.claude/` dizini altındaki takım dosyaları | Kurulu bir takıma ait ajan ya da takım kuralı dosyaları. |
 
-`--team` için etkin takım, kurulu `.claude/agents/` sembolik bağlarından algılanır. Tek takım → kendiliğinden kullanılır; birden çok takım → `AskUserQuestion` ile sorulur.
+`--team` için etkin takım, kurulu `.claude/agents/` dosyalarından algılanır. Tek takım → kendiliğinden kullanılır; birden çok takım → `AskUserQuestion` ile sorulur.
 
 ## Akış
 
@@ -45,8 +45,8 @@ Kullanıcının doğal dildeki ifadesinden çıkar:
 
 | İlgili alan | Dosya |
 |---|---|
-| Bir ajanın bilgi tabanı | `~/.claude/repos/agentteamland/{team}/agents/{agent}.md`. |
-| Takım çapında kural | `~/.claude/repos/agentteamland/{team}/rules/{topic}.md`. |
+| Bir ajanın bilgi tabanı | `.claude/agents/{agent}.md` (etkin kapsam altında). |
+| Takım çapında kural | `.claude/rules/{topic}.md` (etkin kapsam altında). |
 
 Kural birden çoğuna uyuyor ama hepsine uymuyorsa beceri sorar.
 
@@ -95,18 +95,9 @@ Hedef dosyayı `Edit` ile güncelle. Kullanıcıya kısa bir özet ver: hangi do
 
 ### 7. Takım kapsamlı kuralları kalıcılaştırma
 
-Takım kuralları, takımın yerel klonunda yaşar. Her herkese açık `agentteamland/{team}` deposu dal korumalıdır; bu yüzden `origin/main` dalına doğrudan push reddedilir. Bunun yerine bir PR aç:
+`--team` ile yazılan takım kuralları, takımın kurulu varlık dosyalarına — etkin kapsamın `.claude/` dizinine — kaydedilir. Bunlar yerel kopyalardır; takımın kaynak deposuna otomatik olarak geri gönderilmez.
 
-```bash
-cd ~/.claude/repos/agentteamland/{team-name}
-git checkout -b rule/{kebab-case-rule-id}
-git add rules/{file}.md team.json
-git commit -m "rule: {kebab-case-rule-id}"
-git push -u origin rule/{kebab-case-rule-id}
-gh pr create --fill
-```
-
-Kuruluysa [`/create-pr`](/tr/skills/create-pr) bunu otomatikleştirir.
+Bir kuralı upstream'e katkı olarak sunmak için doğrudan takımın kaynak deposuna karşı bir PR aç. Kuruluysa [`/create-pr`](/tr/skills/create-pr) bunu otomatikleştirir.
 
 ## Önemli kurallar
 
@@ -124,4 +115,4 @@ Kuruluysa [`/create-pr`](/tr/skills/create-pr) bunu otomatikleştirir.
 
 ## Kaynak
 
-- Belirtim: [rule/skills/rule/skill.md](https://github.com/agentteamland/rule/blob/main/skills/rule/skill.md).
+- Belirtim: [core/skills/rule/SKILL.md](https://github.com/agentteamland/atl/blob/main/core/skills/rule/SKILL.md)
