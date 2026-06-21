@@ -30,7 +30,7 @@ Yes, as long as your Git client can clone the repo (SSH keys, PAT, etc.). `atl` 
 
 ### What if my `atl` version is too old for a team?
 
-The team's `team.json` can declare a `requires.atl` minimum. If your installed `atl` is older, you get a clear error telling you to upgrade. Use `brew upgrade atl` or whichever channel you installed via.
+The team's `team.json` can declare a `requires.atl` minimum. If your installed `atl` is older, you get a clear error telling you to upgrade. Run `atl update`, or re-run the install script (`curl -fsSL …/scripts/install.sh | sh`), to get the latest `atl`.
 
 ### How do I downgrade a team?
 

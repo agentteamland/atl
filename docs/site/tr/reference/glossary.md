@@ -38,14 +38,14 @@
 
 **Çalışma alanı (workspace)** — `agentteamland/workspace`, tüm eş depoların geliştirme için bir araya getirildiği bakımcı merkezi. AgentTeamLand'i kullanmak için gerekmez; yalnızca platforma katkı veriyorsan ilgilenir.
 
-**Journal** — `.atl/journal/{date}_{agent}.md` altındaki kronolojik, ajan başına öğrenme kaydı. Emekli edilmiş `agent-memory/` katmanının yerini alır. `/save-learnings` tarafından yazılır; ajan açılışında Claude tarafından [knowledge-system kuralı](https://github.com/agentteamland/core/blob/main/rules/knowledge-system.md) gereği okunur.
+**Journal** — `.atl/journal/{date}_{agent}.md` altındaki kronolojik, ajan başına öğrenme kaydı. [`/drain`](/tr/skills/drain) öğrenme kuyruğunu bilgi tabanına işlerken yazar; ajan açılışında Claude tarafından [knowledge-system kuralı](https://github.com/agentteamland/core/blob/main/rules/knowledge-system.md) gereği okunur.
 
-**knowledge-base-summary** — her `children/{topic}.md` (ve `learnings/{topic}.md`) dosyasında zorunlu olan YAML frontmatter alanı. `/save-learnings`'in üst `agent.md`'nin Knowledge Base (ya da `skill.md`'nin Accumulated Learnings) bölümünü yeniden inşa ederken çıkardığı bir-üç satırlık özet. Kaynak doğruluktur — yeniden inşa edilmiş bölüme yapılan elle düzenlemeler bir sonraki save-learnings çalıştırmasında üzerine yazılır.
+**knowledge-base-summary** — her `children/{topic}.md` (ve `learnings/{topic}.md`) dosyasında zorunlu olan YAML frontmatter alanı. [`/drain`](/tr/skills/drain)'in üst `agent.md`'nin Knowledge Base (ya da `skill.md`'nin Accumulated Learnings) bölümünü yeniden inşa ederken çıkardığı bir-üç satırlık özet. Kaynak doğruluktur — yeniden inşa edilmiş bölüme yapılan elle düzenlemeler bir sonraki `/drain` çalıştırmasında üzerine yazılır.
 
 **knowledge-system** — iki katmanlı bilgi modelini (`journal/` + `wiki/`) tanımlayan çekirdek kural. `agent-memory` katmanı journal'a katıldıktan sonra `core@1.8.0` sürümünde `memory-system` adından yeniden adlandırıldı.
 
 **learnings/** — ajanların `children/` dizinini yansıtan, beceri başına alt dizin. Her `learnings/{topic}.md` dosyası `knowledge-base-summary` frontmatter taşır; becerinin `## Accumulated Learnings` bölümü bu dosyalardan kendiliğinden yeniden inşa edilir.
 
-**Öğrenme işaretçisi** — bir öğrenme anı geçtiğinde Claude'un konuşma sırasında düşürdüğü satır içi HTML yorumu. Biçim: `<!-- learning topic: ... kind: ... doc-impact: ... body: ... -->`. Bir sonraki oturumun `SessionStart` adımında `atl learning-capture` tarafından taranır ve `/save-learnings --from-markers` tarafından işlenir.
+**Öğrenme işaretçisi** — bir öğrenme anı geçtiğinde Claude'un konuşma sırasında düşürdüğü satır içi HTML yorumu. Biçim: `<!-- learning: serbest metin -->`. Bir sonraki oturumun `SessionStart` adımında dayanıklı kuyruğa (`~/.atl/queue.db`) taşınır (içerik hash'iyle tekilleştirilerek, tam bir kez), ardından [`/drain`](/tr/skills/drain) tarafından işlenir ve silinir.
 
 **Wiki** — `.atl/wiki/{topic}.md` altında konuya göre düzenlenmiş güncel doğru bilgisi. Doğru değiştiğinde eklenmez, yerine yazılır; `CLAUDE.md` dosyasındaki `<!-- wiki:index -->` işaretçi bloğu canlı dizini her oturum başında Claude'a görünür kılar.
