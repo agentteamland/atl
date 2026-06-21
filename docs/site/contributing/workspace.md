@@ -55,7 +55,7 @@ The workspace ships three scripts under `./scripts/`:
 
 ```bash
 cd repos/<repo-name>
-# Make your changes, follow the team-repo-maintenance discipline
+# Make your changes, follow the repo's conventional-commit + branch-hygiene discipline
 git checkout -b <type>/<short-description>
 # ... edit files ...
 git add <files> && git commit -m "<conventional message>"
