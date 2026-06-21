@@ -86,7 +86,7 @@ Claude raporu görür, /save-learnings --from-markers --transcripts <paths> komu
         bir sonraki oturum 0 işaretçi görür
 ```
 
-İşaretçi biçimi ve gürültü filtresinin ayrıntıları için [`atl learning-capture`](/tr/cli/learning-capture) sayfasına ve davranış belirtimi için core içindeki [learning-capture kuralı](https://github.com/agentteamland/core/blob/main/rules/learning-capture.md) ile [docs-sync kuralına](https://github.com/agentteamland/core/blob/main/rules/docs-sync.md) bak.
+İşaretçi biçimi ve gürültü filtresinin ayrıntıları için [`atl learning-capture`](/tr/cli/learnings) sayfasına ve davranış belirtimi için core içindeki [learning-capture kuralı](https://github.com/agentteamland/core/blob/main/rules/learning-capture.md) ile [docs-sync kuralına](https://github.com/agentteamland/core/blob/main/rules/docs-sync.md) bak.
 
 ## Neden iki hook (dört değil)
 
@@ -143,6 +143,6 @@ Yavaş yol: tipik kurulumlarda (5-10 önbelleklenmiş depo) ~2-3 saniye. Hızlı
 ## İlgili
 
 - [`atl update`](/tr/cli/update) — elle yapılan güncelleme (otomatik güncelleme hook'unun sessizce çağırdığı komut).
-- [`atl learning-capture`](/tr/cli/learning-capture) — elle yapılan tarayıcı (`atl session-start` komutunun sessizce çağırdığı komut).
+- [`atl learning-capture`](/tr/cli/learnings) — elle yapılan tarayıcı (`atl session-start` komutunun sessizce çağırdığı komut).
 - [`atl install`](/tr/cli/install) — ilk kurulum (onay sorusunu içerir).
 - [CLI'yi kur](/tr/guide/install) — `atl`'yi makinene almak.

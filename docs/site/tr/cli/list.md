@@ -47,4 +47,3 @@ Run: atl install <team-name>
 - [`atl install`](/tr/cli/install).
 - [`atl remove`](/tr/cli/remove).
 - [`atl update`](/tr/cli/update).
-- [Kalıtım](/tr/authoring/inheritance).

@@ -1,24 +1,54 @@
 # CLI Overview
 
-`atl` has eight commands. The five **user commands** operate on the **current project** (the directory you ran `atl` in) unless otherwise noted. The three **automation commands** are typically wired to Claude Code hooks and run unattended — you'll usually only invoke them manually for setup or troubleshooting.
+`atl` installs agent teams, keeps them updated, circulates the gains your agents learn, and runs itself in the background so you can focus on your project.
 
-## User commands
+Commands fall into three groups: **team commands** you run by hand, the **gain-circulation** ring that promotes and shares what your agents learn, and **automation** that Claude Code triggers for you. Everything operates on the **current project** (the directory you ran `atl` in) unless noted, with a second **user-global** layer that the project shadows (nearest wins).
+
+## Team commands
 
 | Command | What it does |
 |---|---|
-| [`atl install`](/cli/install) | Install a team by registry name or Git URL. |
+| [`atl install`](/cli/install) | Install a team by handle or Git URL into the current scope. |
 | [`atl list`](/cli/list) | Show teams installed in this project. |
 | [`atl remove`](/cli/remove) | Uninstall a team. |
 | [`atl update`](/cli/update) | Pull latest for one or all installed teams. |
-| [`atl search`](/cli/search) | Search the public registry. |
+| [`atl search`](/cli/search) | Search the team catalog (the GitHub-backed index). |
 
-## Automation commands
+## Gain-circulation commands
+
+As your agents work, they accumulate **gains** — new learnings, sharpened skills, project-local rules. These commands move those gains outward through the three-ring ladder.
 
 | Command | What it does |
 |---|---|
-| [`atl setup-hooks`](/cli/setup-hooks) | One-time install/remove of Claude Code hooks (`SessionStart`, `UserPromptSubmit`) that wire up auto-update + learning capture. |
-| `atl session-start` | Composite boot-time wrapper invoked by the `SessionStart` hook (cache pull + symlink→copy migration + auto-refresh + previous-transcript marker scan + atl self-version check). Not normally run by hand. |
-| [`atl learning-capture`](/cli/learning-capture) | Scan Claude Code transcripts for `<!-- learning -->` markers. Invoked by the `SessionStart` wrapper; can also be run manually for testing or backfill. |
+| `atl promote` | Lift project-local gains to the user-global layer (so every project benefits). |
+| `atl publish` | Publish your global-layer gains — re-publish your own team, or propose them upstream as a GitHub PR. |
+| `atl pin` | Keep a project-local path from being promoted to global. |
+| `atl unpin` | Allow a previously pinned path to be promoted again. |
+| `atl learnings` | Inspect the durable learning queue: `status` (pending per channel/project), `peek` (list items, used by the `/drain` skill), `ack <id>` (mark an item processed). |
+
+## Automation commands
+
+These are wired to Claude Code hooks by [`atl setup-hooks`](/cli/setup-hooks) and run **unattended** — you normally never type them. They are listed here only so you recognize them in hook output or reach for them when troubleshooting.
+
+| Command | What it does |
+|---|---|
+| [`atl setup-hooks`](/cli/setup-hooks) | One-time install/remove of the Claude Code hooks (`SessionStart`, `UserPromptSubmit`) that drive the automation below. |
+| `atl session-start` | Boot-time maintenance run by the `SessionStart` hook (cache refresh + auto-update + previous-transcript marker scan + self-version check). |
+| `atl tick` | The in-session maintenance tick (every 5–10 minutes via prompt-piggyback): drains throttled background work. |
+| `atl doctor` | The self-heal daemon — diagnoses drift and repairs the install automatically. |
+
+> Compared with v1, there is **no `config`, `migrate`, or `learning-capture` command.** Learning capture is now automatic (markers land in a durable queue that `atl learnings` inspects and the `/drain` skill processes); configuration and state-file migration are not part of the v2 surface.
+
+## Companion skills
+
+`atl` is the deterministic half of the platform; the judgment-heavy half lives in Claude Code skills the teams install:
+
+- **`/drain`** — process the learning queue into agent knowledge bases (the v1 `/save-learnings`).
+- **`/create-pr`** — branch → review → commit → PR.
+- **`/create-code-diagram`** — generate an architecture/class diagram of the codebase.
+- **`/brainstorm`**, **`/rule`**, **`/rule-wizard`** — design, author, and scaffold rules.
+
+The split is deliberate: the **CLI is deterministic** (same inputs, same result, no LLM), **skills are LLM-driven** (they reason about your specific code).
 
 ## Global flags
 
@@ -27,47 +57,36 @@
 | `--help`, `-h` | Print usage and exit. |
 | `--version`, `-v` | Print the installed `atl` version. |
 
-Each command has its own `--help` page: `atl install --help`, `atl search --help`, and so on.
+Each command has its own `--help` page: `atl install --help`, `atl publish --help`, and so on.
 
 ## State `atl` keeps
 
-**Shared cache** (one per machine):
+Assets live in **Claude Code's own directories**, in one of two scopes — there is no separate ATL-owned asset store:
 
 ```
-~/.claude/repos/agentteamland/
-└── <team-name>/          ← cloned Git repo, reused across all projects
+~/.claude/                 ← user-global layer (agents/skills/rules shared across all projects)
+<project>/.claude/         ← project layer (shadows global; nearest wins)
 ```
 
-**Per-project state** (per directory you run `atl` in):
+`atl`'s own bookkeeping lives under `~/.atl/` (user-global) and `<project>/.atl/` (per-project):
 
 ```
-<project>/
-└── .claude/
-    ├── .team-installs.json       ← which teams are installed, at what versions
-    ├── agents/                   ← copies to team-provided agents
-    ├── skills/                   ← copies to team-provided skills
-    ├── rules/                    ← copies to team-provided rules
-    └── ...
+~/.atl/
+├── queue.db               ← the durable learning queue (bbolt)
+├── index.json             ← cached team catalog (refreshed by atl update)
+├── config.json            ← atl settings
+├── pins.json              ← paths held back from promotion
+└── installed/             ← per-team install manifests + integrity baselines
 ```
-
-The copies point into the shared cache. That's why `atl update` takes effect in every project at once: you update the cache, not the project.
-
-## Exit codes
-
-| Code | Meaning |
-|---|---|
-| `0` | Success. |
-| `1` | General error (invalid args, team not found, network). |
-| `2` | Validation failure (`team.json` didn't match the schema). |
-| `3` | Inheritance error (circular chain, missing parent). |
 
 ## Philosophy
 
-- **Deterministic.** Same inputs, same copies. No hidden state.
+- **Deterministic.** Same inputs, same result. No hidden state.
 - **Idempotent.** Re-running `atl install` on an already-installed team is a no-op (or a pull).
 - **Observable.** Every action prints what it did. Use the output, not a spinner.
+- **Hands-off.** The automation commands keep things current without you thinking about them.
 
 ## Next
 
 - **[`atl install`](/cli/install)** — the command you'll run most.
-- **[`atl search`](/cli/search)** — discover what's in the registry.
+- **[`atl search`](/cli/search)** — discover what's in the catalog.

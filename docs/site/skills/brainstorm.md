@@ -113,7 +113,7 @@ Every item marked "not doing now, later" during a brainstorm is reflected in `.a
 
 ## Related
 
-- [`/save-learnings`](/skills/save-learnings) — periodic learning capture (parallel to brainstorm; brainstorms are deliberate, learnings are spontaneous)
+- [`/save-learnings`](/skills/drain) — periodic learning capture (parallel to brainstorm; brainstorms are deliberate, learnings are spontaneous)
 - [`/create-pr`](/skills/create-pr) — packages a team brainstorm change as a PR
 - [Concepts: Skill](/guide/concepts#skill) — where brainstorms fit in the knowledge model
 

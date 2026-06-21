@@ -128,11 +128,10 @@ Akış:
 
 İki otomatikleştirilmiş kanal (brew + scoop) bakım maliyetini neredeyse sıfırda tutar. winget kanalı sürüm başına elle PR ister çünkü Microsoft öyle ister — bu, resmi Windows kataloğunda olmanın bedelidir.
 
-Sürüm yayım hattı depoları (`homebrew-tap`, `scoop-bucket`, `winget-pkgs`) bilinçli olarak dal koruması ALTINDA değildir. Goreleaser zorla push'lar; koruma bunu engellerdi. Hangi depoların korunduğu / korunmadığı için bkz. [Yönetişim](../guide/governance).
+Sürüm yayım hattı depoları (`homebrew-tap`, `scoop-bucket`, `winget-pkgs`) bilinçli olarak dal koruması ALTINDA değildir. Goreleaser zorla push'lar; koruma bunu engellerdi.
 
 ## İlgili
 
 - [`atl`'yi kur](../guide/install) — üç kanal için kullanıcıya yönelik kurulum yönergeleri.
 - [winget üst akış-PR süreci](winget-process) — winget hattındaki elle yapılan adım.
-- [Yönetişim](../guide/governance) — organizasyon genelinde dal koruması.
 - cli deposunun [`.goreleaser.yaml`](https://github.com/agentteamland/cli/blob/main/.goreleaser.yaml) dosyası — tüm hattı orkestre eden goreleaser yapılandırması.

@@ -11,7 +11,7 @@ It follows **JSON Schema Draft 2020-12**.
 | Field | Type | Required | Default | Notes |
 |---|---|---|---|---|
 | `schemaVersion` | integer | ✅ | — | Currently `1`. |
-| `name` | string | ✅ | — | Lowercase kebab-case. Must be unique in the registry. |
+| `name` | string | ✅ | — | Lowercase kebab-case. Unique within your handle's namespace. |
 | `version` | string | ✅ | — | SemVer 2.0.0. |
 | `description` | string | ✅ | — | One-sentence summary. |
 | `author` | string | — | — | `"Name <email>"` format recommended. |
@@ -22,8 +22,7 @@ It follows **JSON Schema Draft 2020-12**.
 | `agents` | object[] | — | `[]` | Each: `{ name: string, description: string }`. |
 | `skills` | object[] | — | `[]` | Same shape as `agents`. |
 | `rules` | object[] | — | `[]` | Same shape as `agents`. |
-| `extends` | string | — | — | `"team-name"` or `"team-name@constraint"`. |
-| `excludes` | string[] | — | `[]` | Parent item names to drop. |
+| `scope` | string | — | `"project"` | Publisher-default install layer: `global`, `project`, or `both`. |
 | `dependencies` | object | — | `{}` | Map `"team-name"` → `"version-constraint"`. |
 | `requires` | object | — | `{}` | `{ atl: string }` — minimum CLI version. |
 

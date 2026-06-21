@@ -8,7 +8,7 @@ You can use the same pattern in your own `CLAUDE.md` files. The blocks are just 
 
 | Block | Written by | Purpose |
 |---|---|---|
-| `<!-- wiki:index -->` | [`/save-learnings`](/skills/save-learnings) | Auto-rebuilt table of contents for `.atl/wiki/` pages. Loads with project context, gives Claude the knowledge map at zero cost. |
+| `<!-- wiki:index -->` | [`/save-learnings`](/skills/drain) | Auto-rebuilt table of contents for `.atl/wiki/` pages. Loads with project context, gives Claude the knowledge map at zero cost. |
 | `<!-- brainstorm:active -->` | [`/brainstorm start`](/skills/brainstorm) and [`/brainstorm done`](/skills/brainstorm) | Pins active brainstorm topics into project context so the next session cannot miss them. |
 | `<!-- pending-implementation -->` | Brainstorm `done` flow | Reminds the next session that a brainstorm decided X but the implementation hasn't shipped yet. |
 
@@ -151,6 +151,6 @@ HTML comments are:
 ## Related
 
 - [`/brainstorm`](/skills/brainstorm) — writes/removes the `<!-- brainstorm:active -->` block
-- [`/save-learnings`](/skills/save-learnings) — writes the `<!-- wiki:index -->` block
+- [`/save-learnings`](/skills/drain) — writes the `<!-- wiki:index -->` block
 - [Knowledge system](/guide/knowledge-system) — what the wiki:index block indexes
 - [Concepts: Skill](/guide/concepts#skill) — where these conventions fit in the broader picture

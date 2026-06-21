@@ -128,4 +128,3 @@ If the network is unreachable, `atl install` falls back to the shared cache. You
 - [`atl list`](/cli/list) — see what's installed.
 - [`atl update`](/cli/update) — refresh unmodified copies after the cache pulls.
 - [`atl remove`](/cli/remove) — uninstall (with `--force` for non-interactive).
-- [Inheritance](/authoring/inheritance) — how `extends` resolves.

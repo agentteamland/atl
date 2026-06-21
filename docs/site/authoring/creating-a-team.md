@@ -12,7 +12,6 @@ A team can be:
 - **One or more skills** (slash commands that Claude can invoke)
 - **Rules** (globally-loaded instructions that shape behavior)
 - **Any combination** of the above
-- **An extension of another team** (inherits all its pieces, overrides or excludes specific items) — see [Inheritance](./inheritance)
 
 You can install a team from:
 
@@ -226,8 +225,7 @@ Now that your team works locally:
 
 - **Keep it private.** You can use it forever this way — just point `atl install` at your local path or push it to a private git server (GitHub private repo, GitLab, self-hosted Gitea). No submission required.
 - **Share with a team.** Push to a private repo and give teammates the URL: `atl install git@github.com:your-org/your-team.git`. They'll install via SSH (no registry involvement).
-- **Extend an existing team.** See [Inheritance](./inheritance) — declare `"extends": "software-project-team@^1.1.0"` to inherit that team's agents, then override or exclude specific items.
-- **Submit to the public registry.** Only if you want others to discover it by short name. See [Registry submission](./registry-submission).
+- **Submit to the public registry.** Only if you want others to discover it by short name. See [Registry submission](/cli/publish).
 - **Add a scaffolder skill.** If your team is meant to spin up new projects, add a `/create-*` skill. See [Scaffolder spec](./scaffolder-spec).
 
 ---
@@ -412,7 +410,7 @@ atl doesn't care about the host; `git clone` handles authentication via whatever
 
 ### 🟣 (d) Public to the world
 
-Submit to the [AgentTeamLand registry](https://github.com/agentteamland/registry) so anyone can `atl install your-team`. See [Registry submission](./registry-submission).
+Submit to the [AgentTeamLand registry](https://github.com/agentteamland/registry) so anyone can `atl install your-team`. See [Registry submission](/cli/publish).
 
 ---
 
@@ -463,8 +461,7 @@ No hard limits. In practice team repos are under 10 MB. If you embed large binar
 ## See also
 
 - [team.json field reference](./team-json)
-- [Inheritance](./inheritance) — extending an existing team
 - [Scaffolder spec](./scaffolder-spec) — adding `/create-new-*` skills
-- [Registry submission](./registry-submission) — publishing publicly
+- [Registry submission](/cli/publish) — publishing publicly
 - [`atl install` command](../cli/install) — full CLI reference
 - [Reference schema](../reference/schema) — JSON Schema for `team.json`

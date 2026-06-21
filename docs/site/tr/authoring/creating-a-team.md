@@ -12,7 +12,6 @@ Bir takımın içinde şunlar olabilir:
 - **Bir ya da daha çok beceri** (Claude'un çağırabileceği eğik çizgili komutlar).
 - **Kurallar** (global yüklenen, davranışı biçimlendiren yönergeler).
 - **Yukarıdakilerin herhangi bir bileşimi.**
-- **Başka bir takımın uzantısı** (tüm parçalarını miras alır, belirli öğeleri bastırır ya da dışarıda bırakır) — bkz. [Kalıtım](./inheritance).
 
 Bir takımı şuralardan kurabilirsin:
 
@@ -226,8 +225,7 @@ Takımın yerelde çalıştığına göre:
 
 - **Özel olarak tut.** Sonsuza dek bu şekilde kullanabilirsin — `atl install`'u yerel yola yönlendir ya da özel bir Git sunucusuna push'la (GitHub özel deposu, GitLab, kendi barındırılan Gitea). Başvuru gerekmez.
 - **Bir takımla paylaş.** Özel bir depoya push'la ve takımdaşlarına URL'yi ver: `atl install git@github.com:your-org/your-team.git`. SSH üzerinden kurarlar (kayıt defteri işin içinde değildir).
-- **Var olan bir takımı genişlet.** Bkz. [Kalıtım](./inheritance) — `"extends": "software-project-team@^1.1.0"` bildir; o takımın ajanlarını miras al, belirli öğeleri bastır ya da dışarıda bırak.
-- **Herkese açık kayıt defterine başvur.** Yalnızca başkalarının kısa adıyla bulmasını istiyorsan. Bkz. [Kayıt defteri başvurusu](./registry-submission).
+- **Herkese açık kayıt defterine başvur.** Yalnızca başkalarının kısa adıyla bulmasını istiyorsan. Bkz. [Kayıt defteri başvurusu](/cli/publish).
 - **Bir iskele becerisi ekle.** Takımın yeni proje açma amacındaysa bir `/create-*` becerisi ekle. Bkz. [İskele belirtimi](./scaffolder-spec).
 
 ---
@@ -413,7 +411,7 @@ atl install git@git.your-company.com:platform/your-team.git
 
 ### 🟣 (d) Tüm dünyaya açık
 
-Herkesin `atl install your-team` diyebilmesi için [AgentTeamLand kayıt defterine](https://github.com/agentteamland/registry) gönder. Bkz. [Kayıt defteri başvurusu](./registry-submission).
+Herkesin `atl install your-team` diyebilmesi için [AgentTeamLand kayıt defterine](https://github.com/agentteamland/registry) gönder. Bkz. [Kayıt defteri başvurusu](/cli/publish).
 
 ---
 
@@ -464,8 +462,7 @@ Sert sınır yoktur. Pratikte takım depoları 10 MB'ın altındadır. Büyük i
 ## Ayrıca bkz.
 
 - [team.json alan başvurusu](./team-json).
-- [Kalıtım](./inheritance) — var olan bir takımı genişletme.
 - [İskele belirtimi](./scaffolder-spec) — `/create-new-*` becerileri ekleme.
-- [Kayıt defteri başvurusu](./registry-submission) — herkese açık yayımlama.
+- [Kayıt defteri başvurusu](/cli/publish) — herkese açık yayımlama.
 - [`atl install` komutu](../cli/install) — tam CLI başvurusu.
 - [Başvuru şeması](../reference/schema) — `team.json` için JSON Şeması.

@@ -111,5 +111,4 @@ The rule is loaded into Claude's context on every session start (per the [knowle
 
 ## Related
 
-- [team-repo-maintenance](/authoring/team-repo-maintenance) — governance discipline that pairs with these coding guidelines on shared repo work
 - [Concepts: Rule](/guide/concepts#rule) — what rules are and how they're loaded

@@ -1,20 +1,28 @@
 # Quickstart
 
-From zero to a production-ready agent team in under a minute.
+From zero to a production-ready agent team in under a minute — install the CLI, install your first team, open a session.
 
 ## 1. Install `atl`
 
+`atl` is a single static Go binary with zero runtime dependencies. Install it with the one-line script for your platform:
+
 ```bash
 # macOS / Linux
-brew install agentteamland/tap/atl
+curl -fsSL https://raw.githubusercontent.com/agentteamland/atl/main/scripts/install.sh | sh
 ```
 
 ```powershell
-# Windows (PowerShell; no package manager required)
-irm https://raw.githubusercontent.com/agentteamland/cli/main/scripts/install.ps1 | iex
+# Windows (PowerShell)
+irm https://raw.githubusercontent.com/agentteamland/atl/main/scripts/install.ps1 | iex
 ```
 
-Full matrix (scoop, winget, manual ZIP, one-liner fallback): [Install guide](/guide/install).
+Prefer to install by hand? Grab a pre-built binary from [GitHub Releases](https://github.com/agentteamland/atl/releases/latest) and drop it on your `PATH`. There is no Homebrew, Scoop, or winget channel — the script (or the release ZIP) is the supported path. Full detail: [Install guide](/guide/install).
+
+Verify:
+
+```bash
+atl --version
+```
 
 ## 2. Create a project directory
 
@@ -22,67 +30,90 @@ Full matrix (scoop, winget, manual ZIP, one-liner fallback): [Install guide](/gu
 mkdir my-new-app && cd my-new-app
 ```
 
-`atl` expects to operate inside a project — it will create a `.claude/` directory here for the team's agents, skills, and rules.
+`atl` operates inside a project. When you install a team it writes the team's agents, skills, and rules into this project's `.claude/` directory — exactly where Claude Code reads them.
 
-## 3. Discover a team
+## 3. Find a team
 
 ```bash
 atl search dotnet
 ```
 
-You'll see matching entries from the public [registry](https://github.com/agentteamland/registry), including `software-project-team`.
+[`atl search`](/cli/search) queries the GitHub-backed catalog — generated from public repos tagged with the [`atl-team`](https://github.com/topics/atl-team) topic. Each result prints the `<handle>/<team>@<version>` reference (the handle is the team's GitHub owner — ownership is authorship) and the exact `atl install` command to copy. There is no central registry repo to PR against any more; tagging a repo `atl-team` (or running [`atl publish`](/cli/publish) from it) is how a team gets listed.
 
 ## 4. Install the team
 
 ```bash
-atl install software-project-team
+atl install agentteamland/software-project-team
 ```
 
 In a few seconds:
 
-- The team is cloned into the shared cache (first time only)
-- 13 agents and 3 skills (`create-new-project`, `verify-system`, `design-screen`) are copied into `.claude/`
-- `team.json` is recorded in `.claude/.team-installs.json`
+- The team is resolved from the index and fetched (cached for reuse).
+- 13 agents and 3 skills (`create-new-project`, `verify-system`, `design-screen`) are written into `.claude/`.
+- A manifest of baseline file hashes is recorded under `.atl/` so future updates can tell your edits from upstream changes.
+- The automation hooks are bound into Claude Code as part of the install — automation is on by default, not opt-in.
 
-You now have a full .NET + Flutter + React + Docker agent team wired into your project.
+You now have a full .NET + Flutter + React + Docker agent team wired into the project.
 
-## 5. Inspect what you installed
+::: tip Global vs. project scope
+A team is installed wherever its publisher's default points. Override with `--global` (every project) or `--project` (this one only); when both layers carry a team, the project copy shadows the global one. See [Concepts](/guide/concepts) for the scope axis.
+:::
+
+## 5. See what you installed
 
 ```bash
 atl list
 ```
 
-Shows the teams installed in this project, their effective agent counts, and the inheritance chain.
+[`atl list`](/cli/list) shows the teams installed at each scope — global (`~/.claude`) and project (`<cwd>/.claude`). A team present at both is listed under each.
 
 ## 6. Use it in Claude Code
 
 Open Claude Code in this directory. The team's skills are available as slash commands:
 
-- `/create-new-project MyApp` — scaffolds a full stack (Phase 1–5: gather → scaffold → build → verify → commit)
-- `/verify-system` — runs an end-to-end health check on containers, ports, apps, and pipelines
+- `/create-new-project MyApp` — scaffolds a full stack (gather → scaffold → build → verify → commit).
+- `/verify-system` — runs an end-to-end health check on containers, ports, apps, and pipelines.
 
-And every agent (api-agent, socket-agent, worker-agent, flutter-agent, react-agent, database-agent, redis-agent, rmq-agent, infra-agent, code-reviewer, project-reviewer, design-system-agent, ux-agent) is available for Claude to delegate to.
+Every agent the team ships (api-agent, socket-agent, worker-agent, flutter-agent, react-agent, infra-agent, database-agent, redis-agent, rmq-agent, code-reviewer, project-reviewer, design-system-agent, ux-agent) is available for Claude to delegate to.
 
-## 7. Keep up to date
+The platform's own global skills are there too — `/drain`, `/create-pr`, `/create-code-diagram`, `/brainstorm`, `/rule`, `/rule-wizard` — usable in any project regardless of which team you installed.
 
-When the team author ships improvements:
+## 7. Let the learning loop run itself
+
+This is the part that keeps your setup getting better instead of drifting. While you work, agents capture what they learn into a durable queue. The automation hooks from step 4 mean you don't manage any of it by hand:
+
+- A maintenance **tick** runs in-session (and via `atl tick`), folding queued learnings into the knowledge base.
+- `atl doctor` self-heals the install — it's the always-on health daemon, not a command you have to remember.
+- When something is waiting on you, `atl` reports `N learning(s) pending`; the `/drain` skill (run it in your session) routes each item to the right home — a wiki page, the journal, or an agent's knowledge base — then deletes it from the queue.
+
+Peek at the queue any time:
+
+```bash
+atl learnings status
+```
+
+`atl learnings peek` lists the pending items and `atl learnings ack <id>` marks one processed.
+
+## 8. Keep current
+
+When a team author ships improvements:
 
 ```bash
 atl update
 ```
 
-All installed teams pull, dependencies resolve, copies refresh. Nothing in your project code changes.
+All installed teams refresh; copies you haven't modified are updated in place, and your local edits are preserved. Nothing in your project's own code changes.
 
 ## What just happened?
 
-You installed a curated, version-pinned, dependency-aware set of agents into a project with a single command. Every other project that installs the same team gets the same configuration — and the same updates when the author ships them.
+You installed a curated, version-pinned set of agents into a project with one command, and turned on a self-running maintenance loop. Every other project that installs the same team gets the same configuration — and the same updates when the author ships them — while the gains your agents learn circulate back through `atl promote` and `atl publish`.
 
 ## Add design tooling (optional)
 
-If you want design-system + screen-prototype tooling alongside, install `design-system-team`:
+For design-system + screen-prototype tooling, install `design-system-team`:
 
 ```bash
-atl install design-system-team
+atl install agentteamland/design-system-team
 ```
 
 Then in your Claude Code chat:
@@ -98,7 +129,7 @@ You'll get token-aligned design systems and multi-state HTML prototypes under `.
 
 ## Next
 
-- **[Browse teams](/teams/)** — verified teams in the registry.
-- **[Concepts](/guide/concepts)** — the mental model behind teams, agents, skills, and rules.
+- **[Browse teams](/teams/)** — catalogued teams you can install.
+- **[Concepts](/guide/concepts)** — teams, agents, skills, rules, and the global/project scope axis.
 - **[CLI reference](/cli/overview)** — every command in detail.
-- **[Write your own team](/authoring/creating-a-team)** — publish a team to the registry.
+- **[Creating a team](/authoring/creating-a-team)** — author and publish your own.

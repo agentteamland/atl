@@ -62,7 +62,7 @@ Hayır. AgentTeamLand, Anthropic'in Claude Code'uyla çalışan bağımsız bir 
 
 ### Nasıl katkıda bulunabilirim?
 
-- Kayıt defterine **bir takım yayımla** — [Kayıt defteri başvurusu](/tr/authoring/registry-submission).
+- Kayıt defterine **bir takım yayımla** — [Kayıt defteri başvurusu](/tr/cli/publish).
 - **CLI'yı iyileştir** — PR'lar [`agentteamland/cli`](https://github.com/agentteamland/cli) deposunda beklenir.
 - **Bu belgeleri iyileştir** — PR'lar [`agentteamland/docs`](https://github.com/agentteamland/docs) deposunda beklenir. Her sayfanın "Edit this page on GitHub" bağı vardır.
 - **Issue aç** — hata raporları ve özellik istekleri ilgili depoya.

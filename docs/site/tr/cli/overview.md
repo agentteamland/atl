@@ -1,73 +1,92 @@
-# CLI genel bakışı
+# CLI'a Genel Bakış
 
-`atl`'nin sekiz komutu vardır. Beş **kullanıcı komutu**, aksi belirtilmedikçe **mevcut proje** üzerinde (yani `atl`'yi çalıştırdığın dizinde) iş görür. Üç **otomasyon komutu** ise tipik olarak Claude Code hook'larına bağlanır ve gözetimsiz çalışır — bunları elle yalnızca kurulum ya da sorun gidermek için çalıştırırsın.
+`atl` ajan takımlarını kurar, güncel tutar, ajanlarının öğrendiği kazanımları dolaşıma sokar ve arka planda kendi kendini çalıştırır; böylece sen yalnızca projene odaklanırsın.
 
-## Kullanıcı komutları
+Komutlar üç gruba ayrılır: elle çalıştırdığın **takım komutları**, ajanlarının öğrendiklerini terfi ettirip paylaşan **kazanım-dolaşımı** halkası ve Claude Code'un senin yerine tetiklediği **otomasyon**. Aksi belirtilmedikçe her şey **mevcut proje** (`atl`'ı içinde çalıştırdığın dizin) üzerinde işler; bunun üstünde, projenin gölgelediği ikinci bir **kullanıcı-global** katman vardır (en yakın olan kazanır).
+
+## Takım komutları
 
 | Komut | Ne yapar |
 |---|---|
-| [`atl install`](/tr/cli/install) | Bir takımı kayıt defteri adı veya Git URL'si ile kurar. |
+| [`atl install`](/tr/cli/install) | Bir takımı kısa adıyla ya da Git URL'siyle mevcut kapsama (scope) kurar. |
 | [`atl list`](/tr/cli/list) | Bu projede kurulu takımları gösterir. |
 | [`atl remove`](/tr/cli/remove) | Bir takımı kaldırır. |
-| [`atl update`](/tr/cli/update) | Bir takımın ya da kurulu tüm takımların son sürümünü çeker. |
-| [`atl search`](/tr/cli/search) | Herkese açık kayıt defterinde arama yapar. |
+| [`atl update`](/tr/cli/update) | Bir ya da tüm kurulu takımlar için en günceli çeker. |
+| [`atl search`](/tr/cli/search) | Takım kataloğunda (GitHub destekli index) arama yapar. |
+
+## Kazanım-dolaşımı komutları
+
+Ajanların çalıştıkça **kazanım** biriktirir — yeni öğrenmeler, keskinleşen skill'ler, projeye özel kurallar. Bu komutlar o kazanımları üç-halkalı merdiven boyunca dışarı taşır.
+
+| Komut | Ne yapar |
+|---|---|
+| `atl promote` | Projeye özel kazanımları kullanıcı-global katmana yükseltir (böylece her proje yararlanır). |
+| `atl publish` | Global katmandaki kazanımlarını yayımlar — kendi takımını yeniden yayımlar ya da onları bir GitHub PR'ı olarak yukarı (upstream) önerir. |
+| `atl pin` | Projeye özel bir yolun global katmana terfi ettirilmesini engeller. |
+| `atl unpin` | Daha önce sabitlenmiş (pin) bir yolun yeniden terfi ettirilebilmesine izin verir. |
+| `atl learnings` | Kalıcı öğrenme kuyruğunu inceler: `status` (kanal/proje başına bekleyenler), `peek` (öğeleri listeler; `/drain` skill'inin kullandığı), `ack <id>` (bir öğeyi işlenmiş olarak işaretler). |
 
 ## Otomasyon komutları
 
+Bunlar [`atl setup-hooks`](/tr/cli/setup-hooks) tarafından Claude Code hook'larına bağlanır ve **gözetimsiz** çalışır — normalde bunları hiç yazmazsın. Yalnızca hook çıktısında tanıyabilesin ya da sorun giderirken başvurabilesin diye burada listelenmişlerdir.
+
 | Komut | Ne yapar |
 |---|---|
-| [`atl setup-hooks`](/tr/cli/setup-hooks) | Otomatik güncelleme ve öğrenme yakalamayı bağlayan Claude Code hook'larını (`SessionStart`, `UserPromptSubmit`) tek seferlik kurar veya kaldırır. |
-| `atl session-start` | `SessionStart` hook'unun çağırdığı, açılış zamanına ait birleşik sarmalayıcı (önbellek çekimi + sembolik bağdan kopyaya geçiş + kendiliğinden yenileme + önceki transkript işaretçi taraması + `atl` kendi sürüm denetimi). Normalde elle çalıştırılmaz. |
-| [`atl learning-capture`](/tr/cli/learning-capture) | Claude Code transkriptlerini `<!-- learning -->` işaretçileri için tarar. `SessionStart` sarmalayıcısı tarafından çağrılır; test ya da geriye dönük tarama için elle de çalıştırılabilir. |
+| [`atl setup-hooks`](/tr/cli/setup-hooks) | Aşağıdaki otomasyonu süren Claude Code hook'larının (`SessionStart`, `UserPromptSubmit`) tek seferlik kurulumu/kaldırılması. |
+| `atl session-start` | `SessionStart` hook'unun çalıştırdığı, açılış anındaki bakım işi (önbellek yenileme + otomatik güncelleme + önceki-transkript işaretçi taraması + öz-sürüm denetimi). |
+| `atl tick` | Oturum içi bakım tıkı (prompt'a iliştirilerek her 5–10 dakikada bir): kısılmış (throttled) arka plan işlerini boşaltır. |
+| `atl doctor` | Kendi kendini onaran daemon — sapmayı (drift) teşhis eder ve kurulumu kendiliğinden onarır. |
 
-## Global bayraklar
+> v1 ile karşılaştırıldığında **`config`, `migrate` ya da `learning-capture` komutu yoktur.** Öğrenme yakalama artık otomatiktir (işaretçiler, `atl learnings`'in incelediği ve `/drain` skill'inin işlediği kalıcı bir kuyruğa düşer); yapılandırma ve durum-dosyası taşıma v2 yüzeyinin parçası değildir.
 
-| Bayrak | Etkisi |
+## Eşlik eden skill'ler
+
+`atl` platformun belirlenimci (deterministic) yarısıdır; muhakeme ağırlıklı yarı, takımların kurduğu Claude Code skill'lerinde yaşar:
+
+- **`/drain`** — öğrenme kuyruğunu ajan bilgi tabanlarına işler (v1'deki `/save-learnings`).
+- **`/create-pr`** — branch → review → commit → PR.
+- **`/create-code-diagram`** — kod tabanının bir mimari/sınıf diyagramını üretir.
+- **`/brainstorm`**, **`/rule`**, **`/rule-wizard`** — kuralları tasarla, yaz ve iskeletini kur.
+
+Bu ayrım bilinçlidir: **CLI belirlenimcidir** (aynı girdiler, aynı sonuç, LLM yok), **skill'ler LLM güdümlüdür** (senin özgül kodun üzerinde muhakeme yaparlar).
+
+## Genel bayraklar
+
+| Bayrak | Etki |
 |---|---|
 | `--help`, `-h` | Kullanımı yazdırır ve çıkar. |
 | `--version`, `-v` | Kurulu `atl` sürümünü yazdırır. |
 
-Her komutun kendi `--help` sayfası vardır: `atl install --help`, `atl search --help` ve benzerleri.
+Her komutun kendi `--help` sayfası vardır: `atl install --help`, `atl publish --help` ve benzeri.
 
-## `atl` hangi durumu tutar?
+## `atl`'ın tuttuğu durum (state)
 
-**Paylaşılan önbellek** (makine başına bir adet):
-
-```
-~/.claude/repos/agentteamland/
-└── <team-name>/          ← klonlanmış Git deposu; tüm projelerde yeniden kullanılır
-```
-
-**Proje başına durum** (`atl`'yi çalıştırdığın her dizin için):
+Varlıklar (assets), iki kapsamdan birinde, **Claude Code'un kendi dizinlerinde** yaşar — ATL'a ait ayrı bir varlık deposu yoktur:
 
 ```
-<project>/
-└── .claude/
-    ├── .team-installs.json       ← hangi takımlar hangi sürümde kurulu
-    ├── agents/                   ← takım ajanlarının kopyaları
-    ├── skills/                   ← takım becerilerinin kopyaları
-    ├── rules/                    ← takım kurallarının kopyaları
-    └── ...
+~/.claude/                 ← kullanıcı-global katman (tüm projeler arasında paylaşılan agents/skills/rules)
+<project>/.claude/         ← proje katmanı (global'i gölgeler; en yakın kazanır)
 ```
 
-Kopyalar paylaşılan önbelleğe işaret eder. `atl update`'in aynı anda her projede etkili olmasının nedeni budur: projeyi değil önbelleği güncellersin.
+`atl`'ın kendi defter tutması `~/.atl/` (kullanıcı-global) ve `<project>/.atl/` (proje başına) altında yaşar:
 
-## Çıkış kodları
-
-| Kod | Anlamı |
-|---|---|
-| `0` | Başarılı. |
-| `1` | Genel hata (geçersiz argüman, takım bulunamadı, ağ sorunu). |
-| `2` | Doğrulama hatası (`team.json` şemaya uymadı). |
-| `3` | Kalıtım hatası (döngülü zincir, üst takım yok). |
+```
+~/.atl/
+├── queue.db               ← kalıcı öğrenme kuyruğu (bbolt)
+├── index.json             ← önbelleğe alınmış takım kataloğu (atl update ile yenilenir)
+├── config.json            ← atl ayarları
+├── pins.json              ← terfiden alıkonan yollar
+└── installed/             ← takım başına kurulum manifestoları + bütünlük (integrity) tabanları
+```
 
 ## Felsefe
 
-- **Belirlenimci.** Aynı girdiler, aynı kopyalar. Gizli durum yok.
-- **İdempotent.** Zaten kurulu bir takıma `atl install` komutunu yeniden çalıştırmak işlem yapmaz (ya da yalnızca çekim yapar).
-- **Gözlemlenebilir.** Her eylem ne yaptığını yazdırır. Dönen ikon yerine çıktının kendisini kullan.
+- **Belirlenimci.** Aynı girdiler, aynı sonuç. Gizli durum yok.
+- **Etkisiz (idempotent).** Zaten kurulu bir takımda `atl install`'ı yeniden çalıştırmak işlemsizdir (no-op) (ya da bir pull'dur).
+- **Gözlemlenebilir.** Her eylem ne yaptığını yazdırır. Bir spinner'a değil, çıktıya bak.
+- **Eli boş bırak.** Otomasyon komutları, sen düşünmeden her şeyi güncel tutar.
 
-## Sıradaki
+## Sonraki adım
 
-- **[`atl install`](/tr/cli/install)** — en sık çalıştıracağın komut.
-- **[`atl search`](/tr/cli/search)** — kayıt defterinde ne olduğunu keşfet.
+- **[`atl install`](/tr/cli/install)** — en çok çalıştıracağın komut.
+- **[`atl search`](/tr/cli/search)** — katalogda ne olduğunu keşfet.

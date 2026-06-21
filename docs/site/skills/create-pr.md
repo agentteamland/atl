@@ -1,6 +1,6 @@
 # `/create-pr`
 
-Take working-tree changes (uncommitted, or recently committed to the default branch), derive an appropriate branch name + commit message + PR title from the diff, run [`/save-learnings`](/skills/save-learnings) so wisdom rides along in the same PR, run an AI review chain (generic baseline + any team-declared specialists), commit + push, open a PR. Optionally enable GitHub auto-merge with a bounded polling + auto-fix loop. Always return the user to the target branch at end-of-work.
+Take working-tree changes (uncommitted, or recently committed to the default branch), derive an appropriate branch name + commit message + PR title from the diff, run [`/save-learnings`](/skills/drain) so wisdom rides along in the same PR, run an AI review chain (generic baseline + any team-declared specialists), commit + push, open a PR. Optionally enable GitHub auto-merge with a bounded polling + auto-fix loop. Always return the user to the target branch at end-of-work.
 
 This skill is the deterministic "ship a piece of work" flow — it consumes the disciplines defined by `team-repo-maintenance`, `branch-hygiene`, `learning-capture`, `docs-sync`, and `karpathy-guidelines`, so the user does not have to re-derive them every PR.
 
@@ -51,7 +51,7 @@ The skill does **not** ask the user to confirm names — it generates and procee
 
 ### Step 4 — Save learnings (unless `--no-learning`)
 
-Invokes [`/save-learnings`](/skills/save-learnings) in manual mode (analyzes the live conversation):
+Invokes [`/save-learnings`](/skills/drain) in manual mode (analyzes the live conversation):
 
 - Writes wiki / journal / agent children / skill learnings updates (project-local)
 - For each `<!-- learning doc-impact: readme/docs/breaking -->` marker, prepares a doc draft
@@ -189,7 +189,7 @@ The user ends the skill on the target branch, with the merged change incorporate
 
 ## Related
 
-- [`/save-learnings`](/skills/save-learnings) — invoked at Step 4
+- [`/save-learnings`](/skills/drain) — invoked at Step 4
 - [team-repo-maintenance rule](https://github.com/agentteamland/core/blob/main/rules/team-repo-maintenance.md) — governance for shared repos
 - [karpathy-guidelines rule](https://github.com/agentteamland/core/blob/main/rules/karpathy-guidelines.md) — review prompt's foundation
 

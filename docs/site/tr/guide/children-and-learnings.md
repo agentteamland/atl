@@ -16,7 +16,7 @@ Onsuz, karmaşık ajanlar ve beceriler iki kötü şekilden birinde son bulur:
 Children + learnings deseni ikisini birden çözer:
 
 - **Konu başına bir dosya** — bir parçayı diğerlerine dokunmadan güncellersin.
-- **Kendiliğinden yeniden inşa edilen dizin** — üst düzey dosyanın "Knowledge Base" / "Accumulated Learnings" bölümü her [`/save-learnings`](/tr/skills/save-learnings) çalıştırmasında frontmatter'dan yeniden oluşturulur. Elle yapılan düzenlemeler üzerine yazılır — kaynak doğruluk her çocuk dosyanın frontmatter'ıdır.
+- **Kendiliğinden yeniden inşa edilen dizin** — üst düzey dosyanın "Knowledge Base" / "Accumulated Learnings" bölümü her [`/save-learnings`](/tr/skills/drain) çalıştırmasında frontmatter'dan yeniden oluşturulur. Elle yapılan düzenlemeler üzerine yazılır — kaynak doğruluk her çocuk dosyanın frontmatter'ıdır.
 
 Sonuç: bilgi sürtünmesizce birikir, üst düzey dosya sıkı kalır ve dizin asla bayatlamaz.
 
@@ -148,7 +148,7 @@ Blueprint olmadan ajan, yeni birimleri nasıl oluşturacağını tahmin eder. Bl
 ## İlgili
 
 - [Bilgi sistemi](/tr/guide/knowledge-system) — bu takım tarafı desenin proje tarafındaki yansıması (journal + wiki).
-- [`/save-learnings`](/tr/skills/save-learnings) — `children/` ve `learnings/` dosyalarını yazar; üst dizin bölümlerini yeniden inşa eder.
+- [`/save-learnings`](/tr/skills/drain) — `children/` ve `learnings/` dosyalarını yazar; üst dizin bölümlerini yeniden inşa eder.
 - [Kavramlar: Beceri](/tr/guide/concepts#skill) — `learnings/` deseninin nereye oturduğu.
 - Kanonik kural: [`core/rules/agent-structure.md`](https://github.com/agentteamland/core/blob/main/rules/agent-structure.md).
 

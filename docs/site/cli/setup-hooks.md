@@ -85,7 +85,7 @@ Claude sees the report, invokes /save-learnings --from-markers --transcripts <pa
         + advances the state file's lastProcessedAt → next session sees 0 markers
 ```
 
-See [`atl learning-capture`](/cli/learning-capture) for the marker format and the noise-filter details, and the [learning-capture rule](https://github.com/agentteamland/core/blob/main/rules/learning-capture.md) / [docs-sync rule](https://github.com/agentteamland/core/blob/main/rules/docs-sync.md) in core for the behavior spec.
+See [`atl learning-capture`](/cli/learnings) for the marker format and the noise-filter details, and the [learning-capture rule](https://github.com/agentteamland/core/blob/main/rules/learning-capture.md) / [docs-sync rule](https://github.com/agentteamland/core/blob/main/rules/docs-sync.md) in core for the behavior spec.
 
 ## Why two hooks (and not four)
 
@@ -142,6 +142,6 @@ The marker protocol itself is unchanged — the v0.2.0 marker format still works
 ## Related
 
 - [`atl update`](/cli/update) — manual update (what the auto-update hook calls silently)
-- [`atl learning-capture`](/cli/learning-capture) — manual scanner (what `atl session-start` calls silently)
+- [`atl learning-capture`](/cli/learnings) — manual scanner (what `atl session-start` calls silently)
 - [`atl install`](/cli/install) — first install (includes opt-in prompt)
 - [Install the CLI](/guide/install) — getting atl on your machine

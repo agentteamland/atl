@@ -113,7 +113,7 @@ Bir beyin fırtınası sırasında "şimdi yapmıyoruz, sonraya" diye işaretlen
 
 ## İlgili
 
-- [`/save-learnings`](/tr/skills/save-learnings) — düzenli öğrenme yakalama (beyin fırtınasına paralel; beyin fırtınaları kasıtlıdır, öğrenmeler kendiliğinden olur).
+- [`/save-learnings`](/tr/skills/drain) — düzenli öğrenme yakalama (beyin fırtınasına paralel; beyin fırtınaları kasıtlıdır, öğrenmeler kendiliğinden olur).
 - [`/create-pr`](/tr/skills/create-pr) — bir takım beyin fırtınası değişikliğini PR olarak paketler.
 - [Kavramlar: Beceri](/tr/guide/concepts#skill) — beyin fırtınalarının bilgi modelinde nereye oturduğu.
 
