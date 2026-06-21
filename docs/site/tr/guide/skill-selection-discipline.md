@@ -36,7 +36,7 @@ Muğlak bir istem asistanı tahmine zorlar; tahmin de yanlış-takım seçiminin
 
 ### 2. Skill'i biliyorsan adını söyle
 
-Hangi eğik-çizgi komutunun çalışacağını biliyorsan, doğrudan onu çağırmak asistanın hatırlamasını beklemekten daha hızlı ve daha güvenilirdir. `"/save-learnings yap"` anında çalışır; "öğrendiklerimi kaydet" niyetin skill adına eşlenmesini gerektirir.
+Hangi eğik-çizgi komutunun çalışacağını biliyorsan, doğrudan onu çağırmak asistanın hatırlamasını beklemekten daha hızlı ve daha güvenilirdir. `/drain` yazmak anında çalışır; "öğrendiklerimi işle" niyetin skill adına eşlenmesini gerektirir.
 
 ### 3. Yanlış takım seçildiyse tur ortasında düzelt
 

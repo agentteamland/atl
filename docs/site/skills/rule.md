@@ -4,7 +4,7 @@ Add a coding or architecture rule. The user describes it in natural language (an
 
 For complex or ambiguous rules where multiple formulations are possible, use [`/rule-wizard`](/skills/rule-wizard) instead — it walks through option-based Q&A rounds before invoking `/rule` to write the final form.
 
-Ships as a global skill in [rule](https://github.com/agentteamland/rule).
+Ships as a global skill in the [atl monorepo](https://github.com/agentteamland/atl).
 
 ## Three scopes
 
@@ -12,9 +12,9 @@ Ships as a global skill in [rule](https://github.com/agentteamland/rule).
 |---|---|---|
 | *(none)* | Project `.claude/` files | Rules specific to this project (default) |
 | `--global` | `~/.claude/rules/` | Personal rules that apply to every project |
-| `--team` | `~/.claude/repos/agentteamland/{team}/` files | Agent or team-rule files in the team repo |
+| `--team` | Team files under the active scope's `.claude/` directory | Agent or team-rule files for an installed team |
 
-For `--team`, active team is detected from installed `.claude/agents/` symlinks. Single team → used automatically; multiple teams → asks via `AskUserQuestion`.
+For `--team`, the active team is detected from installed `.claude/agents/` files. Single team → used automatically; multiple teams → asks via `AskUserQuestion`.
 
 ## Flow
 
@@ -45,8 +45,8 @@ From the user's natural-language statement, extract:
 
 | Related area | File |
 |---|---|
-| An agent's knowledge base | `~/.claude/repos/agentteamland/{team}/agents/{agent}.md` |
-| Team-wide rule | `~/.claude/repos/agentteamland/{team}/rules/{topic}.md` |
+| An agent's knowledge base | `.claude/agents/{agent}.md` (under the active scope) |
+| Team-wide rule | `.claude/rules/{topic}.md` (under the active scope) |
 
 If the rule applies to more than one but not all, the skill asks.
 
@@ -95,18 +95,9 @@ Update the target file via `Edit`. Give the user a brief summary: which file and
 
 ### 7. Persisting team-scope rules
 
-Team rules live under the team's local clone. Every public `agentteamland/{team}` repo is branch-protected, so direct push to `origin/main` is refused. Open a PR instead:
+Team rules written with `--team` are saved into the team's installed asset files under `.claude/`. These are local copies — they are not automatically pushed back to the team's upstream repository.
 
-```bash
-cd ~/.claude/repos/agentteamland/{team-name}
-git checkout -b rule/{kebab-case-rule-id}
-git add rules/{file}.md team.json
-git commit -m "rule: {kebab-case-rule-id}"
-git push -u origin rule/{kebab-case-rule-id}
-gh pr create --fill
-```
-
-[`/create-pr`](/skills/create-pr) automates this if installed.
+To contribute a rule back upstream, open a PR against the team's source repository directly. [`/create-pr`](/skills/create-pr) automates this if installed.
 
 ## Important rules
 
@@ -124,4 +115,4 @@ gh pr create --fill
 
 ## Source
 
-- Spec: [rule/skills/rule/skill.md](https://github.com/agentteamland/rule/blob/main/skills/rule/skill.md)
+- Spec: [core/skills/rule/SKILL.md](https://github.com/agentteamland/atl/blob/main/core/skills/rule/SKILL.md)

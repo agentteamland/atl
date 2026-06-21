@@ -6,15 +6,15 @@
 
 ### `atl`, Claude Code'un yerine geçer mi?
 
-Hayır. `atl`, Claude Code'un `.claude/` dizininden zaten okuduğu dosyalar için bir teslim katmanıdır. Claude Code'u her zamanki gibi çalıştırmaya devam edersin; `atl` yalnızca sağlam bir yapılandırmayı yerine koymayı kolaylaştırır.
+Hayır. `atl`, Claude Code'un `.claude/` dizininden zaten okuduğu dosyalar için bir teslim katmanıdır. Claude Code'u her zamanki gibi çalıştırmaya devam edersin; `atl` yalnızca sağlam bir yapılandırmayı yerine koymayı kolaylaştırır — ve bunu kendi kendine iyileştirmeye devam eder.
 
 ### Bu, dosyaları projeler arasında elle kopyalamaktan nasıl farklı?
 
 Üç biçimde:
 
-1. **Sürümleme.** Takımlar SemVer ile sürüm yayımlar. Bir sürüme sabitlersin; güncellemeler `atl update` üzerinden seçimlik gelir.
-2. **Kalıtım.** Başkasının takımını çatallamadan onun üstüne inşa edebilirsin. Yazar iyileştirmeler yayımladığında sen onları miras alırsın.
-3. **Erişim.** Bir takımı bir kez yayımlamak, `atl install your-team` çalıştıran her Claude Code kullanıcısına ulaştırır.
+1. **Sürümleme.** Takımlar SemVer sürümleri etiketler. `atl update`, kurulu her takımın en son yayımlanmış sürümünü çeker; böylece iyileştirmeler tüm kurulumlarına yayılır.
+2. **Kapsam.** Bir takım bir [kapsama](/tr/guide/concepts#scope-global-and-project) kurulur — global (`~/.claude/`) veya proje (`<proje>/.claude/`). Her iki katmanda aynı adda bir varlık varsa, proje kopyası globali gölgeler. Elle kopyalanan dosyalarda böyle bir eksen yoktur.
+3. **Kendi kendine çalışan bir öğrenme döngüsü.** Ajanların çalışırken kazanımlar biriktirirler — yeni öğrenmeler, keskinleşen beceriler. `atl`, bunları otomatik olarak dayanıklı bir kuyruğa aktarır; `/drain` her birini ajan bilgi tabanlarına katar ve `atl promote` / `atl publish` bunları dışa yayar. Elle kopyalanan dosyalar kendi kendine iyileşmez.
 
 ### Claude Code'u kullanmak için `atl` çalıştırmam gerekir mi?
 
@@ -22,39 +22,42 @@ Hayır. Claude Code `atl` olmadan da iyi çalışır. `atl`'yi, yeniden üretile
 
 ### Aynı projede birden çok takım kurabilir miyim?
 
-Evet. Her kurulum kendi kopyalarını `.claude/` altına ekler. İki takım aynı adda bir ajan yayımlıyorsa **ikinci kurulanın** sürümü kazanır (ilk kopyanın üzerine yazılır). Her kopyanın hangi takıma ait olduğunu `atl list` ile görebilirsin.
+Evet. Her kurulum kendi kopyalarını `.claude/` altına ekler. İki takım aynı adda bir ajan yayımlıyorsa **en son kurulanın** sürümü kazanır (önceki kopyanın üzerine yazılır) ve `atl` tek satırlık bir uyarı yazdırır. Bu, kalıtım değil çakışma yönetimidir — her takım bağımsız olarak kurulur. Hangi kapsamda ne kurulu olduğunu görmek için [`atl list`](/tr/cli/list) kullan.
 
-### Özel Git depolarından takım kurabilir miyim?
+### Takımlar nereden geliyor? Özel bir depodan veya Git URL'sinden kurulum yapabilir miyim?
 
-Evet, Git istemcin depoyu klonlayabildiği sürece (SSH anahtarları, PAT vb.). `atl` Git kimlik bilgilerini kendi yönetmez — kabuğunun Git kurulumuna devreder.
+`atl install` **yalnızca katalog üzerinden** çalışır. Bir `<kullanıcı>/<takım>` referansı alır, bunu GitHub destekli kataloga karşı çözer ([`atl-team`](https://github.com/topics/atl-team) konusuyla etiketlenen genel depolardan oluşturulur), kaynağı kısa ömürlü bir HTTPS tarball olarak çeker ve takımın `agents/`, `skills/` ile `rules/` dizinlerini kapsamın `.claude/` içine kopyalar.
+
+Özel depodan, rastgele bir Git URL'sinden, SSH'tan veya yerel dosya yolundan kurulum yapılamaz — bunlar v1'e aitti. Bir takımı kurulabilir hale getirmek için deposunu genel yap ve `atl-team` etiketiyle etiketle (ya da depodan [`atl publish`](/tr/cli/publish) çalıştır). Kataloğun nasıl sorgulandığını görmek için [`atl search`](/tr/cli/search) sayfasına bakabilirsin.
 
 ### `atl` sürümüm bir takım için çok eskiyse ne olur?
 
-Takımın `team.json` dosyası bir `requires.atl` alt sınırı bildirebilir. Kurulu `atl` daha eskiyse, sana yükseltmeni söyleyen açık bir hata alırsın. `atl update` çalıştır ya da kurulum betiğini (`curl -fsSL …/scripts/install.sh | sh`) yeniden çalıştır.
-
-### Bir takımı nasıl eskiye düşürürüm?
+Takımın `team.json` dosyası, beklediği sürümü bildirmek için bir `requires.atl` alt sınırı tanımlayabilir. Güncel kalmak için `atl update` çalıştır (aynı zamanda `atl` ikili dosyasının paketlenmiş çekirdeğini de günceller) ya da kurulum betiğini yeniden çalıştır:
 
 ```bash
-atl install team-name@1.2.0   # belirli bir sürümü kur
+curl -fsSL https://raw.githubusercontent.com/agentteamland/atl/main/scripts/install.sh | sh
 ```
 
-Bu komut, kurulu olanı sabitlenen sürümle değiştirir.
+### Bir projeyi silersem `atl`'nin disk üzerindeki durumuna ne olur?
 
-### Bir projeyi silersem önbelleğe ne olur?
+Global hiçbir şey etkilenmez. `atl` iki tür durum tutar ve bunlar ayrıdır:
 
-Hiçbir şey — önbellek (`~/.claude/repos/agentteamland/`) projeler arasında paylaşılır. Diğer projeler çalışmaya devam eder. Bir takımın artık hiçbir projede kullanılmadığından eminsen, ilgili önbellek dizinini elle silerek disk alanı geri kazanabilirsin.
+- **Takım varlıkları** Claude Code'un kendi `.claude/` dizinlerinde yaşar. Bir projeyi silmek o projenin `.claude/` dizinini siler; `~/.claude/` içindeki global varlıklar etkilenmez.
+- **`atl`'nin kayıt bilgileri** `~/.atl/` (global) ve `<proje>/.atl/` (proje) altında yaşar — önbelleğe alınmış katalog (`index.json`), öğrenme kuyruğu (`queue.db`), sabitlemeler ve takım başına kurulum bildirimleri. Global `~/.atl/` kalır; projenin `<proje>/.atl/` dizini projeyle birlikte silinir.
+
+Temizlenecek paylaşımlı bir klon önbelleği yoktur — kaynaklar kurulum sırasında tek kullanımlık tarball olarak çekilir, disk üzerinde tutulmaz.
 
 ### Bir takımı `atl` olmadan, elle kurabilir miyim?
 
-Evet. Takım deposunu `~/.claude/repos/agentteamland/<team-name>/` altına klonla ve `.claude/` içindeki kopyaları kendin oluştur. CLI; bunun yanında kalıtım ve dışarıda bırakma çözümünü de otomatikleştirmek için vardır; çıktısında sihirli bir şey yoktur.
+Evet — `atl` yalnızca bir kopyalamayı otomatikleştirir. Takım deposunu çek, ardından `agents/`, `skills/` ve `rules/` dizinlerini hedef `.claude/` içine kendin kopyala. Çözümlenecek kalıtım veya dışarıda bırakma mantığı yoktur ve doldurulacak kalıcı bir önbellek de bulunmaz. Kaybedeceğin tek şey `atl`'nin yazdığı kurulum bildirimidir (aşağıya bak); `atl update` ve `atl doctor` yenileme ve öz-onarım için bu bildirimlere güvenir.
 
 ### `atl` kurulu takımlar listesini nerede tutar?
 
-Her projede: `.claude/.team-installs.json`. İnsan tarafından okunabilir bir JSON dosyasıdır. Ne yaptığını biliyorsan düzenleyebilirsin — ama `atl install` / `atl remove` her zaman daha güvenlidir.
+Takım başına bir bildirim dosyasında, kapsam başına bir JSON dosyası olarak: `<kapsam>/.atl/installed/<kullanıcı>__<ad>.json` (`<kapsam>`, global kurulumda `~/.atl`, proje kurulumunda `<proje>/.atl`'dir). Her bildirim takımın `handle`, `name`, `version`, `scope`, `source` değerlerini, kurulum zamanını ve yazılan her dosya yolunun SHA-256 özetini içeren bir `files` haritasını kaydeder. `atl update`'in otomatik yenileme ve `atl doctor`'ın bütünlük denetimi bu özetleri okur. Bildirimleri elle düzenlemek desteklenmez — `atl install` / `atl remove` kullan.
 
 ### `atl` telemetri gönderir mi?
 
-Hayır. `atl` yerel bir araçtır: GitHub'dan klon yapar, kayıt defterini çeker, kopyalar yazar. "Eve telefon" yoktur.
+Hayır. `atl` yerel bir araçtır: takımları HTTPS üzerinden çeker, kataloğu okur ve kopyaları `.claude/` içine yazar. "Eve telefon" yoktur.
 
 ### Bu bir Anthropic ürünü mü?
 
@@ -62,11 +65,10 @@ Hayır. AgentTeamLand, Anthropic'in Claude Code'uyla çalışan bağımsız bir 
 
 ### Nasıl katkıda bulunabilirim?
 
-- Kayıt defterine **bir takım yayımla** — [Kayıt defteri başvurusu](/tr/cli/publish).
-- **CLI'yı iyileştir** — PR'lar [`agentteamland/cli`](https://github.com/agentteamland/cli) deposunda beklenir.
-- **Bu belgeleri iyileştir** — PR'lar [`agentteamland/docs`](https://github.com/agentteamland/docs) deposunda beklenir. Her sayfanın "Edit this page on GitHub" bağı vardır.
-- **Issue aç** — hata raporları ve özellik istekleri ilgili depoya.
+- **Bir takım yayımla.** Takımın deposunu [`atl-team`](https://github.com/topics/atl-team) konusuyla etiketle ya da depodan [`atl publish`](/tr/cli/publish) çalıştır. Katalog bunu otomatik olarak alır — kayıt defteri yoktur ve başvuru PR'ı gerekmez.
+- **CLI'yı, çekirdek kuralları/becerileri, birinci taraf takımları veya bu belgeleri iyileştir.** Hepsi [`agentteamland/atl`](https://github.com/agentteamland/atl) monoreposunda yaşar. PR'lar beklenir; her belge sayfasının "Edit this page on GitHub" bağı vardır.
+- **Issue aç.** Hata raporları ve özellik istekleri [`agentteamland/atl`](https://github.com/agentteamland/atl/issues) deposuna gider.
 
 ### Sorum burada yok.
 
-[`agentteamland/docs` issues](https://github.com/agentteamland/docs/issues) üzerinde `faq` etiketiyle bir issue aç. Yaygın bir soruysa bu sayfaya eklenir.
+[`agentteamland/atl`](https://github.com/agentteamland/atl/issues) üzerinde `faq` etiketiyle bir issue aç. Yaygın bir soruysa bu sayfaya eklenir.

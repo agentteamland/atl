@@ -1,6 +1,6 @@
 # `team.json`
 
-Every team is a Git repository with a `team.json` at its root. That file is the entire contract: what the team is called, what it ships, what it depends on.
+Every team is a Git repository with a `team.json` at its root. That file is the entire contract: what the team is called, what it ships, what it depends on, and where it installs by default.
 
 ## Minimal example
 
@@ -17,35 +17,35 @@ Every team is a Git repository with a `team.json` at its root. That file is the 
 }
 ```
 
-That's enough to install. The CLI will clone the repo, copy `agents/web-agent.md` (or `agents/web-agent/agent.md`) into `.claude/agents/`, and record the install.
+That's enough to install. The CLI parses the manifest, copies `agents/web-agent.md` (or `agents/web-agent/agent.md`) into the scope's `.claude/agents/`, and records the install in a per-scope manifest.
 
 ## Full field reference
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `schemaVersion` | integer | ✅ | Currently `1`. Bumped on breaking schema changes. |
-| `name` | string | ✅ | Registry name. Lowercase kebab-case, 3–40 chars. Must match the directory name in the registry. |
-| `version` | semver string | ✅ | SemVer 2.0.0 (`1.2.3`, `1.2.3-beta.1`). |
-| `description` | string | ✅ | One-sentence pitch shown in `atl search`. **`minLength: 10`, `maxLength: 200`.** Exceeding 200 characters is the most common registry-PR validation failure — keep it tight. |
-| `author` | object | — | `{ "name": "...", "url": "...", "email": "..." }`. `name` is required when present. **Must be an object, not a string** — a plain string like `"Your Name <you@example.com>"` will fail schema validation. |
+| `schemaVersion` | integer | ✅ | Currently `1`. Bumped only on a breaking change to the manifest shape. |
+| `name` | string | ✅ | The team's catalog name. Lowercase kebab-case. Combined with your GitHub handle it forms the install ref `<handle>/<name>`. |
+| `version` | semver string | ✅ | SemVer 2.0.0 (`1.2.3`, `1.2.3-beta.1`). `atl update` compares this to decide whether to pull. |
+| `description` | string | ✅ | One-sentence pitch shown in `atl search`. Keep it tight — it's a single line in catalog output. |
+| `author` | object | — | `{ "name": "...", "url": "...", "email": "..." }`. **Must be an object, not a string** — a plain string like `"Your Name <you@example.com>"` will fail to parse. `name` is the only part required when `author` is present. |
 | `license` | SPDX string | — | `"MIT"`, `"Apache-2.0"`, etc. Defaults to `"MIT"` if omitted. |
-| `keywords` | string[] | — | For search matching. Up to 20 entries, each ≤ 40 chars. `["nextjs", "tailwind", "blog"]`. |
-| `repository` | string | — | Git URL (`https://`, `git@`, or `ssh://`). If omitted, the CLI uses the clone origin. |
+| `keywords` | string[] | — | For `atl search` matching. `["nextjs", "tailwind", "blog"]`. |
+| `repository` | string | — | The team's source URL, surfaced in the catalog. |
 | `homepage` | string | — | Docs / landing URL. |
-| `agents` | object[] | — | Each: `{ name, description, tags? }`. Names must match files/directories under `agents/` and be lowercase kebab-case. |
-| `skills` | object[] | — | Each: `{ name, description, tags? }`. Names must match directories under `skills/`. |
-| `rules` | object[] | — | Each: `{ name, description, tags? }`. Names must match files under `rules/`. |
-| `excludes` | string[] | — | Names (agent/skill/rule) from inherited parents to drop. |
-| `dependencies` | object | — | Map of `team-name → version-constraint` for additional teams the CLI must install alongside. |
-| `requires.atl` | string | — | Minimum `atl` version. E.g. `">=1.0.0"`. |
+| `agents` | object[] | — | Each: `{ name, description }`. Names must match files/directories under `agents/`. |
+| `skills` | object[] | — | Each: `{ name, description }`. Names must match directories under `skills/`. |
+| `rules` | object[] | — | Each: `{ name, description }`. Names must match files under `rules/`. |
+| `scope` | string | — | Publisher-default install layer: `"project"`, `"global"`, or `"both"`. Defaults to `"project"`. The user can always override at install time with `--global` / `--project`. |
+| `dependencies` | object | — | Map of `team-name → version-constraint` for other teams the CLI installs alongside this one. |
+| `requires.atl` | string | — | Minimum `atl` version, e.g. `">=2.0.0"`. |
 
-::: tip Validate before you push
-The `description.maxLength = 200` constraint trips most first-time contributors. Run `./scripts/validate.sh` (in the registry repo) or any local Draft 2020-12 JSON Schema validator against [`team.schema.json`](https://github.com/agentteamland/core/blob/main/schemas/team.schema.json) before opening a PR. CI runs the same check; failing locally is faster than failing on GitHub.
+::: tip Keep the description short
+`description` is rendered as a single line in `atl search` output, so a long one wraps awkwardly. Aim for one tight sentence — it's a pitch, not a paragraph.
 :::
 
 ## Version constraints
 
-The `extends` and `dependencies` fields accept standard SemVer range syntax:
+The `dependencies` map and `requires.atl` accept standard SemVer range syntax:
 
 | Syntax | Meaning |
 |---|---|
@@ -58,7 +58,7 @@ Caret (`^`) is the default recommendation — it gets patch and minor updates, b
 
 ## Directory conventions
 
-`atl` discovers your bundled files by reading `team.json` and looking for matching paths:
+`atl` discovers your bundled files by reading `team.json` and looking for matching paths under `agents/`, `skills/`, and `rules/`:
 
 ```
 my-team/
@@ -77,13 +77,21 @@ my-team/
     └── commit-style.md
 ```
 
-Every entry in `team.json` (under `agents[]`, `skills[]`, `rules[]`) must correspond to an actual file or directory. Missing entries fail validation.
+Only `agents/`, `skills/`, and `rules/` are installable assets — they're the directories Claude Code reads. Everything else in the repo (`team.json`, `README`, `LICENSE`) stays behind and is never copied into the consumer's `.claude/`.
 
-## Validation in CI
+Every entry in `team.json` (under `agents[]`, `skills[]`, `rules[]`) must correspond to an actual file or directory on disk. A team that declares assets but ships none fails to install.
 
-Every team repo ships with a GitHub Action that validates `team.json` on every push and PR, using the schema at [`agentteamland/core/schemas/team.schema.json`](https://github.com/agentteamland/core/blob/main/schemas/team.schema.json). Copy that workflow from one of the existing teams to get this for free.
+## Validation
+
+There is no separate JSON Schema file and no schema-validation CI step in v2. Validation is minimal and lives in the CLI itself:
+
+- `team.json` must parse as JSON.
+- It must have a `name`.
+- The declared `agents/` `skills/` `rules/` must exist on disk — `atl install` errors if a team ships no installable assets.
+
+That's the whole contract. If `atl install` accepts your team, it's valid; there's nothing else to run locally or in CI.
 
 ## Next
 
 - **[Creating a team](./creating-a-team)** — step by step.
-- **[Schema reference](/reference/schema)** — machine-readable contract.
+- **[`atl install`](/cli/install)** — how a team is resolved and installed.

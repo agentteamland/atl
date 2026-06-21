@@ -8,7 +8,7 @@ Komutlar üç gruba ayrılır: elle çalıştırdığın **takım komutları**, 
 
 | Komut | Ne yapar |
 |---|---|
-| [`atl install`](/tr/cli/install) | Bir takımı kısa adıyla ya da Git URL'siyle mevcut kapsama (scope) kurar. |
+| [`atl install`](/tr/cli/install) | Bir takımı kısa adıyla (GitHub destekli index'e göre çözümlenerek) mevcut kapsama (scope) kurar. |
 | [`atl list`](/tr/cli/list) | Bu projede kurulu takımları gösterir. |
 | [`atl remove`](/tr/cli/remove) | Bir takımı kaldırır. |
 | [`atl update`](/tr/cli/update) | Bir ya da tüm kurulu takımlar için en günceli çeker. |
@@ -74,15 +74,15 @@ Varlıklar (assets), iki kapsamdan birinde, **Claude Code'un kendi dizinlerinde*
 ~/.atl/
 ├── queue.db               ← kalıcı öğrenme kuyruğu (bbolt)
 ├── index.json             ← önbelleğe alınmış takım kataloğu (atl update ile yenilenir)
-├── config.json            ← atl ayarları
+├── generation             ← global katman değişim sayacı (her prompt fan-out'unu yönlendirir)
 ├── pins.json              ← terfiden alıkonan yollar
+├── cache/                 ← önbellek damgaları
 └── installed/             ← takım başına kurulum manifestoları + bütünlük (integrity) tabanları
 ```
 
 ## Felsefe
 
 - **Belirlenimci.** Aynı girdiler, aynı sonuç. Gizli durum yok.
-- **Etkisiz (idempotent).** Zaten kurulu bir takımda `atl install`'ı yeniden çalıştırmak işlemsizdir (no-op) (ya da bir pull'dur).
 - **Gözlemlenebilir.** Her eylem ne yaptığını yazdırır. Bir spinner'a değil, çıktıya bak.
 - **Eli boş bırak.** Otomasyon komutları, sen düşünmeden her şeyi güncel tutar.
 

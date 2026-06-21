@@ -4,7 +4,7 @@ Start and complete brainstorming sessions. Brainstorms are the canonical place t
 
 Two modes: `start` opens a new brainstorm; `done` completes the active brainstorm and propagates its decisions to the document chain.
 
-Ships as a global skill in [brainstorm](https://github.com/agentteamland/brainstorm).
+Ships as a global skill in the [ATL monorepo](https://github.com/agentteamland/atl).
 
 ## Three scopes
 
@@ -14,9 +14,9 @@ A brainstorm lives at one of three levels — pick the scope that matches *who* 
 |---|---|---|
 | *(none)* | `.atl/brain-storms/` | Project-specific topics (default) |
 | `--global` | `~/.atl/brain-storms/` | Cross-project, personal topics |
-| `--team` | `~/.claude/repos/agentteamland/{team}/brain-storms/` | Topics related to the team repo (agent rules, team strategy, contributor governance) |
+| `--team` | `<project>/.atl/brain-storms/` (team-scoped subdirectory) | Topics related to an installed team (agent rules, team strategy, contributor governance) |
 
-For `--team`, the active team is detected from installed `.claude/agents/` symlinks. Single team → used automatically; multiple teams → the skill asks via `AskUserQuestion`; no team installed → error with a `/team install` hint.
+For `--team`, the active team is detected from installed `.claude/agents/` entries. Single team → used automatically; multiple teams → the skill asks via `AskUserQuestion`; no team installed → error with an `atl install` hint.
 
 ## `start` mode
 
@@ -66,12 +66,12 @@ The file must be **detailed enough** that a Claude reading it in a new context c
 
 Flow:
 
-1. **Find the active brainstorm.** Searches all three scopes (`.atl/brain-storms/`, `~/.atl/brain-storms/`, `~/.claude/repos/agentteamland/*/brain-storms/`). If multiple, lists them with their scope and asks which to complete.
+1. **Find the active brainstorm.** Searches all three scopes (`.atl/brain-storms/`, `~/.atl/brain-storms/`, and team-scoped subdirectories under `.atl/brain-storms/`). If multiple, lists them with their scope and asks which to complete.
 2. **Complete the brainstorm file.** `status: active` → `status: completed`. Append final notes. Update Open Items (unresolved ones remain). Add a Final Decisions section.
 3. **Create or update the docs file.** Settled decisions go to:
    - **Project brainstorm** → `.atl/docs/`
    - **Global brainstorm** → `~/.atl/docs/`
-   - **Team brainstorm** → `~/.claude/repos/agentteamland/{team}/docs/`
+   - **Team brainstorm** → `<project>/.atl/docs/` (team-scoped subdirectory)
 4. **Update CLAUDE.md / README.** Two things happen:
    - Append the completed-brainstorm summary to the appropriate section
    - Remove this brainstorm's bullet from the `<!-- brainstorm:active -->` marker block. If the bullet list becomes empty, remove the entire block (no stale "Active brainstorms" heading lingers).
@@ -107,17 +107,17 @@ Every item marked "not doing now, later" during a brainstorm is reflected in `.a
 3. **Filename is not requested from the user.** It's inferred from the message and assigned a kebab-case name.
 4. **Brainstorm files are never deleted.** Historical record.
 5. **Each brainstorm focuses on a single topic.** Different topics → different files.
-6. **Active brainstorm search covers all three locations.** In `done` mode, project + global + all team directories are scanned.
+6. **Active brainstorm search covers all three scopes.** In `done` mode, project + global + team-scoped subdirectories are scanned.
 7. **Scope is in frontmatter.** `scope: project|global|team`, `team: {name}` — determines `done`-mode targets.
 8. **Team brainstorms ship via PR, not direct push.** Team repos are branch-protected; the `done` flow writes locally and points at PR creation.
 
 ## Related
 
-- [`/save-learnings`](/skills/drain) — periodic learning capture (parallel to brainstorm; brainstorms are deliberate, learnings are spontaneous)
+- [`/drain`](/skills/drain) — periodic learning capture (parallel to brainstorm; brainstorms are deliberate, learnings are spontaneous)
 - [`/create-pr`](/skills/create-pr) — packages a team brainstorm change as a PR
 - [Concepts: Skill](/guide/concepts#skill) — where brainstorms fit in the knowledge model
 
 ## Source
 
-- Spec: [brainstorm/skills/brainstorm/skill.md](https://github.com/agentteamland/brainstorm/blob/main/skills/brainstorm/skill.md)
-- Rule: [brainstorm/rules/brainstorm.md](https://github.com/agentteamland/brainstorm/blob/main/rules/brainstorm.md)
+- Spec: [core/skills/brainstorm/skill.md](https://github.com/agentteamland/atl/blob/main/core/skills/brainstorm/skill.md)
+- Rule: [core/rules/brainstorm.md](https://github.com/agentteamland/atl/blob/main/core/rules/brainstorm.md)

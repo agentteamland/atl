@@ -1,57 +1,61 @@
 # `atl remove`
 
-Mevcut projeden bir takımı kaldır.
+Bir takımı kaldırır; yalnızca kurulumda yazılan dosyaları siler.
 
 ## Kullanım
 
 ```bash
-atl remove <team>             # etkileşimli — yerel değişiklikleri yok etmeden önce sorar (atl ≥ 1.0.0)
-atl remove <team> --force     # etkileşimsiz — onay sorusunu atlar
+atl remove <handle>/<team>            # proje kapsamından kaldır (varsayılan)
+atl remove <handle>/<team> --global   # kullanıcı-global katmandan kaldır
 ```
 
-`<team>` takımın kayıt defteri adıdır (URL değil). Kurulu adları `atl list` ile görebilirsin.
+`<handle>/<team>`, takımın referansıdır — GitHub sahibi artı takım adı; [`atl install`](/tr/cli/install)'a verdiğinle aynı biçim. Neyin hangi kapsamda kurulu olduğunu görmek için [`atl list`](/tr/cli/list) komutunu çalıştır.
 
 ## Örnek
 
 ```bash
-atl remove starter-extended
+$ atl remove agentteamland/software-project-team
+atl remove: removed agentteamland/software-project-team (17 files) from project scope
+```
+
+Takım o kapsamda kurulu değilse:
+
+```bash
+$ atl remove agentteamland/software-project-team
+agentteamland/software-project-team is not installed at project scope
 ```
 
 ## Ne olur?
 
-1. Takım `.claude/.team-installs.json` içinde bulunur.
-2. Bu takımın `.claude/agents/`, `.claude/skills/`, `.claude/rules/` dizinlerine kurduğu her proje-yerel kopya, manifesto dosyasının kaynak başına SHA-256 referans hat'larına bakılarak belirlenir.
-3. **Değişiklik denetimi**: her kaynağın güncel SHA-256'sı kurulum zamanındaki referans hat ile karşılaştırılır. Herhangi bir kaynak yerel olarak değiştirilmişse CLI `⚠ N kaynakta yerel değişiklik var` özetini yazdırır ve onay ister. `--force` bu soruyu atlar.
-4. **Manifesto güdümlü izinli liste**: yalnızca bu takımın kaydettiği dosyalar silinir. `.claude/` altındaki kullanıcı tarafından yazılmış dosyalar (kendiliğinden büyüyen `children/` ve `learnings/`, özel beceriler, journal kayıtları, wiki sayfaları dahil) **korunur** — `atl` ile kaydedilmemiş oldukları için kaldırma işleminden sağ çıkarlar.
-5. `.claude/.team-installs.json` atomik biçimde (geçici dosya + yeniden adlandırma) güncellenir.
-6. Paylaşılan önbelleğe **dokunulmaz**. Takımın Git klonu yeniden kullanım için `~/.claude/repos/agentteamland/` altında kalır. Disk alanı geri kazanmak için önbellek dizinini elle sil.
+1. Seçilen kapsamdaki takımın kurulum manifestosu `<layer>/.atl/installed/<handle>__<name>.json` konumundan okunur — `<layer>`, `--global` için `~/.atl`, proje kapsamı için `<proje>/.atl`'dir.
+2. Manifestonun kaydettiği her dosya (`.claude/agents/`, `.claude/skills/`, `.claude/rules/` altındakiler) silinir.
+3. Bu dosyaları barındıran dizinler en derinden başlayarak budanır — yalnızca artık boş olanlar. Başka bir takımın dosyalarını ya da kendi içeriğini barındıran bir dizine dokunulmaz.
+4. Manifestonun kendisi kaldırılır.
 
-::: warning Kaldırma sırasında kalıtım zorunlu kılınmaz
-`atl remove`, kurulu başka bir takımın `extends` ile başvurduğu bir takımı kaldırmayı reddetmez. Bir alt takım hâlâ üst takıma başvuruyorken üst takımı kaldırırsan, alt takımın etkin kaynak kümesi bir sonraki `atl update` ya da `atl list`'te tutarsız hâle gelir. Önce `atl list` ile kalıtım zincirine bak — alt takımları üst takımlardan önce kaldır.
+Çıktı, kaç dosyanın silindiğini ve hangi kapsamdan kaldırıldığını raporlar:
+
+```
+atl remove: removed <handle>/<name> (N files) from <scope> scope
+```
+
+::: tip Yalnızca manifesto kaydındaki dosyalar kaldırılır
+`atl remove` tam olarak kurulum sırasında takımın kaydettiği dosyaları siler — bundan fazlası değil. `.claude/` altındaki diğer her şey yerinde kalır: kendiliğinden büyüyen agent `children/` ve `learnings/` dizinleri, kendi yazdığın beceriler, wiki sayfaları, journal kayıtları ve diğer içerikler. Bunlar manifesto kaydında olmadığı için kaldırma işleminden etkilenmez.
 :::
+
+## Kapsam
+
+`atl remove` varsayılan olarak **proje kapsamında** çalışır — komutun çalıştırıldığı dizinin `.claude/` ve `.atl/` klasörleri. Kullanıcı-global katmandan (`~/.claude` varlıkları, `~/.atl` manifestosu) kaldırmak için `--global` bayrağını kullan.
+
+Bir takım her iki kapsamda bağımsız olarak kurulu olabilir; birini kaldırmak diğerini etkilemez. Kaldırmadan önce takımın hangi kapsamda olduğunu görmek için [`atl list`](/tr/cli/list) komutunu çalıştır.
 
 ## Bayraklar
 
 | Bayrak | Etkisi |
 |---|---|
-| `--force` | Yerel değişiklikleri olan projeler için değişiklik-denetimi onay sorusunu atlar. CI ya da betikli sökme işleri için kullanışlıdır. |
-
-## Örnek — CI'da zorlu kaldırma
-
-```bash
-atl remove software-project-team --force
-```
-
-`--force`'u etkileşimsiz bağlamlarda (CI, betikle sökme) kullan. Etkileşimli kullanımda varsayılanı tercih et — soru seni, `/save-learnings` ile saatlerce büyütülmüş içeriği ya da elle yapılmış düzenlemeleri kazara atmaktan korur.
-
-## v1.0.0 öncesinden bu yana davranış değişiklikleri
-
-`atl v1.0.0` öncesinde `atl remove` bir sezgisel yöntem kullanırdı ve takımın kaynaklarıyla birlikte kullanıcı tarafından yazılmış dosyaları kazara silebiliyordu. v1.0.0'daki manifesto güdümlü izinli liste, bu örtük hatayı kapattı — silinen her dosya, takımın açıkça kurduğu bir dosyadır.
-
-Etkileşimli onay sorusu ve `--force` bayrağı da v1.0.0 ile geldi (öncesinde koşulsuz biçimde yıkıcıydı).
+| `--global` | Proje yerine kullanıcı-global katmandan kaldırır. |
 
 ## İlgili
 
-- [`atl list`](/tr/cli/list) — neyi kaldırabileceğini gör.
+- [`atl list`](/tr/cli/list) — neyin hangi kapsamda kurulu olduğunu gör.
 - [`atl install`](/tr/cli/install) — fikrini değiştirirsen yeniden kur.
-- [`atl update`](/tr/cli/update) — değiştirilmemiş kopyaları kendiliğinden yeniler; `--force` ile kaldırıp kaldırmamaya karar verirken bilmen gereken bir şey (bir süredir dokunmadığın bir kopyanın değiştirilmemiş olduğunu fark etmeyebilirsin).
+- [`atl update`](/tr/cli/update) — kurulu takımları katalogdaki en son sürüme yenile.

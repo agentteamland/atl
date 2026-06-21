@@ -1,111 +1,112 @@
 # `atl update`
 
-Pull the latest version of one or all installed / cached agentteamland repos, **and** auto-refresh project-local copies that haven't been locally modified.
+Refresh installed teams: pull a fresh catalog index, upgrade any team that has a newer published version, fan the global layer's gains out to your project copies, and reflect the latest platform core into the global layer — always preserving files you've edited locally (pull, never push).
+
+`atl update` is the **manual** surface for the network refresh. The day-to-day work happens automatically through the [in-session cadence](#automatic-updates-the-in-session-cadence); you only reach for this command to force a pass, or after installing the binary by hand.
 
 ## Usage
 
 ```bash
-atl update                          # update every cached repo + auto-refresh unmodified copies
-atl update <team>                   # update just one team's chain (legacy)
-atl update --silent-if-clean        # no output if nothing changed (used by hooks)
-atl update --check-only             # dry-run: report what WOULD update, pull nothing
-atl update --throttle=30m           # skip if last successful run was <30m ago
-atl update --skip-self-check        # don't check for a newer atl release
-atl update -v                       # verbose (print each git command)
+atl update
 ```
 
-## What it updates
+It takes no arguments and no flags. It always operates on the **current project** (the directory you run it in) plus the **global** layer.
 
-With no team name, `atl update` performs three steps:
+## What it does
 
-1. **Cache pull.** Iterates every git repo under `~/.claude/repos/agentteamland/` (`core`, `brainstorm`, `rule`, `team-manager`, every installed team) — `git fetch origin main` → fast-forward `git pull` if behind → no-op if current.
-2. **Silent symlink → copy migration (atl ≥ 1.0.0).** Per-project, any pre-v1.0.0 symlinks under `.claude/agents/` and `.claude/rules/` that point into the global cache are replaced with project-local copies. Surfaced as a single info line per project; non-destructive (the symlink target is read first, then the symlink is replaced with a real file containing the same content).
-3. **Auto-refresh of unmodified copies (atl ≥ 1.0.0).** For each installed team, every project-local copy of an agent/rule/skill resource is checked via three-way SHA-256 comparison:
-   - **install-time baseline** (recorded in `.team-installs.json` at install)
-   - **current project copy** (what's in `.claude/...` right now)
-   - **current cache content** (what was just pulled)
+`atl update` runs four steps, in order:
 
-   When `current project = baseline ≠ cache`, the resource is unmodified locally → silently overwritten with the new cache content. When `current project ≠ baseline`, the user has edited it → skipped, with a per-team hint pointing at `atl install <team> --refresh` for explicit force-overwrite.
+1. **Refresh the index cache.** Best-effort network fetch of the catalog (the GitHub-backed team index) into `~/.atl/index.json`. If you're offline the fetch fails quietly and resolution falls back to the cached or embedded index — being offline is fine; nothing else is blocked.
+2. **Upgrade teams to newer published versions.** For every team installed at the **project** and **global** layers, `atl update` looks the team up in the resolved index. If the published version is newer than what's installed, it re-fetches the team's source as an ephemeral HTTPS tarball, extracts it, and reflects it onto your installed copy under [fan-out discipline](#fan-out-discipline-how-your-edits-survive): unmodified files refresh to the new version, files you edited are preserved, brand-new files in the release are added. The install manifest is then rewritten at the new version. Teams not present in the index (e.g. a local one) are left alone.
+3. **Fan out global gains to the project.** For every team installed at **both** the global and project layers, each project-local file is compared three ways (see below). Unmodified project copies refresh from the global copy; files you edited locally are kept. This is how a gain promoted into the global layer reaches your projects.
+4. **Reflect platform core into the global layer.** The core rules and skills ship inside the `atl` binary, so this refreshes them into `~/.claude`, keeping the global layer in lockstep with your binary version.
 
-It also checks for a newer `atl` binary release (GitHub Releases API, throttled to 24h):
+After upgrading or fanning out, it also surfaces a one-line suggestion for any **globally**-installed team whose global copy has gains not yet pushed upstream (see [Publish suggestions](#publish-suggestions)).
 
+### Output
+
+The summary line reflects what happened:
+
+```text
+atl update: upgraded 1 team(s), refreshed 14 file(s) from global
 ```
-⬆  atl 1.1.1 → 1.1.2 available — run: brew upgrade atl
+
+```text
+atl update: upgraded 1 team(s)
 ```
 
-The binary is NOT auto-upgraded — the message points at the right package-manager command based on how you installed atl.
+```text
+atl update: refreshed 14 file(s) from the global layer
+```
 
-## Example — silent-if-clean (used by hooks)
+When nothing was outstanding:
 
-Nothing changed:
+```text
+atl update: everything up to date
+```
+
+If core files changed, a separate line precedes the summary:
+
+```text
+atl update: refreshed 3 core file(s)
+```
+
+## Fan-out discipline — how your edits survive
+
+Both the version upgrade (step 2) and the global→project fan-out (step 3) decide each file with the same three-way SHA-256 comparison, against the hash the file had **at install time** (recorded in the [install manifest](#the-install-manifest)):
+
+| Comparison | Meaning | Action |
+|---|---|---|
+| local **=** upstream | already current | nothing to do |
+| local **=** install baseline | you never touched it | **refresh** to the upstream/global version |
+| local **≠** baseline | you edited it | **preserve** — your copy is kept |
+
+"Modified" means "diverged from what we installed", not merely "differs from upstream". A file you never changed is refreshed; a file you changed is never silently overwritten. When a copy is refreshed, its baseline advances to the new content, so the next pass starts clean.
+
+There is no force-overwrite flag. To deliberately discard local edits and take the published version, remove and reinstall the team:
 
 ```bash
-$ atl update --silent-if-clean
-$                               # zero output, exit 0
+atl remove <handle>/<team>
+atl install <handle>/<team>
 ```
 
-Something changed:
+## The install manifest
 
-```bash
-$ atl update --silent-if-clean
-🔄 software-project-team 1.2.0 → 1.2.1 (auto-updated)
-🔄 core 1.8.0 → 1.9.0 (auto-updated)
-   ↪ refreshed 14 unmodified copies in current project
+The baseline that fan-out compares against lives in the team's **install manifest** — one JSON file per team per scope at:
+
+- `~/.atl/installed/<handle>__<name>.json` (global)
+- `<project>/.atl/installed/<handle>__<name>.json` (project)
+
+Each manifest records `schemaVersion`, `handle`, `name`, `version`, `scope`, the `source` it was fetched from (`repo`, `subpath`, `ref`), `installedAt`, and a `files` map of each installed path to its SHA-256 at install time. `atl update` reads this map to tell "unmodified" from "edited", and rewrites it (advancing version, source ref, and baseline hashes) whenever it changes a team.
+
+## Automatic updates — the in-session cadence
+
+You rarely run `atl update` by hand because ATL keeps things current automatically. [`atl setup-hooks`](/cli/setup-hooks) (run as a mandatory part of [`atl install`](/cli/install)) wires two Claude Code hooks:
+
+- `SessionStart` → [`atl session-start`](/cli/setup-hooks) — drains the previous session's learnings, runs the doctor self-check, and reflects platform core into the global layer.
+- `UserPromptSubmit` → [`atl tick --throttle=10m`](/cli/tick) — a cheap per-prompt **fan-out** (global→project), plus a throttled drain + doctor + promote pass.
+
+The per-prompt [`atl tick`](/cli/tick) handles the local fan-out continuously, so gains promoted into your global layer reach your projects without you doing anything. `atl update` adds the **network** half — re-resolving the index and pulling newer *published* team versions — which is the heavier pass you run manually (or whenever you want to check for new releases now).
+
+## Publish suggestions
+
+After it finishes, `atl update` checks every **globally**-installed team for gains in your global copy that aren't in its published version yet, and prints a nudge per team:
+
+```text
+atl update: gains in <handle>/<team> not yet upstream (3 file(s)) — run `atl publish <handle>/<team>` to contribute them
 ```
 
-## Example — dry-run
-
-```bash
-$ atl update --check-only
-🔄 software-project-team 1.2.0 → 1.2.1 (auto-updated)
-   ↪ would refresh 14 unmodified copies in current project
-   ↪ would skip 2 modified copies (run: atl install software-project-team --refresh)
-```
-
-Prints what would update; no git pull executed, no copies touched.
-
-## Automatic updates via hooks (recommended)
-
-Set up once, forget forever:
-
-```bash
-atl setup-hooks                 # default: UserPromptSubmit throttled to 30m
-atl setup-hooks --throttle=5m   # more aggressive
-atl setup-hooks --remove        # disable
-```
-
-This installs two Claude Code hooks in `~/.claude/settings.json`:
-
-- `SessionStart` → `atl session-start --silent-if-clean` (composite: update + previous-transcript marker scan + atl self-check)
-- `UserPromptSubmit` → `atl update --silent-if-clean --throttle=30m` (per-message refresh, throttled)
-
-When Claude Code starts a session or you send a prompt, the hook silently refreshes every cached repo + auto-refreshes unmodified project copies. If something changed, Claude sees a single `🔄` line and acts on the update. If nothing changed, the hook returns instantly (~1ms, just a file-stat check).
-
-On first `atl install`, you're asked whether to enable this. Say yes; you can reverse any time with `atl setup-hooks --remove`.
-
-See [`atl setup-hooks`](/cli/setup-hooks) for details.
-
-## Version constraints (per-team) still honored
-
-If you installed `software-project-team@^1.0.0`, `atl update` pulls up to the latest `1.x.x` — **not** `2.0.0`. Major bumps require explicit `atl install software-project-team@^2.0.0`.
-
-## Throttle internals
-
-Two timestamp files live at:
-
-- `~/.claude/cache/atl-last-repo-check` — repo-fetch throttle
-- `~/.claude/cache/atl-last-self-check` — atl-release-API throttle (24h, fixed)
-
-`--throttle=<dur>` checks the repo-fetch timestamp. If the file's modified time is within `<dur>`, the repo scan is skipped entirely (fast path ~1ms). Otherwise, the scan runs, stamps the file on success. On failure (e.g., offline), the stamp is NOT updated, so the next call retries.
+This is a suggestion only — nothing is published automatically. Publishing stays an explicit, consent-gated act; see [`atl publish`](/cli/publish). The check is best-effort and silent if a team's published source can't be fetched.
 
 ## Offline behavior
 
-If the network is unreachable, individual `git fetch` calls fail silently and that repo is reported as `⚠ <name>: fetch: <error>` (not silenced by `--silent-if-clean` — you want to know). The rest of the check continues. Project copies are never touched on offline runs.
+`atl update` degrades gracefully offline. The index refresh and any tarball fetch fail quietly, resolution falls back to the cached/embedded index, and teams that can't be re-fetched are simply not upgraded. The local global→project fan-out (step 3) needs no network and still runs.
 
 ## Related
 
-- [`atl install`](/cli/install) — first install (with opt-in auto-update prompt)
-- [`atl install <team> --refresh`](/cli/install#idempotency-atl-v100) — explicit force-overwrite for a project (when auto-refresh skipped you due to local mods)
-- [`atl setup-hooks`](/cli/setup-hooks) — configure the hooks manually
-- [`atl list`](/cli/list) — see what's installed
-- [Version constraints](/authoring/team-json#version-constraints) — how `^`, `~`, exact pins resolve
+- [`atl install`](/cli/install) — first install of a team
+- [`atl tick`](/cli/tick) — the per-prompt fan-out + drain pass that keeps projects current automatically
+- [`atl setup-hooks`](/cli/setup-hooks) — wire the automation hooks
+- [`atl promote`](/cli/promote) — lift a project's gains up to the global layer (the source of what fan-out distributes)
+- [`atl publish`](/cli/publish) — contribute global gains back upstream
+- [`atl list`](/cli/list) — see what's installed and at which scope

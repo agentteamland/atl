@@ -8,7 +8,7 @@ Commands fall into three groups: **team commands** you run by hand, the **gain-c
 
 | Command | What it does |
 |---|---|
-| [`atl install`](/cli/install) | Install a team by handle or Git URL into the current scope. |
+| [`atl install`](/cli/install) | Install a team by handle (resolved against the GitHub-backed index) into the current scope. |
 | [`atl list`](/cli/list) | Show teams installed in this project. |
 | [`atl remove`](/cli/remove) | Uninstall a team. |
 | [`atl update`](/cli/update) | Pull latest for one or all installed teams. |
@@ -74,15 +74,15 @@ Assets live in **Claude Code's own directories**, in one of two scopes — there
 ~/.atl/
 ├── queue.db               ← the durable learning queue (bbolt)
 ├── index.json             ← cached team catalog (refreshed by atl update)
-├── config.json            ← atl settings
+├── generation             ← global-layer change counter (drives every-prompt fan-out)
 ├── pins.json              ← paths held back from promotion
+├── cache/                 ← cache stamps
 └── installed/             ← per-team install manifests + integrity baselines
 ```
 
 ## Philosophy
 
 - **Deterministic.** Same inputs, same result. No hidden state.
-- **Idempotent.** Re-running `atl install` on an already-installed team is a no-op (or a pull).
 - **Observable.** Every action prints what it did. Use the output, not a spinner.
 - **Hands-off.** The automation commands keep things current without you thinking about them.
 

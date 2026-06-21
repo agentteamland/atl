@@ -1,63 +1,24 @@
 # Schema
 
-The `team.json` schema is published at:
+There is no separate machine-readable JSON Schema file in ATL v2.
 
-**[`agentteamland/core/schemas/team.schema.json`](https://github.com/agentteamland/core/blob/main/schemas/team.schema.json)**
+In v1, `team.json` was validated against a standalone `team.schema.json` (JSON Schema Draft 2020-12) checked in CI. v2 dropped that file. The `team.json` contract is now documented for humans, and the CLI enforces it minimally at install time.
 
-It follows **JSON Schema Draft 2020-12**.
+## The contract lives at one place
 
-## Quick reference
+**[`team.json`](/authoring/team-json)** is the full field reference — every field, its type, whether it's required, and what it means, with examples.
 
-| Field | Type | Required | Default | Notes |
-|---|---|---|---|---|
-| `schemaVersion` | integer | ✅ | — | Currently `1`. |
-| `name` | string | ✅ | — | Lowercase kebab-case. Unique within your handle's namespace. |
-| `version` | string | ✅ | — | SemVer 2.0.0. |
-| `description` | string | ✅ | — | One-sentence summary. |
-| `author` | string | — | — | `"Name <email>"` format recommended. |
-| `license` | string | — | `"MIT"` | SPDX identifier. |
-| `keywords` | string[] | — | `[]` | Used for `atl search`. |
-| `repository` | string | — | — | Git URL. |
-| `homepage` | string | — | — | Docs / landing URL. |
-| `agents` | object[] | — | `[]` | Each: `{ name: string, description: string }`. |
-| `skills` | object[] | — | `[]` | Same shape as `agents`. |
-| `rules` | object[] | — | `[]` | Same shape as `agents`. |
-| `scope` | string | — | `"project"` | Publisher-default install layer: `global`, `project`, or `both`. |
-| `dependencies` | object | — | `{}` | Map `"team-name"` → `"version-constraint"`. |
-| `requires` | object | — | `{}` | `{ atl: string }` — minimum CLI version. |
+## What the CLI enforces
 
-## Using the schema in CI
+When you run `atl install`, the CLI does not run a JSON Schema validator. It checks three things:
 
-Any JSON Schema validator works. The [Creating a team](/authoring/creating-a-team) page shows a full `ajv-cli` GitHub Actions workflow. The short version:
+- `team.json` parses as valid JSON.
+- It has a `name`.
+- Every asset declared under `agents[]`, `skills[]`, and `rules[]` exists on disk at its expected path.
 
-```bash
-npm install -g ajv-cli
-curl -sSfL https://raw.githubusercontent.com/agentteamland/core/main/schemas/team.schema.json -o team.schema.json
-ajv -s team.schema.json -d team.json --strict=false
-```
-
-## Editor integration
-
-If your editor supports JSON Schema via `$schema`, add this at the top of `team.json`:
-
-```json
-{
-  "$schema": "https://raw.githubusercontent.com/agentteamland/core/main/schemas/team.schema.json",
-  "schemaVersion": 1,
-  ...
-}
-```
-
-VS Code, JetBrains, and most JSON editors will give you autocomplete and inline validation.
-
-## Versioning the schema
-
-- **Additive changes** (new optional field) → no version bump.
-- **Breaking changes** (remove field, change type, tighten required set) → `schemaVersion` bumps to `2`. The CLI continues to accept older `schemaVersion` values for a deprecation window (at least two minor CLI versions).
-
-Current schema is `schemaVersion: 1`.
+If any of those fail, the install stops with an error. Anything else (extra fields, formatting) is ignored.
 
 ## Related
 
-- **[team.json](/authoring/team-json)** — human-oriented reference with examples.
-- **[Glossary](./glossary)** — terms used across the schema.
+- **[team.json](/authoring/team-json)** — the field reference and examples.
+- **[Glossary](./glossary)** — terms used across ATL.

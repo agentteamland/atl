@@ -1,6 +1,6 @@
 # `team.json`
 
-Her takım, kökünde bir `team.json` bulunan bir Git deposudur. Bu dosya tüm sözleşmedir: takımın adı, ne yayımladığı ve neye bağlı olduğu.
+Her takım, kökünde bir `team.json` bulunan bir Git deposudur. Bu dosya tüm sözleşmedir: takımın adı, ne yayımladığı, neye bağlı olduğu ve varsayılan olarak nereye kurulduğu.
 
 ## En küçük örnek
 
@@ -17,48 +17,48 @@ Her takım, kökünde bir `team.json` bulunan bir Git deposudur. Bu dosya tüm s
 }
 ```
 
-Bu kadarı kuruluma yeter. CLI depoyu klonlar, `agents/web-agent.md` (ya da `agents/web-agent/agent.md`) dosyasını `.claude/agents/` altına kopyalar ve kurulumu kaydeder.
+Bu kadarı kuruluma yeter. CLI manifest dosyasını çözümler, `agents/web-agent.md` (ya da `agents/web-agent/agent.md`) dosyasını ilgili kapsamın `.claude/agents/` dizinine kopyalar ve kurulumu kapsama özgü bir manifest dosyasına kaydeder.
 
 ## Tam alan başvurusu
 
 | Alan | Tür | Zorunlu | Açıklama |
 |---|---|---|---|
-| `schemaVersion` | tam sayı | ✅ | Şu an `1`. Geriye dönük uyumsuz şema değişikliklerinde artırılır. |
-| `name` | dize | ✅ | Kayıt defteri adı. Küçük harf kebab-case, 3-40 karakter. Kayıt defterindeki dizin adıyla eşleşmelidir. |
-| `version` | semver dizesi | ✅ | SemVer 2.0.0 (`1.2.3`, `1.2.3-beta.1`). |
-| `description` | dize | ✅ | `atl search` çıktısında görünen tek cümlelik tanıtım. **`minLength: 10`, `maxLength: 200`.** 200 karakteri aşmak, kayıt defteri PR doğrulamasında en sık görülen başarısızlıktır — kısa tut. |
-| `author` | nesne | — | `{ "name": "...", "url": "...", "email": "..." }`. Verildiyse `name` zorunludur. **Bir nesne olmalıdır, dize değil** — `"Your Name <you@example.com>"` gibi düz bir dize şema doğrulamasında başarısız olur. |
-| `license` | SPDX dizesi | — | `"MIT"`, `"Apache-2.0"` gibi. Verilmezse `"MIT"` varsayılır. |
-| `keywords` | dize[] | — | Arama eşleşmesi için. En çok 20 giriş; her biri ≤ 40 karakter. `["nextjs", "tailwind", "blog"]`. |
-| `repository` | dize | — | Git URL'si (`https://`, `git@` ya da `ssh://`). Verilmezse CLI klonlama kaynağını kullanır. |
+| `schemaVersion` | tam sayı | ✅ | Şu an `1`. Yalnızca manifest yapısında geriye dönük uyumsuz bir değişiklik olduğunda artırılır. |
+| `name` | dize | ✅ | Takımın katalog adı. Küçük harf kebab-case. GitHub kullanıcı adınızla birleşerek `<handle>/<name>` kurulum referansını oluşturur. |
+| `version` | semver dizesi | ✅ | SemVer 2.0.0 (`1.2.3`, `1.2.3-beta.1`). `atl update` güncelleme gerekip gerekmediğine bunu karşılaştırarak karar verir. |
+| `description` | dize | ✅ | `atl search` çıktısında görünen tek cümlelik tanıtım. Kısa tut — katalog çıktısında tek satırdır. |
+| `author` | nesne | — | `{ "name": "...", "url": "...", "email": "..." }`. **Nesne olmalıdır, dize değil** — `"Your Name <you@example.com>"` gibi düz bir dize ayrıştırmada başarısız olur. `author` verildiğinde yalnızca `name` zorunludur. |
+| `license` | SPDX dizesi | — | `"MIT"`, `"Apache-2.0"` vb. Verilmezse `"MIT"` varsayılır. |
+| `keywords` | dize[] | — | `atl search` eşleşmesi için. `["nextjs", "tailwind", "blog"]`. |
+| `repository` | dize | — | Katalogda gösterilen takım kaynak URL'si. |
 | `homepage` | dize | — | Belge / açılış URL'si. |
-| `agents` | nesne[] | — | Her biri: `{ name, description, tags? }`. Adlar `agents/` altındaki dosya / dizinlerle eşleşmeli ve küçük harf kebab-case olmalıdır. |
-| `skills` | nesne[] | — | Her biri: `{ name, description, tags? }`. Adlar `skills/` altındaki dizinlerle eşleşmelidir. |
-| `rules` | nesne[] | — | Her biri: `{ name, description, tags? }`. Adlar `rules/` altındaki dosyalarla eşleşmelidir. |
-| `excludes` | dize[] | — | Miras alınan üst takımlardan dışarıda bırakılacak ajan / beceri / kural adları. |
-| `dependencies` | nesne | — | CLI'nin yan yana kurması gereken ek takımlar için `team-name → version-constraint` eşlemesi. |
-| `requires.atl` | dize | — | En düşük `atl` sürümü. Örneğin `">=1.0.0"`. |
+| `agents` | nesne[] | — | Her biri: `{ name, description }`. Adlar `agents/` altındaki dosya ya da dizinlerle eşleşmelidir. |
+| `skills` | nesne[] | — | Her biri: `{ name, description }`. Adlar `skills/` altındaki dizinlerle eşleşmelidir. |
+| `rules` | nesne[] | — | Her biri: `{ name, description }`. Adlar `rules/` altındaki dosyalarla eşleşmelidir. |
+| `scope` | dize | — | Yayıncı varsayılan kurulum katmanı: `"project"`, `"global"` ya da `"both"`. Varsayılan `"project"`. Kullanıcı kurulum sırasında `--global` / `--project` ile her zaman geçersiz kılabilir. |
+| `dependencies` | nesne | — | CLI'nin bu takımın yanına kurması gereken diğer takımlar için `team-name → version-constraint` eşlemesi. |
+| `requires.atl` | dize | — | En düşük `atl` sürümü. Örneğin `">=2.0.0"`. |
 
-::: tip Push'tan önce doğrula
-`description.maxLength = 200` kısıtı ilk kez katkı verenlerin çoğunu çelmeler. Bir PR açmadan önce, kayıt defteri deposundaki `./scripts/validate.sh` betiğini ya da herhangi bir yerel Draft 2020-12 JSON Şeması doğrulayıcısını [`team.schema.json`](https://github.com/agentteamland/core/blob/main/schemas/team.schema.json) dosyasına karşı çalıştır. CI aynı denetimi yapar; yerelde başarısız olmak GitHub'da başarısız olmaktan çok daha hızlıdır.
+::: tip Açıklamayı kısa tut
+`description`, `atl search` çıktısında tek satır olarak gösterilir; uzun bir açıklama garip biçimde kırılır. Bir tanıtım cümlesini hedefle — paragraf değil.
 :::
 
 ## Sürüm kısıtları {#version-constraints}
 
-`extends` ve `dependencies` alanları standart SemVer aralık sözdizimini kabul eder:
+`dependencies` eşlemesi ve `requires.atl` alanı standart SemVer aralık sözdizimini kabul eder:
 
 | Sözdizim | Anlamı |
 |---|---|
-| `^1.2.3` | `>=1.2.3 <2.0.0` (caret — önerilen varsayılan). |
-| `~1.2.3` | `>=1.2.3 <1.3.0` (tilde). |
-| `1.2.3` | Kesin sabitleme. |
-| `>=1.2.0` | Açık uçlu en düşük sürüm. |
+| `^1.2.3` | `>=1.2.3 <2.0.0` (caret — önerilen varsayılan) |
+| `~1.2.3` | `>=1.2.3 <1.3.0` (tilde) |
+| `1.2.3` | Kesin sabitleme |
+| `>=1.2.0` | Açık uçlu en düşük sürüm |
 
 Caret (`^`) önerilen varsayılandır — yama ve küçük sürüm güncellemelerini alır, geriye uyumsuz ana sürüm artırımlarını engeller.
 
 ## Dizin sözleşmeleri
 
-`atl`, paketlediğin dosyaları `team.json` dosyasını okuyarak ve eşleşen yollara bakarak keşfeder:
+`atl`, paketlediğin dosyaları `team.json` dosyasını okuyarak ve eşleşen yolları arayarak keşfeder:
 
 ```
 my-team/
@@ -66,7 +66,7 @@ my-team/
 ├── agents/
 │   ├── web-agent.md             ← basit ajan (tek dosya)
 │   └── db-agent/
-│       ├── agent.md             ← karmaşık ajan (çocuklar deseni)
+│       ├── agent.md             ← karmaşık ajan (children deseni)
 │       └── children/
 │           ├── migrations.md
 │           └── rls.md
@@ -77,13 +77,21 @@ my-team/
     └── commit-style.md
 ```
 
-`team.json` içindeki her giriş (`agents[]`, `skills[]`, `rules[]` altında) gerçek bir dosya ya da dizine karşılık gelmek zorundadır. Eksik girişler doğrulamada başarısız olur.
+Yalnızca `agents/`, `skills/` ve `rules/` kurulabilir varlıklardır — Claude Code'un okuduğu dizinler bunlardır. Repodaki diğer her şey (`team.json`, `README`, `LICENSE`) geride kalır ve tüketicinin `.claude/` dizinine kopyalanmaz.
 
-## CI'de doğrulama
+`team.json` içindeki her giriş (`agents[]`, `skills[]`, `rules[]` altında) diskte gerçek bir dosya ya da dizine karşılık gelmek zorundadır. Varlık bildiren ama hiçbirini göndermeyen bir takım kurulumda hata verir.
 
-Her takım deposu, her push ve PR'da `team.json` dosyasını [`agentteamland/core/schemas/team.schema.json`](https://github.com/agentteamland/core/blob/main/schemas/team.schema.json) şemasına göre doğrulayan bir GitHub Action ile gelir. Mevcut takımlardan birinden iş akışı dosyasını kopyalayarak bunu bedavaya kazanırsın.
+## Doğrulama
+
+v2'de ayrı bir JSON Şeması dosyası ve şema doğrulama CI adımı yoktur. Doğrulama minimumdur ve CLI'nin kendisinde yaşar:
+
+- `team.json` geçerli JSON olarak ayrıştırılabilmelidir.
+- `name` alanı bulunmalıdır.
+- Bildirilen `agents/`, `skills/`, `rules/` girişleri diskte var olmalıdır — `atl install`, kurulabilir varlık olmayan bir takımda hata verir.
+
+Sözleşmenin tamamı budur. `atl install` takımını kabul ederse geçerlidir; yerel ya da CI'da çalıştırılacak başka bir şey yoktur.
 
 ## Sıradaki
 
-- **[Bir takım yazma](./creating-a-team)** — adım adım.
-- **[Şema başvurusu](/tr/reference/schema)** — makine okunabilir sözleşme.
+- **[Bir takım oluşturma](./creating-a-team)** — adım adım.
+- **[`atl install`](/tr/cli/install)** — bir takımın nasıl çözümlendiği ve kurulduğu.

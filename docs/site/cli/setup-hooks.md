@@ -1,21 +1,18 @@
 # `atl setup-hooks`
 
-Configure Claude Code hooks so that teams, global repos (core, brainstorm, rule, team-manager), and the `atl` binary stay auto-checked for updates — AND so that inline learning markers dropped during a conversation get captured at the *next* session start.
+Install the ATL automation hooks into Claude Code so the platform stays self-maintaining — with zero manual action from you.
 
-All with zero manual action from you.
-
-Requires `atl` ≥ 1.1.0.
+In v2 automation is **mandatory, not opt-in**: `atl install` binds these hooks for you. You only run `atl setup-hooks` directly if you want to (re)install them on their own or change the throttle interval.
 
 ## Usage
 
 ```bash
-atl setup-hooks                    # install with 30m throttle (recommended default)
-atl setup-hooks --throttle=5m      # more aggressive update check (every 5 minutes of activity)
-atl setup-hooks --throttle=1h      # less aggressive update check
-atl setup-hooks --remove           # uninstall the atl hooks
+atl setup-hooks                    # install with the default 10m tick throttle
+atl setup-hooks --throttle=5m      # more aggressive in-session tick (every 5 minutes of activity)
+atl setup-hooks --throttle=1h      # less aggressive
 ```
 
-On first `atl install`, you're asked whether to enable this automatically. Saying yes runs `atl setup-hooks` for you. If you declined then, or are opting in later, run it manually.
+`--throttle` only affects the `UserPromptSubmit` hook (the in-session `atl tick`). `SessionStart` always runs in full.
 
 ## What it does
 
@@ -26,122 +23,93 @@ Writes two entries into `~/.claude/settings.json`:
   "hooks": {
     "SessionStart": [
       { "hooks": [
-          { "type": "command", "command": "atl session-start --silent-if-clean" }
+          { "type": "command", "command": "atl session-start" }
       ]}
     ],
     "UserPromptSubmit": [
       { "hooks": [
-          { "type": "command", "command": "atl update --silent-if-clean --throttle=30m" }
+          { "type": "command", "command": "atl tick --throttle=10m" }
       ]}
     ]
   }
 }
 ```
 
-Pre-`v1.1.0` installs that registered four entries (`SessionStart` + `UserPromptSubmit` + `SessionEnd` + `PreCompact`) get the legacy `SessionEnd` and `PreCompact` atl entries silently dropped on the next `atl setup-hooks` run. Their commands kept firing under the old setup but their output never reached Claude (see [the History note below](#history-from-four-hooks-to-two)), so removing them is safe and lossless.
-
 Claude Code runs these automatically:
 
-### `SessionStart` — composite boot-time wrapper (new shape in v1.1.0)
+### `SessionStart` — boot-time maintenance
 
-Runs once when you open a new Claude Code session. The single command `atl session-start` performs three boot-time tasks in order:
+Runs once when you open a new Claude Code session. `atl session-start` performs the boot-time work in order:
 
-1. **Auto-update**: `atl update --silent-if-clean` — pulls every cached repo under `~/.claude/repos/agentteamland/`. Updates surface as a one-line `🔄 <team> <oldVer> → <newVer>` block in Claude's `additionalContext`.
-2. **Previous-transcript marker scan**: `atl learning-capture --previous-transcripts` — scans every transcript file for the current project that was modified since the last successful `/save-learnings` run (state tracked in `~/.claude/state/learning-capture-state.json`, with a 7-day cap on first use). When markers are found, prints a single `🧠 learning-capture: N unprocessed markers across M transcripts → /save-learnings --from-markers --transcripts ...` block.
-3. **atl version check**: hits the GitHub Releases API at most once per 24h. When a newer atl is available, surfaces a `⬆ atl X.Y.Z → X.Y.Z+1 available` line.
+1. **Reflect platform core** — refreshes the in-binary rules + skills into the global `~/.claude` layer so it stays in lockstep with the installed `atl` version.
+2. **Drain the previous session** — discovers this project's transcripts modified since the last drain, extracts the assistant text, and transfers any inline `<!-- learning: ... -->` markers into the durable queue at `~/.atl/queue.db` (exactly once).
+3. **Doctor self-check** — runs the queue-health + asset-integrity checks and surfaces (or auto-heals) anything not OK.
+4. **Signal pending learnings** — if the queue holds unprocessed learnings, prints a one-line `atl: N learning(s) pending — run /drain to fold them into the knowledge base` so Claude folds them in.
 
-When nothing changed and no markers exist, output is empty (zero token cost).
+`SessionStart` is the one Claude Code event that delivers hook stdout to Claude's context, so whatever `session-start` prints reaches Claude. It stays quiet when there's nothing worth surfacing, so a boring boot costs nothing.
 
-### `UserPromptSubmit` — throttled per-message refresh
+### `UserPromptSubmit` — throttled in-session tick
 
-Runs before every message you send to Claude. Throttled to once per `<duration>` (30m default) so the per-message cost is a single file-stat call (~1ms). Slow path (actual git fetch + pull) runs at most twice an hour.
+Runs before every message you send to Claude. `atl tick --throttle=10m` does the cheap work on every prompt and the heavier work at most once per throttle window:
 
-When something changed, Claude sees the same `🔄 <team> ...` line in its context and can mention it briefly. When nothing changed, you see nothing.
+- **Fan-out** (every call, generation-guarded) — when the global layer changed since this project last fanned out, it pulls the updated assets down. Otherwise it's a single small file read, cheap enough to ride every prompt.
+- **Drain + doctor** (throttled) — re-scans this project's transcripts for new markers and runs the doctor self-check. Skipped if the last tick was within the throttle window, so the per-prompt cost stays a single file-stat call.
+- **Promote gains** (throttled) — lifts this project's accumulated gains to the global layer (additive, conflict-archived, pinnable), so they circulate without waiting for a manual `atl promote`.
+
+When something surfaces, Claude sees the corresponding line in its context and can mention it. When nothing changed, you see nothing.
 
 ## How marker-driven learning processing reaches Claude
 
-The flow is end-to-end automatic except for one Claude turn:
+Capture is automatic; only the *fold-in* needs one Claude turn (the LLM work the CLI can't do itself — the CLI/Skill boundary):
 
 ```
-[you close session N]   markers sit in transcript file
+[you close session N]   inline learning markers sit in the transcript file
         ↓
 [you open session N+1]
         ↓
-SessionStart hook fires → atl session-start --silent-if-clean
-        ↓
-   step 2: atl learning-capture --previous-transcripts
-        → reads ~/.claude/state/learning-capture-state.json
-        → enumerates project transcripts modified after the cutoff
-        → grep-scans for <!-- learning --> blocks (assistant-role only)
-        → prints `🧠 learning-capture: N markers ... → Run: /save-learnings ...`
+SessionStart hook fires → atl session-start
+        → drains the previous session's transcripts into ~/.atl/queue.db (each marker enqueued exactly once)
+        → if the queue holds pending learnings, prints `atl: N learning(s) pending — run /drain ...`
         ↓
 Claude Code injects stdout into Claude's first additionalContext
         ↓
 [your first turn in session N+1]
         ↓
-Claude sees the report, invokes /save-learnings --from-markers --transcripts <paths>
+Claude sees the count, invokes /drain
         ↓
-/save-learnings persists markers to journal + wiki + agent children + skill learnings
-        + advances the state file's lastProcessedAt → next session sees 0 markers
+/drain folds each queued learning into wiki / journal / agent KB, then acks (deletes) it
 ```
 
-See [`atl learning-capture`](/cli/learnings) for the marker format and the noise-filter details, and the [learning-capture rule](https://github.com/agentteamland/core/blob/main/rules/learning-capture.md) / [docs-sync rule](https://github.com/agentteamland/core/blob/main/rules/docs-sync.md) in core for the behavior spec.
+Within a single session, `atl tick` keeps the queue current between prompts, so the count surfaced at the next `session-start` (or the next `atl learnings`) is always up to date.
 
-## Why two hooks (and not four)
+See [`atl learnings`](/cli/learnings) for the marker format and the queue's status/peek/ack surface, [`atl tick`](/cli/tick) for the in-session cadence, and the [`/drain` skill](/skills/drain) for how queued learnings get folded into the knowledge base.
+
+## Why these two hooks
 
 | Hook | Answers |
 |---|---|
-| `SessionStart` (via `atl session-start`) | "I'm just opening Claude Code fresh, what changed upstream + what learnings did the previous session leave behind + is there a newer atl?" |
-| `UserPromptSubmit` (via `atl update`) | "I've been in this session for hours, is there a newer release?" |
+| `SessionStart` (via `atl session-start`) | "I'm opening Claude Code fresh — drain what the last session left behind, heal anything broken, and tell me if there are learnings to fold in." |
+| `UserPromptSubmit` (via `atl tick`) | "I've been in this session a while — keep the queue current, pull any global-layer changes, and circulate gains, cheaply, between prompts." |
 
-Two hooks cover the whole guarantee. The pre-v1.1.0 4-hook design separated update and learning-capture across `SessionStart` / `SessionEnd` / `PreCompact`, but `SessionEnd` and `PreCompact` never delivered hook stdout to Claude's `additionalContext` — see [the History note below](#history-from-four-hooks-to-two). Folding everything into `SessionStart` via a composite wrapper preserves all the behavior and ensures the output actually reaches Claude.
+Together they implement the three-speed in-session cadence: an every-prompt fan-out, a throttled tick, and the boot-time drain.
 
 ## Idempotency — safe to re-run
 
-The merge preserves any other hooks you have. Re-running `atl setup-hooks` only touches atl-owned entries (any command prefixed with `atl `). All other hooks, permissions, model settings, and `extraKnownMarketplaces` in `settings.json` are left untouched.
-
-`--remove` similarly only strips atl-owned hook entries, leaving everything else in place. Both commands also drop legacy `SessionEnd` / `PreCompact` atl entries from prior installs.
+The merge preserves any other hooks you have. Re-running `atl setup-hooks` (or `atl install`, which binds the same hooks) only replaces atl-owned entries — any command prefixed with `atl `. All other hooks, permissions, model settings, and `extraKnownMarketplaces` in `settings.json` are left untouched. The write is atomic.
 
 ## When you should run this
 
-- **Always recommended** for interactive Claude Code users.
-- **Not recommended** for CI / scripted `atl install` (the hooks would fire in CI unnecessarily). The first-install opt-in prompt already skips in non-interactive contexts.
-
-## What exactly gets checked
-
-### Each `atl session-start` run
-
-1. **Auto-update** (step 1): iterates `~/.claude/repos/agentteamland/*/`, parallel `git fetch origin main`, fast-forward pull when behind, parses `team.json` before+after to surface `<oldVer> → <newVer>`.
-2. **Marker scan** (step 2): reads `~/.claude/state/learning-capture-state.json` for the per-project `lastProcessedAt` cutoff (or last 7 days on first run), enumerates transcripts modified after that, scans for `<!-- learning -->` blocks emitted by assistant turns only (the v1.1.1 noise filter rejects prose mentions, tool inputs/outputs, summary events, and topics that fail the kebab-case regex). No network calls.
-3. **atl self-check** (step 3): one HTTPS GET to `api.github.com/repos/agentteamland/cli/releases/latest`, throttled to once per 24h. Surfaces a `⬆` line when a newer release exists.
-
-Slow path: ~2-3s for typical setups (5-10 cached repos). Fast path (after the throttle window has elapsed and no transcripts changed): ~1ms.
-
-### Each `atl update --silent-if-clean --throttle=30m` run
-
-Same as `atl session-start`'s step 1, but skipped if the last successful run was less than 30 minutes ago (configurable via `--throttle`).
+- **Always** for interactive Claude Code users — `atl install` already does it, but you can re-run it to change the throttle.
+- **Not recommended** for CI / scripted use (the hooks would fire in CI unnecessarily).
 
 ## Offline behavior
 
-If you're offline, each repo's `git fetch` fails silently, that repo gets a `⚠` warning line (if not silenced), and the rest continue. Marker scanning doesn't need the network at all — it just reads local files. Claude Code's prompt still proceeds normally; hooks failing don't block your work.
-
-## History — from four hooks to two
-
-`atl v0.2.0` (2026-04-24) shipped four hooks: `SessionStart` + `UserPromptSubmit` for auto-update, `SessionEnd` + `PreCompact` for learning-capture. The capture half **looked like it worked** (binary ran, scanned markers, printed reports) but per Claude Code v2.1.x, `SessionEnd` and `PreCompact` hook stdout is NOT delivered to Claude's `additionalContext`. 324 markers across 9 maintainer-workspace sessions in the month after v0.2.0 produced **zero** auto-processing — every actual `/save-learnings` run came from manual user invocation.
-
-`atl v1.1.0` (2026-05-02) restructured the flow:
-
-- New `atl session-start` composite wrapper combines update + previous-transcript marker scan + atl self-check.
-- New `atl learning-capture --previous-transcripts` mode reads transcripts modified since the state-file cutoff (instead of needing the *current* session's `SessionEnd` to fire).
-- `atl setup-hooks` v1.1.0 silently drops legacy `SessionEnd` / `PreCompact` atl entries from prior installs. Other people's hooks under those events are untouched.
-
-The marker protocol itself is unchanged — the v0.2.0 marker format still works. Only the trigger path moved.
-
-`atl v1.1.1` (2026-05-02) added a noise filter to the marker scanner: assistant-role only + kebab-case topic regex. Closes a SessionStart over-report bug where any session that *discussed* the marker format inflated the next session's count by 10-25× (149 raw substring hits → 16 real markers across 5 workspace transcripts in the validation sweep).
+The hooks read and write local files only — draining transcripts, the bbolt queue, and the doctor checks need no network. A hook must never block your work, so `session-start` and `tick` never fail the session; if something goes wrong they surface a line (or stay quiet) and the prompt proceeds normally.
 
 ## Related
 
-- [`atl update`](/cli/update) — manual update (what the auto-update hook calls silently)
-- [`atl learning-capture`](/cli/learnings) — manual scanner (what `atl session-start` calls silently)
-- [`atl install`](/cli/install) — first install (includes opt-in prompt)
+- [`atl tick`](/cli/tick) — the in-session maintenance tick (what the `UserPromptSubmit` hook calls)
+- [`atl learnings`](/cli/learnings) — inspect the durable learning queue (status / peek / ack)
+- [`atl doctor`](/cli/doctor) — the self-check the hooks run on each pass
+- [`atl install`](/cli/install) — first install (binds these hooks for you)
 - [Install the CLI](/guide/install) — getting atl on your machine

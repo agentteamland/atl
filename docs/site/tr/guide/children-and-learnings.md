@@ -4,7 +4,7 @@ Karmaşık ajanların ve becerilerin birikmiş alan bilgisi için kullandığı 
 
 Aynı desen, iki ad — ajanlar için **`children/`**, beceriler için **`learnings/`**. İkisi arasında tek bir zihinsel model.
 
-Kanonik kural [`core/rules/agent-structure.md`](https://github.com/agentteamland/core/blob/main/rules/agent-structure.md) dosyasında yaşar. Bu sayfa kullanıcıya yönelik özettir.
+Kanonik kural [`core/rules/agent-structure.md`](https://github.com/agentteamland/atl/blob/main/core/rules/agent-structure.md) dosyasında yaşar. Bu sayfa kullanıcıya yönelik özettir.
 
 ## Bu desen neden var?
 
@@ -25,7 +25,7 @@ Sonuç: bilgi sürtünmesizce birikir, üst düzey dosya sıkı kalır ve dizin 
 Her karmaşık ajan şu yapıyla düzenlenir:
 
 ```
-~/.claude/repos/agentteamland/{team}/agents/{agent-name}/
+.claude/agents/{agent-name}/
 ├── agent.md              ← Kimlik, sorumluluk alanı, çekirdek ilkeler (kısa, gömülü)
 └── children/             ← Ayrıntılı bilgi, desenler, stratejiler (her konu ayrı bir dosyada)
     ├── topic-1.md
@@ -33,7 +33,7 @@ Her karmaşık ajan şu yapıyla düzenlenir:
     └── ...
 ```
 
-[`atl install`](/tr/cli/install) sonrasında aynı yapı projenin `.claude/agents/{agent-name}/` dizinine kopyalanır.
+[`atl install`](/tr/cli/install), katalogu sorgulayarak takımı getirir ve ajanları, becerileri ile kuralları projenin `.claude/` dizinine kopyalar.
 
 ### Kurallar
 
@@ -46,24 +46,18 @@ Her karmaşık ajan şu yapıyla düzenlenir:
 
 ## Learnings — beceriler için
 
-Her karmaşık beceri ajan biçimini aynalar. İki konum önemlidir:
+Her karmaşık beceri ajan biçimini aynalar:
 
 ```
-# Kaynak doğruluk (atl tarafından sunulan takım / core deposu):
-~/.claude/repos/agentteamland/{team-or-core}/skills/{skill-name}/
+.claude/skills/{skill-name}/
 ├── skill.md              ← Becerinin yordamı (adımlar, kimlik, akış). Kısa kalır.
 └── learnings/            ← Birikmiş sınır durumları, başarılı desenler, kötü desenler
     ├── topic-1.md
     ├── topic-2.md
     └── ...
-
-# Proje-yerel kopya (atl-v1.0.0 sonrası kurulum topolojisi):
-{project}/.claude/skills/{skill-name}/
-├── skill.md              ← Aynı kopya; değiştirilmemişse `atl update` yeniler
-└── learnings/            ← Aynı desen; kendiliğinden büyüyen kopyalar
 ```
 
-[`atl install`](/tr/cli/install) becerileri (ve ajanlar ile kuralları) projeye kopyalar. [`atl update`](/tr/cli/update) değiştirilmemiş kopyaları üç-yönlü SHA-256 karşılaştırmasıyla yeniler. `/drain` önce proje-yerel kopyaya yazar; ardından `atl promote` kazanımları global katmanına taşır ve `atl publish` bunları takımın deposuna üst kaynak olarak önerebilir.
+[`atl install`](/tr/cli/install), katalogu sorgulayarak takımı getirir ve becerileri (ajanlar ve kurallarla birlikte) projenin `.claude/` dizinine kopyalar. [`atl update`](/tr/cli/update), kurulu takımları katalogdan yeniler. `/drain` önce proje-yerel kopyaya yazar; ardından `atl promote` kazanımları global katmanına taşır ve `atl publish` bunları takımın deposuna üst kaynak olarak önerebilir.
 
 Aynı şekil, aynı kurallar, aynı `knowledge-base-summary` frontmatter sözleşmesi. Becerinin `skill.md` dosyası, `learnings/*.md` frontmatter'ından kendiliğinden derlenen bir "Accumulated Learnings" bölümüyle birlikte gelir — `agent.md` Knowledge Base mekanizmasının aynısı.
 
@@ -150,7 +144,7 @@ Blueprint olmadan ajan, yeni birimleri nasıl oluşturacağını tahmin eder. Bl
 - [Bilgi sistemi](/tr/guide/knowledge-system) — bu takım tarafı desenin proje tarafındaki yansıması (journal + wiki).
 - [`/drain`](/tr/skills/drain) — `children/` ve `learnings/` dosyalarını yazar; üst dizin bölümlerini yeniden inşa eder.
 - [Kavramlar: Beceri](/tr/guide/concepts#skill) — `learnings/` deseninin nereye oturduğu.
-- Kanonik kural: [`core/rules/agent-structure.md`](https://github.com/agentteamland/core/blob/main/rules/agent-structure.md).
+- Kanonik kural: [`core/rules/agent-structure.md`](https://github.com/agentteamland/atl/blob/main/core/rules/agent-structure.md).
 
 ## Tarihçe
 

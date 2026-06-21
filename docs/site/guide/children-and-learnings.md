@@ -4,7 +4,7 @@ The shape that complex agents and skills use for accumulated domain knowledge: a
 
 Same pattern, two names — **`children/`** for agents, **`learnings/`** for skills. Single mental model across both.
 
-The canonical rule lives at [`core/rules/agent-structure.md`](https://github.com/agentteamland/core/blob/main/rules/agent-structure.md). This page is the user-facing summary.
+The canonical rule lives at [`core/rules/agent-structure.md`](https://github.com/agentteamland/atl/blob/main/core/rules/agent-structure.md). This page is the user-facing summary.
 
 ## Why this pattern exists
 
@@ -25,7 +25,7 @@ Result: knowledge accumulates frictionlessly, the top-level file stays tight, an
 Every complex agent is organized as:
 
 ```
-~/.claude/repos/agentteamland/{team}/agents/{agent-name}/
+.claude/agents/{agent-name}/
 ├── agent.md              ← Identity, area of responsibility, core principles (short, embedded)
 └── children/             ← Detailed information, patterns, strategies (each topic in a separate file)
     ├── topic-1.md
@@ -33,7 +33,7 @@ Every complex agent is organized as:
     └── ...
 ```
 
-After [`atl install`](/cli/install), the same structure is copied into your project at `.claude/agents/{agent-name}/`.
+[`atl install`](/cli/install) fetches the team from the catalog and copies agents, skills, and rules into your project's `.claude/` directory at this path.
 
 ### Rules
 
@@ -49,21 +49,15 @@ After [`atl install`](/cli/install), the same structure is copied into your proj
 Every complex skill mirrors the agent shape. Two locations matter:
 
 ```
-# Source-of-truth (the team / core repo, served by atl):
-~/.claude/repos/agentteamland/{team-or-core}/skills/{skill-name}/
+.claude/skills/{skill-name}/
 ├── skill.md              ← The skill's procedure (steps, identity, flow). Stays short.
 └── learnings/            ← Accumulated edge cases, successful patterns, anti-patterns
     ├── topic-1.md
     ├── topic-2.md
     └── ...
-
-# Project-local copy (post-atl-v1.0.0 install topology):
-{project}/.claude/skills/{skill-name}/
-├── skill.md              ← Identical copy, refreshed by `atl update` if unmodified
-└── learnings/            ← Same pattern; auto-grown copies
 ```
 
-[`atl install`](/cli/install) copies skills (and agents + rules) into the project. [`atl update`](/cli/update) refreshes unmodified copies via three-way SHA-256 comparison. `/drain` writes to the project-local copy first; `atl promote` then lifts gains to your global layer, and `atl publish` can propose them upstream to the team's repo.
+[`atl install`](/cli/install) fetches the team from the catalog and copies skills (along with agents and rules) into your project's `.claude/` directory. [`atl update`](/cli/update) refreshes installed teams from the catalog. `/drain` writes to the project-local copy first; `atl promote` then lifts gains to your global layer, and `atl publish` can propose them upstream to the team's repo.
 
 Same shape, same rules, same `knowledge-base-summary` frontmatter convention. The skill's `skill.md` ships with an "Accumulated Learnings" section auto-aggregated from `learnings/*.md` frontmatter — same mechanism as `agent.md`'s Knowledge Base.
 
@@ -150,7 +144,7 @@ Without a blueprint, the agent guesses how to create new units. With a blueprint
 - [Knowledge system](/guide/knowledge-system) — the project-side mirror (journal + wiki) of this team-side pattern
 - [`/drain`](/skills/drain) — writes children/ and learnings/ files; rebuilds parent index sections
 - [Concepts: Skill](/guide/concepts#skill) — where the learnings/ pattern fits
-- Canonical rule: [`core/rules/agent-structure.md`](https://github.com/agentteamland/core/blob/main/rules/agent-structure.md)
+- Canonical rule: [`core/rules/agent-structure.md`](https://github.com/agentteamland/atl/blob/main/core/rules/agent-structure.md)
 
 ## History
 

@@ -1,10 +1,10 @@
 # `/create-pr`
 
-Take working-tree changes (uncommitted, or recently committed to the default branch), derive an appropriate branch name + commit message + PR title from the diff, run [`/save-learnings`](/skills/drain) so wisdom rides along in the same PR, run an AI review chain (generic baseline + any team-declared specialists), commit + push, open a PR. Optionally enable GitHub auto-merge with a bounded polling + auto-fix loop. Always return the user to the target branch at end-of-work.
+Take working-tree changes (uncommitted, or recently committed to the default branch), derive an appropriate branch name + commit message + PR title from the diff, run [`/drain`](/skills/drain) so wisdom rides along in the same PR, run an AI review chain (generic baseline + any team-declared specialists), commit + push, open a PR. Optionally enable GitHub auto-merge with a bounded polling + auto-fix loop. Always return the user to the target branch at end-of-work.
 
 This skill is the deterministic "ship a piece of work" flow — it consumes the disciplines defined by `team-repo-maintenance`, `branch-hygiene`, `learning-capture`, `docs-sync`, and `karpathy-guidelines`, so the user does not have to re-derive them every PR.
 
-Ships as a global skill in [core](https://github.com/agentteamland/core) since `core@1.4.0`.
+Ships as a global skill in the [atl monorepo](https://github.com/agentteamland/atl).
 
 ## Flags
 
@@ -13,7 +13,7 @@ Ships as a global skill in [core](https://github.com/agentteamland/core) since `
 | `--auto-merge` | OFF | Enable GitHub auto-merge (`gh pr merge --auto --merge`); poll + auto-fix until merged or terminal failure |
 | `--no-review` | OFF (review on) | Skip the entire review chain (generic + every team reviewer) |
 | `--no-auto-fix` | OFF (fix on) | During the polling loop, do not attempt to fix CI/merge failures; surface to the user instead |
-| `--no-learning` | OFF (learning on) | Skip `/save-learnings` + doc-impact pipeline |
+| `--no-learning` | OFF (learning on) | Skip `/drain` + doc-impact pipeline |
 | `--timeout {min}` | 10 | Polling timeout in minutes; 1-minute interval, applies to both `--auto-merge` and manual-merge wait |
 
 ## Flow
@@ -45,13 +45,13 @@ Outputs:
 
 - **Branch name** — `{type}/{slug}` (e.g., `feat/create-pr-skill`, `fix/winget-403`, `docs/translate-trk-en`)
 - **Commit subject** — `{type}({scope}): {one-line summary}` under 70 chars
-- **Commit body** — 2–4 bullets describing the change. Last line is a "Discovered via" context if invoking from a team-repo context (per [team-repo-maintenance §3](https://github.com/agentteamland/core/blob/main/rules/team-repo-maintenance.md))
+- **Commit body** — 2–4 bullets describing the change. Last line is a "Discovered via" context if invoking from a team-repo context (per [team-repo-maintenance §3](https://github.com/agentteamland/atl/blob/main/core/rules/team-repo-maintenance.md))
 
 The skill does **not** ask the user to confirm names — it generates and proceeds.
 
 ### Step 4 — Save learnings (unless `--no-learning`)
 
-Invokes [`/save-learnings`](/skills/drain) in manual mode (analyzes the live conversation):
+Invokes [`/drain`](/skills/drain) in manual mode (analyzes the live conversation):
 
 - Writes wiki / journal / agent children / skill learnings updates (project-local)
 - For each `<!-- learning doc-impact: readme/docs/breaking -->` marker, prepares a doc draft
@@ -112,7 +112,7 @@ gh pr create \
   --body "..."
 ```
 
-Body has Summary, Discovered via, Version bump (if applicable), Test plan. Per [team-repo-maintenance §4](https://github.com/agentteamland/core/blob/main/rules/team-repo-maintenance.md), the skill does **not** pass `--assignee` or `--reviewer`.
+Body has Summary, Discovered via, Version bump (if applicable), Test plan. Per [team-repo-maintenance §4](https://github.com/agentteamland/atl/blob/main/core/rules/team-repo-maintenance.md), the skill does **not** pass `--assignee` or `--reviewer`.
 
 ### Step 8 — `--auto-merge` polling (only if flag set)
 
@@ -173,25 +173,25 @@ The user ends the skill on the target branch, with the merged change incorporate
    PR:          https://github.com/.../pull/N
    Review:      generic + 1 team reviewer (software-project-team)
                 3 issues, 1 concern, all addressed
-   Learnings:   /save-learnings ran — 2 wiki pages updated, 1 README draft accepted
+   Learnings:   /drain ran — 2 wiki pages updated, 1 README draft accepted
    Auto-merge:  enabled, merged after 4 min (1 auto-fix: prettier formatting)
    End-of-work: returned to main, pulled latest
 ```
 
 ## Important constraints
 
-1. **Never merge directly.** This skill uses `gh pr merge --auto --merge` (auto-merge enable) only when `--auto-merge` flag is passed. Direct merge (`--merge`/`--squash`/`--rebase` without `--auto`) is **always forbidden** — see [team-repo-maintenance "PR merge discipline"](https://github.com/agentteamland/core/blob/main/rules/team-repo-maintenance.md). The user has explicitly authorized auto-merge by typing the flag; this is the documented exception.
-2. **Discovered-via context.** When invoked from a shared / team repo, the skill follows team-repo-maintenance discipline: include "Discovered via" in PR body, bump version, conventional commit. Detection: cwd under `~/.claude/repos/agentteamland/` or matches a known shared-repo pattern.
-3. **Idempotent save-learnings.** Running `/save-learnings` again here is safe — it appends, deduplicates, and processes only fresh content.
-4. **Schema validation.** If the staged diff touches a `team.json`, the validator runs before push (`~/.claude/repos/agentteamland/core/scripts/validate-team-json.sh`).
+1. **Never merge directly.** This skill uses `gh pr merge --auto --merge` (auto-merge enable) only when `--auto-merge` flag is passed. Direct merge (`--merge`/`--squash`/`--rebase` without `--auto`) is **always forbidden** — see [team-repo-maintenance "PR merge discipline"](https://github.com/agentteamland/atl/blob/main/core/rules/team-repo-maintenance.md). The user has explicitly authorized auto-merge by typing the flag; this is the documented exception.
+2. **Discovered-via context.** When invoked from a shared / team repo, the skill follows team-repo-maintenance discipline: include "Discovered via" in PR body, bump version, conventional commit. Detection: matches a known shared-repo pattern (e.g., remote URL under `agentteamland/`).
+3. **Idempotent drain.** Running `/drain` again here is safe — it processes only unacknowledged queue entries.
+4. **team.json validation.** If the staged diff touches a `team.json`, the skill verifies that the file parses, has a `name` field, and all declared assets exist on disk before push.
 5. **Branch hygiene before start.** Before deriving the new branch, the skill verifies the local default branch is current with origin. If not, fast-forward first.
 6. **No silent partial failures.** If any step fails, the skill stops and reports.
 
 ## Related
 
-- [`/save-learnings`](/skills/drain) — invoked at Step 4
-- [team-repo-maintenance rule](https://github.com/agentteamland/core/blob/main/rules/team-repo-maintenance.md) — governance for shared repos
-- [karpathy-guidelines rule](https://github.com/agentteamland/core/blob/main/rules/karpathy-guidelines.md) — review prompt's foundation
+- [`/drain`](/skills/drain) — invoked at Step 4
+- [team-repo-maintenance rule](https://github.com/agentteamland/atl/blob/main/core/rules/team-repo-maintenance.md) — governance for shared repos
+- [karpathy-guidelines rule](https://github.com/agentteamland/atl/blob/main/core/rules/karpathy-guidelines.md) — review prompt's foundation
 
 ## Future evolution (v2)
 
@@ -201,4 +201,4 @@ The user ends the skill on the target branch, with the merged change incorporate
 
 ## Source
 
-- Spec: [core/skills/create-pr/skill.md](https://github.com/agentteamland/core/blob/main/skills/create-pr/skill.md)
+- Spec: [core/skills/create-pr/skill.md](https://github.com/agentteamland/atl/blob/main/core/skills/create-pr/skill.md)

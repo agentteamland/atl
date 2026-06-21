@@ -1,6 +1,6 @@
 # `atl list`
 
-Mevcut projede kurulu takımları gösterir.
+Her kapsamda kurulu takımları gösterir.
 
 ## Kullanım
 
@@ -8,42 +8,31 @@ Mevcut projede kurulu takımları gösterir.
 atl list
 ```
 
+`atl list` herhangi bir bayrak veya argüman almaz. Her katmanın `.atl/installed/` dizinindeki kurulum manifestolarını okur; ağa gitmez.
+
 ## Çıktı
 
-```
-Installed teams in /home/you/projects/your-app:
-
-  ✓ software-project-team@1.2.1
-     effective: 13 agents, 3 skills, 1 rules
-
-  ↑ starter-extended@0.2.0 [community]  (latest: 0.3.0)
-     extends: software-project-team@^1.0.0
-     effective: 12 agents, 2 skills, 1 rules
-```
-
-Takım başına biçim:
-
-- **`✓`** — bilinen en son sürümde kurulu (yeşil onay işareti).
-- **`↑`** — kurulu, ama kayıt defterinde daha yeni bir sürüm var (sarı yukarı oku). En yeni sürüm parantez içinde gösterilir; yenilemek için `atl update`.
-- **`name@version`** — kurulu takımın adı ve sürümü (`team.json` dosyasından).
-- **`[community]`** — takım topluluk durumundaysa (henüz doğrulanmamışsa) rozet olarak görünür. Doğrulanmış takımlarda rozet yoktur.
-- **`extends:`** — yalnızca takımın bir üst takımı varsa yazdırılır. Kalıtım zincirini gösterir (kök → ... → kurulu takım).
-- **`effective:`** — kalıtım çözümünden sonraki sayılar: üst ve alt takım kaynakları, eksi `excludes`, alt takım bastırma çakışmaları sıkıştırılmış hâliyle.
-
-## Projede takım yoksa
+Takımlar [kapsama](/tr/guide/concepts#scope-global-and-project) göre gruplanır; her takım iki boşluk girintili `<handle>/<name>@<version>` biçiminde yazdırılır:
 
 ```
-No teams installed in this project.
-Run: atl install <team-name>
+global:
+  agentteamland/software-project-team@1.2.1
+project:
+  agentteamland/design-system-team@0.8.1
 ```
 
-## Notlar
+Her iki kapsamda da kurulu bir takım her ikisinin altında görünür. `<handle>` takımın GitHub sahibidir; `<name>` ve `<version>` takımın `team.json` dosyasından gelir.
 
-- `atl list` okumayı `.claude/.team-installs.json` dosyasından ve global kayıt defteri önbelleğinden yapar. Kararlı durumda ağa gitmez — eski sürüm tespiti (`↑`) önbelleklenmiş kayıt defteri kopyasını kullanır; o kopya da `atl update` tarafından yenilenir.
-- Komutun şu anda hiçbir bayrağı yoktur. Önceki belgeler `--json` ve `--chain` bayraklarından söz ediyordu; bu bayraklar hiç hayata geçirilmedi. Betiklenebilir çıktıya gereksinimin varsa `.claude/.team-installs.json` dosyasını doğrudan ayrıştır — kararlı bir JSON'dur ve `name`, `version`, `extendsChain` ve `effective` alanlarını içerir.
+## Hiç takım kurulu değilse
+
+Her iki kapsamda da kurulu takım yoksa:
+
+```
+atl list: no teams installed
+```
 
 ## İlgili
 
-- [`atl install`](/tr/cli/install).
-- [`atl remove`](/tr/cli/remove).
-- [`atl update`](/tr/cli/update).
+- [`atl install`](/tr/cli/install) — takım kur.
+- [`atl remove`](/tr/cli/remove) — takım kaldır.
+- [`atl search`](/tr/cli/search) — kurulacak takım bul.

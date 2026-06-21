@@ -4,7 +4,7 @@ Beyin fırtınası oturumlarını başlat ve tamamla. Beyin fırtınaları, kod 
 
 İki kip: `start` yeni bir beyin fırtınası açar; `done` etkin beyin fırtınasını tamamlar ve kararlarını belge zincirine yayar.
 
-Global beceri olarak [brainstorm](https://github.com/agentteamland/brainstorm) içinde yayımlanır.
+Global beceri olarak [ATL monoreposunda](https://github.com/agentteamland/atl) yayımlanır.
 
 ## Üç kapsam
 
@@ -14,9 +14,9 @@ Bir beyin fırtınası üç düzeyden birinde yaşar — *kimin* karara önem ve
 |---|---|---|
 | *(yok)* | `.atl/brain-storms/` | Projeye özgü konular (varsayılan). |
 | `--global` | `~/.atl/brain-storms/` | Projeler arası, kişisel konular. |
-| `--team` | `~/.claude/repos/agentteamland/{team}/brain-storms/` | Takım deposuyla ilgili konular (ajan kuralları, takım stratejisi, katkıcı yönetişimi). |
+| `--team` | `<proje>/.atl/brain-storms/` (takım kapsamlı alt dizin) | Kurulu bir takımla ilgili konular (ajan kuralları, takım stratejisi, katkıcı yönetişimi). |
 
-`--team` için etkin takım, kurulu `.claude/agents/` sembolik bağlarından algılanır. Tek takım → kendiliğinden kullanılır; birden çok takım → beceri `AskUserQuestion` ile sorar; kurulu takım yok → `/team install` ipucuyla bir hata verir.
+`--team` için etkin takım, kurulu `.claude/agents/` girişlerinden algılanır. Tek takım → kendiliğinden kullanılır; birden çok takım → beceri `AskUserQuestion` ile sorar; kurulu takım yok → `atl install` ipucuyla bir hata verir.
 
 ## `start` kipi
 
@@ -66,12 +66,12 @@ Dosya, **yeterince ayrıntılı** olmalıdır; yeni bir bağlamda dosyayı okuya
 
 Akış:
 
-1. **Etkin beyin fırtınasını bul.** Üç kapsamı da tarar (`.atl/brain-storms/`, `~/.atl/brain-storms/`, `~/.claude/repos/agentteamland/*/brain-storms/`). Birden çoksa bunları kapsamlarıyla birlikte listeler ve hangisinin tamamlanacağını sorar.
+1. **Etkin beyin fırtınasını bul.** Üç kapsamı da tarar (`.atl/brain-storms/`, `~/.atl/brain-storms/` ve `.atl/brain-storms/` altındaki takım kapsamlı alt dizinler). Birden çoksa bunları kapsamlarıyla birlikte listeler ve hangisinin tamamlanacağını sorar.
 2. **Beyin fırtınası dosyasını tamamla.** `status: active` → `status: completed`. Son notları sona ekle. Open Items bölümünü güncelle (çözülmemişler kalır). Final Decisions bölümünü ekle.
 3. **Belge dosyasını oluştur ya da güncelle.** Yerleşmiş kararlar şu yerlere gider:
    - **Proje beyin fırtınası** → `.atl/docs/`.
    - **Global beyin fırtınası** → `~/.atl/docs/`.
-   - **Takım beyin fırtınası** → `~/.claude/repos/agentteamland/{team}/docs/`.
+   - **Takım beyin fırtınası** → `<proje>/.atl/docs/` (takım kapsamlı alt dizin).
 4. **`CLAUDE.md` / `README` güncellenir.** İki şey olur:
    - Tamamlanmış beyin fırtınası özeti uygun bölüme eklenir.
    - Bu beyin fırtınasının maddesi `<!-- brainstorm:active -->` işaretçi bloğundan kaldırılır. Madde listesi boşalırsa blok tümüyle kaldırılır (geride bayatlamış bir "Active brainstorms" başlığı kalmaz).
@@ -107,17 +107,17 @@ Bir beyin fırtınası sırasında "şimdi yapmıyoruz, sonraya" diye işaretlen
 3. **Dosya adı kullanıcıdan istenmez.** Mesajdan çıkarılır ve uygun bir kebab-case ad atanır.
 4. **Beyin fırtınası dosyaları asla silinmez.** Tarihsel kayıttır.
 5. **Her beyin fırtınası tek konuya odaklanır.** Farklı konular → farklı dosyalar.
-6. **Etkin beyin fırtınası araması üç konumu da kapsar.** `done` kipinde proje, global ve tüm takım dizinleri taranır.
+6. **Etkin beyin fırtınası araması üç kapsamı da kapsar.** `done` kipinde proje, global ve takım kapsamlı alt dizinler taranır.
 7. **Kapsam frontmatter'da yer alır.** `scope: project|global|team`, `team: {ad}` — `done` kipinin hedeflerini belirler.
 8. **Takım beyin fırtınaları doğrudan push'la değil, PR ile yayımlanır.** Takım depoları dal korumalıdır; `done` akışı yerelde yazar ve PR oluşturmaya yönlendirir.
 
 ## İlgili
 
-- [`/save-learnings`](/tr/skills/drain) — düzenli öğrenme yakalama (beyin fırtınasına paralel; beyin fırtınaları kasıtlıdır, öğrenmeler kendiliğinden olur).
+- [`/drain`](/tr/skills/drain) — düzenli öğrenme yakalama (beyin fırtınasına paralel; beyin fırtınaları kasıtlıdır, öğrenmeler kendiliğinden olur).
 - [`/create-pr`](/tr/skills/create-pr) — bir takım beyin fırtınası değişikliğini PR olarak paketler.
 - [Kavramlar: Beceri](/tr/guide/concepts#skill) — beyin fırtınalarının bilgi modelinde nereye oturduğu.
 
 ## Kaynak
 
-- Belirtim: [brainstorm/skills/brainstorm/skill.md](https://github.com/agentteamland/brainstorm/blob/main/skills/brainstorm/skill.md).
-- Kural: [brainstorm/rules/brainstorm.md](https://github.com/agentteamland/brainstorm/blob/main/rules/brainstorm.md).
+- Belirtim: [core/skills/brainstorm/skill.md](https://github.com/agentteamland/atl/blob/main/core/skills/brainstorm/skill.md)
+- Kural: [core/rules/brainstorm.md](https://github.com/agentteamland/atl/blob/main/core/rules/brainstorm.md)

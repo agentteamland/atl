@@ -1,43 +1,35 @@
 # Creating a team
 
-A team is a reusable bundle of AI **agents**, **skills**, and **rules** that you install into a project with `atl install`. This page walks through everything you need from empty directory to installed team — including the "I'm building this on my laptop, haven't pushed anywhere yet" case.
+A team is a reusable bundle of AI **agents**, **skills**, and **rules** that anyone can install with `atl install`. This page walks through it end to end — from an empty directory to a catalogued team others can pull by handle.
 
 ## What a team is (and isn't)
 
-A team is just a git repository with a `team.json` file and some Markdown. When you run `atl install`, the CLI clones that repo into your local cache and copies its contents into `.claude/` inside your project. That's it — no plugin system, no JavaScript runtime, no custom binaries. The whole thing is text files and copies.
+A team is just a Git repository with a `team.json` file and some Markdown. When someone runs `atl install <handle>/<team>`, the CLI resolves the handle against the GitHub-backed catalog, fetches the repo as an ephemeral tarball, and copies the team's `agents/`, `skills/`, and `rules/` into the target's `.claude/` directory. That's it — no plugin system, no JavaScript runtime, no custom binaries. The whole thing is text files and copies.
 
 A team can be:
 
 - **One agent** (a single Markdown file with instructions Claude follows)
 - **One or more skills** (slash commands that Claude can invoke)
-- **Rules** (globally-loaded instructions that shape behavior)
+- **Rules** (always-loaded instructions that shape behavior)
 - **Any combination** of the above
 
-You can install a team from:
-
-1. The public **AgentTeamLand registry** (`atl install software-project-team`)
-2. Any **GitHub repo** (`atl install agentteamland/starter-extended` or a full URL)
-3. **Any git URL** — GitHub, GitLab, Bitbucket, self-hosted (public or private via SSH keys)
-4. **Your local filesystem** (`atl install ./my-team` or an absolute path) — no remote required, just a `git init` in the team dir
-
-The last option is what most people reach for first when authoring a team of their own. We'll cover it in detail below.
+A team becomes installable once it's **catalogued**: tag its public GitHub repo with the [`atl-team`](https://github.com/topics/atl-team) topic (or run [`atl publish`](/cli/publish) from it), and the generated index picks it up. From then on anyone can `atl install <handle>/<team>` — where the handle is the repo's GitHub owner. There is no registry repo and no submission PR.
 
 ---
 
-## Part 1 — The full walk-through
+## The full walk-through
 
-Let's build a small real team from nothing. You're going to create a `my-team` directory on your machine, add one agent, and install it into a test project — without ever pushing to a git server.
+Let's build a small real team from nothing. You'll create a `my-team` repo, add one agent, and get it ready to install.
 
-### Step 1 — Create the team directory
+### Step 1 — Create the team repo
 
 ```bash
 mkdir ~/projects/my-team
 cd ~/projects/my-team
-
-git init -b main                    # atl requires a git repo for the install pipeline
+git init -b main
 ```
 
-Any location works. The folder name doesn't have to match the team's registry name — that's set in `team.json` below.
+The folder name doesn't have to match the team's catalog name — that's set in `team.json` below.
 
 ### Step 2 — Write `team.json`
 
@@ -56,9 +48,7 @@ This is the team's manifest. Minimum viable:
     { "name": "web-agent", "description": "Reviews and builds Next.js pages." }
   ],
   "skills": [],
-  "rules": [],
-  "extends": null,
-  "excludes": []
+  "rules": []
 }
 ```
 
@@ -66,9 +56,9 @@ Full field reference: [team.json](./team-json).
 
 **Gotchas worth calling out:**
 
-- `name` is the **registry short-name**. Once set, don't change it — users will refer to it. Must be kebab-case (lowercase letters, digits, hyphens).
-- `version` is SemVer (major.minor.patch). Bump it when you publish changes, even for local iteration — `atl update` uses this to decide whether to pull.
-- `author` is an **object**, not a string. At minimum `{ "name": "Your Name" }`. Registry submissions need `url` too.
+- `name` is the team's short-name. Once set, don't change it — users refer to it. Must be kebab-case (lowercase letters, digits, hyphens).
+- `version` is SemVer (major.minor.patch). Bump it when you ship changes — `atl update` uses this to decide whether to pull.
+- `author` is an **object**, not a string. At minimum `{ "name": "Your Name" }`. A plain string like `"author": "You"` fails to parse.
 - `agents` is an array of **metadata**, not agent content. The actual agent Markdown lives under `agents/<name>/agent.md` (see Step 3).
 
 ### Step 3 — Add your agent
@@ -120,55 +110,71 @@ I do NOT touch:
 
 That's a functioning agent. Add more detail in `children/` as the agent grows.
 
-> 📘 **Deep dive:** the children pattern is explained in `agentteamland/core`'s [agent-structure rule](https://github.com/agentteamland/core/blob/main/rules/agent-structure.md). Key idea: `agent.md` stays short, topic-specific detail goes in `children/*.md` with one topic per file.
+::: tip Deep dive
+The children pattern is explained in [`core/rules/agent-structure.md`](https://github.com/agentteamland/atl/blob/main/core/rules/agent-structure.md) and summarized in [Children + learnings](/guide/children-and-learnings). Key idea: `agent.md` stays short, topic-specific detail goes in `children/*.md` with one topic per file.
+:::
 
 ### Step 4 — Commit
 
-atl's install pipeline uses `git clone` under the hood, so the team dir must be a git repo with at least one commit:
+Commit your work — `atl` installs from a committed ref, not your working tree:
 
 ```bash
 git add .
 git commit -m "feat: initial team"
 ```
 
-No remote is needed at this point.
+### Step 5 — Publish so others can install it
 
-### Step 5 — Install into a test project
+`atl install` resolves handles against the catalog, so a team has to be catalogued before anyone (including you) can install it by handle. Push the repo to a public GitHub repo and tag it with the `atl-team` topic:
+
+```bash
+# Push to a public GitHub repo under your account or org:
+gh repo create you/my-team --public --source=. --push
+
+# Tag it so the catalog indexes it:
+gh repo edit you/my-team --add-topic atl-team
+```
+
+The index reindexes from public `atl-team`-tagged repos, so within a short window your team is discoverable as `you/my-team`.
+
+### Step 6 — Install it
 
 ```bash
 mkdir /tmp/demo-app && cd /tmp/demo-app
-atl install ~/projects/my-team         # absolute path ✓
-# or:  atl install ../my-team          # relative path ✓
-# or:  atl install file:///Users/you/projects/my-team   # explicit file:// URL ✓
+atl install you/my-team
+# → atl: installed you/my-team@0.1.0 at project scope
 
 atl list
-# → my-team@0.1.0    (effective: 1 agents, 0 skills, 0 rules)
+# project:
+#   you/my-team@0.1.0
 
 ls -la .claude/agents/
-# → web-agent.md → ~/.claude/repos/agentteamland/my-team/agents/web-agent/agent.md
+# → web-agent.md
 ```
 
 If the output matches, your team is installed. The agent is now available to Claude in `/tmp/demo-app/`.
 
-> 💡 **Why "agentteamland" in the cache path for my private team?**  atl uses one shared local cache directory regardless of where a team came from. Your private team sits next to the public ones in `~/.claude/repos/agentteamland/`; the name in `team.json` is what distinguishes them. This does NOT mean your team got pushed or shared with the org — it's just a cache convention.
+The team installs at whatever scope its publisher declared (project by default — see the `scope` field in [team.json](./team-json)). Override per-install with `--global` or `--project`.
 
-### Step 6 — Iterate
+### Step 7 — Iterate
 
-Edit files under `~/projects/my-team/`, commit (`atl` reads commits, not the working tree), then refresh the install:
+Edit files under `~/projects/my-team/`, bump the `version` in `team.json`, then commit and push. The catalog reindexes to the new version, and any project that has the team installed picks it up with `atl update`:
 
 ```bash
 cd ~/projects/my-team
 vim agents/web-agent/agent.md           # or any edit
+# bump "version" in team.json, then:
 git commit -am "tweak web-agent guidance"
+git push
 
 cd /tmp/demo-app
-atl update my-team
-# → atl re-pulls, refreshes copies
+atl update
+# → atl re-fetches the published version, refreshes unmodified copies
 ```
 
-A round-trip takes ~1 second. You can iterate rapidly against the test project.
+`atl update` refreshes copies you haven't modified and leaves your local edits in place.
 
-### Step 7 — (Optional) Add skills and rules
+### Step 8 — (Optional) Add skills and rules
 
 **Skills** are slash commands. Each gets a `skills/<skill-name>/skill.md` with frontmatter:
 
@@ -199,7 +205,7 @@ Declare it in `team.json`:
 ]
 ```
 
-**Rules** are globally-loaded Markdown files that shape Claude's behavior. Put them at `rules/<rule-name>.md`:
+**Rules** are always-loaded Markdown files that shape Claude's behavior. Put them at `rules/<rule-name>.md`:
 
 ```markdown
 # React 19 defaults
@@ -217,69 +223,17 @@ Declare:
 ]
 ```
 
-After any change — agents, skills, or rules — commit + `atl update` in the test project to pick it up.
+After any change — agents, skills, or rules — bump the version, commit, and push, then `atl update` to pick it up.
 
-### Step 8 — Where to go next
+### Step 9 — Where to go next
 
-Now that your team works locally:
-
-- **Keep it private.** You can use it forever this way — just point `atl install` at your local path or push it to a private git server (GitHub private repo, GitLab, self-hosted Gitea). No submission required.
-- **Share with a team.** Push to a private repo and give teammates the URL: `atl install git@github.com:your-org/your-team.git`. They'll install via SSH (no registry involvement).
-- **Submit to the public registry.** Only if you want others to discover it by short name. See [Registry submission](/cli/publish).
-- **Add a scaffolder skill.** If your team is meant to spin up new projects, add a `/create-*` skill. See [Scaffolder spec](./scaffolder-spec).
+- **Add a scaffolder skill.** If your team is meant to spin up new projects, add a `/create-new-project` skill. See [Scaffolder spec](./scaffolder-spec).
+- **Depend on another team.** If your team builds on someone else's, declare it under `dependencies` in `team.json` — `atl install` pulls the dependency alongside yours.
+- **Earn the verified badge.** Teams reviewed by AgentTeamLand maintainers (and everything under `agentteamland/*`) show a `[verified]` badge in `atl search`. Its absence just means a team is self-published.
 
 ---
 
-## Part 2 — Install modes explained
-
-All of these work. Pick the one that fits where your team lives.
-
-### Registry (public, verified)
-
-```bash
-atl install software-project-team
-```
-
-The short name is looked up in the [public registry](https://github.com/agentteamland/registry). Works only for teams that have been submitted and verified.
-
-### GitHub `owner/repo` shorthand
-
-```bash
-atl install agentteamland/starter-extended
-```
-
-Expands to `https://github.com/agentteamland/starter-extended.git`. Handy for public GitHub teams that aren't in the registry.
-
-### Full git URL (any host, public or private)
-
-```bash
-atl install https://github.com/you/your-team.git      # public, HTTPS
-atl install git@github.com:you/your-team.git          # private, SSH
-atl install ssh://git@gitlab.com/you/your-team.git    # GitLab SSH
-atl install https://gitea.example.com/you/team.git    # self-hosted Gitea
-```
-
-For private repos, git credentials / SSH keys must be set up on the host (atl shells out to `git clone`, which inherits your git config). No atl-specific authentication.
-
-### Local filesystem (no remote needed)
-
-```bash
-atl install ~/projects/my-team                   # absolute or home path
-atl install ./my-team                            # relative
-atl install file:///Users/you/projects/my-team   # explicit file:// URL
-```
-
-Requires:
-- The target is a directory that contains a `team.json` at its root
-- The directory is a git repo with at least one commit (`git init` + `git add . && git commit` is enough)
-
-No remote push is required. Ideal for local iteration, private teams, or teams you're not ready to share yet.
-
-> ⚠️ **Version:** local-filesystem install requires `atl` ≥ 0.1.4. Earlier versions only accepted URLs.
-
----
-
-## Part 3 — Team layout reference
+## Team layout reference
 
 ```
 my-team/
@@ -304,164 +258,71 @@ my-team/
 │   └── run-e2e/
 │       └── skill.md
 │
-├── rules/                         ← one .md per rule (flat, not dir)
-│   ├── react-19-defaults.md
-│   └── file-naming.md
-│
-├── schemas/                       ← optional: JSON Schemas your team validates
-│   └── config.schema.json
-│
-└── .github/workflows/
-    └── validate.yml               ← schema-validate team.json on every push
+└── rules/                         ← one .md per rule (flat, not dir)
+    ├── react-19-defaults.md
+    └── file-naming.md
 ```
 
 Every file under `agents/`, `skills/`, and `rules/` that `team.json` lists becomes a copy in the consumer's `.claude/` when they install. Files not listed are ignored.
 
 ---
 
-## Part 4 — Schema validation in CI (recommended)
+## How install works under the hood
 
-Drop this into `.github/workflows/validate.yml` to catch malformed `team.json` before it breaks an install:
+When someone runs `atl install you/my-team`:
 
-```yaml
-name: Validate team.json
-on:
-  push:
-  pull_request:
+1. **Resolve.** The handle is looked up in the GitHub-backed catalog (generated from public `atl-team`-tagged repos). A first-party team resolves to a monorepo subpath; a third-party team to its standalone repo.
+2. **Fetch.** The team is downloaded as a ref-pinned HTTPS tarball into a temp directory — no `git` binary required. The temp directory is deleted after the install.
+3. **Validate.** `atl` parses `team.json`, checks that it has a name, and confirms every declared agent/skill/rule actually exists on disk. Anything missing fails here.
+4. **Write.** Agents, skills, and rules are **copied** into the scope's `.claude/` — `~/.claude` for a global install, `<project>/.claude` for a project install.
+5. **Record.** A per-team manifest at `<layer>/.atl/installed/<handle>__<name>.json` records the source ref + per-file SHA-256 baselines that `atl update`'s auto-refresh and `atl doctor`'s integrity check rely on.
 
-jobs:
-  validate:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      - run: npm install -g ajv-cli
-
-      - name: Download schema
-        run: curl -sSfL https://raw.githubusercontent.com/agentteamland/core/main/schemas/team.schema.json -o team.schema.json
-
-      - name: Validate
-        run: ajv -s team.schema.json -d team.json --strict=false
-```
-
-This is optional but catches most `team.json` mistakes at PR time instead of at install time.
+There is no persistent clone cache and no separate ATL asset store — team assets live under `.claude/`; ATL's bookkeeping (catalog cache, learning queue, pins, install manifests) lives under `~/.atl` and `<project>/.atl`.
 
 ---
 
-## Part 5 — Private team workflows
-
-There are three flavors of "private team", and they each have a cleanest path:
-
-### 🟢 (a) Fully local, just me
-
-You're the only user. The team lives on your laptop.
-
-```bash
-# Author it:
-mkdir ~/projects/my-team && cd ~/projects/my-team
-git init -b main
-vim team.json agents/main-agent/agent.md
-git add . && git commit -m "init"
-
-# Install into any project:
-cd ~/projects/my-real-app
-atl install ~/projects/my-team
-
-# Iterate (edit → commit → refresh):
-cd ~/projects/my-team
-vim agents/main-agent/agent.md
-git commit -am "tighter scope"
-
-cd ~/projects/my-real-app
-atl update my-team
-```
-
-That's the entire workflow. No remote involved.
-
-### 🟡 (b) Shared with a few teammates
-
-You want 2–10 people to install it, but NOT the public.
-
-```bash
-# Push to a private GitHub (or GitLab / Gitea) repo:
-gh repo create you/your-team --private --source=. --push
-
-# Teammates install via SSH (their SSH keys must be added to the repo):
-atl install git@github.com:you/your-team.git
-
-# Updates:
-atl update your-team
-```
-
-No registry submission; no discoverability by strangers. SSH works on any modern git host.
-
-### 🔵 (c) Internal / corp, behind a self-hosted git server
-
-Same as (b) but the URL points at your self-hosted Git:
-
-```bash
-atl install git@git.your-company.com:platform/your-team.git
-```
-
-atl doesn't care about the host; `git clone` handles authentication via whatever SSH keys or credential helpers you've configured.
-
-### 🟣 (d) Public to the world
-
-Submit to the [AgentTeamLand registry](https://github.com/agentteamland/registry) so anyone can `atl install your-team`. See [Registry submission](/cli/publish).
-
----
-
-## Part 6 — Common pitfalls
-
-**`atl install ./my-team` says "could not find team"**
-→ `./my-team` isn't recognized as a local path. Check: is it a directory? Does it contain `team.json`? Is `atl` version ≥ 0.1.4? (`atl --version`)
+## Common pitfalls
 
 **`Error: agent source missing: .../agents/foo/agent.md`**
-→ Your `team.json` lists `agents: [{"name": "foo"}]` but the filesystem has `agents/foo.md` (flat) instead of `agents/foo/agent.md` (children pattern). atl requires the children-pattern structure.
+→ Your `team.json` lists `agents: [{"name": "foo"}]` but the filesystem has `agents/foo.md` (flat) where the children pattern expects `agents/foo/agent.md`. Match the declared assets to what's on disk.
 
 **`Error: parse team.json: json: cannot unmarshal string into Go struct field TeamManifest.author`**
 → `author` must be an object, not a string. Change `"author": "You"` to `"author": { "name": "You" }`.
 
 **Edited the team and ran `atl update`, no effect**
-→ Did you commit? `atl update` pulls via git, so uncommitted edits don't flow. Commit the team, then `atl update`.
+→ Did you commit, bump the version, and push? `atl update` pulls the published version, so uncommitted (or unpushed) edits don't flow. Commit + bump + push, then `atl update`.
+
+**`atl install` says "team not found"**
+→ The handle isn't in the catalog yet. The repo must be public and tagged with the `atl-team` topic (or have had `atl publish` run against it). Try `atl search` to confirm what's indexed.
 
 **Want to delete a team cleanly**
-→ `atl remove my-team` in the project removes copies from `.claude/` but keeps the cached repo. To nuke the cache too: `rm -rf ~/.claude/repos/agentteamland/my-team`.
-
-**Team uses `extends` but I changed the parent locally; `atl install` pulls the wrong parent**
-→ `extends` is resolved via the registry / URL spec written in the child's `team.json`. It won't read your local parent unless the child's `extends` points at a local path. Pin extending with a local path like `"extends": "/abs/path/to/parent-team"` for fully-local chains.
+→ `atl remove you/my-team` removes the team's manifest-recorded files at the scope (project by default; `--global` for the global layer) and prunes any now-empty directories.
 
 ---
 
-## Part 7 — FAQ
+## FAQ
 
 **Do I have to push my team anywhere to use it?**
-No. Point `atl install` at your local path (atl ≥ 0.1.4). Commits in your local git repo are all that's required.
-
-**Do I have to submit to the registry?**
-No. The registry is only for discoverability via short names. Most private / internal teams never submit.
+Yes. `atl install` resolves handles against the GitHub-backed catalog, so a team needs a public repo tagged `atl-team` (or one `atl publish` has run against) before it can be installed by handle.
 
 **Can multiple teams coexist in one project?**
-Yes — `atl install a && atl install b && atl install c`. Each team's items are copied into the shared `.claude/` directory. If names collide, atl warns you (child team wins over parent; later installs override earlier).
+Yes — install as many as you like. Each team's items are copied into the shared `.claude/` directory. If two teams declare an item with the same name, the most recently installed one wins and `atl` prints a one-line warning.
 
 **What Markdown format does atl use?**
-Plain Markdown with optional YAML frontmatter. Claude's agent and skill format is supported natively.
+Plain Markdown with optional YAML frontmatter. Claude Code's agent and skill format is supported natively.
 
 **Can I version skills independently of the team?**
-Not today. Versioning is team-level via `team.json.version`. Per-skill versioning is a proposed future feature.
+Not today. Versioning is team-level via `team.json`'s `version` field.
 
 **Are there size limits?**
-No hard limits. In practice team repos are under 10 MB. If you embed large binaries (CSS bundles, SVG sprites), mention it in the README so users know what they're pulling.
+No hard limits. In practice team repos are under 10 MB. If you embed large binaries, mention it in the README so users know what they're pulling.
 
 ---
 
 ## See also
 
 - [team.json field reference](./team-json)
-- [Scaffolder spec](./scaffolder-spec) — adding `/create-new-*` skills
-- [Registry submission](/cli/publish) — publishing publicly
-- [`atl install` command](../cli/install) — full CLI reference
-- [Reference schema](../reference/schema) — JSON Schema for `team.json`
+- [Scaffolder spec](./scaffolder-spec) — adding `/create-new-project` skills
+- [`atl install`](/cli/install) — full CLI reference
+- [`atl publish`](/cli/publish) — circulate your team's accumulated gains upstream
+- [Children + learnings](/guide/children-and-learnings) — the agent/skill knowledge-base pattern

@@ -1,10 +1,10 @@
 # `/create-pr`
 
-Çalışma ağacı değişikliklerini al (commit edilmemiş ya da yakın zamanda varsayılan dala commit edilmiş), farktan uygun bir dal adı + commit mesajı + PR başlığı türet, [`/save-learnings`](/tr/skills/drain) komutunu çalıştır ki birikmiş deneyim aynı PR'ın içinde yolculuk etsin, AI inceleme zincirini çalıştır (genel temel + takım tarafından bildirilen uzmanlar), commit + push yap, bir PR aç. İsteğe bağlı olarak GitHub auto-merge düzeneğini, sınırlı bir yoklama ve kendiliğinden düzeltme döngüsüyle etkinleştir. İş bitiminde kullanıcıyı daima hedef dala döndür.
+Çalışma ağacı değişikliklerini al (commit edilmemiş ya da yakın zamanda varsayılan dala commit edilmiş), farktan uygun bir dal adı + commit mesajı + PR başlığı türet, [`/drain`](/tr/skills/drain) komutunu çalıştır ki birikmiş deneyim aynı PR'ın içinde yolculuk etsin, AI inceleme zincirini çalıştır (genel temel + takım tarafından bildirilen uzmanlar), commit + push yap, bir PR aç. İsteğe bağlı olarak GitHub auto-merge düzeneğini, sınırlı bir yoklama ve kendiliğinden düzeltme döngüsüyle etkinleştir. İş bitiminde kullanıcıyı daima hedef dala döndür.
 
 Bu beceri, "bir parça işi yayımla" akışının belirlenimci hâlidir — `team-repo-maintenance`, `branch-hygiene`, `learning-capture`, `docs-sync` ve `karpathy-guidelines` ile tanımlı disiplinleri tüketir; kullanıcı bunları her PR'da yeniden üretmek zorunda kalmaz.
 
-Global beceri olarak [core](https://github.com/agentteamland/core) içinde, `core@1.4.0` sürümünden bu yana yayımlanır.
+Global beceri olarak [atl monoreposunda](https://github.com/agentteamland/atl) yayımlanır.
 
 ## Bayraklar
 
@@ -13,7 +13,7 @@ Global beceri olarak [core](https://github.com/agentteamland/core) içinde, `cor
 | `--auto-merge` | KAPALI | GitHub auto-merge düzeneğini etkinleştirir (`gh pr merge --auto --merge`); birleşene ya da kalıcı bir başarısızlık olana kadar yoklama + kendiliğinden düzeltme yapılır. |
 | `--no-review` | KAPALI (inceleme açık) | Tüm inceleme zincirini atlar (genel + her takım inceleyicisi). |
 | `--no-auto-fix` | KAPALI (düzeltme açık) | Yoklama döngüsü sırasında CI / birleştirme başarısızlıklarını düzeltmeye çalışmaz; bunun yerine kullanıcıya bildirir. |
-| `--no-learning` | KAPALI (öğrenme açık) | `/save-learnings` ve doc-impact hattını atlar. |
+| `--no-learning` | KAPALI (öğrenme açık) | `/drain` ve doc-impact hattını atlar. |
 | `--timeout {min}` | 10 | Dakika cinsinden yoklama zaman aşımı; 1 dakikalık aralık; hem `--auto-merge` hem elle birleştirme beklemesi için geçerli. |
 
 ## Akış
@@ -45,13 +45,13 @@ Stage'lenmiş + stage'lenmemiş + izlenmeyen değişiklikleri çözümle:
 
 - **Dal adı** — `{type}/{slug}` (örneğin `feat/create-pr-skill`, `fix/winget-403`, `docs/translate-trk-en`).
 - **Commit konusu** — `{type}({scope}): {tek satırlık özet}`, 70 karakterin altında.
-- **Commit gövdesi** — değişikliği anlatan 2-4 madde. Takım deposu bağlamında çağrılıyorsa son satır bir "Discovered via" bağlamıdır ([team-repo-maintenance §3](https://github.com/agentteamland/core/blob/main/rules/team-repo-maintenance.md) gereği).
+- **Commit gövdesi** — değişikliği anlatan 2-4 madde. Takım deposu bağlamında çağrılıyorsa son satır bir "Discovered via" bağlamıdır ([team-repo-maintenance §3](https://github.com/agentteamland/atl/blob/main/core/rules/team-repo-maintenance.md) gereği).
 
 Beceri kullanıcıya ad onayı için **sormaz** — adları üretir ve devam eder.
 
 ### Adım 4 — Öğrenmeleri kaydet (`--no-learning` verilmedikçe)
 
-[`/save-learnings`](/tr/skills/drain) komutunu elle kipte çalıştırır (canlı konuşmayı çözümler):
+[`/drain`](/tr/skills/drain) komutunu elle kipte çalıştırır (canlı konuşmayı çözümler):
 
 - Wiki / journal / ajan children / beceri learnings güncellemelerini yazar (proje-yerel).
 - Her `<!-- learning doc-impact: readme/docs/breaking -->` işaretçisi için bir doküman taslağı hazırlar.
@@ -112,7 +112,7 @@ gh pr create \
   --body "..."
 ```
 
-Gövdede Summary, Discovered via, Sürüm artırımı (uygulanabilirse) ve Test plan bulunur. [team-repo-maintenance §4](https://github.com/agentteamland/core/blob/main/rules/team-repo-maintenance.md) gereği beceri `--assignee` ya da `--reviewer` **geçirmez**.
+Gövdede Summary, Discovered via, Sürüm artırımı (uygulanabilirse) ve Test plan bulunur. [team-repo-maintenance §4](https://github.com/agentteamland/atl/blob/main/core/rules/team-repo-maintenance.md) gereği beceri `--assignee` ya da `--reviewer` **geçirmez**.
 
 ### Adım 8 — `--auto-merge` etkinleştirme (yalnızca bayrak verilmişse)
 
@@ -173,27 +173,27 @@ Kullanıcı beceriyi hedef dalda, birleştirilmiş değişiklik dahil edilmiş h
    PR:          https://github.com/.../pull/N
    Review:      generic + 1 team reviewer (software-project-team)
                 3 issues, 1 concern, all addressed
-   Learnings:   /save-learnings ran — 2 wiki pages updated, 1 README draft accepted
+   Learnings:   /drain ran — 2 wiki pages updated, 1 README draft accepted
    Auto-merge:  enabled, merged after 4 min (1 auto-fix: prettier formatting)
    End-of-work: returned to main, pulled latest
 ```
 
 ## Önemli kısıtlar
 
-1. **Asla doğrudan birleştirme.** Bu beceri `gh pr merge --auto --merge` (auto-merge etkinleştirme) komutunu yalnızca `--auto-merge` bayrağı verildiğinde kullanır. Doğrudan birleştirme (`--auto` olmadan `--merge`/`--squash`/`--rebase`) **daima yasaktır** — bkz. [team-repo-maintenance "PR merge discipline"](https://github.com/agentteamland/core/blob/main/rules/team-repo-maintenance.md). Kullanıcı bayrağı yazarak auto-merge'i açıkça yetkilendirmiştir; bu belgelenmiş istisnadır.
-2. **Discovered-via bağlamı.** Paylaşılan / takım deposundan çağrıldığında beceri team-repo-maintenance disiplinine uyar: PR gövdesine "Discovered via" eklenir, sürüm artırılır, conventional commit kullanılır. Algılama: çalışma dizini `~/.claude/repos/agentteamland/` altında ya da bilinen bir paylaşılan depo desenine uyuyor.
-3. **İdempotent save-learnings.** Burada `/save-learnings`'i yeniden çalıştırmak güvenlidir — ekler, yinelenenleri ayıklar ve yalnızca yeni içeriği işler.
-4. **Şema doğrulaması.** Stage'lenmiş fark bir `team.json` dosyasına dokunuyorsa, push'tan önce doğrulayıcı çalışır (`~/.claude/repos/agentteamland/core/scripts/validate-team-json.sh`).
+1. **Asla doğrudan birleştirme.** Bu beceri `gh pr merge --auto --merge` (auto-merge etkinleştirme) komutunu yalnızca `--auto-merge` bayrağı verildiğinde kullanır. Doğrudan birleştirme (`--auto` olmadan `--merge`/`--squash`/`--rebase`) **daima yasaktır** — bkz. [team-repo-maintenance "PR merge discipline"](https://github.com/agentteamland/atl/blob/main/core/rules/team-repo-maintenance.md). Kullanıcı bayrağı yazarak auto-merge'i açıkça yetkilendirmiştir; bu belgelenmiş istisnadır.
+2. **Discovered-via bağlamı.** Paylaşılan / takım deposundan çağrıldığında beceri team-repo-maintenance disiplinine uyar: PR gövdesine "Discovered via" eklenir, sürüm artırılır, conventional commit kullanılır. Algılama: uzak URL'nin bilinen bir paylaşılan depo desenine (örneğin `agentteamland/` altında) uyması.
+3. **İdempotent drain.** Burada `/drain`'i yeniden çalıştırmak güvenlidir — yalnızca onaylanmamış kuyruk girdilerini işler.
+4. **team.json doğrulaması.** Stage'lenmiş fark bir `team.json` dosyasına dokunuyorsa, push'tan önce beceri dosyanın ayrıştırılabilir olduğunu, bir `name` alanı içerdiğini ve bildirilen tüm varlıkların diskte var olduğunu doğrular.
 5. **Başlamadan önce dal hijyeni.** Yeni dalı türetmeden önce beceri yerel varsayılan dalın `origin` ile güncel olduğunu doğrular. Değilse önce ileri-sarma yapar.
 6. **Sessiz, kısmi başarısızlık yok.** Herhangi bir adım başarısız olursa beceri durur ve raporlar.
 
 ## İlgili
 
-- [`/save-learnings`](/tr/skills/drain) — Adım 4'te çağrılır.
-- [team-repo-maintenance kuralı](https://github.com/agentteamland/core/blob/main/rules/team-repo-maintenance.md) — paylaşılan depolar için yönetişim.
-- [karpathy-guidelines kuralı](https://github.com/agentteamland/core/blob/main/rules/karpathy-guidelines.md) — inceleme isteminin temeli.
+- [`/drain`](/tr/skills/drain) — Adım 4'te çağrılır.
+- [team-repo-maintenance kuralı](https://github.com/agentteamland/atl/blob/main/core/rules/team-repo-maintenance.md) — paylaşılan depolar için yönetişim.
+- [karpathy-guidelines kuralı](https://github.com/agentteamland/atl/blob/main/core/rules/karpathy-guidelines.md) — inceleme isteminin temeli.
 
-## Gelecek evrim (v2)
+## Gelecek evrim
 
 - **Alana duyarlı inceleme yönlendirmesi** — her takım ajanı `domains: ["*.tsx", ...]` glob'u bildirir; beceri farkın dosya türlerini eşler ve yalnızca ilgili ajanları çağırır.
 - **Paralel takım incelemesi** — takım inceleyicileri eş zamanlı çalıştırılır.
@@ -201,4 +201,4 @@ Kullanıcı beceriyi hedef dalda, birleştirilmiş değişiklik dahil edilmiş h
 
 ## Kaynak
 
-- Belirtim: [core/skills/create-pr/skill.md](https://github.com/agentteamland/core/blob/main/skills/create-pr/skill.md).
+- Belirtim: [core/skills/create-pr/skill.md](https://github.com/agentteamland/atl/blob/main/core/skills/create-pr/skill.md).
