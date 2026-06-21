@@ -29,7 +29,7 @@ Knowledge lives in `.atl/wiki/` (current truth, topic-organized) and `.atl/journ
 **Wiki topics:**
 - [docs-audit-false-positive-rate](.atl/wiki/docs-audit-false-positive-rate.md) — ~40% of multi-agent docs-drift audit reports include hallucinated findings
 - [pr-merge-discipline](.atl/wiki/pr-merge-discipline.md) — never `gh pr merge` from Claude; surface URL and stop
-- [save-learnings-timing](.atl/wiki/save-learnings-timing.md) — run before PR creation as feature branch's last commit
+- [complexity-resistance](.atl/wiki/complexity-resistance.md) — when a proposal needs paragraphs to defend, that's a smell
 - ...
 
 **Discipline:** Before working on a topic, scan this list. If a topic looks relevant, read the page.
@@ -50,7 +50,7 @@ Her madde tek satırdır: `- [topic](.atl/wiki/topic.md) — tek satırlık öze
 
 These topics have an in-progress brainstorm — read the file before making any decision on them.
 
-- **[docs-sync-automation](.atl/brain-storms/docs-sync-automation.md)** (project, 2026-05-03) — closing the README + docs-site drift gap; save-learnings extension vs. /docs-sync skill vs. doc-agent
+- **[profile-team](.atl/brain-storms/profile-team.md)** (project, 2026-05-08) — schema, storage, privacy, and initial scope for the new profile-team package
 <!-- brainstorm:active:end -->
 ```
 

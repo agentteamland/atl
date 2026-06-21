@@ -43,7 +43,7 @@ Every active brainstorm pins itself into the scope's `CLAUDE.md` (or team `READM
 
 These topics have an in-progress brainstorm — read the file before making any decision on them.
 
-- **[docs-sync-automation](.atl/brain-storms/docs-sync-automation.md)** (project, 2026-05-03) — closing the README + docs-site drift gap
+- **[profile-team](.atl/brain-storms/profile-team.md)** (project, 2026-05-08) — schema, storage, privacy, and initial scope for the new profile-team package
 <!-- brainstorm:active:end -->
 ```
 

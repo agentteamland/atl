@@ -1,10 +1,10 @@
 # Workspace — the maintainer hub
 
-The [`agentteamland/workspace`](https://github.com/agentteamland/workspace) repo is the **maintainer hub** for the AgentTeamLand ecosystem. It's a meta-repo: cloning it and running one script gives you every peer repo (cli, core, registry, software-project-team, etc.) checked out under a single tree at `./repos/`. Every moving part of the platform is one `cd repos/<name>` away.
+The [`agentteamland/workspace`](https://github.com/agentteamland/workspace) repo is the **maintainer hub** for the AgentTeamLand ecosystem. It's a meta-repo: cloning it and running one script gives you every peer repo (atl, docs, .github, etc.) checked out under a single tree at `./repos/`. Every moving part of the platform is one `cd repos/<name>` away.
 
-Use the workspace when you're doing maintenance work that spans multiple repos: cross-repo refactors, multi-PR rollouts, governance audits, or just `git status` across the whole org without 14 separate `cd` commands.
+Use the workspace when you're doing maintenance work that spans multiple repos: cross-repo refactors, multi-PR rollouts, governance audits, or just `git status` across the whole org without many separate `cd` commands.
 
-If you only want to USE atl (install teams in your own projects), you don't need the workspace — `brew install agentteamland/tap/atl` is enough. The workspace is for ecosystem-side work.
+If you only want to USE atl (install teams in your own projects), you don't need the workspace — the [install script](../guide/install) is enough. The workspace is for ecosystem-side work.
 
 ## Bootstrap
 
