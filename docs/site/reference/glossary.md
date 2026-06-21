@@ -38,14 +38,14 @@
 
 **Workspace** — `agentteamland/workspace`, the maintainer hub repo where all peer repos are aggregated for development. Not needed to use AgentTeamLand; only relevant if you're contributing to the platform itself.
 
-**Journal** — chronological per-agent learning record under `.atl/journal/{date}_{agent}.md`. Replaces the retired `agent-memory/` layer. Written by `/save-learnings`; read by Claude during agent startup per the [knowledge-system rule](https://github.com/agentteamland/core/blob/main/rules/knowledge-system.md).
+**Journal** — chronological per-agent learning record under `.atl/journal/{date}_{agent}.md`. Written by [`/drain`](/skills/drain) as it folds the learning queue into the knowledge base; read by Claude during agent startup per the [knowledge-system rule](https://github.com/agentteamland/core/blob/main/rules/knowledge-system.md).
 
-**knowledge-base-summary** — required YAML frontmatter field on every `children/{topic}.md` (and `learnings/{topic}.md`) file. One- to three-line summary that `/save-learnings` extracts to rebuild the parent agent.md's Knowledge Base (or skill.md's Accumulated Learnings) section. Source-of-truth — hand edits to the rebuilt section are overwritten on the next save-learnings run.
+**knowledge-base-summary** — required YAML frontmatter field on every `children/{topic}.md` (and `learnings/{topic}.md`) file. One- to three-line summary that [`/drain`](/skills/drain) extracts to rebuild the parent agent.md's Knowledge Base (or skill.md's Accumulated Learnings) section. Source-of-truth — hand edits to the rebuilt section are overwritten on the next `/drain` run.
 
 **knowledge-system** — the core rule that defines the two-layer knowledge model (`journal/` + `wiki/`). Renamed from `memory-system` in `core@1.8.0` after the agent-memory layer was merged into journal.
 
 **learnings/** — per-skill subdirectory mirroring agents' `children/`. Each `learnings/{topic}.md` carries `knowledge-base-summary` frontmatter; the skill's `## Accumulated Learnings` section is auto-rebuilt from those.
 
-**Learning marker** — inline HTML comment dropped by Claude during a conversation when a learning moment occurs. Format: `<!-- learning topic: ... kind: ... doc-impact: ... body: ... -->`. Scanned by `atl learning-capture` on the next session's `SessionStart` and processed by `/save-learnings --from-markers`.
+**Learning marker** — inline HTML comment dropped by Claude during a conversation when a learning moment occurs. Format: `<!-- learning: free text -->`. Transferred into the durable queue (`~/.atl/queue.db`) at the next session's `SessionStart` (exactly once, deduped by content hash), then processed by [`/drain`](/skills/drain) and deleted.
 
 **Wiki** — topic-organized current-truth knowledge under `.atl/wiki/{topic}.md`. Replaced (not appended) when truth changes; the `<!-- wiki:index -->` marker block in CLAUDE.md keeps the live index visible to Claude on every session start.

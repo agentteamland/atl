@@ -16,7 +16,7 @@ Without it, complex agents and skills end up as one of two anti-shapes:
 The children + learnings pattern resolves both:
 
 - **Topic-per-file** — update one piece without touching others
-- **Auto-rebuilt index** — the top-level file's "Knowledge Base" / "Accumulated Learnings" section is regenerated from frontmatter on every [`/save-learnings`](/skills/drain) run. Hand edits are overwritten — the source of truth is each child's frontmatter.
+- **Auto-rebuilt index** — the top-level file's "Knowledge Base" / "Accumulated Learnings" section is regenerated from frontmatter on every [`/drain`](/skills/drain) run. Hand edits are overwritten — the source of truth is each child's frontmatter.
 
 Result: knowledge accumulates frictionlessly, the top-level file stays tight, and the index never goes stale.
 
@@ -39,7 +39,7 @@ After [`atl install`](/cli/install), the same structure is copied into your proj
 
 1. **`agent.md` stays short.** Only: identity, area of responsibility (positive list), core principles (unchanging, short bullets), Knowledge Base section (auto-aggregated), "read children/" instruction.
 2. **Everything detailed goes under `children/`.** Strategies, patterns, workflows, conventions — each in a separate `.md` file.
-3. **New topic = new file.** Without touching `agent.md` by hand, add a `.md` file under `children/`. The Knowledge Base section is rebuilt automatically by `/save-learnings` from each child file's frontmatter.
+3. **New topic = new file.** Without touching `agent.md` by hand, add a `.md` file under `children/`. The Knowledge Base section is rebuilt automatically by `/drain` from each child file's frontmatter.
 4. **Update = single file.** To update a topic, only the relevant `children/` file is touched.
 5. **Monolithic agent files are prohibited.**
 6. **This pattern applies to all agents.** API, Socket, Worker, Flutter, React, Mail, Log, Infra — all follow the same structure.
@@ -63,7 +63,7 @@ Every complex skill mirrors the agent shape. Two locations matter:
 └── learnings/            ← Same pattern; auto-grown copies
 ```
 
-[`atl install`](/cli/install) copies skills (and agents + rules) into the project. [`atl update`](/cli/update) refreshes unmodified copies via three-way SHA-256 comparison. `/save-learnings` writes to the project-local copy first; the auto-update flow propagates changes upstream when the user is the team-repo maintainer.
+[`atl install`](/cli/install) copies skills (and agents + rules) into the project. [`atl update`](/cli/update) refreshes unmodified copies via three-way SHA-256 comparison. `/drain` writes to the project-local copy first; `atl promote` then lifts gains to your global layer, and `atl publish` can propose them upstream to the team's repo.
 
 Same shape, same rules, same `knowledge-base-summary` frontmatter convention. The skill's `skill.md` ships with an "Accumulated Learnings" section auto-aggregated from `learnings/*.md` frontmatter — same mechanism as `agent.md`'s Knowledge Base.
 
@@ -83,11 +83,11 @@ knowledge-base-summary: "<one-to-three-line summary used in the auto-rebuilt ind
 <the actual content — patterns, strategies, examples — as long as needed>
 ```
 
-This summary is what feeds the parent file's Knowledge Base / Accumulated Learnings section. Without it, `/save-learnings` either skips the topic in the rebuild OR (for new files it created itself) writes the field with a generated summary; in both cases the file should have one.
+This summary is what feeds the parent file's Knowledge Base / Accumulated Learnings section. Without it, `/drain` either skips the topic in the rebuild OR (for new files it created itself) writes the field with a generated summary; in both cases the file should have one.
 
 ## Auto-rebuilt index sections
 
-When `/save-learnings` runs, it rebuilds the parent file's index section from the frontmatter of every `children/*.md` (for agents) or `learnings/*.md` (for skills). The shape is identical for both:
+When `/drain` runs, it rebuilds the parent file's index section from the frontmatter of every `children/*.md` (for agents) or `learnings/*.md` (for skills). The shape is identical for both:
 
 ```markdown
 ## Knowledge Base                     ← (or "Accumulated Learnings" for skills)
@@ -103,7 +103,7 @@ When `/save-learnings` runs, it rebuilds the parent file's index section from th
 ...
 ```
 
-Hand edits to this section are **overwritten** on the next `/save-learnings` run — the source of truth is each child file's frontmatter. The rest of `agent.md` / `skill.md` (identity, responsibility, principles, flow) is **not touched** by the rebuild.
+Hand edits to this section are **overwritten** on the next `/drain` run — the source of truth is each child file's frontmatter. The rest of `agent.md` / `skill.md` (identity, responsibility, principles, flow) is **not touched** by the rebuild.
 
 ## Three layers of update
 
@@ -111,9 +111,9 @@ The split lets "knowledge accumulates" be automatic and frictionless, while prot
 
 | Layer | What changes | How |
 |---|---|---|
-| **A — auto** | A `children/{topic}.md` or `learnings/{topic}.md` file is created or updated. | `/save-learnings` writes it directly. No prompt. |
-| **B — auto** | The parent's Knowledge Base / Accumulated Learnings section is rebuilt from the new frontmatter set. | `/save-learnings` rebuilds it. No prompt. |
-| **C — gated** | The parent's identity / responsibility / principles / skill flow needs to change. | `/save-learnings` raises an `AskUserQuestion` gate. The user approves; the file is updated. The user rejects; the proposal is logged to journal as "rejected." |
+| **A — auto** | A `children/{topic}.md` or `learnings/{topic}.md` file is created or updated. | `/drain` writes it directly. No prompt. |
+| **B — auto** | The parent's Knowledge Base / Accumulated Learnings section is rebuilt from the new frontmatter set. | `/drain` rebuilds it. No prompt. |
+| **C — gated** | The parent's identity / responsibility / principles / skill flow needs to change. | `/drain` raises an `AskUserQuestion` gate. The user approves; the file is updated. The user rejects; the proposal is logged to journal as "rejected." |
 
 The C-layer protects the top-level identity from automatic drift. Once the user approves a change, the file is updated.
 
@@ -148,7 +148,7 @@ Without a blueprint, the agent guesses how to create new units. With a blueprint
 ## Related
 
 - [Knowledge system](/guide/knowledge-system) — the project-side mirror (journal + wiki) of this team-side pattern
-- [`/save-learnings`](/skills/drain) — writes children/ and learnings/ files; rebuilds parent index sections
+- [`/drain`](/skills/drain) — writes children/ and learnings/ files; rebuilds parent index sections
 - [Concepts: Skill](/guide/concepts#skill) — where the learnings/ pattern fits
 - Canonical rule: [`core/rules/agent-structure.md`](https://github.com/agentteamland/core/blob/main/rules/agent-structure.md)
 

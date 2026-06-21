@@ -104,12 +104,11 @@ This means re-running `atl install` is safe even in scripts. To pick up upstream
 
 ## What happens
 
-1. **Resolve.** Registry names are looked up in [`teams.json`](https://github.com/agentteamland/registry/blob/main/teams.json); URLs are used directly.
-2. **Clone or pull.** If the team isn't in the shared cache, it's cloned. If it is, the cache is fast-forwarded.
-3. **Resolve inheritance.** If `team.json` has an `extends` field, the parent is installed (recursively) before the child.
-4. **Validate.** `team.json` is checked against the [schema](/reference/schema). Invalid teams fail here.
-5. **Materialize.** Agents, rules, and skills are **copied** into `.claude/agents/`, `.claude/rules/`, `.claude/skills/`. Precedence applies (child wins, excludes drop). Existing project copies are kept (idempotent default); use `--refresh` to overwrite.
-6. **Record.** `.claude/.team-installs.json` is updated atomically (tmp + rename) with the installed team, version, chain, and per-resource SHA-256 baselines used by `atl update`'s auto-refresh.
+1. **Resolve.** The handle is looked up in the GitHub-backed index — a first-party team resolves to a monorepo subpath, a third-party team to its standalone repo. A Git URL is used directly.
+2. **Fetch.** The team is downloaded as a ref-pinned HTTP tarball (no `git` binary required) into a local cache.
+3. **Validate.** `team.json` is checked against the [schema](/reference/schema). Invalid teams fail here.
+4. **Write.** Agents, rules, and skills are **copied** into the scope's `.claude/` — `~/.claude` for a global install, `<project>/.claude` for a project install. Existing copies are kept (idempotent default); use `--refresh` to overwrite.
+5. **Record.** A per-team manifest at `<layer>/.atl/installed/<handle>__<name>.json` records the source ref + per-file SHA-256 baselines that `atl update`'s auto-refresh and `atl doctor`'s integrity check rely on.
 
 ## Offline behavior
 
@@ -117,8 +116,7 @@ If the network is unreachable, `atl install` falls back to the shared cache. You
 
 ## Troubleshooting
 
-- **"team not found"** — the name isn't in the registry. Try `atl search`.
-- **"circular extends chain"** — a team in the chain extends an ancestor. The error prints the full chain.
+- **"team not found"** — the handle isn't in the index. Try `atl search`.
 - **"schema validation failed"** — the team's `team.json` is malformed. Ask the author to fix it, or pin to an earlier version.
 - **"invalid team slug"** — the name resolved to a slug that fails the safety regex (e.g., starts with `-`). Pass the team in `owner/repo` form or use a Git URL.
 

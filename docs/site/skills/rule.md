@@ -121,7 +121,6 @@ gh pr create --fill
 
 - [`/rule-wizard`](/skills/rule-wizard) — option-based clarification wizard for ambiguous rules; invokes `/rule` at the end
 - [Concepts: Rule](/guide/concepts#rule) — what rules are and how they're loaded
-- [team-repo-maintenance rule](https://github.com/agentteamland/core/blob/main/rules/team-repo-maintenance.md) — discipline for shipping rule changes upstream
 
 ## Source
 

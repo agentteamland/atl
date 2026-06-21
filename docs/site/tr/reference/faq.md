@@ -30,7 +30,7 @@ Evet, Git istemcin depoyu klonlayabildiği sürece (SSH anahtarları, PAT vb.). 
 
 ### `atl` sürümüm bir takım için çok eskiyse ne olur?
 
-Takımın `team.json` dosyası bir `requires.atl` alt sınırı bildirebilir. Kurulu `atl` daha eskiyse, sana yükseltmeni söyleyen açık bir hata alırsın. Hangi kanaldan kurduysan ona göre `brew upgrade atl` (ya da eşdeğeri) çalıştır.
+Takımın `team.json` dosyası bir `requires.atl` alt sınırı bildirebilir. Kurulu `atl` daha eskiyse, sana yükseltmeni söyleyen açık bir hata alırsın. `atl update` çalıştır ya da kurulum betiğini (`curl -fsSL …/scripts/install.sh | sh`) yeniden çalıştır.
 
 ### Bir takımı nasıl eskiye düşürürüm?
 

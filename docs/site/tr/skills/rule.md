@@ -121,7 +121,6 @@ Kuruluysa [`/create-pr`](/tr/skills/create-pr) bunu otomatikleştirir.
 
 - [`/rule-wizard`](/tr/skills/rule-wizard) — belirsiz kurallar için seçenek tabanlı netleştirme sihirbazı; sonunda `/rule`'u çağırır.
 - [Kavramlar: Kural](/tr/guide/concepts#rule) — kuralların ne olduğu ve nasıl yüklendiği.
-- [team-repo-maintenance kuralı](https://github.com/agentteamland/core/blob/main/rules/team-repo-maintenance.md) — kural değişikliklerini üst kaynağa gönderme disiplini.
 
 ## Kaynak
 
