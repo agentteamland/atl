@@ -55,7 +55,7 @@ repos/
 
 ```bash
 cd repos/<repo-name>
-# Değişikliklerini yap, team-repo-maintenance disiplinini izle
+# Değişikliklerini yap, conventional-commit + branch-hygiene disiplinini izle
 git checkout -b <type>/<short-description>
 # ... dosyaları düzenle ...
 git add <files> && git commit -m "<conventional message>"

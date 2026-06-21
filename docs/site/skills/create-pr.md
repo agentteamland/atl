@@ -1,8 +1,8 @@
 # `/create-pr`
 
-Take working-tree changes (uncommitted, or recently committed to the default branch), derive an appropriate branch name + commit message + PR title from the diff, run [`/drain`](/skills/drain) so wisdom rides along in the same PR, run an AI review chain (generic baseline + any team-declared specialists), commit + push, open a PR. Optionally enable GitHub auto-merge with a bounded polling + auto-fix loop. Always return the user to the target branch at end-of-work.
+Take working-tree changes (uncommitted, or recently committed to the default branch), derive an appropriate branch name + commit message + PR title from the diff, run [`/drain`](/skills/drain) so pending learnings ride along in the same PR, run an AI review chain (generic baseline + any team-declared specialists), commit + push, and open a PR. Optionally enable GitHub auto-merge with a bounded polling + auto-fix loop. Always return the user to the target branch at end-of-work.
 
-This skill is the deterministic "ship a piece of work" flow — it consumes the disciplines defined by `team-repo-maintenance`, `branch-hygiene`, `learning-capture`, `docs-sync`, and `karpathy-guidelines`, so the user does not have to re-derive them every PR.
+This skill is the deterministic "ship a piece of work" flow — it applies the [`branch-hygiene`](https://github.com/agentteamland/atl/blob/main/core/rules/branch-hygiene.md), [`learning-capture`](https://github.com/agentteamland/atl/blob/main/core/rules/learning-capture.md), and [`karpathy-guidelines`](https://github.com/agentteamland/atl/blob/main/core/rules/karpathy-guidelines.md) rules, so you don't re-derive them every PR.
 
 Ships as a global skill in the [atl monorepo](https://github.com/agentteamland/atl).
 
@@ -10,10 +10,10 @@ Ships as a global skill in the [atl monorepo](https://github.com/agentteamland/a
 
 | Flag | Default | Effect |
 |---|---|---|
-| `--auto-merge` | OFF | Enable GitHub auto-merge (`gh pr merge --auto --merge`); poll + auto-fix until merged or terminal failure |
+| `--auto-merge` | OFF | Enable GitHub auto-merge (`gh pr merge --auto --squash`); poll + auto-fix until merged or terminal failure |
 | `--no-review` | OFF (review on) | Skip the entire review chain (generic + every team reviewer) |
 | `--no-auto-fix` | OFF (fix on) | During the polling loop, do not attempt to fix CI/merge failures; surface to the user instead |
-| `--no-learning` | OFF (learning on) | Skip `/drain` + doc-impact pipeline |
+| `--no-drain` | OFF (drain on) | Skip folding pending learnings into the knowledge base |
 | `--timeout {min}` | 10 | Polling timeout in minutes; 1-minute interval, applies to both `--auto-merge` and manual-merge wait |
 
 ## Flow
@@ -23,7 +23,7 @@ The flow runs sequentially. Each step has a clear precondition and postcondition
 ### Step 1 — Pre-checks
 
 - Current directory is inside a git repo
-- Working tree has changes OR the current branch has unpushed commits
+- Working tree has changes OR the current branch has unpushed commits (if neither: "Nothing to do — working tree clean and branch up-to-date")
 - Determine the repo's default branch (`main`/`master`)
 
 ### Step 2 — Determine target branch
@@ -31,39 +31,33 @@ The flow runs sequentially. Each step has a clear precondition and postcondition
 The "target branch" is what the PR merges into AND what the user returns to at end-of-work.
 
 - **On the default branch** → target = default branch.
-- **On a non-default branch** → `AskUserQuestion` with three choices: upper branch (auto-detected), default branch, or a free-text Other.
+- **On a non-default branch** → `AskUserQuestion` with three choices: upstream branch (auto-detected), the default branch, or a free-text Other.
 
 ### Step 3 — Generate branch name + commit message
 
 Analyze staged + unstaged + untracked changes:
 
-- **Type** — one of `feat`, `fix`, `docs`, `chore`, `refactor`, `test`, `perf`, `style` (heuristic-derived from the diff: new file under `skills/agents/rules/` → `feat`; bug-fix language → `fix`; only `*.md` → `docs`; etc.)
+- **Type** — one of `feat`, `fix`, `docs`, `chore`, `refactor`, `test`, `perf` (heuristic-derived from the diff: new agent/skill/rule or feature → `feat`; bug-fix language → `fix`; only `*.md` → `docs`; etc.)
 - **Scope** — most-specific scope covering the change (skill name, rule name, agent name, CLI command, repo area)
 - **Slug** — kebab-case, ≤ 50 chars, ASCII
 
 Outputs:
 
-- **Branch name** — `{type}/{slug}` (e.g., `feat/create-pr-skill`, `fix/winget-403`, `docs/translate-trk-en`)
+- **Branch name** — `{type}/{slug}` (e.g., `feat/create-pr-skill`, `fix/install-404`, `docs/translate-tr-en`)
 - **Commit subject** — `{type}({scope}): {one-line summary}` under 70 chars
-- **Commit body** — 2–4 bullets describing the change. Last line is a "Discovered via" context if invoking from a team-repo context (per [team-repo-maintenance §3](https://github.com/agentteamland/atl/blob/main/core/rules/team-repo-maintenance.md))
+- **Commit body** — 2–4 bullets describing the change
 
 The skill does **not** ask the user to confirm names — it generates and proceeds.
 
-### Step 4 — Save learnings (unless `--no-learning`)
+### Step 4 — Drain pending learnings (unless `--no-drain`)
 
-Invokes [`/drain`](/skills/drain) in manual mode (analyzes the live conversation):
+Invokes [`/drain`](/skills/drain) so any learnings captured during the session ride along in the same PR:
 
-- Writes wiki / journal / agent children / skill learnings updates (project-local)
-- For each `<!-- learning doc-impact: readme/docs/breaking -->` marker, prepares a doc draft
-- Each draft is presented inline to the user for accept / reject / edit:
+- `/drain` reads the durable learning queue, routes each pending item to the wiki / journal / agent knowledge base, and acks it.
+- An empty queue is a no-op.
+- If `/drain` isn't installed, the step is skipped with a one-line notice — it never fails the skill.
 
-```
-📝 Doc draft for README.md:
-<diff>
-Accept? (y/n/edit)
-```
-
-Accepted drafts get staged; rejected drafts are discarded.
+v2's marker is plain prose (`<!-- learning: free text -->`); `/drain` infers where each learning belongs, so there's no separate doc-draft step to review. See [`atl learnings`](/cli/learnings) and the [`/drain` skill](/skills/drain).
 
 ### Step 5 — Review chain (unless `--no-review`)
 
@@ -71,23 +65,23 @@ Two layers, executed sequentially:
 
 **5a — Generic reviewer (always)**
 
-Invokes a fresh-context sub-agent (`subagent_type: general-purpose`) with a Karpathy-grounded review prompt:
+Spawns a fresh-context sub-agent over the staged diff (fresh context so the review isn't biased by the model that wrote the diff), prompted with the four Karpathy guidelines:
 
 - Think Before Coding (assumptions explicit?)
 - Simplicity First (over-engineering?)
 - Surgical Changes (drive-by edits? orphans?)
-- Goal-Driven Execution (verifies against goal? success criteria?)
+- Goal-Driven Execution (verifies against the goal? success criteria?)
 
-Plus general code quality (naming, scope creep, security smells, dead code, test coverage). Reports as 🔴 Issues / 🟡 Concerns / 🟢 Looks good.
+Plus general code quality (naming, scope creep, security smells — secrets in logs, injection, hardcoded credentials — dead code, test coverage). Reports as 🔴 issues / 🟡 concerns / 🟢 good.
 
-**5b — Team reviewers (per installed team)**
+**5b — Team specialists (per installed team)**
 
-For each installed team, the skill reads `team.json` and looks for `capabilities.review`:
+For each installed team (look under `.claude/agents/` then `~/.claude/agents/` — project shadows global), the skill reads `team.json` `capabilities.review`:
 
-- If declared (e.g., `capabilities.review: "code-reviewer"`), the named team agent runs against the same diff and produces a domain-specific review
-- If not declared, skipped silently — there is no fallback per team. The generic reviewer is the platform-wide baseline.
+- If it names an agent (e.g., `capabilities.review: "code-reviewer"`), that team agent runs against the same diff and produces a domain-specific review.
+- If not declared, the team is skipped — 5a is the platform-wide baseline.
 
-The consolidated report is shown to the user. Continue / abort / edit.
+The consolidated report is shown to the user: continue / abort / edit.
 
 ### Step 6 — Commit + push
 
@@ -96,9 +90,7 @@ git checkout -b {branch-name}
 git add -A
 git commit -m "{commit-subject}
 
-{commit-body}
-
-{discovered-via-line if applicable}"
+{commit-body}"
 
 git push -u origin {branch-name}
 ```
@@ -109,18 +101,18 @@ git push -u origin {branch-name}
 gh pr create \
   --base {target-branch} \
   --title "{commit-subject}" \
-  --body "..."
+  --body "<Summary bullets + Test plan checklist>"
 ```
 
-Body has Summary, Discovered via, Version bump (if applicable), Test plan. Per [team-repo-maintenance §4](https://github.com/agentteamland/atl/blob/main/core/rules/team-repo-maintenance.md), the skill does **not** pass `--assignee` or `--reviewer`.
+The skill does **not** pass `--assignee` or `--reviewer`.
 
-### Step 8 — `--auto-merge` polling (only if flag set)
+### Step 8 — `--auto-merge` (only if the flag is set)
 
 ```bash
-gh pr merge {N} --auto --merge
+gh pr merge {N} --auto --squash
 ```
 
-This is the **only allowed merge invocation in the entire skill set.** It does not merge immediately — GitHub waits for required checks then merges automatically. Branch protection's check gate is preserved.
+This is the **only allowed merge invocation in the entire skill set.** It does not merge immediately — GitHub waits for required checks, then merges, so the branch-protection gate is preserved. The user opted in by passing the flag.
 
 ### Step 9 — Polling + auto-fix loop (if `--auto-merge`)
 
@@ -135,7 +127,7 @@ Polls PR state at 1-minute intervals, up to `{timeout}` attempts (default 10). S
 
 #### `handle_failure` classification
 
-**In-scope (auto-fix attempted):**
+**In-scope (auto-fix attempted, max 3):**
 
 - Merge conflicts — fetch latest target, attempt 3-way merge
 - Lint / format failures — run the project's formatter (auto-detected: `package.json scripts.lint`, `.prettierrc`, `gofmt`, `cargo fmt`, etc.)
@@ -160,7 +152,7 @@ Reached only when the PR was merged successfully:
 
 ```bash
 git checkout {target-branch}
-git pull origin {target-branch}
+git pull
 ```
 
 The user ends the skill on the target branch, with the merged change incorporated, ready for the next task.
@@ -173,32 +165,25 @@ The user ends the skill on the target branch, with the merged change incorporate
    PR:          https://github.com/.../pull/N
    Review:      generic + 1 team reviewer (software-project-team)
                 3 issues, 1 concern, all addressed
-   Learnings:   /drain ran — 2 wiki pages updated, 1 README draft accepted
+   Drain:       /drain ran — 2 wiki pages updated, 1 journal entry
    Auto-merge:  enabled, merged after 4 min (1 auto-fix: prettier formatting)
    End-of-work: returned to main, pulled latest
 ```
 
 ## Important constraints
 
-1. **Never merge directly.** This skill uses `gh pr merge --auto --merge` (auto-merge enable) only when `--auto-merge` flag is passed. Direct merge (`--merge`/`--squash`/`--rebase` without `--auto`) is **always forbidden** — see [team-repo-maintenance "PR merge discipline"](https://github.com/agentteamland/atl/blob/main/core/rules/team-repo-maintenance.md). The user has explicitly authorized auto-merge by typing the flag; this is the documented exception.
-2. **Discovered-via context.** When invoked from a shared / team repo, the skill follows team-repo-maintenance discipline: include "Discovered via" in PR body, bump version, conventional commit. Detection: matches a known shared-repo pattern (e.g., remote URL under `agentteamland/`).
-3. **Idempotent drain.** Running `/drain` again here is safe — it processes only unacknowledged queue entries.
-4. **team.json validation.** If the staged diff touches a `team.json`, the skill verifies that the file parses, has a `name` field, and all declared assets exist on disk before push.
-5. **Branch hygiene before start.** Before deriving the new branch, the skill verifies the local default branch is current with origin. If not, fast-forward first.
-6. **No silent partial failures.** If any step fails, the skill stops and reports.
+1. **Never merge directly.** The skill uses `gh pr merge --auto --squash` (auto-merge enable) only when `--auto-merge` is passed. An immediate `gh pr merge --squash`/`--merge`/`--rebase` (without `--auto`) is **always forbidden** — auto-merge preserves the required-check gate, and the user opted in by typing the flag.
+2. **Idempotent drain.** Running `/drain` here is safe — it processes only unacknowledged queue entries.
+3. **team.json validation.** If the staged diff touches a `team.json`, the skill verifies that the file parses, has a `name` field, and all declared assets exist on disk before push.
+4. **Branch hygiene before start.** Before deriving the new branch, the skill verifies the local default branch is current with origin; if behind, it fast-forwards first (per [`branch-hygiene`](https://github.com/agentteamland/atl/blob/main/core/rules/branch-hygiene.md)).
+5. **No silent partial failures.** If any step fails, the skill stops and reports — the user always knows where they are.
 
 ## Related
 
-- [`/drain`](/skills/drain) — invoked at Step 4
-- [team-repo-maintenance rule](https://github.com/agentteamland/atl/blob/main/core/rules/team-repo-maintenance.md) — governance for shared repos
-- [karpathy-guidelines rule](https://github.com/agentteamland/atl/blob/main/core/rules/karpathy-guidelines.md) — review prompt's foundation
-
-## Future evolution (v2)
-
-- **Domain-aware review routing** — each team agent declares `domains: ["*.tsx", ...]` glob; skill matches the diff's file types and invokes only relevant agents
-- **Parallel team review** — run team reviewers concurrently
-- **Auto-fix scope expansion** — extend in-scope to test failures where the test was added in the same diff
+- [`/drain`](/skills/drain) — invoked at Step 4 to fold pending learnings into the knowledge base
+- [`branch-hygiene` rule](https://github.com/agentteamland/atl/blob/main/core/rules/branch-hygiene.md) — keep the base branch current before branching
+- [`karpathy-guidelines` rule](https://github.com/agentteamland/atl/blob/main/core/rules/karpathy-guidelines.md) — the review prompt's foundation
 
 ## Source
 
-- Spec: [core/skills/create-pr/skill.md](https://github.com/agentteamland/atl/blob/main/core/skills/create-pr/skill.md)
+- Spec: [core/skills/create-pr/SKILL.md](https://github.com/agentteamland/atl/blob/main/core/skills/create-pr/SKILL.md)
