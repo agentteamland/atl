@@ -4,7 +4,7 @@
 
 Çalışma alanını, **birden çok depoyu kapsayan bakım işi** yaparken kullan: depolar arası yeniden tasarımlar, çoklu PR yayımları, yönetişim denetimleri ya da yalnızca birçok ayrı `cd` komutu olmadan organizasyon genelinde `git status` çalıştırmak.
 
-`atl`'yi yalnızca KULLANMAK istiyorsan (kendi projelerine takım kurmak için) çalışma alanına ihtiyacın yoktur — `brew install agentteamland/tap/atl` yeterlidir. Çalışma alanı, ekosistem tarafındaki iş içindir.
+`atl`'yi yalnızca KULLANMAK istiyorsan (kendi projelerine takım kurmak için) çalışma alanına ihtiyacın yoktur — [kurulum betiği](../guide/install) yeterlidir. Çalışma alanı, ekosistem tarafındaki iş içindir.
 
 ## İlk kurulum
 

@@ -1,136 +1,100 @@
-# Release pipeline (goreleaser → brew + scoop + winget)
+# Release pipeline (goreleaser → GitHub Releases)
 
-How `atl` releases get from a git tag in [`agentteamland/cli`](https://github.com/agentteamland/cli) to a `brew install` / `scoop install` / `winget install` ready-to-use binary on every supported platform.
+How an `atl` release gets from a git tag in the [`agentteamland/atl`](https://github.com/agentteamland/atl) monorepo to a ready-to-install binary on every supported platform.
 
 This page is for **maintainers**. If you only want to install `atl`, see [Install](../guide/install).
 
 ## The pipeline at a glance
 
 ```
-[tag pushed in cli repo]                   git tag v1.1.4 && git push origin v1.1.4
+[tag pushed in the atl monorepo]      git tag v2.0.0 && git push origin v2.0.0
         ↓
-[GitHub Actions workflow fires]            .github/workflows/release.yml
+[GitHub Actions workflow fires]       .github/workflows/release.yml
         ↓
-[goreleaser builds 6 binaries]             darwin/amd64, darwin/arm64,
-                                           linux/amd64, linux/arm64,
-                                           windows/amd64, windows/arm64
+[go test ./...]                       the cli module is tested before anything ships
         ↓
-[goreleaser publishes per channel]
-   ├── GitHub Release (artifacts attached)
-   ├── homebrew-tap repo (Formula/atl.rb auto-bumped + force-pushed)
-   ├── scoop-bucket repo (atl.json manifest auto-bumped)
-   └── winget-pkgs FORK (manifests/a/AgentTeamLand/atl/<version>/ added)
+[goreleaser builds 6 binaries]        linux/amd64,   linux/arm64,
+                                      darwin/amd64,  darwin/arm64,
+                                      windows/amd64, windows/arm64
         ↓
-[manual upstream PR — winget only]         see /contributing/winget-process
+[goreleaser publishes ONE channel]
+   └── GitHub Release
+         ├── per-platform archives (.tar.gz; .zip on Windows)
+         ├── a checksums file (atl_<version>_checksums.txt)
+         └── an auto-generated changelog grouped by commit type
 ```
 
-Every other channel (brew + scoop) is fully automated. winget requires a manual PR to `microsoft/winget-pkgs` for the version to actually appear in the upstream catalog.
+v2 distributes through **GitHub Releases only**. There is no Homebrew, Scoop, or winget channel — those were retired in the v2 rebuild. Users install with the one-liner scripts (`install.sh` / `install.ps1`), which download the right archive straight from the latest GitHub Release.
 
-## How it's tagged
+## How it's versioned
 
-Versions are managed by `cli`'s `internal/config/config.go`:
+The version is baked into the binary at build time via `cli/internal/buildinfo`:
 
 ```go
-// internal/config/config.go
-const Version = "0.1.0-dev"  // ldflags-overridden at build time
+// cli/internal/buildinfo/buildinfo.go
+var (
+	Version = "dev" // ldflags-overridden at release build time
+	Commit  = ""
+	Date    = ""
+)
 ```
 
-The `dev` suffix is the working-tree default. Goreleaser overrides via ldflags using the git tag name when it builds:
+`dev` is the working-tree default. goreleaser overrides all three via ldflags using the git tag, commit, and build date:
 
-```bash
-go build -ldflags "-X 'github.com/agentteamland/cli/internal/config.Version=v1.1.4'"
+```
+-X github.com/agentteamland/atl/cli/internal/buildinfo.Version={{.Version}}
+-X github.com/agentteamland/atl/cli/internal/buildinfo.Commit={{.Commit}}
+-X github.com/agentteamland/atl/cli/internal/buildinfo.Date={{.Date}}
 ```
 
-So `atl --version` prints whatever tag the build was created from.
+So `atl --version` prints the tag the build was cut from.
 
 ## Tag → release flow
 
-After merging a PR that's release-worthy:
+After merging a release-worthy PR to `main`:
 
 ```bash
-cd repos/cli
+cd repos/atl
 git checkout main && git pull
-git tag v1.1.4         # use the version that's in main's config.go after merge
-git push origin v1.1.4 # triggers .github/workflows/release.yml
+git tag v2.0.0          # the version to release
+git push origin v2.0.0  # triggers .github/workflows/release.yml
 ```
 
 The tag push:
 
-1. Triggers GitHub Actions on `cli`
-2. goreleaser cross-compiles 6 binaries
-3. Publishes a GitHub Release with the binaries + auto-generated changelog from commit titles
-4. Force-pushes Formula updates to [`agentteamland/homebrew-tap`](https://github.com/agentteamland/homebrew-tap)
-5. Force-pushes manifest updates to [`agentteamland/scoop-bucket`](https://github.com/agentteamland/scoop-bucket)
-6. Adds new manifests to our [winget-pkgs fork](https://github.com/agentteamland/winget-pkgs)
+1. Triggers the `release` workflow on a `v*` tag (`.github/workflows/release.yml`).
+2. Runs `go test ./...` in `cli/` — a failing test blocks the release.
+3. Runs `goreleaser release --clean`, which cross-compiles the 6 binaries.
+4. Publishes a GitHub Release with the archives, a checksums file, and a changelog auto-generated from commit titles (Features / Bug fixes / Documentation / Others).
 
-Within ~5 minutes of the tag push, `brew upgrade atl` and `scoop update atl` will pull the new version. The winget channel needs an upstream PR (see below).
+Within a minute or two of the tag push, the new version is the latest GitHub Release — and the install scripts resolve to it automatically.
 
-## Channel: Homebrew (macOS + Linux)
+## The single channel: GitHub Releases
 
-[`agentteamland/homebrew-tap`](https://github.com/agentteamland/homebrew-tap) holds a single Ruby Formula at `Formula/atl.rb`. Goreleaser replaces the Formula on every tag — no manual edits needed.
+[`.goreleaser.yaml`](https://github.com/agentteamland/atl/blob/main/.goreleaser.yaml) defines one `builds` entry (the cli module, `dir: cli`, `main: ./cmd/atl`) and one `archives` entry:
 
-Branch protection is intentionally NOT applied here (would block goreleaser's force-push).
+- **Archives** — `atl_<version>_<os>_<arch>.tar.gz` for linux/darwin, `.zip` for windows. Each archive bundles the `atl` binary plus `README.md` + `LICENSE`.
+- **Checksums** — a single `atl_<version>_checksums.txt` covering every archive, for verification.
+- **Changelog** — generated from the GitHub commit history, grouped by conventional-commit type.
 
-The `Formula/atl.rb` carries:
-- The current version
-- Per-platform binary URLs (point at the cli repo's GitHub Release artifacts)
-- Per-platform SHA-256 checksums
+The release `header` embeds the install one-liners, so the GitHub Release page itself shows users how to install.
 
-A user installing via:
+## How users install from it
 
-```bash
-brew install agentteamland/tap/atl
-```
+The install scripts at [`scripts/install.sh`](https://github.com/agentteamland/atl/blob/main/scripts/install.sh) (macOS/Linux) and [`scripts/install.ps1`](https://github.com/agentteamland/atl/blob/main/scripts/install.ps1) (Windows):
 
-clones the tap repo, reads `Formula/atl.rb`, downloads the binary for their platform from the cli repo's GitHub Release, verifies the checksum, installs to `/opt/homebrew/bin/atl` (or `/usr/local/bin/atl` on Intel macs / Linuxbrew).
+1. Resolve the latest release tag via the GitHub API (or honor a pinned `ATL_VERSION`).
+2. Detect OS + arch and build the archive name (`atl_<version>_<os>_<arch>.tar.gz`).
+3. Download that archive from the release, extract `atl`, and drop it on the user's `PATH` (`ATL_INSTALL_DIR`, default `/usr/local/bin`).
 
-> **Brew tap stale formula caveat:** `brew upgrade atl` does NOT auto-refresh the third-party tap clone — only homebrew-core's central index is auto-refreshed. Use `brew update && brew upgrade atl` (or set `HOMEBREW_AUTO_UPDATE_SECS=1` to disable the 24h throttle). See the [brew-tap-stale-formula](https://github.com/agentteamland/workspace/blob/main/.atl/wiki/brew-tap-stale-formula.md) wiki entry for the detailed history of this gotcha.
+No package manager, no tap, no central catalog — the release artifact is the source of truth. See [Install](../guide/install) for the user-facing instructions.
 
-## Channel: Scoop (Windows)
+## Why a single channel
 
-[`agentteamland/scoop-bucket`](https://github.com/agentteamland/scoop-bucket) holds a single JSON manifest at `bucket/atl.json`. Same auto-update mechanism as Homebrew — goreleaser overwrites on every tag.
-
-A user installing via:
-
-```bash
-scoop bucket add agentteamland https://github.com/agentteamland/scoop-bucket
-scoop install atl
-```
-
-adds the bucket as a remote, downloads `atl.json`, fetches the binary for Windows from the cli GitHub Release, installs to `~/scoop/apps/atl/`.
-
-Branch protection: NOT applied (same reason as Homebrew tap).
-
-## Channel: winget (Windows, official catalog)
-
-[`agentteamland/winget-pkgs`](https://github.com/agentteamland/winget-pkgs) is a **fork** of [`microsoft/winget-pkgs`](https://github.com/microsoft/winget-pkgs). winget unlike the other channels does NOT pull from arbitrary repos — packages must be in Microsoft's official catalog.
-
-The flow:
-
-1. **Goreleaser auto-pushes** new manifests to OUR fork's `manifests/a/AgentTeamLand/atl/<version>/` directory
-2. **Manual PR to upstream** is required: open a PR from our fork to `microsoft/winget-pkgs:master`
-3. Microsoft's validation pipeline runs (cert check, MSIX/MSI/EXE format check, hash verification, etc.)
-4. Microsoft reviewer merges (typically within a few days)
-5. Once merged, `winget upgrade atl` pulls the new version
-
-The upstream PR step is detailed in [winget upstream-PR process](winget-process). Until the upstream PR merges, winget users see the previous version — a typical lag of one or two `v*` tags.
-
-The first three winget releases:
-
-- v0.1.1 — [PR #361975](https://github.com/microsoft/winget-pkgs/pull/361975), merged 2026-04-24
-- v0.2.0 — [PR #364841](https://github.com/microsoft/winget-pkgs/pull/364841), merged 2026-04-25
-- v1.1.4 — [PR #367931](https://github.com/microsoft/winget-pkgs/pull/367931), pending review (intermediate v0.3.0 / v1.0.0 / v1.1.0 / v1.1.1 / v1.1.2 / v1.1.3 manifests preserved in our fork's branches but not separately back-PR'd, per winget convention).
-
-## Why this is set up this way
-
-The three-channel split is **standard for cross-platform CLIs**. Each platform has its own dominant package manager and users expect to install through their familiar tool. Goreleaser is the orchestrator — single config (`.goreleaser.yaml` in the cli repo), one tag triggers all three.
-
-The two automated channels (brew + scoop) keep maintenance cost ~zero. The winget channel needs a manual PR per release because Microsoft requires it — that's the cost of being in the official Windows catalog.
-
-The release-pipeline repos (`homebrew-tap`, `scoop-bucket`, `winget-pkgs`) are intentionally NOT branch-protected. Goreleaser force-pushes; protection would block it.
+v1 fanned out to Homebrew, Scoop, and winget. Each added maintenance cost — winget in particular required a manual PR to `microsoft/winget-pkgs` per release, with a Microsoft review queue and fork-master discipline to police. The v2 rebuild collapsed distribution to the install scripts + GitHub Releases: one goreleaser config, one tag, one artifact set, zero per-release manual steps. goreleaser stays as the cross-compile + publish orchestrator; only the downstream package-manager pushes were dropped.
 
 ## Related
 
-- [Install `atl`](../guide/install) — the user-facing install instructions for all three channels
-- [winget upstream-PR process](winget-process) — the manual step in the winget pipeline
-- The cli repo's [`.goreleaser.yaml`](https://github.com/agentteamland/cli/blob/main/.goreleaser.yaml) — the goreleaser config that orchestrates this whole pipeline
+- [Install `atl`](../guide/install) — the user-facing install instructions.
+- The monorepo's [`.goreleaser.yaml`](https://github.com/agentteamland/atl/blob/main/.goreleaser.yaml) — the goreleaser config that drives this pipeline.
+- [`.github/workflows/release.yml`](https://github.com/agentteamland/atl/blob/main/.github/workflows/release.yml) — the tag-triggered workflow.
