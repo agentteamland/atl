@@ -106,7 +106,8 @@ export default defineConfig({
                 { text: '/rule-wizard', link: '/skills/rule-wizard' },
                 { text: '/create-pr', link: '/skills/create-pr' },
                 { text: '/create-code-diagram', link: '/skills/create-code-diagram' },
-                { text: '/publish', link: '/skills/publish' }
+                { text: '/publish', link: '/skills/publish' },
+                { text: '/docs-audit', link: '/skills/docs-audit' }
               ]
             }
           ],
@@ -234,7 +235,8 @@ export default defineConfig({
                 { text: '/rule-wizard', link: '/tr/skills/rule-wizard' },
                 { text: '/create-pr', link: '/tr/skills/create-pr' },
                 { text: '/create-code-diagram', link: '/tr/skills/create-code-diagram' },
-                { text: '/publish', link: '/tr/skills/publish' }
+                { text: '/publish', link: '/tr/skills/publish' },
+                { text: '/docs-audit', link: '/tr/skills/docs-audit' }
               ]
             }
           ],

@@ -14,6 +14,7 @@ Ships as a global skill in the [atl monorepo](https://github.com/agentteamland/a
 | `--no-review` | OFF (review on) | Skip the entire review chain (generic + every team reviewer) |
 | `--no-auto-fix` | OFF (fix on) | During the polling loop, do not attempt to fix CI/merge failures; surface to the user instead |
 | `--no-drain` | OFF (drain on) | Skip folding pending learnings into the knowledge base |
+| `--no-docs` | OFF (docs on) | Skip the docs-impact pass that keeps the docs site in sync with the change |
 | `--timeout {min}` | 10 | Polling timeout in minutes; 1-minute interval, applies to both `--auto-merge` and manual-merge wait |
 
 ## Flow
@@ -58,6 +59,18 @@ Invokes [`/drain`](/skills/drain) so any learnings captured during the session r
 - If `/drain` isn't installed, the step is skipped with a one-line notice — it never fails the skill.
 
 v2's marker is plain prose (`<!-- learning: free text -->`); `/drain` infers where each learning belongs, so there's no separate doc-draft step to review. See [`atl learnings`](/cli/learnings) and the [`/drain` skill](/skills/drain).
+
+### Step 4.5 — Docs-impact pass (unless `--no-docs`)
+
+Keeps the docs site in lockstep with the change — the change-time layer of [docs-sync](/cli/docs), so drift never forms. It pre-flights and skips cheaply unless **both** hold: the repo has a docs site (`docs/site/.vitepress`), and the diff touches a doc-affecting surface (`cli/`, `core/`, `docs/`, or a command/skill/rule/concept).
+
+When it applies:
+
+1. **Deterministic first** — runs [`atl docs check`](/cli/docs) and fixes every FAIL (a missing page, an absent TR mirror, a stale install instruction). Mechanical, zero-false-positive.
+2. **Semantic, grep-grounded** — for each page that plausibly describes what the diff changed, reads it against the new code and quotes the source verbatim before claiming drift (the ~40% hallucination guard). Updates the affected pages (EN + the TR mirror).
+3. Stages the doc edits so they ride the **same PR** — docs and code land atomically.
+
+Boring diffs cost nothing (the pre-flight skips them). This is the LLM half the deterministic [docs CI gate](/cli/docs) can't do. See [`/docs-audit`](/skills/docs-audit) for the full-site backstop.
 
 ### Step 5 — Review chain (unless `--no-review`)
 

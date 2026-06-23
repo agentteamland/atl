@@ -14,6 +14,7 @@ Global beceri olarak [atl monoreposunda](https://github.com/agentteamland/atl) y
 | `--no-review` | KAPALI (inceleme açık) | Tüm inceleme zincirini atlar (genel + her takım inceleyicisi). |
 | `--no-auto-fix` | KAPALI (düzeltme açık) | Yoklama döngüsü sırasında CI / birleştirme başarısızlıklarını düzeltmeye çalışmaz; bunun yerine kullanıcıya bildirir. |
 | `--no-drain` | KAPALI (drain açık) | Bekleyen öğrenmeleri bilgi tabanına katlamayı atlar. |
+| `--no-docs` | KAPALI (docs açık) | Doküman sitesini değişiklikle senkron tutan docs-impact geçişini atlar. |
 | `--timeout {min}` | 10 | Dakika cinsinden yoklama zaman aşımı; 1 dakikalık aralık; hem `--auto-merge` hem elle birleştirme beklemesi için geçerli. |
 
 ## Akış
@@ -58,6 +59,18 @@ Beceri kullanıcıya ad onayı için **sormaz** — adları üretir ve devam ede
 - `/drain` kurulu değilse adım tek satırlık bir bildirimle atlanır — beceriyi asla başarısız kılmaz.
 
 v2'nin işaretçisi düz metindir (`<!-- learning: serbest metin -->`); ayrı bir doküman-etkisi / doküman-taslağı hattı yoktur — her öğrenmenin nereye ait olduğunu `/drain` çıkarır. Bkz. [`atl learnings`](/tr/cli/learnings) ve [`/drain` becerisi](/tr/skills/drain).
+
+### Adım 4.5 — Docs-impact geçişi (`--no-docs` verilmedikçe)
+
+Doküman sitesini değişiklikle aynı hizada tutar — [docs-sync](/tr/cli/docs)'in değişiklik-anı katmanı, böylece drift hiç oluşmaz. Ön-kontrol yapar ve **ikisi de** geçerli olmadıkça ucuzca atlar: repo'nun bir doküman sitesi vardır (`docs/site/.vitepress`) ve diff doc-etkili bir yüzeye dokunur (`cli/`, `core/`, `docs/` ya da bir komut/skill/rule/kavram).
+
+Geçerli olduğunda:
+
+1. **Önce deterministik** — [`atl docs check`](/tr/cli/docs)'i çalıştırır ve her FAIL'i düzeltir (eksik sayfa, olmayan TR aynası, bayat kurulum talimatı). Mekanik, sıfır yanlış-pozitif.
+2. **Anlamsal, grep-temelli** — diff'in değiştirdiğini olası biçimde anlatan her sayfa için, onu yeni koda karşı okur ve drift iddia etmeden önce kaynağı verbatim alıntılar (~%40 halüsinasyon koruması). Etkilenen sayfaları günceller (EN + TR aynası).
+3. Doküman düzenlemelerini **aynı PR**'da yolculuk edecek şekilde stage'ler — docs ve kod atomik olarak iner.
+
+Sıradan diff'ler hiçbir şeye mal olmaz (ön-kontrol onları atlar). Bu, deterministik [docs CI kapısının](/tr/cli/docs) yapamadığı LLM yarısıdır. Tüm-site backstop için bkz. [`/docs-audit`](/tr/skills/docs-audit).
 
 ### Adım 5 — İnceleme zinciri (`--no-review` verilmedikçe)
 
