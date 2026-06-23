@@ -53,6 +53,12 @@ var sessionStartCmd = &cobra.Command{
 				fmt.Printf("atl: %d learning(s) pending — run /drain to fold them into the knowledge base\n", n)
 			}
 		}
+
+		// Docs-correctness signal — fires only in a repo that has a docs site
+		// (monorepo-internal): a deterministic drift count plus a /docs-audit
+		// "sweep due" signal. Silent everywhere else.
+		docsSessionSignal()
+
 		return nil
 	},
 }
