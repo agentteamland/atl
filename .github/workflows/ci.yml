@@ -29,3 +29,28 @@ jobs:
         run: go test ./...
       - name: English-only (no non-English text outside /tr/ mirrors)
         run: bash scripts/scan-non-english.sh
+
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26"
+          cache-dependency-path: cli/go.sum
+      - name: Build atl
+        working-directory: cli
+        run: go build -o ../atl ./cmd/atl
+      - name: Docs drift check (deterministic, LLM-free)
+        run: ./atl docs check
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: docs/package-lock.json
+      - name: Install docs deps
+        working-directory: docs
+        run: npm ci
+      - name: VitePress build (fails on dead links)
+        working-directory: docs
+        run: npm run build
