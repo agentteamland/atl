@@ -101,12 +101,12 @@ export default defineConfig({
               text: 'Global Skills',
               items: [
                 { text: '/drain', link: '/skills/drain' },
-                { text: '/wiki', link: '/skills/wiki' },
                 { text: '/brainstorm', link: '/skills/brainstorm' },
                 { text: '/rule', link: '/skills/rule' },
                 { text: '/rule-wizard', link: '/skills/rule-wizard' },
                 { text: '/create-pr', link: '/skills/create-pr' },
-                { text: '/create-code-diagram', link: '/skills/create-code-diagram' }
+                { text: '/create-code-diagram', link: '/skills/create-code-diagram' },
+                { text: '/publish', link: '/skills/publish' }
               ]
             }
           ],
@@ -229,12 +229,12 @@ export default defineConfig({
               text: 'Global Skill\'ler',
               items: [
                 { text: '/drain', link: '/tr/skills/drain' },
-                { text: '/wiki', link: '/tr/skills/wiki' },
                 { text: '/brainstorm', link: '/tr/skills/brainstorm' },
                 { text: '/rule', link: '/tr/skills/rule' },
                 { text: '/rule-wizard', link: '/tr/skills/rule-wizard' },
                 { text: '/create-pr', link: '/tr/skills/create-pr' },
-                { text: '/create-code-diagram', link: '/tr/skills/create-code-diagram' }
+                { text: '/create-code-diagram', link: '/tr/skills/create-code-diagram' },
+                { text: '/publish', link: '/tr/skills/publish' }
               ]
             }
           ],
