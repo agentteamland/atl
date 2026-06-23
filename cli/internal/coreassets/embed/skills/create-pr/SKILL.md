@@ -1,7 +1,7 @@
 ---
 name: create-pr
 description: "Ship working-tree changes: auto-named branch, drain pending learnings, an AI review chain (generic baseline + team specialists), commit, push, open a PR. Optional --auto-merge with a polling + auto-fix loop. Returns you to the target branch."
-argument-hint: "[--auto-merge] [--no-review] [--no-auto-fix] [--no-drain] [--timeout N]"
+argument-hint: "[--auto-merge] [--no-review] [--no-auto-fix] [--no-drain] [--no-docs] [--timeout N]"
 ---
 
 # /create-pr
@@ -20,6 +20,7 @@ This is the deterministic "ship a piece of work" flow — it applies the `branch
 | `--no-review` | review on | Skip the entire review chain |
 | `--no-auto-fix` | fix on | During polling, don't try to fix CI/merge failures — surface them instead |
 | `--no-drain` | drain on | Skip folding pending learnings into the knowledge base |
+| `--no-docs` | docs on | Skip the docs-impact pass (keeping the docs site in sync with the change) |
 | `--timeout N` | 10 | Polling timeout in minutes (1-minute interval) |
 
 ## Flow
@@ -46,6 +47,16 @@ Branch `{type}/{slug}`; commit subject `{type}({scope}): {summary}` (< 70 chars)
 
 ### 4. Drain pending learnings (unless `--no-drain`)
 Invoke `/drain` so any queued markers are folded into wiki / journal / agent knowledge base and ship in the same PR. Empty queue → no-op. If `/drain` isn't installed, skip with a one-line notice — don't fail the skill.
+
+### 4.5. Docs-impact pass (unless `--no-docs`)
+Keep the docs site in lockstep with the change — the change-time layer of docs-sync, so drift never forms. **Pre-flight, skip cheaply unless both hold:** the repo has a docs site (`docs/site/.vitepress`), AND the diff touches a doc-affecting surface (`cli/`, `core/`, `docs/`, or a command/skill/rule/concept).
+
+When it applies:
+1. **Deterministic first** — run `atl docs check`; fix every FAIL (a missing page, an absent TR mirror, a stale install instruction). Mechanical, zero-false-positive.
+2. **Semantic, grep-grounded** — for each page that plausibly describes what the diff changed, read it against the new code; **quote the source verbatim before claiming drift** (the ~40% hallucination guard). Update the affected pages (EN + the TR mirror).
+3. Stage the doc edits so they ride **this same PR** — docs and code land atomically.
+
+Boring diffs cost nothing (the pre-flight skips them). If `atl docs check` isn't installed, skip with a one-line notice — don't fail the skill. This is the LLM half the deterministic CI docs gate can't do.
 
 ### 5. Review chain (unless `--no-review`)
 
