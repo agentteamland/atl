@@ -126,6 +126,63 @@ func gitHEAD(repoRoot string) string {
 	return strings.TrimSpace(string(out))
 }
 
+// docsSessionSignal surfaces docs-correctness notes at session start, but only when
+// the current project has a docs site (monorepo-internal): a deterministic drift
+// count (the fast Layer of docs-sync v2) and, when a full sweep is due, a
+// /docs-audit signal. Silent in every project without a docs site (so end-user
+// sessions pay nothing). Best-effort — it never errors; a hook must not block.
+func docsSessionSignal() {
+	site, repoRoot, err := findSiteDir()
+	if err != nil {
+		return // no docs site here — the pre-flight skip
+	}
+	in := docscheck.Input{
+		SiteDir:  site,
+		CoreDir:  filepath.Join(repoRoot, "core"),
+		Commands: commandDocs(),
+		Denylist: docscheck.DefaultDenylist,
+	}
+	if fails, _ := splitFindings(docscheck.RunAll(in)); len(fails) > 0 {
+		fmt.Printf("atl docs: %d drift item(s) on the docs site — run `atl docs check`\n", len(fails))
+	}
+	if docsAuditDue(repoRoot) {
+		fmt.Println("atl docs: a full audit is due — run /docs-audit to sweep the docs site for semantic drift")
+	}
+}
+
+// docsAuditDue reports whether a /docs-audit full sweep is due: doc-affecting
+// commits have landed since the last recorded audit, gated by a ~1-day
+// runaway-guard. This is the backstop's pre-flight — the deterministic + change-time
+// layers are the primary defense, so the sweep only needs to run sparsely.
+func docsAuditDue(repoRoot string) bool {
+	st, err := docsstate.Load()
+	if err != nil {
+		return false
+	}
+	if st.LastAuditAt != "" {
+		if t, perr := time.Parse(time.RFC3339, st.LastAuditAt); perr == nil && time.Since(t) < 24*time.Hour {
+			return false // runaway-guard: don't sweep again within ~1 day
+		}
+	}
+	return docAffectingCommitsSince(repoRoot, st.LastAuditSHA)
+}
+
+// docAffectingCommitsSince reports whether any commit touching docs/, core/, or
+// cli/ has landed since sinceSHA (or, when sinceSHA is empty, whether the repo has
+// any such commit at all — i.e. it was never audited).
+func docAffectingCommitsSince(repoRoot, sinceSHA string) bool {
+	args := []string{"-C", repoRoot, "log", "--oneline", "-1"}
+	if sinceSHA != "" {
+		args = append(args, sinceSHA+"..HEAD")
+	}
+	args = append(args, "--", "docs", "core", "cli")
+	out, err := exec.Command("git", args...).Output()
+	if err != nil {
+		return false
+	}
+	return len(strings.TrimSpace(string(out))) > 0
+}
+
 func splitFindings(fs []docscheck.Finding) (fails, warns []docscheck.Finding) {
 	for _, f := range fs {
 		if f.Severity == docscheck.Fail {
