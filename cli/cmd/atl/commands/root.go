@@ -41,5 +41,6 @@ func init() {
 		listCmd,
 		searchCmd,
 		removeCmd,
+		docsCmd,
 	)
 }
