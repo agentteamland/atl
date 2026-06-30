@@ -15,9 +15,13 @@ import (
 	"strings"
 )
 
-// Hook is an event→command pair to install.
+// Hook is an event→command pair to install. Matcher is an optional tool-name
+// matcher for the tool events (PreToolUse / PostToolUse) — empty means the hook
+// fires on every tool call; for the non-tool events (SessionStart,
+// UserPromptSubmit) it is left empty and no matcher key is emitted.
 type Hook struct {
 	Event   string
+	Matcher string
 	Command string
 }
 
@@ -55,11 +59,15 @@ func InstallHooks(hooks []Hook) (string, error) {
 				kept = append(kept, g)
 			}
 		}
-		kept = append(kept, map[string]any{
+		group := map[string]any{
 			"hooks": []any{
 				map[string]any{"type": "command", "command": h.Command},
 			},
-		})
+		}
+		if h.Matcher != "" {
+			group["matcher"] = h.Matcher
+		}
+		kept = append(kept, group)
 		hooksMap[h.Event] = kept
 	}
 	obj["hooks"] = hooksMap

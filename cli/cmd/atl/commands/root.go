@@ -37,6 +37,7 @@ func init() {
 		tickCmd,
 		sessionStartCmd,
 		setupHooksCmd,
+		guardCmd,
 		doctorCmd,
 		listCmd,
 		searchCmd,
