@@ -25,8 +25,9 @@ atl install agentteamland/software-project-team
 3. **Read.** `team.json` is parsed. Validation is minimal: it must be valid JSON and have a `name`. There is no JSON-Schema validator — see [Schema](/reference/schema) for exactly what the CLI checks and [`team.json`](/authoring/team-json) for the full field contract.
 4. **Write assets.** The team's `agents/`, `skills/`, and `rules/` subtrees are copied straight into the scope's Claude Code directory — `~/.claude` for a global install, `<project>/.claude` for a project install. Nothing else from the repo (`team.json`, `README`, `LICENSE`) is copied.
 5. **Record a manifest.** A per-team manifest is written under the scope's `.atl/` directory at `<layer>/.atl/installed/<handle>__<name>.json`. It records the resolved source ref and a SHA-256 baseline for every copied file, which `atl update`'s refresh and `atl doctor`'s integrity check rely on.
-6. **Bind automation hooks.** The automation hooks (`SessionStart → atl session-start`, `UserPromptSubmit → atl tick`) are installed into Claude Code as a mandatory part of install — automation is on by default, not opt-in. A hook-binding failure is surfaced as a warning and does not fail the install.
+6. **Bind automation hooks.** The automation hooks (`SessionStart → atl session-start`, `UserPromptSubmit → atl tick`, and `PreToolUse (Bash|Edit|Write) → atl guard`) are installed into Claude Code as a mandatory part of install — automation is on by default, not opt-in. A hook-binding failure is surfaced as a warning and does not fail the install.
 7. **Reflect platform core.** The platform's own rules and skills (`/drain`, `/create-pr`, `/brainstorm`, and the rest) ship inside the binary and are reflected into the global layer so they're available in every project. Best-effort — a failure is surfaced, not fatal.
+8. **Scaffold a project `CLAUDE.md`.** If the project has no `CLAUDE.md`, install drops the project-tier starter (see [`atl init`](/cli/init)) so the `/brainstorm` and `/drain` blocks have a home. Only-if-absent — a file you already have is never touched — and best-effort, so a failure never fails the install.
 
 On success the CLI prints:
 

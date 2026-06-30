@@ -20,4 +20,7 @@ ls "$PROJ/.atl/installed/"*.json >/dev/null 2>&1 && ok "project manifest written
 [ -f "$HOME/.claude/rules/learning-capture.md" ] && ok "core rules reflected"      || bad "core rules missing"
 [ -f "$HOME/.claude/skills/drain/SKILL.md" ]     && ok "core drain skill reflected" || bad "core drain missing"
 
+# install drops a project CLAUDE.md starter when the project has none (only-if-absent)
+[ -f "$PROJ/CLAUDE.md" ] && ok "install scaffolded a project CLAUDE.md" || bad "project CLAUDE.md not scaffolded"
+
 finish

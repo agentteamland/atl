@@ -80,6 +80,7 @@ export default defineConfig({
               text: 'CLI Reference',
               items: [
                 { text: 'Overview', link: '/cli/overview' },
+                { text: 'atl init', link: '/cli/init' },
                 { text: 'atl install', link: '/cli/install' },
                 { text: 'atl search', link: '/cli/search' },
                 { text: 'atl list', link: '/cli/list' },
@@ -209,6 +210,7 @@ export default defineConfig({
               text: 'CLI Başvuru',
               items: [
                 { text: 'Genel bakış', link: '/tr/cli/overview' },
+                { text: 'atl init', link: '/tr/cli/init' },
                 { text: 'atl install', link: '/tr/cli/install' },
                 { text: 'atl search', link: '/tr/cli/search' },
                 { text: 'atl list', link: '/tr/cli/list' },
