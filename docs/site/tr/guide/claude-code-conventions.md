@@ -18,7 +18,7 @@ Her zaman yüklü zincir (global + project) ~300 satırın altında kalmalı —
 
 ### Ownership — yönetilen vs. kullanıcıya ait
 
-**project** tier'inde, bir marker bloğunun içindeki içerik (aşağıdaki üç blok) **ATL-yönetimlidir**: `/brainstorm` ve `/drain` becerileri bu blokların sahibidir (her bloğun aşağıdaki durum notuna bak) ve onları yeniden yazar, dolayısıyla marker'ların içine yapılan elle düzenlemeler kalıcı olmaz. Marker'ların **dışındaki** her şey **senindir** — `atl init` onu bir kez tohumlar ve bir daha dokunmaz (yalnızca var olmayan bir `CLAUDE.md`'i yazar). **global** tier'in hiç yönetilen bloğu yoktur: tamamen senindir.
+**project** tier'inde, bir marker bloğunun içindeki içerik (aşağıdaki üç blok) **ATL-yönetimlidir**: `/brainstorm` ve `/drain` becerileri bu blokları yazar ve yeniden yazar, dolayısıyla marker'ların içine yapılan elle düzenlemeler kalıcı olmaz. Marker'ların **dışındaki** her şey **senindir** — `atl init` onu bir kez tohumlar ve bir daha dokunmaz (yalnızca var olmayan bir `CLAUDE.md`'i yazar). **global** tier'in hiç yönetilen bloğu yoktur: tamamen senindir.
 
 Kullanıcıya ait gerçekleri **kodun gerçekte nasıl davrandığından** doldur — stack'i, gerçek build/test komutlarını, kullanımdaki kuralları yakala. İş kuralları uydurma; sözdizimini tekrar etmek yerine meta-mimariyi hizala.
 
@@ -30,7 +30,7 @@ Oynak çalışma/sprint durumu her-zaman-yüklü dosyaya **ait değildir** — h
 
 | Blok | Yazan | Amaç |
 |---|---|---|
-| `<!-- wiki:index -->` | [`/drain`](/tr/skills/drain) (amaçlanan) | `.atl/wiki/` sayfaları için içindekiler tablosu — proje bağlamıyla yüklenir, Claude'a sıfır maliyetle bilgi haritasını sunar. Bugün sözleşmeyle bakılır; otomatik yeniden inşa v2 `/drain` becerisinde henüz bağlı değil (aşağıdaki durum notuna bak). |
+| `<!-- wiki:index -->` | [`/drain`](/tr/skills/drain) | `.atl/wiki/` sayfaları için kendiliğinden yeniden inşa edilen içindekiler tablosu. Proje bağlamıyla yüklenir, Claude'a sıfır maliyetle bilgi haritasını sunar. |
 | `<!-- brainstorm:active -->` | [`/brainstorm start`](/tr/skills/brainstorm) ve [`/brainstorm done`](/tr/skills/brainstorm) | Etkin beyin fırtınası konularını proje bağlamına sabitler; bir sonraki oturum bunları kaçıramaz. |
 | `<!-- pending-implementation -->` | Beyin fırtınası `done` akışı | Bir beyin fırtınasının X kararını verdiğini ama uygulamasının henüz yayımlanmadığını bir sonraki oturuma anımsatır. |
 
@@ -40,7 +40,7 @@ Oynak çalışma/sprint durumu her-zaman-yüklü dosyaya **ait değildir** — h
 
 ## `<!-- wiki:index -->` — bilgi haritası
 
-`.atl/wiki/` sayfaları için bir içindekiler tablosu; `CLAUDE.md` dosyasının üst kısmına yakın, H1 ve giriş paragrafından sonra yaşar:
+Bir wiki sayfası yazdığında ya da güncellediğinde [`/drain`](/tr/skills/drain) tarafından yeniden inşa edilir. `.atl/wiki/` sayfaları için bir içindekiler tablosu; `CLAUDE.md` dosyasının üst kısmına yakın, H1 ve giriş paragrafından sonra yaşar:
 
 ```markdown
 <!-- wiki:index:start -->
@@ -48,21 +48,13 @@ Oynak çalışma/sprint durumu her-zaman-yüklü dosyaya **ait değildir** — h
 
 Knowledge lives in `.atl/wiki/` (current truth, topic-organized) and `.atl/journal/` (historical record, date-based). Before working on a topic, scan this list — if a page looks relevant, read it before deciding.
 
-**Wiki topics:**
 - [docs-audit-false-positive-rate](.atl/wiki/docs-audit-false-positive-rate.md) — ~40% of multi-agent docs-drift audit reports include hallucinated findings
 - [pr-merge-discipline](.atl/wiki/pr-merge-discipline.md) — never `gh pr merge` from Claude; surface URL and stop
 - [complexity-resistance](.atl/wiki/complexity-resistance.md) — when a proposal needs paragraphs to defend, that's a smell
-- ...
-
-**Discipline:** Before working on a topic, scan this list. If a topic looks relevant, read the page.
 <!-- wiki:index:end -->
 ```
 
-Her madde tek satırdır: `- [topic](.atl/wiki/topic.md) — tek satırlık özet` (dosya adına göre alfabetik sıralı). Özet, her wiki sayfasının frontmatter ve başlık dışındaki ilk satırından alınır.
-
-::: warning Güncel durum
-Bu bloğun otomatik yeniden inşası v2 `/drain` becerisinde **henüz bağlı değil** — `/drain` wiki sayfalarını ve journal kayıtlarını yazar, ama `CLAUDE.md` içindeki `wiki:index` bloğu şimdilik sözleşmeyle (elle ya da aynı bul/değiştir deseniyle) bakılır. Üreticiyi uzlaştırmak izlenen bir takip işidir; bloğun biçimi ve rolü değişmedi.
-:::
+Her madde tek satırdır: `- [topic](.atl/wiki/topic.md) — tek satırlık özet` (dosya adına göre alfabetik sıralı). Özet, her wiki sayfasının frontmatter ve başlık dışındaki ilk satırından alınır. Blok program yoluyla yeniden inşa edilir — marker'ların içine yapılan elle düzenlemeler bir sonraki `/drain` çalıştırmasında üzerine yazılır; yani bir konu eklemek için wiki sayfasını oluşturursun (ya da `/drain`'in oluşturmasına bırakırsın), dizin onu izler.
 
 ## `<!-- brainstorm:active -->` — etkin konu sabitleyici
 
@@ -175,6 +167,6 @@ HTML yorumları:
 ## İlgili
 
 - [`/brainstorm`](/tr/skills/brainstorm) — `<!-- brainstorm:active -->` bloğunu yazar ve kaldırır.
-- [`/drain`](/tr/skills/drain) — `<!-- wiki:index -->` bloğunun sahibidir (otomatik yeniden inşası izlenen bir takip işidir).
+- [`/drain`](/tr/skills/drain) — `<!-- wiki:index -->` bloğunu yeniden inşa eder.
 - [Bilgi sistemi](/tr/guide/knowledge-system) — wiki:index bloğunun neyi indekslediği.
 - [Kavramlar: Beceri](/tr/guide/concepts#skill) — bu sözleşmelerin geniş resme nereye oturduğu.

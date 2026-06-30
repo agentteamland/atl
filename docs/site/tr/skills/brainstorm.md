@@ -72,9 +72,10 @@ Akış:
    - **Proje beyin fırtınası** → `.atl/docs/`.
    - **Global beyin fırtınası** → `~/.atl/docs/`.
    - **Takım beyin fırtınası** → `<proje>/.atl/docs/` (takım kapsamlı alt dizin).
-4. **`CLAUDE.md` / `README` güncellenir.** İki şey olur:
+4. **`CLAUDE.md` / `README` güncellenir.** En fazla üç şey olur:
    - Tamamlanmış beyin fırtınası özeti uygun bölüme eklenir.
    - Bu beyin fırtınasının maddesi `<!-- brainstorm:active -->` işaretçi bloğundan kaldırılır. Madde listesi boşalırsa blok tümüyle kaldırılır (geride bayatlamış bir "Active brainstorms" başlığı kalmaz).
+   - Karar implementasyonsuz iş bırakıyorsa, bir sonraki oturumun kuyruğu görmesi için `<!-- pending-implementation -->` bloğuna bir madde eklenir (saf-karar beyin fırtınalarında atlanır; implementasyon yayımlanınca kaldırılır).
 5. **Takım beyin fırtınalarını doğrudan push'la değil, PR ile yayımla.** Takım beyin fırtınaları takımın yerel klonunda yaşar ve takım depoları dal korumalıdır. `done` akışı dosyayı yerelde yazar ve kullanıcıya bir PR açmasını söyler (elle ya da [`/create-pr`](/tr/skills/create-pr) ile).
 
 ## Belge zinciri

@@ -109,6 +109,40 @@ This section is derived, not hand-edited — replace it wholesale each run; the
 source of truth is each child's frontmatter. (Same pattern applies to a skill's
 `learnings/` + `## Accumulated Learnings`, if a learning targets a skill.)
 
+## Wiki index rebuild (the `<!-- wiki:index -->` contract)
+
+Whenever this run writes or updates any `<proj>/.atl/wiki/<topic>.md` page, rebuild
+the project's knowledge-map block so the index stays in sync with the pages. (No
+wiki write this run → skip; nothing to update.)
+
+Target: the `<!-- wiki:index:start --> … <!-- wiki:index:end -->` block in the
+**project root** `CLAUDE.md`. If the project has no `CLAUDE.md`, skip the rebuild
+(don't create the file from here — `atl init` / `atl install` own that).
+
+Rebuild the block contents from every `<proj>/.atl/wiki/*.md`, sorted
+alphabetically by filename:
+
+```markdown
+<!-- wiki:index:start -->
+## 📚 Knowledge map
+
+Knowledge lives in `.atl/wiki/` (current truth, topic-organized) and `.atl/journal/` (historical record, date-based). Before working on a topic, scan this list — if a page looks relevant, read it before deciding.
+
+- [<topic>](.atl/wiki/<topic>.md) — <summary>
+<!-- wiki:index:end -->
+```
+
+Each entry is one line: `- [<topic>](.atl/wiki/<topic>.md) — <summary>`, where
+`<topic>` is the filename without `.md` and `<summary>` is the page's first
+non-frontmatter, non-heading line. The block is **derived, not hand-edited** —
+replace its contents wholesale each run (same discipline as the agent KB).
+
+**Placement:** if the block exists, replace its contents in place. If it's absent,
+insert it near the top of `CLAUDE.md` — after the H1 + intro, before the first
+plain `##` section, and **below** any `<!-- brainstorm:active -->` /
+`<!-- pending-implementation -->` blocks (the knowledge map is the least urgent of
+the three managed blocks, so it sits last).
+
 ## Notes
 
 - **Scope**: wiki + journal are project knowledge (`<proj>/.atl/`). Agent KB

@@ -72,9 +72,10 @@ Flow:
    - **Project brainstorm** → `.atl/docs/`
    - **Global brainstorm** → `~/.atl/docs/`
    - **Team brainstorm** → `<project>/.atl/docs/` (team-scoped subdirectory)
-4. **Update CLAUDE.md / README.** Two things happen:
+4. **Update CLAUDE.md / README.** Up to three things happen:
    - Append the completed-brainstorm summary to the appropriate section
    - Remove this brainstorm's bullet from the `<!-- brainstorm:active -->` marker block. If the bullet list becomes empty, remove the entire block (no stale "Active brainstorms" heading lingers).
+   - If the decision leaves unshipped implementation, add a bullet to the `<!-- pending-implementation -->` block so the next session sees the queued work (omitted for a pure-decision brainstorm; removed when the implementation ships).
 5. **Persist team brainstorms via PR, not direct push.** Team brainstorms live under the team's local clone and team repos are branch-protected. The `done` flow writes the file locally and instructs the user to open a PR (manually or via [`/create-pr`](/skills/create-pr)).
 
 ## The document chain
