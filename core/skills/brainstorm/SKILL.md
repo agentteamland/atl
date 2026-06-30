@@ -155,7 +155,7 @@ Reference the brainstorm at the top of the file.
 - **Project brainstorm** → update `CLAUDE.md` at the project root
 - **Global brainstorm** → update `~/.claude/CLAUDE.md`
 
-Two updates happen:
+Up to three updates happen:
 1. **Add the completed-brainstorm summary** to the appropriate section (existing
    behavior).
 2. **Remove the active-brainstorm marker** for THIS brainstorm:
@@ -166,6 +166,26 @@ Two updates happen:
      section lingers.
    - **If other bullets remain**, keep the block intact — other brainstorms are
      still active.
+3. **Pin a pending-implementation reminder — only if the decision leaves unshipped
+   work.** If this brainstorm decided on a change that hasn't been implemented yet,
+   add a bullet to the `<!-- pending-implementation:start -->` …
+   `<!-- pending-implementation:end -->` block so the next session sees the queue.
+   **Omit this entirely for a pure-decision brainstorm** (a rejection, or a doc-only
+   choice with nothing to build).
+   - Block format (insert near the top if absent — after any `<!-- brainstorm:active -->`
+     block, above the `<!-- wiki:index -->` block):
+
+     ```markdown
+     <!-- pending-implementation:start -->
+     ## 🚧 Pending implementation
+
+     Brainstorms have decided these but the work hasn't shipped yet:
+
+     - **[{name}]({relative-path-to-docs-or-brainstorm})** — {decided X; impl pending}
+     <!-- pending-implementation:end -->
+     ```
+   - Add a bullet (preserve existing; don't duplicate). The bullet is removed when
+     the implementation ships — by hand, or by the PR that ships the change.
 
 ### 5. Respond
 Tell the user the brainstorm is complete and list the created/updated files.

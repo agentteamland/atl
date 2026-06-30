@@ -97,6 +97,10 @@ knowledge-base-summary: "<one-line summary used in agent.md's Knowledge Base sec
 
 After writing or updating a child, **fully rebuild** `agent.md`'s `## Knowledge Base` section from the children's frontmatter (sorted by filename). That section is derived, not hand-edited — it's replaced wholesale each run. The same pattern applies to a skill's `learnings/` directory and its `## Accumulated Learnings` section, if a learning targets a skill.
 
+## Wiki index rebuild
+
+Whenever a `/drain` run writes or updates a `.atl/wiki/` page, it rebuilds the `<!-- wiki:index -->` block in the project's `CLAUDE.md` so the knowledge map stays in sync — one `- [topic](.atl/wiki/topic.md) — summary` line per page, sorted by filename, derived (not hand-edited). If the project has no `CLAUDE.md`, the rebuild is skipped (`atl init` / `atl install` create the file). See [Claude Code conventions](/guide/claude-code-conventions) for the block's format and placement.
+
 ## Examples
 
 ### Drain after a session-start prompt

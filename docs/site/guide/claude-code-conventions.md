@@ -18,7 +18,7 @@ The always-loaded chain (global + project) should stay under ~300 lines — ever
 
 ### Ownership — managed vs. user-owned
 
-In the **project** tier, content inside a marker block (the three blocks below) is **ATL-managed**: the `/brainstorm` and `/drain` skills own these blocks (see each block's status note below) and rewrite them, so hand-edits inside the markers don't survive. Everything **outside** the markers is **yours** — `atl init` seeds it once and never touches it again (it only ever writes a `CLAUDE.md` that doesn't already exist). The **global** tier has no managed blocks at all: it is entirely yours.
+In the **project** tier, content inside a marker block (the three blocks below) is **ATL-managed**: the `/brainstorm` and `/drain` skills write and rewrite these blocks, so hand-edits inside the markers don't survive. Everything **outside** the markers is **yours** — `atl init` seeds it once and never touches it again (it only ever writes a `CLAUDE.md` that doesn't already exist). The **global** tier has no managed blocks at all: it is entirely yours.
 
 Fill the user-owned facts from **how the code actually behaves** — capture the stack, the real build/test commands, the conventions in use. Don't invent business rules, and align meta-architecture rather than restating syntax.
 
@@ -30,7 +30,7 @@ Volatile working/sprint state does **not** belong in the always-loaded file — 
 
 | Block | Written by | Purpose |
 |---|---|---|
-| `<!-- wiki:index -->` | [`/drain`](/skills/drain) (intended) | Table of contents for `.atl/wiki/` pages — loads with project context, gives Claude the knowledge map at zero cost. Maintained by convention today; the automatic rebuild isn't wired in the v2 `/drain` skill yet (see the status note below). |
+| `<!-- wiki:index -->` | [`/drain`](/skills/drain) | Auto-rebuilt table of contents for `.atl/wiki/` pages. Loads with project context, gives Claude the knowledge map at zero cost. |
 | `<!-- brainstorm:active -->` | [`/brainstorm start`](/skills/brainstorm) and [`/brainstorm done`](/skills/brainstorm) | Pins active brainstorm topics into project context so the next session cannot miss them. |
 | `<!-- pending-implementation -->` | Brainstorm `done` flow | Reminds the next session that a brainstorm decided X but the implementation hasn't shipped yet. |
 
@@ -40,7 +40,7 @@ All three use the same `<!-- block:start --> ... <!-- block:end -->` delimiter p
 
 ## `<!-- wiki:index -->` — knowledge map
 
-A table of contents for `.atl/wiki/` pages, near the top of `CLAUDE.md`, after the H1 + intro:
+Rebuilt by [`/drain`](/skills/drain) whenever it writes or updates a wiki page. A table of contents for `.atl/wiki/` pages, near the top of `CLAUDE.md`, after the H1 + intro:
 
 ```markdown
 <!-- wiki:index:start -->
@@ -48,21 +48,13 @@ A table of contents for `.atl/wiki/` pages, near the top of `CLAUDE.md`, after t
 
 Knowledge lives in `.atl/wiki/` (current truth, topic-organized) and `.atl/journal/` (historical record, date-based). Before working on a topic, scan this list — if a page looks relevant, read it before deciding.
 
-**Wiki topics:**
 - [docs-audit-false-positive-rate](.atl/wiki/docs-audit-false-positive-rate.md) — ~40% of multi-agent docs-drift audit reports include hallucinated findings
 - [pr-merge-discipline](.atl/wiki/pr-merge-discipline.md) — never `gh pr merge` from Claude; surface URL and stop
 - [complexity-resistance](.atl/wiki/complexity-resistance.md) — when a proposal needs paragraphs to defend, that's a smell
-- ...
-
-**Discipline:** Before working on a topic, scan this list. If a topic looks relevant, read the page.
 <!-- wiki:index:end -->
 ```
 
-Each entry is one line: `- [topic](.atl/wiki/topic.md) — one-line summary` (sorted alphabetically by filename). The summary comes from the first non-frontmatter, non-heading line of each wiki page.
-
-::: warning Current status
-The automatic rebuild of this block is **not yet wired** in the v2 `/drain` skill — `/drain` writes the wiki pages and journal entries, but the `wiki:index` block in `CLAUDE.md` is maintained by convention (by hand or by the same find/replace pattern) for now. Reconciling the producer is a tracked follow-up; the block's format and role are unchanged.
-:::
+Each entry is one line: `- [topic](.atl/wiki/topic.md) — one-line summary` (sorted alphabetically by filename). The summary comes from the first non-frontmatter, non-heading line of each wiki page. The block is rebuilt programmatically — hand-edits inside the markers are overwritten on the next `/drain` run, so to add a topic you create the wiki page (or let `/drain` create it), and the index follows.
 
 ## `<!-- brainstorm:active -->` — active topics pin
 
@@ -175,6 +167,6 @@ HTML comments are:
 ## Related
 
 - [`/brainstorm`](/skills/brainstorm) — writes/removes the `<!-- brainstorm:active -->` block
-- [`/drain`](/skills/drain) — owns the `<!-- wiki:index -->` block (its automatic rebuild is a tracked follow-up)
+- [`/drain`](/skills/drain) — rebuilds the `<!-- wiki:index -->` block
 - [Knowledge system](/guide/knowledge-system) — what the wiki:index block indexes
 - [Concepts: Skill](/guide/concepts#skill) — where these conventions fit in the broader picture

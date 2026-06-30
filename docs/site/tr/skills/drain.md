@@ -97,6 +97,10 @@ knowledge-base-summary: "<agent.md'nin Knowledge Base bölümünde kullanılan t
 
 Bir çocuğu yazdıktan ya da güncelledikten sonra, `agent.md`'nin `## Knowledge Base` bölümünü çocukların frontmatter alanlarından (dosya adına göre sıralı) **tümüyle yeniden inşa et**. O bölüm türetilmiştir, elle düzenlenmez — her çalıştırmada baştan sona değiştirilir. Aynı desen, bir öğrenme bir beceriyi hedef alıyorsa, becerinin `learnings/` dizini ve `## Accumulated Learnings` bölümü için de geçerlidir.
 
+## Wiki dizini yeniden inşası
+
+Bir `/drain` çalıştırması bir `.atl/wiki/` sayfasını yazdığında ya da güncellediğinde, projenin `CLAUDE.md`'sindeki `<!-- wiki:index -->` bloğunu yeniden inşa eder ki bilgi haritası eşzamanlı kalsın — sayfa başına bir `- [topic](.atl/wiki/topic.md) — özet` satırı, dosya adına göre sıralı, türetilmiş (elle düzenlenmez). Projede `CLAUDE.md` yoksa yeniden inşa atlanır (`atl init` / `atl install` dosyayı oluşturur). Bloğun biçimi ve yerleşimi için [Claude Code kuralları](/tr/guide/claude-code-conventions) sayfasına bak.
+
 ## Örnekler
 
 ### Oturum başı bir komut isteminin ardından boşaltma
