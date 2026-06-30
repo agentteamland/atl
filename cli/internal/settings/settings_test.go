@@ -82,6 +82,33 @@ func TestInstallHooksPreservesUserHooks(t *testing.T) {
 	}
 }
 
+func TestInstallHooksMatcher(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	path, err := InstallHooks([]Hook{
+		{Event: "PreToolUse", Matcher: "Bash|Edit|Write", Command: "atl guard"},
+		{Event: "SessionStart", Command: "atl session-start"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	hm := readHooks(t, path)
+
+	// The PreToolUse group carries the tool matcher.
+	pre, _ := hm["PreToolUse"].([]any)
+	if len(pre) != 1 {
+		t.Fatalf("want 1 PreToolUse group, got %d", len(pre))
+	}
+	if m := pre[0].(map[string]any)["matcher"]; m != "Bash|Edit|Write" {
+		t.Fatalf("PreToolUse matcher: got %v, want Bash|Edit|Write", m)
+	}
+
+	// A matcher-less event emits no matcher key (unchanged shape).
+	ss, _ := hm["SessionStart"].([]any)
+	if _, has := ss[0].(map[string]any)["matcher"]; has {
+		t.Fatal("SessionStart group should not carry a matcher key")
+	}
+}
+
 func TestInstallHooksCommandShape(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	path, err := InstallHooks(v2Hooks)

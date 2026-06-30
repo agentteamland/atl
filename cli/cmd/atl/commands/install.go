@@ -149,6 +149,7 @@ func defaultHooks() []settings.Hook {
 	return []settings.Hook{
 		{Event: "SessionStart", Command: "atl session-start"},
 		{Event: "UserPromptSubmit", Command: "atl tick --throttle=10m"},
+		{Event: "PreToolUse", Matcher: "Bash|Edit|Write", Command: "atl guard"},
 	}
 }
 

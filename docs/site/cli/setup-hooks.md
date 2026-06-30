@@ -16,7 +16,7 @@ atl setup-hooks --throttle=1h      # less aggressive
 
 ## What it does
 
-Writes two entries into `~/.claude/settings.json`:
+Writes three entries into `~/.claude/settings.json`:
 
 ```json
 {
@@ -29,6 +29,12 @@ Writes two entries into `~/.claude/settings.json`:
     "UserPromptSubmit": [
       { "hooks": [
           { "type": "command", "command": "atl tick --throttle=10m" }
+      ]}
+    ],
+    "PreToolUse": [
+      { "matcher": "Bash|Edit|Write",
+        "hooks": [
+          { "type": "command", "command": "atl guard" }
       ]}
     ]
   }
@@ -58,6 +64,15 @@ Runs before every message you send to Claude. `atl tick --throttle=10m` does the
 
 When something surfaces, Claude sees the corresponding line in its context and can mention it. When nothing changed, you see nothing.
 
+### `PreToolUse` — the enforcement guard
+
+Runs before every `Bash`, `Edit`, and `Write` tool call (scoped by the hook's `matcher`). `atl guard` applies ATL's discipline as **deterministic enforcement** rather than prose a model can skip — in two layers, split by reversibility:
+
+- **Catastrophe layer (blocks)** — an irreversible Bash operation is denied outright, with the reason shown to Claude so it can take a safe path instead. The fixed set: `git push --force` (use `--force-with-lease`), `git reset --hard`, `git clean -f`, destructive SQL (`DROP TABLE` / `DROP DATABASE` / `TRUNCATE`), and `--no-verify` (which bypasses the commit/push gate). `rm -rf /` and `rm -rf ~` are deliberately left out — Claude Code already blocks those itself, even in bypass mode.
+- **Quality layer (never blocks)** — the first time you edit an *existing* file in a session, the guard injects a short grep-before-edit reminder as context. It sets no permission decision, so it neither interrupts the flow nor changes what you're prompted to approve; the second edit of the same file is silent, and creating a new file is exempt.
+
+The guard fires in every permission mode — including `bypassPermissions` — because a PreToolUse hook is an enforcement layer above the permission prompts. Like the other hooks it never fails your work: on malformed input or any internal error it stays silent and the tool call proceeds.
+
 ## How marker-driven learning processing reaches Claude
 
 Capture is automatic; only the *fold-in* needs one Claude turn (the LLM work the CLI can't do itself — the CLI/Skill boundary):
@@ -84,14 +99,15 @@ Within a single session, `atl tick` keeps the queue current between prompts, so 
 
 See [`atl learnings`](/cli/learnings) for the marker format and the queue's status/peek/ack surface, [`atl tick`](/cli/tick) for the in-session cadence, and the [`/drain` skill](/skills/drain) for how queued learnings get folded into the knowledge base.
 
-## Why these two hooks
+## Why these hooks
 
 | Hook | Answers |
 |---|---|
 | `SessionStart` (via `atl session-start`) | "I'm opening Claude Code fresh — drain what the last session left behind, heal anything broken, and tell me if there are learnings to fold in." |
 | `UserPromptSubmit` (via `atl tick`) | "I've been in this session a while — keep the queue current, pull any global-layer changes, and circulate gains, cheaply, between prompts." |
+| `PreToolUse` (via `atl guard`) | "I'm about to run a tool — block the irreversible mistakes outright, and remind me to grep before I first edit a file." |
 
-Together they implement the three-speed in-session cadence: an every-prompt fan-out, a throttled tick, and the boot-time drain.
+The first two implement the three-speed in-session cadence (an every-prompt fan-out, a throttled tick, and the boot-time drain); `PreToolUse` adds the enforcement layer that makes ATL's discipline bite at the moment of action.
 
 ## Idempotency — safe to re-run
 

@@ -37,6 +37,7 @@ learning blueprints stay non-flaky).
 | `update` | none | a global change fans out to an unmodified project copy |
 | `list-remove` | none | list shows the team; remove deletes its files + manifest |
 | `search` | none | catalog is searchable by keyword + name, browsable with no query, miss reports cleanly |
+| `guard` | none | PreToolUse hook: irreversible Bash op denied; first-edit nudge then silent; new file + malformed input pass |
 | `learning-loop` | token | real `claude -p`: marker → tick → queue → /drain → KB → ack |
 | `publish-propose` | gh | a gain in a team you don't own → real fork + PR (then cleanup) |
 | `publish-own` | gh | a team you own → real commit + version bump + tag |
