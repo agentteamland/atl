@@ -2,7 +2,10 @@
 
 Fold the pending learning queue into the knowledge base — route each item to the wiki, the journal, or an agent's knowledge base, then ack it so it's deleted.
 
-`/drain` is the **consuming half** of the v2 learning loop. Capture is automatic and deterministic: Claude drops silent `<!-- learning -->` markers during a conversation, and [`atl tick`](/cli/tick) transfers each one into a durable bbolt queue exactly once. This skill is the LLM half the CLI can't do itself — read each queued learning, decide where it belongs, integrate it, and ack it.
+`/drain` is the **consuming half** of the v2 learning loop. Capture is automatic and deterministic: Claude drops silent `<!-- learning -->` markers during a conversation, and [`atl tick`](/cli/tick) transfers each one into a durable bbolt queue exactly once. This skill is the LLM half the CLI can't do itself, and it does two judgment jobs:
+
+1. **Mine** the conversation for learnings the agent *forgot* to mark — the user's corrections, reverts, repeated mistakes — and enqueue them like any marker. Marker capture only catches what the agent noticed, and the mistakes worth not-repeating are exactly the ones it didn't.
+2. **Quality-gate, then integrate** each queued item — decide whether it's worth keeping (Save / Improve / Absorb / Drop), then route the keepers to the wiki, the journal, or an agent's knowledge base, and ack each.
 
 ## When to use it
 
@@ -13,11 +16,27 @@ The CLI half is exposed by [`atl learnings`](#the-cli-half): `status` shows pend
 
 ## Why ack = delete
 
-The queue guarantees exactly-once delivery and dedup. You never re-scan transcripts and never track state — you only `peek`, integrate, and `ack`. An acked item is **deleted** from the queue, so it can never be re-reported. The v1 re-report bug class is structurally gone: there is no state file to advance and nothing to dedup against, so re-running `/drain` on an empty queue is a no-op.
+The queue guarantees exactly-once delivery and dedup by content hash. An acked item is **deleted** from the queue, so it can never be re-reported — the v1 re-report bug class is structurally gone. The mining step does read the recent conversation, but anything it captures is enqueued like a marker and deduped by the same content hash, so re-running `/drain` is safe: a lesson you already saved re-enqueues to a no-op, and an empty queue with nothing new to mine is a no-op too.
 
 ## Procedure
 
-### 1. Peek the queue
+### 1. Mine the conversation for unmarked learnings
+
+Before peeking the queue, harvest what the agent forgot to mark. Read the recent conversation flow (prose only — tool calls and results are stripped):
+
+```bash
+atl learnings transcript
+```
+
+Scan it for **durable** learnings that were never captured as a marker: **user corrections** (the user said the agent was wrong and how to fix it), **reverts** (an approach was tried, rejected, replaced), and **repeated mistakes** (the same class of error recurred). For each, write a one-line learning stating the lesson **with its why**, and enqueue it exactly like a marker:
+
+```bash
+atl learnings _enqueue learning "<the lesson, with its reason>"
+```
+
+Be **strict** — mine only what's worth never-repeating; a one-off or anything already obvious is noise. The queue dedups by content hash, so re-mining the same lesson is a safe no-op, but the real filter is the quality gate in step 3. If nothing qualifies, enqueue nothing.
+
+### 2. Peek the queue
 
 Run in the project directory:
 
@@ -25,9 +44,22 @@ Run in the project directory:
 atl learnings peek --channel learning --json
 ```
 
-Each item is `{id, channel, payload, enqueued_at}`. The `payload` is free text — the marker body that was captured. If the list is empty, report "nothing to drain" and stop.
+Each item is `{id, channel, payload, enqueued_at}` — now both agent-dropped markers and anything you just mined. The `payload` is free text. If the list is empty, report "nothing to drain" and stop.
 
-### 2. Route each item by the shape of its payload
+### 3. Quality-gate each item before persisting
+
+A learning store rots when it bloats, so don't save blindly. For each item, **first grep the existing knowledge** (`.atl/wiki/`, `.atl/journal/`, any owning agent's `children/`), then give a holistic verdict:
+
+| Verdict | When | Action |
+|---|---|---|
+| **Save** | New, durable, worth keeping | Route + write (steps 4–5) |
+| **Improve-then-Save** | Worth keeping but vague as written | Sharpen the wording, then route + write |
+| **Absorb** | An existing page/entry already covers it | Merge the nuance into that note — no new file — then ack |
+| **Drop** | Trivial, one-off, redundant, or obvious | Ack, write nothing |
+
+This is a **holistic** judgment, not a numeric score. Lean toward Absorb over a near-duplicate page and Drop over a marginal one — the bar for a standalone entry is "a future session would be glad this exists." Absorb and Drop both end in an `ack`; only Save / Improve-then-Save proceed to routing.
+
+### 4. Route each kept item by the shape of its payload
 
 The v2 marker carries no `topic`/`kind` metadata — **you** infer the destination from the payload, and derive a kebab-case `topic` from the content (one concept: `auth-refresh`, `redis-ttl`).
 
@@ -40,7 +72,7 @@ The v2 marker carries no `topic`/`kind` metadata — **you** infer the destinati
 
 To find the owning agent, look at the installed agents under `<proj>/.claude/agents/` and `~/.claude/agents/` (project shadows global). If no agent clearly owns it, route to the wiki instead. Always include the **WHY** in what you write — a fact without its reason rots.
 
-### 3. Write, then ack — one item at a time
+### 5. Write, then ack — one item at a time
 
 Non-structural writes are silent (no confirmation). After each item is integrated, ack it so it leaves the queue:
 
@@ -50,19 +82,20 @@ atl learnings ack <id>
 
 Ack **only after** the write succeeds. If you can't integrate an item, leave it (don't ack) and note it in the report.
 
-### 4. Structural changes — propose, never auto-apply
+### 6. Structural changes — propose, never auto-apply
 
 For the "structural" row, do not author agents/skills/rules silently. Collect them and, at the end, propose each one through `AskUserQuestion` (new agent / new skill / new rule / identity change). This is the reactive-creation boundary: a human confirms structural growth. Ack a structural item only once its proposal is resolved.
 
-### 5. Report
+### 7. Report
 
 Summarize what landed where: per item, topic → destination; list any new files created and any structural proposals. Keep it short.
 
 ## The CLI half
 
-`/drain` drives three deterministic verbs under [`atl learnings`](/cli/learnings):
+`/drain` drives deterministic verbs under [`atl learnings`](/cli/learnings):
 
 ```bash
+atl learnings transcript      # recent conversation flow for the mining step (step 1)
 atl learnings status          # pending counts per channel for this project
 atl learnings peek            # list pending items (human-readable)
 atl learnings peek --json     # the full machine-readable list the skill consumes
@@ -72,10 +105,11 @@ atl learnings ack <id>        # delete a processed item from the queue
 
 Flags:
 
+- `transcript --limit <n>` — read the most recent N transcripts (default 2); `--json` emits role/text records.
 - `peek --json` — emit pending items as JSON (id, channel, payload, enqueued_at).
 - `peek --channel <name>` — filter to a single channel (e.g. `learning`).
 
-`status` and `ack` take no flags. `ack` takes exactly one argument — the item `id`.
+`status` takes no flags. `ack` takes exactly one argument — the item `id`. The mining step itself enqueues with the hidden `atl learnings _enqueue learning "<lesson>"` helper (the same one capture uses), so dedup lives in the queue.
 
 ### Channels
 

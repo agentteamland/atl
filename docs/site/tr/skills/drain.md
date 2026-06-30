@@ -2,7 +2,10 @@
 
 Bekleyen öğrenme kuyruğunu bilgi tabanına katar — her öğeyi wiki'ye, journal'a ya da bir ajanın bilgi tabanına yönlendirir, ardından onaylayarak (ack) kuyruktan siler.
 
-`/drain`, v2 öğrenme döngüsünün **tüketen yarısıdır**. Yakalama kendiliğinden ve belirlenimcidir: Claude bir konuşma sırasında sessiz `<!-- learning -->` işaretçileri düşürür, [`atl tick`](/tr/cli/tick) ise her birini dayanıklı bir bbolt kuyruğuna tam olarak bir kez aktarır. Bu beceri, CLI'nin tek başına yapamayacağı LLM yarısıdır — kuyruğa alınmış her öğrenmeyi okur, nereye ait olduğuna karar verir, onu birleştirir ve onaylar.
+`/drain`, v2 öğrenme döngüsünün **tüketen yarısıdır**. Yakalama kendiliğinden ve belirlenimcidir: Claude bir konuşma sırasında sessiz `<!-- learning -->` işaretçileri düşürür, [`atl tick`](/tr/cli/tick) ise her birini dayanıklı bir bbolt kuyruğuna tam olarak bir kez aktarır. Bu beceri, CLI'nin tek başına yapamayacağı LLM yarısıdır ve iki yargı işi yapar:
+
+1. **Madenleme** — ajanın işaretlemeyi *unuttuğu* öğrenmeleri (kullanıcının düzeltmeleri, geri almaları, tekrarlanan hataları) konuşmadan çıkarır ve herhangi bir işaretçi gibi kuyruğa ekler. İşaretçi yakalaması yalnızca ajanın fark ettiğini yakalar; tekrarlanmaması gereken hatalar ise tam da ajanın fark etmedikleridir.
+2. **Kalite kapısı, sonra birleştirme** — kuyruktaki her öğe için saklanmaya değer mi diye karar verir (Kaydet / Düzelt / Birleştir / At), sonra saklananları wiki'ye, journal'a ya da bir ajanın bilgi tabanına yönlendirir ve her birini onaylar (ack).
 
 ## Ne zaman kullanılır?
 
@@ -13,11 +16,27 @@ CLI yarısı [`atl learnings`](#cli-yarisi) tarafından sunulur: `status` bekley
 
 ## Neden ack = silme?
 
-Kuyruk, tam-olarak-bir-kez teslim ve yineleme ayıklama güvencesi verir. Transkriptleri hiç yeniden taramaz ve durum izlemezsin — yalnızca `peek` (gözat), birleştir ve `ack` (onayla) yaparsın. Onaylanmış bir öğe kuyruktan **silinir**, böylece bir daha asla yeniden raporlanamaz. v1'in yeniden-raporlama hata sınıfı yapısal olarak ortadan kalkmıştır: ilerletilecek bir durum dosyası ve karşı yineleme ayıklayacak hiçbir şey yoktur; bu yüzden boş bir kuyrukta `/drain` komutunu yeniden çalıştırmak işlem yapmaz.
+Kuyruk, içerik özetine (hash) göre tam-olarak-bir-kez teslim ve yineleme ayıklama güvencesi verir. Onaylanmış bir öğe kuyruktan **silinir**, böylece bir daha asla yeniden raporlanamaz — v1'in yeniden-raporlama hata sınıfı yapısal olarak ortadan kalkmıştır. Madenleme adımı son konuşmayı okur, ama yakaladığı her şey bir işaretçi gibi kuyruğa eklenir ve aynı içerik özetiyle yinelemesi ayıklanır; bu yüzden `/drain`'i yeniden çalıştırmak güvenlidir: zaten kaydettiğin bir ders işlemsizliğe (no-op) yeniden eklenir, madenlenecek yeni bir şeyi olmayan boş bir kuyruk da işlemsizdir.
 
 ## Yordam
 
-### 1. Kuyruğa gözat
+### 1. Konuşmayı işaretlenmemiş öğrenmeler için madenle
+
+Kuyruğa gözatmadan önce, ajanın işaretlemeyi unuttuğunu derle. Son konuşma akışını oku (yalnızca düz metin — araç çağrıları ve sonuçları ayıklanır):
+
+```bash
+atl learnings transcript
+```
+
+Onu, işaretçi olarak hiç yakalanmamış **kalıcı** öğrenmeler için tara: **kullanıcı düzeltmeleri** (kullanıcı ajanın yanlış olduğunu ve nasıl düzeltileceğini söyledi), **geri almalar** (bir yaklaşım denendi, reddedildi, değiştirildi) ve **tekrarlanan hatalar** (aynı sınıf hata yeniden ortaya çıktı). Her biri için dersi **gerekçesiyle** belirten tek satırlık bir öğrenme yaz ve onu tıpkı bir işaretçi gibi kuyruğa ekle:
+
+```bash
+atl learnings _enqueue learning "<ders, gerekçesiyle>"
+```
+
+**Katı** ol — yalnızca asla-tekrarlanmaması gerekeni madenle; tek seferlik ya da zaten apaçık olan her şey gürültüdür. Kuyruk içerik özetiyle yineleme ayıkladığından aynı dersi yeniden madenlemek güvenli bir işlemsizliktir (no-op), ama asıl süzgeç 3. adımdaki kalite kapısıdır. Hiçbir şey uygun değilse, hiçbir şey ekleme.
+
+### 2. Kuyruğa gözat
 
 Proje dizininde çalıştır:
 
@@ -25,9 +44,22 @@ Proje dizininde çalıştır:
 atl learnings peek --channel learning --json
 ```
 
-Her öğe `{id, channel, payload, enqueued_at}` biçimindedir. `payload` serbest metindir — yakalanan işaretçinin gövdesidir. Liste boşsa "boşaltılacak bir şey yok" diye raporla ve dur.
+Her öğe `{id, channel, payload, enqueued_at}` biçimindedir — artık hem ajanın düşürdüğü işaretçiler hem de az önce madenlediklerin. `payload` serbest metindir. Liste boşsa "boşaltılacak bir şey yok" diye raporla ve dur.
 
-### 2. Her öğeyi payload'ının biçimine göre yönlendir
+### 3. Saklamadan önce her öğeyi kalite kapısından geçir
+
+Bir öğrenme deposu şiştiğinde çürür, bu yüzden körlemesine kaydetme. Her öğe için **önce mevcut bilgiyi grep'le** (`.atl/wiki/`, `.atl/journal/`, sahibi olan bir ajanın `children/` dizini), sonra holistik bir karar ver:
+
+| Karar | Ne zaman | Eylem |
+|---|---|---|
+| **Kaydet** | Yeni, kalıcı, saklanmaya değer | Yönlendir + yaz (4–5. adımlar) |
+| **Düzelt-sonra-Kaydet** | Saklanmaya değer ama yazıldığı hâliyle belirsiz | İfadeyi keskinleştir, sonra yönlendir + yaz |
+| **Birleştir** | Mevcut bir sayfa/madde zaten kapsıyor | Nüansı o nota kat — yeni dosya yok — sonra onayla |
+| **At** | Önemsiz, tek seferlik, gereksiz ya da apaçık | Onayla, hiçbir şey yazma |
+
+Bu, sayısal bir puan değil, **holistik** bir yargıdır. Neredeyse-yinelenen bir sayfa yerine Birleştir'e, marjinal bir öğe yerine At'a yat — bağımsız bir madde için eşik "ileride bir oturum bunun var olmasına sevinir mi" sorusudur. Birleştir ve At, ikisi de bir `ack` ile biter; yalnızca Kaydet / Düzelt-sonra-Kaydet yönlendirmeye geçer.
+
+### 4. Saklanan her öğeyi payload'ının biçimine göre yönlendir
 
 v2 işaretçisi `topic`/`kind` üst verisi taşımaz — hedefi payload'dan **sen** çıkarırsın ve içerikten kebab-case bir `topic` türetirsin (tek kavram: `auth-refresh`, `redis-ttl`).
 
@@ -40,7 +72,7 @@ v2 işaretçisi `topic`/`kind` üst verisi taşımaz — hedefi payload'dan **se
 
 Sahibi olan ajanı bulmak için `<proj>/.claude/agents/` ve `~/.claude/agents/` altındaki kurulu ajanlara bak (proje, global'i gölgeler). Hiçbir ajan onu açıkça sahiplenmiyorsa, bunun yerine wiki'ye yönlendir. Yazdığın şeye daima **NEDEN**'i kat — gerekçesiz bir gerçek çürür.
 
-### 3. Yaz, sonra onayla — birer birer
+### 5. Yaz, sonra onayla — birer birer
 
 Yapısal olmayan yazımlar sessizdir (onay yok). Her öğe birleştirildikten sonra, kuyruktan çıkması için onayla:
 
@@ -50,19 +82,20 @@ atl learnings ack <id>
 
 **Yalnızca** yazım başarıyla tamamlandıktan sonra onayla. Bir öğeyi birleştiremiyorsan, onu bırak (onaylama) ve raporda not düş.
 
-### 4. Yapısal değişiklikler — öner, asla kendiliğinden uygulama
+### 6. Yapısal değişiklikler — öner, asla kendiliğinden uygulama
 
 "Yapısal" satırı için ajanları/becerileri/kuralları sessizce yazma. Onları topla ve en sonunda her birini `AskUserQuestion` üzerinden öner (yeni ajan / yeni beceri / yeni kural / kimlik değişikliği). Bu, reaktif-yaratım sınırıdır: yapısal büyümeyi bir insan onaylar. Yapısal bir öğeyi yalnızca önerisi çözüme bağlandıktan sonra onayla.
 
-### 5. Raporla
+### 7. Raporla
 
 Neyin nereye indiğini özetle: öğe başına, konu → hedef; oluşturulan yeni dosyaları ve varsa yapısal önerileri listele. Kısa tut.
 
 ## CLI yarısı
 
-`/drain`, [`atl learnings`](/tr/cli/learnings) altındaki üç belirlenimci eylemi sürer:
+`/drain`, [`atl learnings`](/tr/cli/learnings) altındaki belirlenimci eylemleri sürer:
 
 ```bash
+atl learnings transcript      # madenleme adımı için son konuşma akışı (1. adım)
 atl learnings status          # bu proje için kanal başına bekleyen sayılar
 atl learnings peek            # bekleyen öğeleri listele (insan tarafından okunabilir)
 atl learnings peek --json     # becerinin tükettiği tam, makinece okunabilir liste
@@ -72,10 +105,11 @@ atl learnings ack <id>        # işlenmiş bir öğeyi kuyruktan sil
 
 Bayraklar:
 
+- `transcript --limit <n>` — en son N transkripti okur (varsayılan 2); `--json` rol/metin kayıtları verir.
 - `peek --json` — bekleyen öğeleri JSON olarak yayımlar (id, channel, payload, enqueued_at).
 - `peek --channel <name>` — tek bir kanala süzer (ör. `learning`).
 
-`status` ve `ack` bayrak almaz. `ack` tam olarak bir argüman alır — öğenin `id`'si.
+`status` bayrak almaz. `ack` tam olarak bir argüman alır — öğenin `id`'si. Madenleme adımının kendisi, gizli `atl learnings _enqueue learning "<ders>"` yardımcısıyla (yakalamanın kullandığının aynısı) kuyruğa ekler; böylece yineleme ayıklama kuyrukta yaşar.
 
 ### Kanallar
 
