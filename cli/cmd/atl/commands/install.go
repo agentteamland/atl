@@ -3,10 +3,12 @@ package commands
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/agentteamland/atl/cli/internal/generation"
 	"github.com/agentteamland/atl/cli/internal/index"
 	"github.com/agentteamland/atl/cli/internal/manifest"
+	"github.com/agentteamland/atl/cli/internal/scaffold"
 	"github.com/agentteamland/atl/cli/internal/scope"
 	"github.com/agentteamland/atl/cli/internal/settings"
 	"github.com/agentteamland/atl/cli/internal/source"
@@ -97,6 +99,12 @@ var installCmd = &cobra.Command{
 		// ships in the binary and underpins every team. Best-effort.
 		if _, cerr := reflectCore(); cerr != nil {
 			fmt.Printf("atl: warning — could not reflect core: %v\n", cerr)
+		}
+
+		// Drop a project CLAUDE.md starter if this project has none — only-if-absent,
+		// so a user's own file is never touched. Best-effort; never fail the install.
+		if path, created, serr := scaffold.WriteIfAbsent(scaffold.Project, projectRoot, filepath.Base(projectRoot)); serr == nil && created {
+			fmt.Printf("atl: created %s — a project CLAUDE.md starter; fill in the sections marked for you.\n", path)
 		}
 
 		fmt.Printf("atl: installed %s@%s at %s scope\n", entry.Ref(), tm.Version, scopeLabel(targets))

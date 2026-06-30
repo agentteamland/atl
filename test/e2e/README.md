@@ -30,7 +30,8 @@ learning blueprints stay non-flaky).
 
 | Blueprint | needs | What it proves |
 |---|---|---|
-| `install` | none | install at both scopes; assets + manifests + embedded core reflect |
+| `init` | none | `atl init` scaffolds a per-tier CLAUDE.md, only-if-absent (never clobbers), flags mutually exclusive |
+| `install` | none | install at both scopes; assets + manifests + embedded core reflect; project CLAUDE.md scaffolded |
 | `promote` | none | a project gain lifts to global; second pass is a no-op |
 | `pin` | none | a pinned file is held back from promote; unpin re-enables it |
 | `doctor` | none | a deleted installed file is self-healed from the pinned source |

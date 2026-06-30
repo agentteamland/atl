@@ -1,14 +1,36 @@
 # Claude Code sözleşmeleri
 
-`atl` ve onunla birlikte gelen becerilerin oturumlar arasında durumu eşgüdümlemek için `CLAUDE.md` içinde kullandığı işaretçi blok sözleşmeleri. Bunlar, Claude Code'un proje yönergesi mekanizması tarafından kendiliğinden yüklenen, HTML yorumlarıyla sınırlanan bloklardır — görüntülenmiş Markdown içinde görünmezler, Claude dosyayı okuduğunda kaçırılması olanaksızdır.
+ATL'nin `CLAUDE.md`'i — Claude Code'un talimat olarak otomatik yüklediği dosya — nasıl şekillendirdiği. İki yarım: **üç tier** (her katman için tek yalın dosya, token bütçeleri ve bir ownership modeliyle) ve proje tier'inin oturumlar arası durumu eşgüdümlemek için taşıdığı **marker bloklar**.
 
-Aynı deseni kendi `CLAUDE.md` dosyalarında sen de kullanabilirsin. Bloklar yalnızca bir sözleşmedir — özel bir ayrıştırıcı yoktur. Yorum sınırlayıcıları, blokları program yoluyla bulmak, güncellemek ve kaldırmak için güvenli kılar.
+[`atl init`](/tr/cli/init) her tier için bir başlangıç oluşturur; `atl install` da bir projede yoksa project başlangıcını otomatik düşürür. Bu sayfa, o scaffold'ların somutlaştırdığı şekildir.
+
+## Üç tier
+
+Tier başına tek, her zaman yüklü dosya — her biri büyüteceğin yalın bir başlangıç. Yetki katmanları (kimlik → kurallar → yönlendirme) ayrı dosyalar değil, **tek dosya içindeki sıralı bölümlerdir** — `SOUL`/`RULES`/`AGENTS` çoğaltması yok.
+
+| Tier | Dosya | Ne tutar | Yumuşak bütçe |
+|---|---|---|---|
+| **global** | `~/.claude/CLAUDE.md` | Saf kullanıcı **persona'sı** — Claude'un her yerde nasıl çalışmasını istediğin (dil, stil, her projede istediğin mühendislik varsayılanları). **ATL burada hiçbir şey yönetmez.** | ≤ ~80 satır |
+| **project** | `<proje>/CLAUDE.md` | **Hibrit:** ATL'nin yönettiği marker bloklar (aşağıda) + kendi kanıttan-doldurulan gerçeklerin (stack, komutlar, kurallar) + opsiyonel ≤5 satırlık glob→skill yönlendirme tablosu. | ≤ ~60 satır |
+| **monorepo** | `<repo>/CLAUDE.md` | Proje şeklinin **özelleşmiş + yalın** hâli: bir layout tablosu ve kurallar **pointer** olarak, içeri gömülmeden. | ~30 satır |
+
+Her zaman yüklü zincir (global + project) ~300 satırın altında kalmalı — her satır her oturumda context'e mal olur, bu yüzden her bölüm bütçeye karşı yerini hak etmeli.
+
+### Ownership — yönetilen vs. kullanıcıya ait
+
+**project** tier'inde, bir marker bloğunun içindeki içerik (aşağıdaki üç blok) **ATL-yönetimlidir**: `/brainstorm` ve `/drain` becerileri bu blokların sahibidir (her bloğun aşağıdaki durum notuna bak) ve onları yeniden yazar, dolayısıyla marker'ların içine yapılan elle düzenlemeler kalıcı olmaz. Marker'ların **dışındaki** her şey **senindir** — `atl init` onu bir kez tohumlar ve bir daha dokunmaz (yalnızca var olmayan bir `CLAUDE.md`'i yazar). **global** tier'in hiç yönetilen bloğu yoktur: tamamen senindir.
+
+Kullanıcıya ait gerçekleri **kodun gerçekte nasıl davrandığından** doldur — stack'i, gerçek build/test komutlarını, kullanımdaki kuralları yakala. İş kuralları uydurma; sözdizimini tekrar etmek yerine meta-mimariyi hizala.
+
+### Volatilite ayrımı
+
+Oynak çalışma/sprint durumu her-zaman-yüklü dosyaya **ait değildir** — her oturumda context'e mal olur ve sürekli çalkalanır. Onu ayrı, talep üzerine okunan bir tracker'da tut ve `CLAUDE.md`'de yalnızca bir pointer bırak (proje başlangıcının `## State` bölümü bu pointer'dır). Pratik kural: yalnızca güncel sprint için ayrıntılı; artık icrayı şekillendirmediğinde docs/journal'a özetleyip çıkar.
 
 ## Üç blok
 
 | Blok | Yazan | Amaç |
 |---|---|---|
-| `<!-- wiki:index -->` | [`/drain`](/tr/skills/drain) | `.atl/wiki/` sayfaları için kendiliğinden yeniden inşa edilen içindekiler tablosu. Proje bağlamıyla yüklenir, Claude'a sıfır maliyetle bilgi haritasını sunar. |
+| `<!-- wiki:index -->` | [`/drain`](/tr/skills/drain) (amaçlanan) | `.atl/wiki/` sayfaları için içindekiler tablosu — proje bağlamıyla yüklenir, Claude'a sıfır maliyetle bilgi haritasını sunar. Bugün sözleşmeyle bakılır; otomatik yeniden inşa v2 `/drain` becerisinde henüz bağlı değil (aşağıdaki durum notuna bak). |
 | `<!-- brainstorm:active -->` | [`/brainstorm start`](/tr/skills/brainstorm) ve [`/brainstorm done`](/tr/skills/brainstorm) | Etkin beyin fırtınası konularını proje bağlamına sabitler; bir sonraki oturum bunları kaçıramaz. |
 | `<!-- pending-implementation -->` | Beyin fırtınası `done` akışı | Bir beyin fırtınasının X kararını verdiğini ama uygulamasının henüz yayımlanmadığını bir sonraki oturuma anımsatır. |
 
@@ -18,7 +40,7 @@ Aynı deseni kendi `CLAUDE.md` dosyalarında sen de kullanabilirsin. Bloklar yal
 
 ## `<!-- wiki:index -->` — bilgi haritası
 
-`.atl/wiki/` dizinindeki her değişiklikten sonra `/drain` tarafından yeniden inşa edilir. `CLAUDE.md` dosyasının üst kısmına yakın, H1 ve giriş paragrafından sonra yaşar:
+`.atl/wiki/` sayfaları için bir içindekiler tablosu; `CLAUDE.md` dosyasının üst kısmına yakın, H1 ve giriş paragrafından sonra yaşar:
 
 ```markdown
 <!-- wiki:index:start -->
@@ -38,7 +60,9 @@ Knowledge lives in `.atl/wiki/` (current truth, topic-organized) and `.atl/journ
 
 Her madde tek satırdır: `- [topic](.atl/wiki/topic.md) — tek satırlık özet` (dosya adına göre alfabetik sıralı). Özet, her wiki sayfasının frontmatter ve başlık dışındaki ilk satırından alınır.
 
-**Neden normal bir bölüm değil de işaretçi bloku:** blok program yoluyla yeniden inşa ediliyor. İşaretçilerin içine yapılan elle düzenlemeler bir sonraki `/drain` çalıştırmasında üzerine yazılır. Bir konu eklemek için: `CLAUDE.md` dosyasını doğrudan DÜZENLEME — wiki sayfasını konu başlığıyla oluştur; ardından `/drain` dizini yeniden inşa eder.
+::: warning Güncel durum
+Bu bloğun otomatik yeniden inşası v2 `/drain` becerisinde **henüz bağlı değil** — `/drain` wiki sayfalarını ve journal kayıtlarını yazar, ama `CLAUDE.md` içindeki `wiki:index` bloğu şimdilik sözleşmeyle (elle ya da aynı bul/değiştir deseniyle) bakılır. Üreticiyi uzlaştırmak izlenen bir takip işidir; bloğun biçimi ve rolü değişmedi.
+:::
 
 ## `<!-- brainstorm:active -->` — etkin konu sabitleyici
 
@@ -151,6 +175,6 @@ HTML yorumları:
 ## İlgili
 
 - [`/brainstorm`](/tr/skills/brainstorm) — `<!-- brainstorm:active -->` bloğunu yazar ve kaldırır.
-- [`/drain`](/tr/skills/drain) — `<!-- wiki:index -->` bloğunu yazar.
+- [`/drain`](/tr/skills/drain) — `<!-- wiki:index -->` bloğunun sahibidir (otomatik yeniden inşası izlenen bir takip işidir).
 - [Bilgi sistemi](/tr/guide/knowledge-system) — wiki:index bloğunun neyi indekslediği.
 - [Kavramlar: Beceri](/tr/guide/concepts#skill) — bu sözleşmelerin geniş resme nereye oturduğu.

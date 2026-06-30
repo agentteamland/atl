@@ -1,14 +1,36 @@
 # Claude Code conventions
 
-The marker-block conventions `atl` and its sibling skills use inside `CLAUDE.md` to coordinate state across sessions. These are HTML-comment-delimited blocks that are auto-loaded by Claude Code's project-instruction mechanism — invisible in rendered Markdown, impossible to miss when Claude reads the file.
+How ATL shapes `CLAUDE.md` — the file Claude Code auto-loads as instructions. Two halves: the **three tiers** (one lean file per layer, with token budgets and an ownership model) and the **marker blocks** the project tier carries to coordinate state across sessions.
 
-You can use the same pattern in your own `CLAUDE.md` files. The blocks are just convention — there's no special parser. The comment delimiters make them safe to find/update/remove programmatically.
+[`atl init`](/cli/init) scaffolds a starter for each tier; `atl install` drops the project starter automatically when a project has none. This page is the shape those scaffolds embody.
+
+## The three tiers
+
+One always-loaded file per tier, each a lean starter you grow. Authority layers (identity → rules → guidance) are **ordered sections within one file**, not separate files — no `SOUL`/`RULES`/`AGENTS` multiplication.
+
+| Tier | File | What it holds | Soft budget |
+|---|---|---|---|
+| **global** | `~/.claude/CLAUDE.md` | Pure user **persona** — how you want Claude to work everywhere (language, style, the engineering defaults you want in every project). **ATL manages nothing here.** | ≤ ~80 lines |
+| **project** | `<project>/CLAUDE.md` | **Hybrid:** ATL-managed marker blocks (below) + your own evidence-fillable facts (stack, commands, conventions) + an optional ≤5-row glob→skill routing table. | ≤ ~60 lines |
+| **monorepo** | `<repo>/CLAUDE.md` | The project shape **specialized + lean**: a layout table and conventions as **pointers**, not inlined content. | ~30 lines |
+
+The always-loaded chain (global + project) should stay under ~300 lines — every line costs context on every session, so each section earns its place against the budget.
+
+### Ownership — managed vs. user-owned
+
+In the **project** tier, content inside a marker block (the three blocks below) is **ATL-managed**: the `/brainstorm` and `/drain` skills own these blocks (see each block's status note below) and rewrite them, so hand-edits inside the markers don't survive. Everything **outside** the markers is **yours** — `atl init` seeds it once and never touches it again (it only ever writes a `CLAUDE.md` that doesn't already exist). The **global** tier has no managed blocks at all: it is entirely yours.
+
+Fill the user-owned facts from **how the code actually behaves** — capture the stack, the real build/test commands, the conventions in use. Don't invent business rules, and align meta-architecture rather than restating syntax.
+
+### Volatility split
+
+Volatile working/sprint state does **not** belong in the always-loaded file — it would cost context every session and churn constantly. Keep it in a separate, read-on-demand tracker and leave only a pointer in `CLAUDE.md` (the project starter's `## State` section is that pointer). The rule of thumb: detailed for the current sprint only; summarize out to docs/journal once it no longer shapes execution.
 
 ## The three blocks
 
 | Block | Written by | Purpose |
 |---|---|---|
-| `<!-- wiki:index -->` | [`/drain`](/skills/drain) | Auto-rebuilt table of contents for `.atl/wiki/` pages. Loads with project context, gives Claude the knowledge map at zero cost. |
+| `<!-- wiki:index -->` | [`/drain`](/skills/drain) (intended) | Table of contents for `.atl/wiki/` pages — loads with project context, gives Claude the knowledge map at zero cost. Maintained by convention today; the automatic rebuild isn't wired in the v2 `/drain` skill yet (see the status note below). |
 | `<!-- brainstorm:active -->` | [`/brainstorm start`](/skills/brainstorm) and [`/brainstorm done`](/skills/brainstorm) | Pins active brainstorm topics into project context so the next session cannot miss them. |
 | `<!-- pending-implementation -->` | Brainstorm `done` flow | Reminds the next session that a brainstorm decided X but the implementation hasn't shipped yet. |
 
@@ -18,7 +40,7 @@ All three use the same `<!-- block:start --> ... <!-- block:end -->` delimiter p
 
 ## `<!-- wiki:index -->` — knowledge map
 
-Auto-rebuilt by `/drain` after every change to `.atl/wiki/`. Lives near the top of `CLAUDE.md`, after the H1 + intro:
+A table of contents for `.atl/wiki/` pages, near the top of `CLAUDE.md`, after the H1 + intro:
 
 ```markdown
 <!-- wiki:index:start -->
@@ -38,7 +60,9 @@ Knowledge lives in `.atl/wiki/` (current truth, topic-organized) and `.atl/journ
 
 Each entry is one line: `- [topic](.atl/wiki/topic.md) — one-line summary` (sorted alphabetically by filename). The summary comes from the first non-frontmatter, non-heading line of each wiki page.
 
-**Why it's a marker block, not just a normal section:** the block is rebuilt programmatically. Hand-edits inside the markers are overwritten on the next `/drain` run. To add a topic: don't edit `CLAUDE.md` directly — create the wiki page with the topic title, then `/drain` rebuilds the index.
+::: warning Current status
+The automatic rebuild of this block is **not yet wired** in the v2 `/drain` skill — `/drain` writes the wiki pages and journal entries, but the `wiki:index` block in `CLAUDE.md` is maintained by convention (by hand or by the same find/replace pattern) for now. Reconciling the producer is a tracked follow-up; the block's format and role are unchanged.
+:::
 
 ## `<!-- brainstorm:active -->` — active topics pin
 
@@ -151,6 +175,6 @@ HTML comments are:
 ## Related
 
 - [`/brainstorm`](/skills/brainstorm) — writes/removes the `<!-- brainstorm:active -->` block
-- [`/drain`](/skills/drain) — writes the `<!-- wiki:index -->` block
+- [`/drain`](/skills/drain) — owns the `<!-- wiki:index -->` block (its automatic rebuild is a tracked follow-up)
 - [Knowledge system](/guide/knowledge-system) — what the wiki:index block indexes
 - [Concepts: Skill](/guide/concepts#skill) — where these conventions fit in the broader picture
