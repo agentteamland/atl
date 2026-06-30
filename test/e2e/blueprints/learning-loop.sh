@@ -22,6 +22,14 @@ claude_turn "$MARKER" || bad "capture turn errored (see turns.log)"
 T=$(find "$HOME/.claude/projects" -name '*.jsonl' 2>/dev/null | xargs ls -t 2>/dev/null | head -1)
 { [ -n "$T" ] && grep -q '<!-- learning:' "$T"; } && ok "real session dropped a marker" || bad "no marker in transcript"
 
+# Correction-mining read surface: `atl learnings transcript` must expose the
+# user+assistant flow from the real session (the substrate /drain's mining step
+# scans). Deterministic — the prompt is in the transcript as a user turn. (The
+# LLM mining/quality-gate judgment itself rides the real /drain turn below; it's
+# not asserted directly here, which would be flaky.)
+FLOW=$(cd "$PROJ" && atl learnings transcript --json 2>/dev/null)
+echo "$FLOW" | jq -e 'any(.[]?; .role == "user")' >/dev/null 2>&1 && ok "transcript exposes conversation flow (mining read surface)" || bad "transcript flow empty -- [$FLOW]"
+
 ( cd "$PROJ" && atl tick >/dev/null 2>&1 )
 PEEK=$(cd "$PROJ" && atl learnings peek --channel learning --json 2>/dev/null)
 echo "$PEEK" | jq -e 'length > 0' >/dev/null 2>&1 && ok "marker enqueued in the durable queue" || bad "queue empty after tick -- [$PEEK]"

@@ -7,28 +7,82 @@ description: Fold pending learning-queue items into the knowledge base — route
 
 This is the **consuming half** of the v2 learning loop. Capture (silent markers →
 `atl tick` → bbolt queue) is automatic and deterministic; this skill is the LLM
-half the CLI can't do itself: read each queued learning, decide where it belongs,
-integrate it, and ack it.
+half the CLI can't do itself. It does two judgment jobs:
 
-The queue already guarantees exactly-once and dedup. You never re-scan
-transcripts and never track state — you only `peek`, integrate, and `ack`. An
-acked item is **deleted**, so it can never be re-reported (the v1 re-report bug
-class is structurally gone).
+1. **Mine** the conversation for learnings the agent *forgot* to mark — the user's
+   corrections, reverts, repeated mistakes — and enqueue them like any marker. This
+   is the missing input side: marker capture only catches what the agent noticed,
+   and the mistakes worth not-repeating are exactly the ones it didn't.
+2. **Quality-gate, then integrate** each queued item: decide whether it's worth
+   keeping (Save / Improve / Absorb / Drop), then route the keepers to the wiki,
+   the journal, or an agent's knowledge base, and ack each.
+
+The queue guarantees exactly-once and dedup by content hash, so mining is safe to
+re-run (a learning you've seen before re-enqueues to a no-op) and an acked item is
+**deleted**, so it can never be re-reported (the v1 re-report bug class is
+structurally gone).
 
 ## Procedure
 
-### 1. Peek the queue
+### 1. Mine the conversation for unmarked learnings
+Before peeking the queue, harvest what the agent forgot to mark. Read the recent
+conversation flow (prose only — tool calls/results are stripped):
+
+```
+atl learnings transcript
+```
+
+Scan it for **durable** learnings the agent never captured as a marker:
+
+- **User corrections** — the user told the agent it was wrong and how to do it right
+  ("no, use refresh tokens not sessions", "stop editing the config, fix the code").
+- **Reverts / do-overs** — an approach was tried, rejected, and replaced.
+- **Repeated mistakes** — the same class of error recurred across the session.
+
+For each one, write a one-line learning **stating the lesson, with the why**, and
+enqueue it exactly like a marker:
+
+```
+atl learnings _enqueue learning "<the lesson, with its reason>"
+```
+
+Be **strict** — mine only what's worth never-repeating. A preference voiced once,
+a one-off, or anything already obvious is noise; skip it. The queue dedups by
+content hash, so re-mining the same lesson is a safe no-op — but don't lean on
+that to lower the bar. (The quality gate in step 3 is the real filter; this step
+just feeds it candidates.) If nothing qualifies, enqueue nothing and move on.
+
+### 2. Peek the queue
 Run in the project directory (the queue is keyed by cwd):
 
 ```
 atl learnings peek --channel learning --json
 ```
 
-Each item is `{id, channel, payload, enqueued_at}`. The `payload` is free text —
-the marker body the user/assistant captured. If the list is empty, report
-"nothing to drain" and stop.
+Each item is `{id, channel, payload, enqueued_at}` — now both agent-dropped markers
+and anything you just mined. The `payload` is free text — the captured marker body.
+If the list is empty, report "nothing to drain" and stop.
 
-### 2. Route each item by the shape of its payload
+### 3. Quality-gate each item before persisting
+Don't blindly save every item — a learning store rots when it bloats. For each
+item, **first grep the existing knowledge** (the project `.atl/wiki/`,
+`.atl/journal/`, and any owning agent's `children/`) for the same topic, then give
+a holistic verdict:
+
+| Verdict | When | Action |
+|---|---|---|
+| **Save** | New, durable, worth keeping | Route + write (steps 4–5) |
+| **Improve-then-Save** | Worth keeping but vague/unclear as written | Sharpen the wording (keep the why), then route + write |
+| **Absorb** | A page/entry already covers this | Merge the new nuance into the existing note — **no new file** — then ack |
+| **Drop** | Trivial, one-off, redundant, or already obvious | Ack and write nothing |
+
+This is a **holistic** judgment, not a score — no confidence numbers. Lean toward
+**Absorb** over a near-duplicate new page and **Drop** over a marginal one; the
+bar for a standalone entry is "a future session would be glad this exists." Absorb
+and Drop both end in an `ack` (the item is handled — it just didn't become a new
+file). Only Save / Improve-then-Save proceed to routing.
+
+### 4. Route each kept item by the shape of its payload
 The v2 marker carries no `topic`/`kind` metadata — **you** infer the destination
 from the payload. Derive a kebab-case `topic` from the content (one concept:
 `auth-refresh`, `redis-ttl`).
@@ -38,7 +92,7 @@ from the payload. Derive a kebab-case `topic` from the content (one concept:
 | Topic-shaped current truth ("the right way to do auth is …") | **Wiki** — `<proj>/.atl/wiki/<topic>.md` (replace/merge if it exists) **+ journal** |
 | Time-stamped narrative ("we tried X, then Y, Y worked") | **Journal only** — `<proj>/.atl/journal/<YYYY-MM-DD>.md` (append) |
 | Domain knowledge for a specific installed agent ("api-agent: prefer prepared statements") | **Agent KB** — `<scope>/.claude/agents/<agent>/children/<topic>.md` + rebuild that agent's `## Knowledge Base` **+ journal** |
-| A repeating workflow, a crystallized convention, a new domain with no owning agent, or an identity expansion of an existing agent/skill | **Structural** — do NOT write autonomously; collect and propose (step 4) |
+| A repeating workflow, a crystallized convention, a new domain with no owning agent, or an identity expansion of an existing agent/skill | **Structural** — do NOT write autonomously; collect and propose (step 6) |
 
 To find the owning agent, look at the installed agents under
 `<proj>/.claude/agents/` and `~/.claude/agents/` (project shadows global). Match
@@ -46,7 +100,7 @@ on the agent's area; if no agent clearly owns it, route to the wiki instead.
 
 Always include the **WHY** in what you write — a fact without its reason rots.
 
-### 3. Write, then ack — one item at a time
+### 5. Write, then ack — one item at a time
 Non-structural writes are **silent** (no confirmation needed):
 
 - **Wiki** (`<proj>/.atl/wiki/<topic>.md`): current truth. If the page exists,
@@ -65,14 +119,14 @@ atl learnings ack <id>
 Ack **only after** the write succeeds. If you can't integrate an item, leave it
 (don't ack) and note it in the report.
 
-### 4. Structural changes — propose, never auto-apply
+### 6. Structural changes — propose, never auto-apply
 For the "structural" row, do not author agents/skills/rules silently. Collect
 them and, at the end, use **AskUserQuestion** to propose each one (new agent /
 new skill / new rule / identity change). This is the reactive-creation boundary
 (decision doc D-1): a human confirms structural growth. Ack a structural item
 only once its proposal is resolved (applied or declined).
 
-### 5. Report
+### 7. Report
 Summarize what landed where: per item, topic → destination; list any new files
 created and any structural proposals. Keep it short.
 
@@ -149,5 +203,6 @@ the three managed blocks, so it sits last).
   follows the agent's install scope (project `.claude/` shadows global `~/.claude/`).
 - **profile-fact channel**: not handled here — that's profile-team's drain
   (a future first-party team). This skill processes the `learning` channel only.
-- **Idempotency**: ack deletes the item; there is nothing to dedup against and no
-  state file to advance. Re-running `/drain` on an empty queue is a no-op.
+- **Idempotency**: ack deletes the item, and both capture and mining dedup by
+  content hash — so re-running `/drain` is safe. Mining a lesson you already saved
+  re-enqueues to a no-op; an empty queue with nothing new to mine is a no-op.

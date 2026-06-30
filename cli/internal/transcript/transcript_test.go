@@ -42,6 +42,44 @@ not even json
 	}
 }
 
+func TestExtractFlow(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "t.jsonl")
+	lines := `{"type":"user","message":{"role":"user","content":[{"type":"text","text":"do the auth thing"}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"on it"},{"type":"tool_use","name":"Edit"}]}}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","content":"ok"}]}}
+{"type":"user","message":{"role":"user","content":"no, use refresh tokens not sessions"}}
+{"type":"assistant","message":{"role":"assistant","content":"fixed"}}
+not even json
+`
+	if err := os.WriteFile(path, []byte(lines), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	turns, err := ExtractFlow(path)
+	if err != nil {
+		t.Fatalf("flow: %v", err)
+	}
+	// Expected: user "do the auth thing", assistant "on it", user "no, use…",
+	// assistant "fixed". The tool_result-only user message yields no text → dropped.
+	if len(turns) != 4 {
+		t.Fatalf("want 4 prose turns, got %d: %+v", len(turns), turns)
+	}
+	if turns[0].Role != "user" || turns[0].Text != "do the auth thing" {
+		t.Errorf("turn0: %+v", turns[0])
+	}
+	if turns[1].Role != "assistant" || turns[1].Text != "on it" {
+		t.Errorf("turn1 (tool_use must be dropped): %+v", turns[1])
+	}
+	if turns[2].Role != "user" || !strings.Contains(turns[2].Text, "refresh tokens") {
+		t.Errorf("turn2 (the correction): %+v", turns[2])
+	}
+	for _, tn := range turns {
+		if strings.Contains(tn.Text, "ok") && tn.Text == "ok" {
+			t.Error("tool_result content must not become a turn")
+		}
+	}
+}
+
 func TestFindModTimeFilterAndOrder(t *testing.T) {
 	dir := t.TempDir()
 	old := filepath.Join(dir, "old.jsonl")

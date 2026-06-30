@@ -4,7 +4,7 @@
 
 Konuşma sırasında yakalanan işaretçiler (Claude'un oturum ortasında düşürdüğü satır içi `<!-- learning ... -->` notları) kuyruğa **tam olarak bir kez** aktarılır; içerik özetine (hash) göre yinelenenler ayıklanır. [`/drain`](/tr/skills/drain) skill'i bekleyen her öğeyi bilgi tabanına (wiki / journal / ajan bilgi tabanı) katlar, ardından onaylar (ack) — böylece işlenen öğe silinir ve **bir daha asla yeniden raporlanamaz**. Bu işle-sonra-sil tasarımı, v1'in uzun-oturum yeniden-rapor hata sınıfını yapısal olarak ortadan kaldıran şeydir: raporlar kuyruktan gelir, sürekli büyüyen bir transkripti yeniden tarayarak değil.
 
-Kuyruk, `~/.atl/queue.db` konumundaki tek bir gömülü [bbolt](https://github.com/etcd-io/bbolt) dosyasıdır — sunucu yok, daemon yok. Her projenin kuyruğu o tek dosyada yaşar; çalışma diziniyle anahtarlanan, proje başına ayrı kovalara (bucket) yalıtılmıştır. Üç alt komutun hepsi de **mevcut proje** üzerinde işler (komutları çalıştırdığın dizin).
+Kuyruk, `~/.atl/queue.db` konumundaki tek bir gömülü [bbolt](https://github.com/etcd-io/bbolt) dosyasıdır — sunucu yok, daemon yok. Her projenin kuyruğu o tek dosyada yaşar; çalışma diziniyle anahtarlanan, proje başına ayrı kovalara (bucket) yalıtılmıştır. Bu alt komutların hepsi de **mevcut proje** üzerinde işler (komutları çalıştırdığın dizin).
 
 ## Ne zaman kullanılır?
 
@@ -13,6 +13,7 @@ Bunları elle pek nadiren çalıştırırsın — döngü onları kendiliğinden
 - **`status`** — bilgi tabanına katlanmak üzere ne kadar öğenin beklediğine bir göz atmak için (bu, `SessionStart` hook'unun yüzeye çıkardığı sayının aynısıdır).
 - **`peek`** — bekleyen öğeleri gerçekten görmek ya da makine-okunur listeyi bir betiğe vermek için. Bu, [`/drain`](/tr/skills/drain) skill'inin tükettiği belirlenimci okuma yüzeyidir.
 - **`ack`** — döngünün normalde katlayacağı bir şeyi atlamak istiyorsan bir öğeyi elle işlenmiş olarak işaretlemek (silmek) için.
+- **`transcript`** — son konuşma akışını (yalnızca düz metin) yazdırmak için. Bu, [`/drain`](/tr/skills/drain) skill'inin düzeltme-madenleme adımının, ajanın işaretlemeyi unuttuğu öğrenmeleri geri kazanmak için kullandığı okuma yüzeyidir.
 
 ## Kullanım
 
@@ -22,6 +23,8 @@ atl learnings peek                   # bekleyen öğeleri listele (insan-okunur)
 atl learnings peek --json            # tam makine-okunur liste
 atl learnings peek --channel learning  # tek bir kanala filtrele
 atl learnings ack <id>               # bir öğeyi işlenmiş işaretle (sil)
+atl learnings transcript             # son konuşma akışı (/drain madenlemesi için)
+atl learnings transcript --json      # aynı akış, rol/metin kayıtları olarak
 ```
 
 ## Alt komutlar
@@ -63,6 +66,22 @@ a1b2c3d4e5f6  learning      BSD sed requires escaped pipes for alternation …
 
 ```
 acked a1b2c3d4e5f6...
+```
+
+### `atl learnings transcript`
+
+Mevcut proje için son **kullanıcı + asistan konuşma akışını** yazdırır — yalnızca düz metin; araç çağrıları ve sonuçları gürültü olarak ayıklanır. Bu, [`/drain`](/tr/skills/drain) skill'inin düzeltme-madenleme adımının üstünde çalıştığı okuma yüzeyidir: akışı, ajanın hiç işaretlemediği kullanıcı düzeltmeleri, geri almaları ve tekrarlanan hataları için tarar, sonra her birini bir öğrenme olarak kuyruğa ekler (kuyruğun içerik özetiyle yinelemesi ayıklanır; yani ilerletilecek bir imleci olmayan düz bir okumadır).
+
+| Bayrak | Tip | Varsayılan | Ne yapar |
+|---|---|---|---|
+| `--limit <n>` | int | `2` | Bu proje için en son N transkripti okur. |
+| `--json` | bool | `false` | Turları `[rol] metin` satırları yerine JSON olarak (`role`, `text`) verir. |
+
+İnsan-okunur çıktı, tur başına bir satırdır:
+
+```
+[user] hayır, oturum değil yenileme jetonu kullan
+[assistant] Haklısın — yenileme jetonlarına geçiyorum.
 ```
 
 ## Örnekler

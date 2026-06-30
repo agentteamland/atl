@@ -115,6 +115,55 @@ func ExtractText(path string) (string, error) {
 	return sb.String(), nil
 }
 
+// Turn is one conversational turn — user or assistant prose — for the /drain
+// correction-mining step. Tool calls and tool results never become a Turn.
+type Turn struct {
+	Role string `json:"role"`
+	Text string `json:"text"`
+}
+
+// ExtractFlow reads a transcript and returns the ordered user + assistant prose
+// turns (only type:"text" content contributes, so tool calls and tool results
+// are dropped — they're noise for correction-mining). Where ExtractText sees
+// only the assistant surface (where markers live), this sees the back-and-forth
+// the drain mines for user corrections, reverts, and repeated mistakes the agent
+// never marked. Empty turns are skipped; malformed lines are skipped rather than
+// failing the whole read.
+func ExtractFlow(path string) ([]Turn, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	var turns []Turn
+	sc := bufio.NewScanner(f)
+	sc.Buffer(make([]byte, 0, 64*1024), 8*1024*1024) // allow long transcript lines
+	for sc.Scan() {
+		line := sc.Bytes()
+		if len(line) == 0 {
+			continue
+		}
+		var ev transcriptEvent
+		if err := json.Unmarshal(line, &ev); err != nil {
+			continue
+		}
+		role := ev.Message.Role
+		if role != "user" && role != "assistant" {
+			continue
+		}
+		text := strings.TrimSpace(contentText(ev.Message.Content))
+		if text == "" {
+			continue
+		}
+		turns = append(turns, Turn{Role: role, Text: text})
+	}
+	if err := sc.Err(); err != nil {
+		return nil, err
+	}
+	return turns, nil
+}
+
 // contentText extracts text from a message content field, which may be a plain
 // string (legacy) or an array of typed parts (only type:"text" contributes).
 func contentText(raw json.RawMessage) string {

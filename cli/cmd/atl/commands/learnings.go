@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/agentteamland/atl/cli/internal/queue"
+	"github.com/agentteamland/atl/cli/internal/transcript"
 	"github.com/spf13/cobra"
 )
 
@@ -147,6 +149,63 @@ var learningsEnqueueCmd = &cobra.Command{
 	},
 }
 
+// learningsTranscriptCmd prints the recent user+assistant conversation flow so
+// the /drain skill's correction-mining step can spot user corrections, reverts,
+// and repeated mistakes the agent never marked — the missing input side of the
+// marker-only capture. Anything mined from this is enqueued like a marker, so
+// dedup lives in the queue (content hash); this is a plain read with no cursor
+// to advance.
+var learningsTranscriptCmd = &cobra.Command{
+	Use:   "transcript",
+	Short: "Print recent conversation flow (for /drain correction-mining)",
+	Long: "Emit the recent user+assistant conversation flow for the current project so\n" +
+		"the /drain skill can mine user corrections, reverts, and repeated mistakes the\n" +
+		"agent never marked. Tool calls/results are dropped — prose only. --limit N reads\n" +
+		"the most recent N transcripts (default 2); --json emits role/text records.",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		project, err := os.Getwd()
+		if err != nil {
+			return err
+		}
+		dir, err := transcript.ProjectDir(project)
+		if err != nil {
+			return err
+		}
+		files, err := transcript.Find(dir, time.Time{})
+		if err != nil {
+			return err
+		}
+		limit, _ := cmd.Flags().GetInt("limit")
+		if limit > 0 && len(files) > limit {
+			files = files[len(files)-limit:] // Find returns oldest-first → keep the most recent N
+		}
+		var turns []transcript.Turn
+		for _, fl := range files {
+			t, err := transcript.ExtractFlow(fl.Path)
+			if err != nil {
+				continue // a single unreadable transcript shouldn't fail the mine
+			}
+			turns = append(turns, t...)
+		}
+		if jsonOut, _ := cmd.Flags().GetBool("json"); jsonOut {
+			b, err := json.MarshalIndent(turns, "", "  ")
+			if err != nil {
+				return err
+			}
+			fmt.Println(string(b))
+			return nil
+		}
+		if len(turns) == 0 {
+			fmt.Println("no recent conversation flow")
+			return nil
+		}
+		for _, t := range turns {
+			fmt.Printf("[%s] %s\n", t.Role, t.Text)
+		}
+		return nil
+	},
+}
+
 // firstLine returns the first line of s, marked with an ellipsis if truncated.
 func firstLine(s string) string {
 	if i := strings.IndexByte(s, '\n'); i >= 0 {
@@ -176,5 +235,7 @@ func openQueue() (*queue.Store, string, error) {
 func init() {
 	learningsPeekCmd.Flags().Bool("json", false, "emit pending items as JSON")
 	learningsPeekCmd.Flags().String("channel", "", "filter to one channel (e.g. learning)")
-	learningsCmd.AddCommand(learningsStatusCmd, learningsPeekCmd, learningsAckCmd, learningsEnqueueCmd)
+	learningsTranscriptCmd.Flags().Bool("json", false, "emit turns as JSON")
+	learningsTranscriptCmd.Flags().Int("limit", 2, "read the most recent N transcripts")
+	learningsCmd.AddCommand(learningsStatusCmd, learningsPeekCmd, learningsAckCmd, learningsEnqueueCmd, learningsTranscriptCmd)
 }
