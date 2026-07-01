@@ -1,6 +1,6 @@
 # `/create-pr`
 
-Take working-tree changes (uncommitted, or recently committed to the default branch), derive an appropriate branch name + commit message + PR title from the diff, run [`/drain`](/skills/drain) so pending learnings ride along in the same PR, run an AI review chain (generic baseline + any team-declared specialists), commit + push, and open a PR. Optionally enable GitHub auto-merge with a bounded polling + auto-fix loop. Always return the user to the target branch at end-of-work.
+Take working-tree changes (uncommitted, or recently committed to the default branch), derive an appropriate branch name + commit message + PR title from the diff, run [`/drain`](/skills/drain) so pending learnings ride along in the same PR, run an adversarial AI review chain (generic baseline + any team-declared specialists + a refute-to-keep verification pass), commit + push, and open a PR. Optionally enable GitHub auto-merge with a bounded polling + auto-fix loop. Always return the user to the target branch at end-of-work.
 
 This skill is the deterministic "ship a piece of work" flow — it applies the [`branch-hygiene`](https://github.com/agentteamland/atl/blob/main/core/rules/branch-hygiene.md), [`learning-capture`](https://github.com/agentteamland/atl/blob/main/core/rules/learning-capture.md), and [`karpathy-guidelines`](https://github.com/agentteamland/atl/blob/main/core/rules/karpathy-guidelines.md) rules, so you don't re-derive them every PR.
 
@@ -11,7 +11,7 @@ Ships as a global skill in the [atl monorepo](https://github.com/agentteamland/a
 | Flag | Default | Effect |
 |---|---|---|
 | `--auto-merge` | OFF | Enable GitHub auto-merge (`gh pr merge --auto --squash`); poll + auto-fix until merged or terminal failure |
-| `--no-review` | OFF (review on) | Skip the entire review chain (generic + every team reviewer) |
+| `--no-review` | OFF (review on) | Skip the entire review chain (generic + every team reviewer + the adversarial verify pass) |
 | `--no-auto-fix` | OFF (fix on) | During the polling loop, do not attempt to fix CI/merge failures; surface to the user instead |
 | `--no-drain` | OFF (drain on) | Skip folding pending learnings into the knowledge base |
 | `--no-docs` | OFF (docs on) | Skip the docs-impact pass that keeps the docs site in sync with the change |
@@ -74,7 +74,7 @@ Boring diffs cost nothing (the pre-flight skips them). This is the LLM half the 
 
 ### Step 5 — Review chain (unless `--no-review`)
 
-Two layers, executed sequentially:
+Three layers, executed sequentially — two finders, then an adversarial verifier:
 
 **5a — Generic reviewer (always)**
 
@@ -93,6 +93,15 @@ For each installed team (look under `.claude/agents/` then `~/.claude/agents/` �
 
 - If it names an agent (e.g., `capabilities.review: "code-reviewer"`), that team agent runs against the same diff and produces a domain-specific review.
 - If not declared, the team is skipped — 5a is the platform-wide baseline.
+
+**5c — Adversarial verify (always)**
+
+The finders are author-adjacent optimists, so their raw findings aren't presented directly. One fresh-context sub-agent runs over the **consolidated 5a + 5b findings** (the findings list, not the whole diff again) with two jobs:
+
+- **Evidence gate** — every finding must cite concrete evidence (a `file:line`, a grep pattern, or a failing test/command). A finding that names none is dropped, not shown — the [`/docs-audit`](/skills/docs-audit) "no claim without a verbatim quote" discipline, applied to code review.
+- **Refute-to-keep** — for each surviving finding, the agent reads the cited lines and tries to refute it; only findings that survive are kept, with severity re-weighed. When 5a and a 5b specialist disagree on severity, this pass is the tiebreaker.
+
+It's one extra agent over a small findings list, not a second whole-diff review. Only the surviving, evidence-backed findings are shown, with a count of how many were dropped or refuted.
 
 The consolidated report is shown to the user: continue / abort / edit.
 
@@ -176,8 +185,8 @@ The user ends the skill on the target branch, with the merged change incorporate
 ✅ /create-pr complete
    Branch:      feat/create-pr-skill
    PR:          https://github.com/.../pull/N
-   Review:      generic + 1 team reviewer (software-project-team)
-                3 issues, 1 concern, all addressed
+   Review:      generic + 1 team reviewer (software-project-team) + adversarial verify
+                3 issues, 1 concern surviving (2 dropped: no evidence), all addressed
    Drain:       /drain ran — 2 wiki pages updated, 1 journal entry
    Auto-merge:  enabled, merged after 4 min (1 auto-fix: prettier formatting)
    End-of-work: returned to main, pulled latest
