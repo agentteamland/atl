@@ -46,5 +46,6 @@ func init() {
 		initCmd,
 		gcCmd,
 		skillsCmd,
+		rulesCmd,
 	)
 }

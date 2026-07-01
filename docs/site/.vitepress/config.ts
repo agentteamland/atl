@@ -94,6 +94,7 @@ export default defineConfig({
                 { text: 'atl gc', link: '/cli/gc' },
                 { text: 'atl docs', link: '/cli/docs' },
                 { text: 'atl skills', link: '/cli/skills' },
+                { text: 'atl rules', link: '/cli/rules' },
                 { text: 'atl publish', link: '/cli/publish' },
                 { text: 'atl setup-hooks', link: '/cli/setup-hooks' }
               ]
@@ -111,7 +112,8 @@ export default defineConfig({
                 { text: '/create-code-diagram', link: '/skills/create-code-diagram' },
                 { text: '/publish', link: '/skills/publish' },
                 { text: '/docs-audit', link: '/skills/docs-audit' },
-                { text: '/skill-stocktake', link: '/skills/skill-stocktake' }
+                { text: '/skill-stocktake', link: '/skills/skill-stocktake' },
+                { text: '/rules-distill', link: '/skills/rules-distill' }
               ]
             }
           ],
@@ -227,6 +229,7 @@ export default defineConfig({
                 { text: 'atl gc', link: '/tr/cli/gc' },
                 { text: 'atl docs', link: '/tr/cli/docs' },
                 { text: 'atl skills', link: '/tr/cli/skills' },
+                { text: 'atl rules', link: '/tr/cli/rules' },
                 { text: 'atl publish', link: '/tr/cli/publish' },
                 { text: 'atl setup-hooks', link: '/tr/cli/setup-hooks' }
               ]
@@ -244,7 +247,8 @@ export default defineConfig({
                 { text: '/create-code-diagram', link: '/tr/skills/create-code-diagram' },
                 { text: '/publish', link: '/tr/skills/publish' },
                 { text: '/docs-audit', link: '/tr/skills/docs-audit' },
-                { text: '/skill-stocktake', link: '/tr/skills/skill-stocktake' }
+                { text: '/skill-stocktake', link: '/tr/skills/skill-stocktake' },
+                { text: '/rules-distill', link: '/tr/skills/rules-distill' }
               ]
             }
           ],
