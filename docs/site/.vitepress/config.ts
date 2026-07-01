@@ -110,7 +110,8 @@ export default defineConfig({
                 { text: '/create-pr', link: '/skills/create-pr' },
                 { text: '/create-code-diagram', link: '/skills/create-code-diagram' },
                 { text: '/publish', link: '/skills/publish' },
-                { text: '/docs-audit', link: '/skills/docs-audit' }
+                { text: '/docs-audit', link: '/skills/docs-audit' },
+                { text: '/skill-stocktake', link: '/skills/skill-stocktake' }
               ]
             }
           ],
@@ -242,7 +243,8 @@ export default defineConfig({
                 { text: '/create-pr', link: '/tr/skills/create-pr' },
                 { text: '/create-code-diagram', link: '/tr/skills/create-code-diagram' },
                 { text: '/publish', link: '/tr/skills/publish' },
-                { text: '/docs-audit', link: '/tr/skills/docs-audit' }
+                { text: '/docs-audit', link: '/tr/skills/docs-audit' },
+                { text: '/skill-stocktake', link: '/tr/skills/skill-stocktake' }
               ]
             }
           ],

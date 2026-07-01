@@ -20,9 +20,10 @@ Every check is **zero-false-positive by construction** — a failure is always a
 | **manifest** | Each `team.json`'s `agents[]` / `skills[]` names match the on-disk directories — **both directions** (nothing declared-but-absent, nothing on-disk-but-undeclared). |
 | **children** | Every agent-KB child (`agents/<x>/children/*.md`) declares a non-empty `knowledge-base-summary` frontmatter — the KB-rebuild contract. |
 
-`atl skills check` exits non-zero on any failure, so it **gates every PR in CI** alongside the docs-drift gate. The judgment half — does a skill obey its own documented flow? do two skills overlap? — is the job of the companion `/skill-stocktake` skill (LLM), not this deterministic net. That split is the CLI/Skill boundary: deterministic checks here, grounded judgment in the skill.
+`atl skills check` exits non-zero on any failure, so it **gates every PR in CI** alongside the docs-drift gate. The judgment half — does a skill obey its own documented flow? do two skills overlap? — is the job of the companion [`/skill-stocktake`](/skills/skill-stocktake) skill (LLM), not this deterministic net. That split is the CLI/Skill boundary: deterministic checks here, grounded judgment in the skill.
 
 ## Related
 
+- [`/skill-stocktake`](/skills/skill-stocktake) — the LLM half: obedience + redundancy, grep-grounded, change-aware
 - [`atl docs check`](/cli/docs) — the sibling gate: docs-site drift (this one is asset content-quality)
 - [`atl doctor`](/cli/doctor) — the runtime self-heal (this is a build-time quality gate)
