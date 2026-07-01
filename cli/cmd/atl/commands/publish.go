@@ -26,8 +26,9 @@ var publishCmd = &cobra.Command{
 		"best-effort contribution (a gh fork + PR) the owner can accept — your own\n" +
 		"local + global gains never block on acceptance.\n\n" +
 		"publish is deliberate by design (it crosses the author boundary); it never\n" +
-		"runs automatically. By default it shows the plan; --apply forks and opens\n" +
-		"the PR (propose-upstream). Own-team re-publish is coming in a follow-up.",
+		"runs automatically. By default it shows the plan; --apply re-publishes to a\n" +
+		"team you own (commit + version bump + tag) or forks + opens the PR\n" +
+		"(propose-upstream) for one you don't.",
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		handle, name, err := index.ParseRef(args[0])
