@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/agentteamland/atl/cli/internal/doctor"
+	"github.com/agentteamland/atl/cli/internal/gc"
 	"github.com/agentteamland/atl/cli/internal/queue"
 	"github.com/spf13/cobra"
 )
@@ -42,6 +43,21 @@ var sessionStartCmd = &cobra.Command{
 		for _, r := range doctor.Run(checks) {
 			if r.Status != doctor.OK || r.Healed {
 				fmt.Printf("atl doctor: %s — %s\n", r.Status, r.Detail)
+			}
+		}
+
+		// Reclamation awareness — surface only high-signal orphans (gains/edits
+		// beside an installed unit), not wholly-unowned dirs (usually the user's own
+		// non-ATL Claude Code assets — noise). Awareness only; `atl gc` is the action.
+		if orphans, oerr := gc.Scan(project, time.Now()); oerr == nil {
+			n := 0
+			for _, o := range orphans {
+				if o.Owned {
+					n++
+				}
+			}
+			if n > 0 {
+				fmt.Printf("atl: %d orphaned file(s) beside installed units — run `atl gc` to review (reversible)\n", n)
 			}
 		}
 

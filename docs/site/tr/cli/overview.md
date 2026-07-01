@@ -13,6 +13,7 @@ Komutlar üç gruba ayrılır: elle çalıştırdığın **takım komutları**, 
 | [`atl remove`](/tr/cli/remove) | Bir takımı kaldırır. |
 | [`atl update`](/tr/cli/update) | Bir ya da tüm kurulu takımlar için en günceli çeker. |
 | [`atl search`](/tr/cli/search) | Takım kataloğunda (GitHub destekli index) arama yapar. |
+| [`atl gc`](/tr/cli/gc) | Hiçbir manifestin sahiplenmediği sahipsiz varlıkları geri kazanır — kurulumun geri-alınabilir tersi (varsayılan kuru-çalışma; yumuşak-silme + geri-al). |
 
 ## Kazanım-dolaşımı komutları
 
