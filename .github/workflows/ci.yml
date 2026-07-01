@@ -43,6 +43,8 @@ jobs:
         run: go build -o ../atl ./cmd/atl
       - name: Docs drift check (deterministic, LLM-free)
         run: ./atl docs check
+      - name: Skill/asset quality check (deterministic, LLM-free)
+        run: ./atl skills check
       - uses: actions/setup-node@v4
         with:
           node-version: 22

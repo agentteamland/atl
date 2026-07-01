@@ -93,6 +93,7 @@ export default defineConfig({
                 { text: 'atl doctor', link: '/cli/doctor' },
                 { text: 'atl gc', link: '/cli/gc' },
                 { text: 'atl docs', link: '/cli/docs' },
+                { text: 'atl skills', link: '/cli/skills' },
                 { text: 'atl publish', link: '/cli/publish' },
                 { text: 'atl setup-hooks', link: '/cli/setup-hooks' }
               ]
@@ -224,6 +225,7 @@ export default defineConfig({
                 { text: 'atl doctor', link: '/tr/cli/doctor' },
                 { text: 'atl gc', link: '/tr/cli/gc' },
                 { text: 'atl docs', link: '/tr/cli/docs' },
+                { text: 'atl skills', link: '/tr/cli/skills' },
                 { text: 'atl publish', link: '/tr/cli/publish' },
                 { text: 'atl setup-hooks', link: '/tr/cli/setup-hooks' }
               ]

@@ -75,6 +75,9 @@ var sessionStartCmd = &cobra.Command{
 		// "sweep due" signal. Silent everywhere else.
 		docsSessionSignal()
 
+		// Skill/asset content-quality signal — monorepo-internal, same as docs.
+		skillsSessionSignal()
+
 		return nil
 	},
 }
