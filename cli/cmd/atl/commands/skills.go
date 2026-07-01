@@ -3,9 +3,13 @@ package commands
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
+	"time"
 
 	"github.com/agentteamland/atl/cli/internal/skillcheck"
+	"github.com/agentteamland/atl/cli/internal/skillsstate"
 	"github.com/spf13/cobra"
 )
 
@@ -28,6 +32,8 @@ var skillsCheckCmd = &cobra.Command{
 		"nothing and exits 0 (the pre-flight skip).",
 	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		record, _ := cmd.Flags().GetBool("record-stocktake")
+
 		root, err := findCoreRoot()
 		if err != nil {
 			fmt.Println("atl skills: no core/ here — nothing to check")
@@ -52,6 +58,12 @@ var skillsCheckCmd = &cobra.Command{
 				loc = "-"
 			}
 			fmt.Printf("  [%s] %s · %s — %s\n", marker, f.Check, loc, f.Detail)
+		}
+
+		if record && fails == 0 {
+			if sha := gitHEAD(root); sha != "" {
+				_ = skillsstate.Record(sha, time.Now())
+			}
 		}
 
 		switch {
@@ -85,9 +97,11 @@ func findCoreRoot() (string, error) {
 	}
 }
 
-// skillsSessionSignal surfaces asset content-quality drift at session start, but
+// skillsSessionSignal surfaces asset content-quality signals at session start, but
 // only inside the monorepo (findCoreRoot succeeds) — silent in end-user projects,
-// so those sessions pay nothing. Best-effort; a hook must never block.
+// so those sessions pay nothing. Two signals: a deterministic drift count (the
+// fast Layer) and, when a full sweep is due, a /skill-stocktake signal (the LLM
+// backstop). Best-effort; a hook must never block.
 func skillsSessionSignal() {
 	root, err := findCoreRoot()
 	if err != nil {
@@ -106,8 +120,44 @@ func skillsSessionSignal() {
 	if fails > 0 {
 		fmt.Printf("atl skills: %d asset quality item(s) — run `atl skills check`\n", fails)
 	}
+	if stocktakeDue(root) {
+		fmt.Println("atl skills: a stocktake is due — run /skill-stocktake to sweep skills for obedience + redundancy")
+	}
+}
+
+// stocktakeDue reports whether a /skill-stocktake full sweep is due:
+// asset-affecting commits (core/ or teams/) have landed since the last recorded
+// stocktake, gated by a ~1-day runaway-guard. Mirrors docsAuditDue.
+func stocktakeDue(repoRoot string) bool {
+	st, err := skillsstate.Load()
+	if err != nil {
+		return false
+	}
+	if st.LastStocktakeAt != "" {
+		if t, perr := time.Parse(time.RFC3339, st.LastStocktakeAt); perr == nil && time.Since(t) < 24*time.Hour {
+			return false // runaway-guard: don't sweep again within ~1 day
+		}
+	}
+	return assetAffectingCommitsSince(repoRoot, st.LastStocktakeSHA)
+}
+
+// assetAffectingCommitsSince reports whether any commit touching core/ or teams/
+// has landed since sinceSHA (or, when sinceSHA is empty, whether the repo has any
+// such commit at all — i.e. it was never stocktaken).
+func assetAffectingCommitsSince(repoRoot, sinceSHA string) bool {
+	args := []string{"-C", repoRoot, "log", "--oneline", "-1"}
+	if sinceSHA != "" {
+		args = append(args, sinceSHA+"..HEAD")
+	}
+	args = append(args, "--", "core", "teams")
+	out, err := exec.Command("git", args...).Output()
+	if err != nil {
+		return false
+	}
+	return len(strings.TrimSpace(string(out))) > 0
 }
 
 func init() {
+	skillsCheckCmd.Flags().Bool("record-stocktake", false, "record HEAD as the last-stocktaken commit when free of failures")
 	skillsCmd.AddCommand(skillsCheckCmd)
 }
