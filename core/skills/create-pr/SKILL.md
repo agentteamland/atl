@@ -1,6 +1,6 @@
 ---
 name: create-pr
-description: "Ship working-tree changes: auto-named branch, drain pending learnings, an AI review chain (generic baseline + team specialists), commit, push, open a PR. Optional --auto-merge with a polling + auto-fix loop. Returns you to the target branch."
+description: "Ship working-tree changes: auto-named branch, drain pending learnings, an adversarial AI review chain (generic baseline + team specialists + a refute-to-keep pass), commit, push, open a PR. Optional --auto-merge with a polling + auto-fix loop. Returns you to the target branch."
 argument-hint: "[--auto-merge] [--no-review] [--no-auto-fix] [--no-drain] [--no-docs] [--timeout N]"
 ---
 
@@ -64,7 +64,11 @@ Boring diffs cost nothing (the pre-flight skips them). If `atl docs check` isn't
 
 **5b — Team specialists.** For each installed team (look under `.claude/agents/` then `~/.claude/agents/` — project shadows global), read its `team.json` `capabilities.review`; if it names an agent, spawn that agent over the same diff for a domain-specific review. A team with no `capabilities.review` is skipped — 5a is the baseline.
 
-Present the consolidated report; ask continue / abort / edit.
+**5c — Adversarial verify (always).** The finders are author-adjacent optimists; don't present raw findings. Spawn one fresh-context agent over the *consolidated 5a + 5b findings* (the findings list, not the whole diff again) with two jobs:
+- **Evidence gate (drop):** every finding must cite concrete evidence — a `file:line`, a grep pattern, or a failing test/command. A finding that names none is dropped, not shown (the `/docs-audit` "no claim without a verbatim quote" discipline, applied to code review).
+- **Refute-to-keep:** for each surviving finding, read the cited lines and try to refute it — keep only the findings that survive, re-weighing severity on what's left. When 5a and a 5b specialist disagree on severity, this pass is the tiebreaker: its evidence-weighed verdict wins.
+
+One extra agent over a small findings list — not a second whole-diff review. Present only the surviving, evidence-backed findings; note how many raw findings were dropped (no evidence) or refuted, so the pass is visible. Ask continue / abort / edit.
 
 ### 6. Commit + push
 ```bash
@@ -108,7 +112,7 @@ git pull
 Return to a clean target branch with the change incorporated. If the pull fails (rare), surface the error and leave the user where they are.
 
 ### 12. Final report
-One block: branch, PR URL, review summary (issues/concerns + whether addressed), drain result, auto-merge result, end-of-work. State explicitly anything skipped via a `--no-X` flag.
+One block: branch, PR URL, review summary (surviving issues/concerns + how many findings the adversarial pass dropped/refuted + whether addressed), drain result, auto-merge result, end-of-work. State explicitly anything skipped via a `--no-X` flag.
 
 ## Constraints
 
