@@ -103,6 +103,11 @@ These topics have an in-progress brainstorm — read the file before making any 
 2. **If the marker block EXISTS:** add a new bullet to the list (preserve
    existing bullets — multiple active brainstorms coexist). Do not duplicate a
    bullet for the same brainstorm.
+2b. **Keep each bullet a pointer, not a status log:** the link + the ≤~80-char
+   summary only; progress, decisions, and PR links live in the brainstorm file,
+   never accreted onto the pin. If an existing bullet has grown a status dump
+   over time, re-tighten it back to a pointer when you next touch the block — it
+   is always loaded into context, so it must not balloon.
 3. **Relative path:** path relative to the file you're editing (e.g.,
    `.atl/brain-storms/foo.md` from project `CLAUDE.md`; `brain-storms/foo.md`
    from `~/.claude/CLAUDE.md`).
