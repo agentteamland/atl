@@ -78,6 +78,9 @@ var sessionStartCmd = &cobra.Command{
 		// Skill/asset content-quality signal — monorepo-internal, same as docs.
 		skillsSessionSignal()
 
+		// Rules-distill "distill due" signal — monorepo-internal, same shape.
+		rulesSessionSignal()
+
 		return nil
 	},
 }
