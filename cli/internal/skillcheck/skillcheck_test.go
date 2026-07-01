@@ -37,6 +37,20 @@ func TestCleanTeamHasNoFindings(t *testing.T) {
 	}
 }
 
+func TestSkillFileAcceptsLowercaseSkillMd(t *testing.T) {
+	// Core skills use SKILL.md; team skills use skill.md. Both must pass — and
+	// case-sensitively (this once broke on Linux CI while passing on macOS).
+	root := t.TempDir()
+	teams := filepath.Join(root, "teams")
+	base := filepath.Join(teams, "demo")
+	write(t, filepath.Join(base, "team.json"), `{"name":"demo","skills":[{"name":"ship"}]}`)
+	write(t, filepath.Join(base, "skills/ship/skill.md"), "---\nname: ship\ndescription: \"ship it\"\n---\n")
+
+	if f := RunAll(Input{TeamsDir: teams}); len(f) != 0 {
+		t.Fatalf("a lowercase skill.md should be accepted, got %+v", f)
+	}
+}
+
 func TestMissingFrontmatterFields(t *testing.T) {
 	root := t.TempDir()
 	teams := filepath.Join(root, "teams")

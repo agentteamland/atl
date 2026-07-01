@@ -65,10 +65,24 @@ func Frontmatter(coreDir, teamsDir string) []Finding {
 func checkSkillDir(dir, rel string) []Finding {
 	var f []Finding
 	for _, name := range subdirs(dir) {
-		md := filepath.Join(dir, name, "SKILL.md")
-		f = append(f, requireFrontmatter(md, filepath.ToSlash(filepath.Join(rel, name, "SKILL.md")), "skill")...)
+		md, mdRel := skillFile(filepath.Join(dir, name), filepath.Join(rel, name))
+		f = append(f, requireFrontmatter(md, mdRel, "skill")...)
 	}
 	return f
+}
+
+// skillFile resolves a skill's markdown file, accepting both conventions in the
+// repo: core skills use SKILL.md, team skills use skill.md. Returns whichever
+// exists (case-sensitively — this must be correct on Linux CI, not just
+// case-insensitive macOS); falls back to SKILL.md for the "missing" error path.
+func skillFile(dir, rel string) (path, relPath string) {
+	names, _ := os.ReadDir(dir)
+	for _, e := range names {
+		if n := e.Name(); n == "SKILL.md" || n == "skill.md" {
+			return filepath.Join(dir, n), filepath.ToSlash(filepath.Join(rel, n))
+		}
+	}
+	return filepath.Join(dir, "SKILL.md"), filepath.ToSlash(filepath.Join(rel, "SKILL.md"))
 }
 
 func checkAgentDir(dir, rel string) []Finding {
