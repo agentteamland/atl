@@ -91,6 +91,7 @@ export default defineConfig({
                 { text: 'atl tick', link: '/cli/tick' },
                 { text: 'atl learnings', link: '/cli/learnings' },
                 { text: 'atl doctor', link: '/cli/doctor' },
+                { text: 'atl gc', link: '/cli/gc' },
                 { text: 'atl docs', link: '/cli/docs' },
                 { text: 'atl publish', link: '/cli/publish' },
                 { text: 'atl setup-hooks', link: '/cli/setup-hooks' }
@@ -221,6 +222,7 @@ export default defineConfig({
                 { text: 'atl tick', link: '/tr/cli/tick' },
                 { text: 'atl learnings', link: '/tr/cli/learnings' },
                 { text: 'atl doctor', link: '/tr/cli/doctor' },
+                { text: 'atl gc', link: '/tr/cli/gc' },
                 { text: 'atl docs', link: '/tr/cli/docs' },
                 { text: 'atl publish', link: '/tr/cli/publish' },
                 { text: 'atl setup-hooks', link: '/tr/cli/setup-hooks' }

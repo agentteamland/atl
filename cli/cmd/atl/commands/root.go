@@ -44,5 +44,6 @@ func init() {
 		removeCmd,
 		docsCmd,
 		initCmd,
+		gcCmd,
 	)
 }

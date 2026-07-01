@@ -13,6 +13,7 @@ Commands fall into three groups: **team commands** you run by hand, the **gain-c
 | [`atl remove`](/cli/remove) | Uninstall a team. |
 | [`atl update`](/cli/update) | Pull latest for one or all installed teams. |
 | [`atl search`](/cli/search) | Search the team catalog (the GitHub-backed index). |
+| [`atl gc`](/cli/gc) | Reclaim orphaned assets no manifest owns — the reversible inverse of install (dry-run by default; soft-delete + undo). |
 
 ## Gain-circulation commands
 

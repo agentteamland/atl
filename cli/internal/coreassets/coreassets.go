@@ -20,6 +20,29 @@ var assets embed.FS
 
 const embedRoot = "embed"
 
+// Paths returns every core asset's path relative to the Claude dir (e.g.
+// rules/communication-style.md, skills/drain/SKILL.md). gc uses this to treat
+// core files as owned — they are platform assets reflected from the binary, not
+// orphans, even though they carry no install manifest.
+func Paths() ([]string, error) {
+	var out []string
+	err := fs.WalkDir(assets, embedRoot, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		rel, err := filepath.Rel(embedRoot, p)
+		if err != nil {
+			return err
+		}
+		out = append(out, filepath.ToSlash(rel))
+		return nil
+	})
+	return out, err
+}
+
 // Reflect writes the embedded core rules + skills into the global Claude dir
 // (e.g. ~/.claude/rules, ~/.claude/skills). Refresh-always: core is the
 // platform layer and is not user-owned — a user who wants to override a rule
