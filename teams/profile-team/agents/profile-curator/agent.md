@@ -70,5 +70,17 @@ Read the child file before acting on its topic; the summaries below are a routin
 <!-- Auto-rebuilt from children/*.md frontmatter. Do not hand-edit — /profile-drain rebuilds this from each child's `knowledge-base-summary`. -->
 
 ### Curation Charter
-What I own under `~/.atl/profiles/`, the self/third-party distinction, the 4-tier privacy framework, and the source-flag discipline every write obeys.
+What I own under ~/.atl/profiles/, the self/third-party distinction, the 4-tier privacy framework, and the source-flag discipline every write obeys.
 -> [Details](children/curation-charter.md)
+
+---
+
+### Interface Model
+How interfaces evolve and profiles stay current: the profile.md layout, schema-version + changelog diff, changelog-driven lazy fill (inference tolerated + source-flagged, Tier-3+ inference rejected), the override/history policy, and BC via semver.
+-> [Details](children/interface-model.md)
+
+---
+
+### Person Interface
+The canonical person interface — the seed schema I materialize to ~/.atl/profiles/_interfaces/person.md: self-describing frontmatter (matches/examples/schema-version/changelog/tier-defaults/thresholds) + the core + person field shape.
+-> [Details](children/person-interface.md)
