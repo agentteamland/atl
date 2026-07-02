@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "name": "profile-team",
+  "version": "1.0.0",
+  "description": "Curates a cross-project profile of the people in your world: drains profile-fact markers into person profiles at ~/.atl/profiles, each grown through a self-describing, versioned interface.",
+  "author": {
+    "name": "AgentTeamLand",
+    "url": "https://github.com/agentteamland"
+  },
+  "license": "MIT",
+  "keywords": [
+    "profile",
+    "memory",
+    "personal",
+    "people",
+    "global",
+    "advisory",
+    "interface-evolution"
+  ],
+  "repository": "https://github.com/agentteamland/atl",
+  "homepage": "https://github.com/agentteamland",
+  "scope": "global",
+  "agents": [
+    {
+      "name": "profile-curator",
+      "description": "Drains profile-fact markers into person profiles under ~/.atl/profiles: detects the entity type, selects or evolves its interface, fills fields, and rebuilds the profile index."
+    }
+  ],
+  "skills": [],
+  "rules": [],
+  "capabilities": {
+    "profile": {
+      "role": "provider",
+      "curator": "profile-curator",
+      "store": "~/.atl/profiles"
+    }
+  },
+  "extends": null,
+  "excludes": [],
+  "dependencies": {
+    "core": "^1.0.0"
+  },
+  "requires": {
+    "atl": ">=2.0.0-alpha.9"
+  }
+}
