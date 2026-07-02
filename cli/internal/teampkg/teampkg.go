@@ -30,6 +30,10 @@ type TeamManifest struct {
 	Version       string `json:"version"`
 	Description   string `json:"description"`
 	Scope         string `json:"scope"` // v2 addition; "" = project (see internal/scope.Parse)
+	// Dependencies maps a team name (or "<handle>/<name>") to a semver range.
+	// "core" is the platform core (always present) and is skipped by install;
+	// every other entry is resolved from the index and installed transitively.
+	Dependencies map[string]string `json:"dependencies"`
 }
 
 // ReadManifest loads and minimally validates team.json from a fetched team dir.
