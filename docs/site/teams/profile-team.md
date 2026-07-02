@@ -1,9 +1,11 @@
 # profile-team
 
-**profile-team** curates a shared, cross-project profile of the people in your world. It is
-the first rebuilt first-party team and a **global-scope** team: the same person is one
-profile in every project you work in. It is the foundation the paused personal-advisory
-stack builds on — advisory lenses read the profiles it maintains.
+**profile-team** curates a shared, cross-project profile of the people **and things** in your
+world — your inner world of the entities that carry meaning: people, organizations, animals,
+places, objects, and projects. It is the first rebuilt first-party team and a
+**global-scope** team: the same entity is one profile in every project you work in. It is the
+foundation the paused personal-advisory stack builds on — advisory lenses read the profiles
+it maintains.
 
 ```bash
 atl install profile-team
@@ -11,7 +13,7 @@ atl install profile-team
 
 It installs globally by default (its `team.json` declares `scope: global`), landing the
 `profile-curator` agent, the `/profile-drain` skill, and the `profile-capture` rule in
-`~/.claude`, with person profiles stored under `~/.atl/profiles/`.
+`~/.claude`, with profiles stored under `~/.atl/profiles/`.
 
 ## The profile world
 
@@ -67,16 +69,29 @@ channel, the sibling of the [learning loop](/guide/learning-marker-lifecycle):
    evolves the schema, rebuilds `_index.md`, and acks it. Core `/drain` stays
    `learning`-only — `profile-fact` is profile-team's channel.
 
-## The person interface
+## The interfaces
 
-The schema is a single **self-describing** interface file (`_interfaces/person.md`). Its
-own frontmatter carries what it is (`matches` + examples, for type detection), its
-`schema-version` + `changelog` (for evolution), `tier-defaults` (privacy), `thresholds`
-(type-match + salience), and the allowed `kind`/`role` enums. The `fields:` block is a
-**hybrid** shape: a common **core** every entity shares (`meta`, `identity`,
-`relation-to-user` incl. `salience`, `emotional-tags`) plus a **person extension** (nine
-trait fields + skills, `identity-extension`, `anchors`, `state.{emotional,goals,financial}`,
-`relationships`).
+Each entity **type** has its own **self-describing** interface file (`_interfaces/<type>.md`).
+Six are seeded — **person, org, animal, place, object, project** — and the world is type-open
+(below). An interface's frontmatter carries what it is (`matches` + examples, for type
+detection), its `schema-version` + `changelog` (for evolution), `tier-defaults` (privacy),
+`thresholds` (type-match + salience), and its allowed enums. The `fields:` block is a
+**hybrid** shape: a common **core** every type shares (`meta`, `identity`, `relation-to-user`
+incl. `salience`, `emotional-tags`) plus a **type extension** — person adds nine trait fields
++ skills + `state.{emotional,goals,financial}` + relationships; animal adds species +
+`adopted`/`passed` anchors + history-tracked health; place adds a bond + sensory-memories;
+object adds provenance + a history-tracked status; project adds status/motivation/stakes; org
+adds standing + key-people links.
+
+**Type detection.** When a fact names an entity, the curator takes the marker's optional
+`type:` hint, else fit-scores the entity against every interface's `matches` + examples and
+reuses the best fit at/above the 0.80 threshold.
+
+**Type-open (auto-creation).** When an entity fits none of the seeded types well and is a
+*coherent, recurring kind*, the curator **authors a new interface** for it on the fly —
+silent but guardrailed (a small extension over the core, conservative default tiers, stamped
+`authored: agent-<date>` so it stays reviewable). A genuine one-off is kept as a light
+`unknown` stub. This is what lets the profile world hold kinds it was never pre-taught.
 
 **Interface evolution.** There are no required fields — every profile is always valid, and
 the curator's discipline is to *fill fields to the extent the evidence supports*, never to
@@ -105,9 +120,9 @@ sensitive fields may be recorded directly.
 ## Reading profiles
 
 A consuming team's lens reads profiles directly: it loads `_index.md` on demand to see who
-exists, then reads the specific `~/.atl/profiles/people/<slug>/profile.md` it needs
+and what exists, then reads the specific `~/.atl/profiles/<type>/<slug>/profile.md` it needs
 (profiles are plain markdown, like the wiki). The index is never injected into `CLAUDE.md`
-— it is pulled only when a lens is actually reasoning about the user's people.
+— it is pulled only when a lens is actually reasoning about the user's world.
 
 **Cross-team access** is declared, not open. Once third-party advisory teams arrive, each
 declares its profile access in its own `team.json` under `capabilities.profile` (`reads` /
@@ -115,16 +130,20 @@ declares its profile access in its own `team.json` under `capabilities.profile` 
 different access than a wellbeing team. In v1 the only consumer is personal-advisory-team;
 the contract exists now so it is in place before third-party teams read freely.
 
-## What ships in v1
+## What ships
 
-v1 delivers the **person** interface and the full loop, validated on the north-star
-consumer (personal-advisory-team). The architecture is type-open — a clearly non-person
-entity is held as a minimal `unknown` stub rather than fabricated into a person.
+profile-team ships the full loop over **six entity types** (person, org, animal, place,
+object, project), each with its own self-describing interface, plus **auto-creation** of a
+new interface for a coherent novel kind and interface **evolution** (changelog-driven
+lazy-fill). The whole thing runs on the north-star consumer (personal-advisory-team) it was
+built for.
 
-Deferred to a later version (design captured): the other entity types (organization,
-animal, project, place, object) and auto-authoring a brand-new interface; scheduled/interval
-drain (today it runs at session start); structured cross-links between the profile and
-project worlds; and the lazy-*migration* implementation for breaking schema changes.
+Deferred to a later version (design captured, trigger-gated): **scheduled / interval drain**
+(today it runs at session start — gated on a separate ATL scheduling primitive); **structured
+cross-links** between the profile and project worlds (free markdown links today); the
+lazy-**migration** implementation for breaking schema changes; and the consumer-side pieces
+that arrive with the first consuming team — **transitive dependency install** and
+**`capabilities.profile` enforcement**.
 
 ## See also
 

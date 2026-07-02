@@ -1,9 +1,11 @@
 # profile-team
 
-**profile-team**, dünyandaki insanların paylaşımlı, projeler-arası bir profilini yönetir.
-Yeniden inşa edilen ilk birinci-parti takım ve bir **global-kapsamlı** takımdır: aynı kişi,
-çalıştığın her projede tek bir profildir. Duraklatılmış kişisel-danışman yığınının üstüne
-kurulduğu temeldir — danışman lens'leri onun yönettiği profilleri okur.
+**profile-team**, dünyandaki insanların **ve şeylerin** paylaşımlı, projeler-arası bir
+profilini yönetir — anlam taşıyan varlıklardan oluşan iç dünyanın: insanlar, organizasyonlar,
+hayvanlar, yerler, nesneler ve projeler. Yeniden inşa edilen ilk birinci-parti takım ve bir
+**global-kapsamlı** takımdır: aynı varlık, çalıştığın her projede tek bir profildir.
+Duraklatılmış kişisel-danışman yığınının üstüne kurulduğu temeldir — danışman lens'leri onun
+yönettiği profilleri okur.
 
 ```bash
 atl install profile-team
@@ -11,7 +13,7 @@ atl install profile-team
 
 Varsayılan olarak global kurulur (`team.json`'ı `scope: global` bildirir); `profile-curator`
 ajanını, `/profile-drain` becerisini ve `profile-capture` kuralını `~/.claude`'a yerleştirir,
-kişi profillerini `~/.atl/profiles/` altında saklar.
+profilleri `~/.atl/profiles/` altında saklar.
 
 ## Profil dünyası
 
@@ -67,15 +69,30 @@ yeniden kullanır — [öğrenme döngüsünün](/tr/guide/learning-marker-lifec
    `_index.md`'yi yeniden kurar ve onaylar (ack). Çekirdek `/drain` yalnızca `learning`
    kanalında kalır — `profile-fact` profile-team'in kanalıdır.
 
-## person interface
+## interface'ler
 
-Şema tek bir **kendini-tanımlayan** interface dosyasıdır (`_interfaces/person.md`). Kendi
-frontmatter'ı ne olduğunu (`matches` + örnekler, tür tespiti için), `schema-version` +
-`changelog`'unu (evrim için), `tier-defaults`'unu (gizlilik), `thresholds`'unu (tür-eşleşmesi +
-salience) ve izinli `kind`/`role` enum'larını taşır. `fields:` bloğu **hibrit** bir yapıdır: her
-varlığın paylaştığı ortak bir **çekirdek** (`meta`, `identity`, `salience` dahil
-`relation-to-user`, `emotional-tags`) artı bir **person uzantısı** (dokuz trait alanı + skills,
-`identity-extension`, `anchors`, `state.{emotional,goals,financial}`, `relationships`).
+Her varlık **türü**nün kendi **kendini-tanımlayan** interface dosyası vardır
+(`_interfaces/<type>.md`). Altı tanesi tohumlanmıştır — **person, org, animal, place, object,
+project** — ve dünya tür-açıktır (aşağıda). Bir interface'in frontmatter'ı ne olduğunu
+(`matches` + örnekler, tür tespiti için), `schema-version` + `changelog`'unu (evrim için),
+`tier-defaults`'unu (gizlilik), `thresholds`'unu (tür-eşleşmesi + salience) ve izinli enum'larını
+taşır. `fields:` bloğu **hibrit** bir yapıdır: her türün paylaştığı ortak bir **çekirdek**
+(`meta`, `identity`, `salience` dahil `relation-to-user`, `emotional-tags`) artı bir **tür
+uzantısı** — person dokuz trait alanı + skills + `state.{emotional,goals,financial}` +
+relationships ekler; animal species + `adopted`/`passed` anchors + history-tracked health;
+place bond + sensory-memories; object provenance + history-tracked status; project
+status/motivation/stakes; org standing + key-people bağlantıları.
+
+**Tür tespiti.** Bir bilgi bir varlığı adlandırdığında, curator marker'ın opsiyonel `type:`
+ipucunu alır, yoksa varlığı her interface'in `matches` + örneklerine karşı fit-scorlar ve
+0.80 eşiğinde/üstünde en iyi uyanı yeniden kullanır.
+
+**Tür-açık (auto-creation).** Bir varlık tohumlanmış türlerin hiçbirine iyi uymadığında ve
+*tutarlı, tekrar eden bir tür* olduğunda, curator onun için **anında yeni bir interface yazar**
+— sessiz ama guardrail'li (çekirdek üstünde küçük bir uzantı, konservatif varsayılan tier'lar,
+`authored: agent-<date>` damgalı, incelenebilir kalsın diye). Gerçek bir tek-seferlik varlık
+hafif bir `unknown` taslağı olarak tutulur. Bu, profil dünyasının hiç öğretilmediği türleri de
+tutabilmesini sağlar.
 
 **Interface evrimi.** Zorunlu alan yoktur — her profil her zaman geçerlidir ve curator'ın
 disiplini, *kanıtın desteklediği ölçüde alanları doldurmaktır*, doğrulamak değil. Interface
@@ -103,10 +120,11 @@ doğrudan kaydedilebildiği tek yer.
 
 ## Profilleri okuma
 
-Tüketen bir takımın lens'i profilleri doğrudan okur: kimin var olduğunu görmek için `_index.md`'yi
-istek üzerine yükler, sonra ihtiyaç duyduğu belirli `~/.atl/profiles/people/<slug>/profile.md`'yi
-okur (profiller, wiki gibi düz markdown'dır). Index asla `CLAUDE.md`'ye enjekte edilmez — yalnızca
-bir lens gerçekten kullanıcının insanları üzerine akıl yürütürken çekilir.
+Tüketen bir takımın lens'i profilleri doğrudan okur: kimin ve neyin var olduğunu görmek için
+`_index.md`'yi istek üzerine yükler, sonra ihtiyaç duyduğu belirli
+`~/.atl/profiles/<type>/<slug>/profile.md`'yi okur (profiller, wiki gibi düz markdown'dır). Index
+asla `CLAUDE.md`'ye enjekte edilmez — yalnızca bir lens gerçekten kullanıcının dünyası üzerine
+akıl yürütürken çekilir.
 
 **Takımlar-arası erişim** açık değil, bildirimlidir. Üçüncü-taraf danışman takımlar geldiğinde,
 her biri profil erişimini kendi `team.json`'ında `capabilities.profile` altında bildirir (`reads`
@@ -114,16 +132,19 @@ her biri profil erişimini kendi `team.json`'ında `capabilities.profile` altın
 bir esenlik takımından farklı erişim verilebilir. v1'de tek tüketici personal-advisory-team'dir;
 sözleşme şimdi vardır ki üçüncü-taraf takımlar serbestçe okumadan önce yerinde olsun.
 
-## v1'de ne geliyor
+## Ne geliyor
 
-v1, **person** interface'ini ve tam döngüyü sağlar; kuzey-yıldızı tüketicisi
-(personal-advisory-team) üzerinde doğrulanır. Mimari tür-açıktır — açıkça person olmayan bir varlık,
-person'a uydurulmak yerine minimal bir `unknown` taslağı olarak tutulur.
+profile-team, **altı varlık türü** (person, org, animal, place, object, project) üzerinde tam
+döngüyü sağlar — her biri kendi kendini-tanımlayan interface'iyle — artı tutarlı yeni bir tür
+için **auto-creation** (yeni interface yazma) ve interface **evrimi** (changelog-güdümlü
+lazy-fill). Tümü, kuzey-yıldızı tüketicisi (personal-advisory-team) üzerinde doğrulanır.
 
-Daha sonraki bir sürüme ertelenen (tasarımı yakalanmış): diğer varlık türleri (organizasyon,
-hayvan, proje, yer, nesne) ve sıfırdan yeni bir interface yazma; zamanlanmış/aralıklı drain (bugün
-oturum başlangıcında çalışır); profil ve proje dünyaları arasında yapılandırılmış çapraz-bağlantılar;
-ve kırıcı şema değişiklikleri için tembel-*göç (migration)* uygulaması.
+Daha sonraki bir sürüme ertelenen (tasarımı yakalanmış, tetik-gözetimli): **zamanlanmış /
+aralıklı drain** (bugün oturum başlangıcında çalışır — ayrı bir ATL zamanlama primitive'ine
+bağlı); profil ve proje dünyaları arasında **yapılandırılmış çapraz-bağlantılar** (bugün serbest
+markdown linkleri); kırıcı şema değişiklikleri için tembel-**göç (migration)** uygulaması; ve
+ilk tüketen takımla gelen tüketici-tarafı parçaları — **transitive dependency install** ve
+**`capabilities.profile` enforcement**.
 
 ## Ayrıca bkz.
 
