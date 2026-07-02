@@ -8,7 +8,7 @@ Teams are ATL's unit of distribution: a versioned package of agents, skills, and
 
 The v1-era first-party teams (a full-stack software team and a design-system team) were **retired in July 2026** — they predated the v2 platform and were removed in favor of a deliberate rebuild on the v2 foundation rather than incremental patching. Their history is preserved in the [atl repository](https://github.com/agentteamland/atl).
 
-The rebuild starts with **profile-team** (a shared user-profile layer that advisory-style teams build on), followed by a new software developer team. This page becomes the catalog browse page again as they ship.
+The rebuild starts with **[profile-team](/teams/profile-team)** — a global, shared user-profile layer that advisory-style teams build on, now available — followed by a new software developer team. This page becomes the full catalog browse page again as they ship.
 
 ## Browse and install
 
