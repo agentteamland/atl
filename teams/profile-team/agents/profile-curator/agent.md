@@ -69,6 +69,12 @@ Read the child file before acting on its topic; the summaries below are a routin
 
 <!-- Auto-rebuilt from children/*.md frontmatter. Do not hand-edit — /profile-drain rebuilds this from each child's `knowledge-base-summary`. -->
 
+### Animal Interface
+The canonical animal interface — the seed schema I materialize to ~/.atl/profiles/_interfaces/animal.md: self-describing frontmatter (matches/examples/schema-version/changelog/tier-defaults/thresholds) + the inherited common core + the animal type-extension (species/breed, adopted/birthday/passed anchors, temperament/quirks/favorites, history-tracked health + status).
+-> [Details](children/animal-interface.md)
+
+---
+
 ### Curation Charter
 What I own under ~/.atl/profiles/, the self/third-party distinction, the 4-tier privacy framework, and the source-flag discipline every write obeys.
 -> [Details](children/curation-charter.md)
@@ -93,9 +99,33 @@ The primary production unit: process one profile-fact into the right profile. Pa
 
 ---
 
+### Object Interface
+The canonical object interface — the seed schema I materialize to ~/.atl/profiles/_interfaces/object.md: a specific physical thing loaded with meaning for the user (beloved toy, meaningful mug, heirloom, missed car) — core + object-extension (identity-extension/provenance/state/story pointer), history-tracked status.
+-> [Details](children/object-interface.md)
+
+---
+
+### Org Interface
+The canonical org interface — the seed schema I materialize to ~/.atl/profiles/_interfaces/org.md: self-describing frontmatter (matches/examples/schema-version/changelog/tier-defaults/thresholds) + the inherited core + the lean org type-extension (identity-extension, anchors, standing state, key-people links).
+-> [Details](children/org-interface.md)
+
+---
+
 ### Person Interface
 The canonical person interface — the seed schema I materialize to ~/.atl/profiles/_interfaces/person.md: self-describing frontmatter (matches/examples/schema-version/changelog/tier-defaults/thresholds) + the core + person field shape.
 -> [Details](children/person-interface.md)
+
+---
+
+### Place Interface
+The canonical place interface — the seed schema I materialize to ~/.atl/profiles/_interfaces/place.md: a real place (country/city/district/neighbourhood/village/home/spot) the user is emotionally bonded to, with its bond kind, anchors, and the sensory memories/associations/feelings it evokes.
+-> [Details](children/place-interface.md)
+
+---
+
+### Project Interface
+The canonical project interface — the seed schema I materialize to ~/.atl/profiles/_interfaces/project.md: self-describing frontmatter (matches/examples/schema-version/changelog/tier-defaults/thresholds) + the inherited core + the project type-extension (kind/domain, status/motivation/stakes, anchors, investment, associated-people).
+-> [Details](children/project-interface.md)
 
 ---
 
