@@ -31,7 +31,7 @@ matches: |
   a weather location). NOT a fictional or mythical place.
 examples-positive:
   - "I still miss the village where my grandmother lived"
-  - "Kadıköy is the one place in Istanbul where I feel like myself"
+  - "Moda is the one place in Istanbul where I feel like myself"
   - "The old apartment on Bahariye smelled like my whole childhood"
 examples-negative:
   - "There was an earthquake in Japan this morning"
