@@ -4,7 +4,7 @@ When you install multiple ATL teams in the same project, the assistant has multi
 
 ## What's happening under the hood
 
-Each ATL team ships skills (slash commands the assistant can invoke). When you run `atl install software-project-team` and `atl install personal-advisory-team` (for example), both teams' skills become available in every Claude Code session in this project. The assistant sees the union of all skills and picks one — or none — per turn.
+Each ATL team ships skills (slash commands the assistant can invoke). When you install a software team and a personal-advisory team in the same project (for example), both teams' skills become available in every Claude Code session in this project. The assistant sees the union of all skills and picks one — or none — per turn.
 
 ATL's [`skill-selection-discipline` rule](https://github.com/agentteamland/atl/blob/main/core/rules/skill-selection-discipline.md) requires the assistant to consider the full skill list, match prompt intent to each skill's purpose, and disambiguate when multiple skills could apply. The rule auto-loads in every session.
 
@@ -50,7 +50,7 @@ Mid-turn correction is normal and fast. A wrong skill running to completion is w
 Most ATL projects only need one team. Multi-team setups arise mainly when:
 
 - You're using the assistant for personal advisory work AND for a specific software project, in the same `.atl/` (and you don't want two separate Claude Code sessions to switch contexts).
-- You've installed multiple teams that each bring specialized skills (e.g., `software-project-team` alongside a personal advisory team).
+- You've installed multiple teams that each bring specialized skills (e.g., a software team alongside a personal advisory team).
 
 If you find yourself frequently fighting the assistant over which team a prompt belongs to, that's a signal to either (a) split into separate projects (each with one team), or (b) be more explicit in your prompts. ATL is designed to support multi-team setups, but it's not designed to be invisible — your prompts are part of the routing logic.
 

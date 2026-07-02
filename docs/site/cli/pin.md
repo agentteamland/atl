@@ -20,11 +20,11 @@ atl unpin <path>      # remove a pin
 `path` is relative to this project's `.claude` directory and slash-separated. It names either a single file or a subtree — point it at an agent/skill/rule unit to pin the whole thing:
 
 ```bash
-atl pin agents/api-agent       # pins the whole api-agent subtree
+atl pin agents/backend-agent   # pins the whole backend-agent subtree
 atl pin rules/house-style.md   # pins a single rule file
 ```
 
-Paths are normalized (leading `./`, surrounding slashes, and `.` / `..` segments are cleaned), so `./rules/house-style.md/` and `rules/house-style.md` record the same pin. A subtree pin covers every file nested under it — pinning `agents/api-agent` exempts `agents/api-agent/agent.md`, its `children/`, its `learnings/`, and so on.
+Paths are normalized (leading `./`, surrounding slashes, and `.` / `..` segments are cleaned), so `./rules/house-style.md/` and `rules/house-style.md` record the same pin. A subtree pin covers every file nested under it — pinning `agents/backend-agent` exempts `agents/backend-agent/agent.md`, its `children/`, its `learnings/`, and so on.
 
 Pins live in `<project>/.atl/pins.json` — one file per project, written atomically with the list kept sorted. A missing file just means "no pins."
 
@@ -40,7 +40,7 @@ atl pin
 
 ```
 atl pin — project-only paths (never promoted):
-  agents/api-agent
+  agents/backend-agent
   rules/house-style.md
 ```
 

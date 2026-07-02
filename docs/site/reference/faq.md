@@ -66,7 +66,7 @@ No. AgentTeamLand is an independent open-source project that works with Anthropi
 ### How do I contribute?
 
 - **Publish a team.** Tag the team's repo with the [`atl-team`](https://github.com/topics/atl-team) topic, or run [`atl publish`](/cli/publish) from the repo. The catalog picks it up automatically — there's no registry and no submission PR.
-- **Improve the CLI, the core rules/skills, the first-party teams, or these docs.** They all live in the [`agentteamland/atl`](https://github.com/agentteamland/atl) monorepo. PRs welcome; every docs page has an "Edit this page on GitHub" link.
+- **Improve the CLI, the core rules/skills, or these docs.** They all live in the [`agentteamland/atl`](https://github.com/agentteamland/atl) monorepo. PRs welcome; every docs page has an "Edit this page on GitHub" link.
 - **Open issues.** Bug reports and feature requests go on [`agentteamland/atl`](https://github.com/agentteamland/atl/issues).
 
 ### My question isn't here.

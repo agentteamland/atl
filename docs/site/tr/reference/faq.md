@@ -66,7 +66,7 @@ Hayır. AgentTeamLand, Anthropic'in Claude Code'uyla çalışan bağımsız bir 
 ### Nasıl katkıda bulunabilirim?
 
 - **Bir takım yayımla.** Takımın deposunu [`atl-team`](https://github.com/topics/atl-team) konusuyla etiketle ya da depodan [`atl publish`](/tr/cli/publish) çalıştır. Katalog bunu otomatik olarak alır — kayıt defteri yoktur ve başvuru PR'ı gerekmez.
-- **CLI'yı, çekirdek kuralları/becerileri, birinci taraf takımları veya bu belgeleri iyileştir.** Hepsi [`agentteamland/atl`](https://github.com/agentteamland/atl) monoreposunda yaşar. PR'lar beklenir; her belge sayfasının "Edit this page on GitHub" bağı vardır.
+- **CLI'yı, çekirdek kuralları/becerileri veya bu belgeleri iyileştir.** Hepsi [`agentteamland/atl`](https://github.com/agentteamland/atl) monoreposunda yaşar. PR'lar beklenir; her belge sayfasının "Edit this page on GitHub" bağı vardır.
 - **Issue aç.** Hata raporları ve özellik istekleri [`agentteamland/atl`](https://github.com/agentteamland/atl/issues) deposuna gider.
 
 ### Sorum burada yok.

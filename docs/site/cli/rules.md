@@ -18,7 +18,7 @@ Walks the skill + agent markdown in `core/` and `teams/` and prints every line c
 
 ```
 core/skills/drain/SKILL.md:49  Be strict — mine only what's worth never-repeating.
-teams/software-project-team/agents/api-agent/agent.md:88  Never expose the domain entity directly …
+teams/example-team/agents/backend-agent/agent.md:88  Never expose the domain entity directly …
 ```
 
 It **over-collects on purpose** — the collect step only gathers grounded candidates; the LLM decides which are real recurring principles. `rules/` subtrees are skipped, because rules are the distill *target*, not a source.

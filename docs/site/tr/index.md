@@ -30,8 +30,8 @@ features:
     title: Kendi kendini süren güncelleme + öğrenme
     details: Hook'lar takımlarını güncel tutar ve session içi öğrenimleri kendiliğinden bilgi tabanına işler — kazanımları global katmanına promote et, üst kaynağa publish et.
   - icon: 🧪
-    title: İki first-party takım
-    details: software-project-team (13 agent — .NET, Flutter, React, Docker) ve design-system-team (DS + prototype araçları, /dst-* skill'leri). Daha fazlasını atl search ile keşfet.
+    title: Katalogdan keşfet
+    details: Takımlar, atl-team topic'iyle etiketlenmiş herkese açık GitHub depolarından üretilen katalogda yaşar. atl search ile keşfet, tek install komutuyla kur — yayımlamak da aynı ölçüde açık.
   - icon: 🔍
     title: Açık self-publish
     details: Deponu atl-team GitHub topic'iyle etiketle ve atl publish çalıştır — merkezi bir kapı bekçisi yok. Herhangi bir takımı adıyla atl search ile keşfet.
@@ -62,16 +62,15 @@ irm https://raw.githubusercontent.com/agentteamland/atl/main/scripts/install.ps1
 
 ```bash
 # Sonra, herhangi bir projede:
-atl install software-project-team
-atl install design-system-team    # opsiyonel: design-system + prototype araçları
+atl install <handle>/<takım>      # takımı atl search ile keşfet
 atl setup-hooks                   # opsiyonel: her Claude Code session'ında auto-update + öğrenme yakalama
 ```
 
-13 agent'lık tam bir stack (API, web, mobil, veritabanı, altyapı, kod incelemesi) projenin `.claude/` dizinine bağlanmış, Claude Code'un hemen kullanımına hazır. Yanına design-system-team eklersen `/dst-*` design araçlarını da kazanırsın.
+Kurduğun takımın agent'ları, skill'leri ve rule'ları projenin `.claude/` dizinine kopyalanır — Claude Code hepsini anında görür, hemen kullanıma hazırdır.
 
 ## Sıradaki
 
 - **[`atl` nedir?](/tr/guide/what-is-atl)** — beş dakikada büyük resim.
 - **[Hızlı başlangıç](/tr/guide/quickstart)** — ilk takım 60 saniyeden kısa sürede kurulu.
-- **[Takımlara göz at](/tr/teams/)** — first-party takımlar.
+- **[Takımlara göz at](/tr/teams/)** — takım kataloğu ve keşif.
 - **[Takım yazımı](/tr/authoring/team-json)** — kendi takımını yayınla.

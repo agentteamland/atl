@@ -19,7 +19,7 @@ var pinCmd = &cobra.Command{
 		"pins.\n\n" +
 		"Promotion is automatic by default; a pin is the declarative opt-out (it does\n" +
 		"not stop fan-out, which already preserves any file you've changed locally).\n" +
-		"Examples: `atl pin agents/api-agent`, `atl pin rules/house-style.md`.",
+		"Examples: `atl pin agents/backend-agent`, `atl pin rules/house-style.md`.",
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		layer, err := projectAtlDir()

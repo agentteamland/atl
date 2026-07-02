@@ -16,7 +16,7 @@ Install a team and its contents appear as copies inside `.claude/`. Claude Code 
 
 ## Agent
 
-An agent is a Markdown file that defines a role. `api-agent`, `flutter-agent`, `code-reviewer` — each one is a focused personality with its own area of responsibility and its own knowledge base.
+An agent is a Markdown file that defines a role. `backend-agent`, `frontend-agent`, `code-reviewer` — each one is a focused personality with its own area of responsibility and its own knowledge base.
 
 The convention for complex agents is the **children pattern**: the top-level `agent.md` is short (identity, scope, principles) and detailed knowledge lives under `children/` as topic-per-file. This keeps the top-level file tight and makes it cheap to update one topic without touching the rest. Each child file carries a `knowledge-base-summary` frontmatter line that `/drain` lifts into the auto-rebuilt **Knowledge Base** section of `agent.md` — so the index in the parent file is always derived from the children, never hand-edited.
 
@@ -24,11 +24,11 @@ See [Children + learnings](/guide/children-and-learnings) for the full shape.
 
 ## Skill
 
-A skill is a user-invocable slash command. `/create-new-project`, `/verify-system`, `/drain`. Skills ship as directories with a `SKILL.md` at their root; the file describes when to use the skill and what it should do.
+A skill is a user-invocable slash command. `/drain`, `/create-pr`, `/docs-audit`. Skills ship as directories with a `SKILL.md` at their root; the file describes when to use the skill and what it should do.
 
 Skills mirror the agent shape: complex skills carry a `learnings/` subdirectory of topic-per-file edge cases and accumulated wisdom, with the same `knowledge-base-summary` frontmatter contract. `/drain` rebuilds the **Accumulated Learnings** section of `SKILL.md` from those frontmatter lines — `learnings/` is to skills what `children/` is to agents.
 
-Skills can be **global** (shipped with `atl` itself) or **team-scoped** (shipped by a specific team and only visible after the team is installed). `/create-new-project`, `/verify-system`, and `/design-screen` are team-scoped because the work they do is always stack-specific. `/drain`, `/create-pr`, `/create-code-diagram`, `/brainstorm`, `/rule`, and `/rule-wizard` are global because they apply universally.
+Skills can be **global** (shipped with `atl` itself) or **team-scoped** (shipped by a specific team and only visible after the team is installed). Scaffolder skills like `/create-new-project` and `/verify-system` are team-scoped by convention, because the work they do is always stack-specific. `/drain`, `/create-pr`, `/create-code-diagram`, `/brainstorm`, `/rule`, and `/rule-wizard` are global because they apply universally.
 
 The split between a skill and the CLI is deliberate: the **CLI is deterministic** (same inputs, same result, no LLM); **skills are LLM-driven** (they reason about your specific code). `/drain` is the judgment half of the learning loop; `atl learnings` is the deterministic half. See [The CLI](#the-cli) below.
 
@@ -51,7 +51,7 @@ There is no separate ATL-owned asset store. Assets live in Claude Code's own dir
 
 ## The team catalog
 
-Teams are discovered through a **catalog** — a generated index built from public GitHub repositories tagged with the [`atl-team`](https://github.com/topics/atl-team) topic. Running `atl install software-project-team` resolves the name against that index and installs from the matching repo.
+Teams are discovered through a **catalog** — a generated index built from public GitHub repositories tagged with the [`atl-team`](https://github.com/topics/atl-team) topic. Running `atl install <handle>/<team>` resolves the reference against that index and installs from the matching repo.
 
 There is no registry repository and no submission PR. To get a team listed, you tag its repo with `atl-team` (or run `atl publish` from the team repo) and the index picks it up. `atl search` queries the index; `atl install` resolves against it. A **`[verified]`** badge marks teams reviewed by AgentTeamLand maintainers — its absence just means a team is self-published, not that it's unsafe.
 

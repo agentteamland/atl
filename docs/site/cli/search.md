@@ -13,16 +13,16 @@ atl search [keyword]
 ## Example
 
 ```bash
-atl search flutter
+atl search example
 ```
 
 ```
-1 team(s) matching "flutter":
+1 team(s) matching "example":
 
-  agentteamland/software-project-team@1.2.1 [verified]
-    13 agents for full-stack projects: .NET 9 + Flutter + React + Postgres + RabbitMQ + Redis + Elasticsearch + MinIO.
-    keywords: dotnet, docker, full-stack, flutter, react, microservices
-    install: atl install agentteamland/software-project-team
+  acme/example-team@1.0.0
+    An example team: a small stack of agents, skills, and rules for a fictional project.
+    keywords: example, full-stack, starter
+    install: atl install acme/example-team
 ```
 
 Each result shows:

@@ -13,16 +13,16 @@ atl search [anahtar-sözcük]
 ## Örnek
 
 ```bash
-atl search flutter
+atl search web
 ```
 
 ```
-1 team(s) matching "flutter":
+1 team(s) matching "web":
 
-  agentteamland/software-project-team@1.2.1 [verified]
-    13 agents for full-stack projects: .NET 9 + Flutter + React + Postgres + RabbitMQ + Redis + Elasticsearch + MinIO.
-    keywords: dotnet, docker, full-stack, flutter, react, microservices
-    install: atl install agentteamland/software-project-team
+  acme/example-team@1.2.0
+    Agents, skills and rules for a typical full-stack web project.
+    keywords: web, full-stack, example
+    install: atl install acme/example-team
 ```
 
 Her sonuç şunları gösterir:

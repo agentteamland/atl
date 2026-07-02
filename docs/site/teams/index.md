@@ -1,49 +1,27 @@
-# First-Party Teams
+# Teams
 
-AgentTeamLand publishes **2 first-party teams**. Each is independently versioned and follows the [`team.json` contract](/authoring/team-json). Both are discoverable through the team catalog and installable by reference.
+Teams are ATL's unit of distribution: a versioned package of agents, skills, and rules that installs into a project (or globally) with one command. Every team follows the [`team.json` contract](/authoring/team-json) and is discoverable through the team catalog.
 
 > The catalog is generated from public GitHub repositories tagged with the [`atl-team`](https://github.com/topics/atl-team) topic. There is no registry to submit to — tagging the repo (or running [`atl publish`](/cli/publish)) is what lists a team.
 
-## Browse
+## First-party teams: being rebuilt
 
-| Team | Version | Description |
-|------|---------|-------------|
-| [`software-project-team`](/teams/software-project-team) | 1.2.1 | 13 specialized agents for full-stack software projects (.NET 9 + Flutter + React + Postgres + RabbitMQ + Redis + Elasticsearch + MinIO). Phase 2.C: agent KB sections auto-rebuilt from children frontmatter. |
-| [`design-system-team`](/teams/design-system-team) | 0.8.1 | Design systems and UI prototypes inside any project — local, file-based, browser-viewable. `/dst-*` skills produce JSON state and Tailwind-rendered HTML pages under `.dst/`. |
+The v1-era first-party teams (a full-stack software team and a design-system team) were **retired in July 2026** — they predated the v2 platform and were removed in favor of a deliberate rebuild on the v2 foundation rather than incremental patching. Their history is preserved in the [atl repository](https://github.com/agentteamland/atl).
 
-Both ship under the `agentteamland/` handle, so they carry the **`[verified]`** badge in [`atl search`](/cli/search). The badge marks teams reviewed by AgentTeamLand maintainers (`agentteamland/*` plus a maintainer allowlist); it is not a status field on the team, and its absence on a self-published team does not mean the team is unsafe.
+The rebuild starts with **profile-team** (a shared user-profile layer that advisory-style teams build on), followed by a new software developer team. This page becomes the catalog browse page again as they ship.
 
-## Install any team
+## Browse and install
 
 ```bash
-atl install agentteamland/software-project-team
+atl search                      # browse the catalog
+atl search <keyword>            # find teams by name, description, or keyword
+atl install <handle>/<team>     # install by reference
 ```
 
-Teams install by `<handle>/<name>` reference. [`atl install`](/cli/install) resolves the ref against the GitHub-backed catalog, fetches the source as an ephemeral tarball over HTTPS, and copies the team's `agents/`, `skills/`, and `rules/` into the scope's `.claude/` directory:
+Teams install by `<handle>/<name>` reference. [`atl install`](/cli/install) resolves the ref against the GitHub-backed catalog, fetches the source as an ephemeral tarball over HTTPS, and copies the team's `agents/`, `skills/`, and `rules/` into the scope's `.claude/` directory. By default a team installs at the scope its publisher declares (project, global, or both); pass `--global` or `--project` to override. See [scopes](/guide/concepts#scope-global-and-project) for how the two layers interact.
 
-```
-atl: installed agentteamland/software-project-team@1.2.1 at project scope
-```
+Teams published under the `agentteamland/` handle (plus a maintainer allowlist) carry the **`[verified]`** badge in [`atl search`](/cli/search). The badge marks teams reviewed by AgentTeamLand maintainers; its absence on a self-published team does not mean the team is unsafe.
 
-By default a team installs at the scope its publisher declares (project, global, or both). Pass `--global` or `--project` to override. See [scopes](/guide/concepts#scope-global-and-project) for how the two layers interact.
+## Publish your own
 
-## Install multiple teams in one project
-
-Both teams coexist cleanly in the same project. When two teams declare an asset with the same name, the most recently installed one wins and `atl` prints a one-line collision warning:
-
-```bash
-cd your-project
-atl install agentteamland/software-project-team    # full-stack agents + scaffolder
-atl install agentteamland/design-system-team       # add design-system + prototype tooling
-
-atl list
-# project:
-#   agentteamland/software-project-team@1.2.1
-#   agentteamland/design-system-team@0.8.1
-```
-
-The two are designed to complement each other: design with `/dst-*` skills, implement with software-project-team agents (flutter-agent, react-agent, etc.).
-
-## Contributing a team
-
-Want to publish your own team? See the [team authoring guide](/authoring/creating-a-team) — write a `team.json`, push it to a public GitHub repo, then tag that repo with the `atl-team` topic or run [`atl publish`](/cli/publish). The catalog picks it up from there; no PR submission needed.
+Anyone can publish a team — see [Creating a team](/authoring/creating-a-team). A public repo with a valid `team.json` and the `atl-team` topic appears in the catalog within the hour.

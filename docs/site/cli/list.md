@@ -16,9 +16,9 @@ Teams are grouped by [scope](/guide/concepts#scope-global-and-project), with eac
 
 ```
 global:
-  agentteamland/software-project-team@1.2.1
+  acme/example-team@1.0.0
 project:
-  agentteamland/design-system-team@0.8.1
+  acme/proto-team@0.3.0
 ```
 
 A team installed at both scopes appears under each. The `<handle>` is the team's GitHub owner, `<name>` and `<version>` come from its `team.json`.

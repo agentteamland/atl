@@ -4,7 +4,7 @@ Aynı projede birden fazla ATL takımı yüklediğinde, asistanın her tur için
 
 ## Kaputun altında ne oluyor?
 
-Her ATL takımı kendi skill'lerini (asistanın çağırabileceği eğik-çizgi komutları) yayımlar. `atl install software-project-team` ve `atl install personal-advisory-team` çalıştırdığında (örneğin) her iki takımın skill'leri bu projedeki her Claude Code oturumunda erişilebilir hale gelir. Asistan skill'lerin birleşimini görür ve tur başına bir tanesini seçer — ya da hiçbirini.
+Her ATL takımı kendi skill'lerini (asistanın çağırabileceği eğik-çizgi komutları) yayımlar. Aynı projeye örneğin bir yazılım takımı ve bir kişisel danışmanlık takımı kurduğunda, iki takımın skill'leri de bu projedeki her Claude Code oturumunda erişilebilir hale gelir. Asistan skill'lerin birleşimini görür ve tur başına bir tanesini seçer — ya da hiçbirini.
 
 ATL'nin [`skill-selection-discipline` kuralı](https://github.com/agentteamland/core/blob/main/rules/skill-selection-discipline.md), asistanın skill listesinin tamamını gözden geçirmesini, istemin niyetini her skill'in amacıyla eşleştirmesini ve birden fazla skill aday olduğunda netleştirme yapmasını gerektirir. Kural her oturumda otomatik yüklenir.
 
@@ -30,7 +30,7 @@ Muğlak bir istem asistanı tahmine zorlar; tahmin de yanlış-takım seçiminin
 |---|---|
 | "Ne yapmam lazım?" | "Yarın Ahmet'le toplantım var, ne sormam lazım?" (açıkça kişisel) |
 | "Şuna bir bak" | "API endpoint'inde validation yazalım" (açıkça yazılım) |
-| "Yardım et" | "Bu hafta finansal durumumu gözden geçirelim" (açıkça personal-advisory) |
+| "Yardım et" | "Bu hafta finansal durumumu gözden geçirelim" (açıkça kişisel danışmanlık) |
 
 İstemin alanı ne kadar net adlandırırsa, asistanın çıkarım yapması o kadar azalır.
 
@@ -51,7 +51,7 @@ Tur ortası düzeltme normal ve hızlıdır. Yanlış skill'in baştan sona çal
 ATL projelerinin çoğunda yalnızca tek bir takım gerekir. Çoklu-takım kurulumları çoğunlukla şu durumlarda ortaya çıkar:
 
 - Asistanı hem kişisel danışmanlık işleri hem de belirli bir yazılım projesi için aynı `.atl/` altında kullanıyorsundur (ve iki ayrı Claude Code oturumu arasında bağlam değiştirmek istemiyorsundur).
-- Bir temel takımı takıma özel eklentilerle genişletmişsindir (ör. `software-project-team`'i genişleten `starter-extended`).
+- Bir temel takımı takıma özel eklentilerle genişletmişsindir (ör. `acme/example-team`'i genişleten `acme/proto-team`).
 
 Asistanla bir istemin hangi takıma ait olduğunu sürekli tartışıyorsan, bu (a) ayrı projelere bölmenin (her biri tek takımla), ya da (b) istemlerinde daha açık olmanın sinyalidir. ATL çoklu-takım kurulumlarını desteklemek üzere tasarlanmıştır, ama görünmez olmak üzere tasarlanmamıştır — istemlerin yönlendirme mantığının bir parçasıdır.
 

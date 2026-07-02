@@ -10,7 +10,7 @@ import (
 )
 
 func TestBranchName(t *testing.T) {
-	if got := BranchName("agentteamland", "design-system-team"); got != "atl-publish/agentteamland-design-system-team" {
+	if got := BranchName("acme", "example-team"); got != "atl-publish/acme-example-team" {
 		t.Errorf("BranchName = %q", got)
 	}
 	// Non-alnum chars collapse to dashes and the result is trimmed.
@@ -90,8 +90,8 @@ func TestProposeUpstreamArgv(t *testing.T) {
 		"gh pr":   "https://github.com/agentteamland/atl/pull/123",
 	}}
 	m := &manifest.Manifest{
-		Handle: "agentteamland", Name: "design-system-team",
-		Source: manifest.Source{Repo: "agentteamland/atl", Subpath: "teams/design-system-team", Ref: "v2.0.0-alpha.1"},
+		Handle: "acme", Name: "example-team",
+		Source: manifest.Source{Repo: "agentteamland/atl", Subpath: "teams/example-team", Ref: "v2.0.0-alpha.1"},
 	}
 	bodyFile := filepath.Join(t.TempDir(), "body.md")
 	writeF(t, bodyFile, "PR body")
@@ -111,12 +111,12 @@ func TestProposeUpstreamArgv(t *testing.T) {
 	}
 	assertArg(t, pr, "--repo", "agentteamland/atl")
 	assertArg(t, pr, "--base", "main")
-	assertArg(t, pr, "--head", "octocat:atl-publish/agentteamland-design-system-team")
+	assertArg(t, pr, "--head", "octocat:atl-publish/acme-example-team")
 	assertArg(t, pr, "--body-file", bodyFile)
 
 	// The gain was git-added with its subpath-prefixed repo-relative path.
 	add := findGitCall(f.calls, "add")
-	if add == nil || !containsArg(add, "teams/design-system-team/agents/a/agent.md") {
+	if add == nil || !containsArg(add, "teams/example-team/agents/a/agent.md") {
 		t.Errorf("git add missing subpath-prefixed path: %v", add)
 	}
 

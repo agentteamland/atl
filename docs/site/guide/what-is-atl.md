@@ -28,7 +28,7 @@ Every team is just a public GitHub repository with a `team.json` file at the roo
 
 `atl` is **v2** — a single monorepo ([`agentteamland/atl`](https://github.com/agentteamland/atl)), currently in **alpha**. The install topology is project-local copies fetched from the catalog (no persistent on-disk clone cache — sources are fetched fresh and discarded after each install), the auto-update path runs through Claude Code `SessionStart` + `UserPromptSubmit` hooks, and the learning loop persists session knowledge: inline markers are queued durably, and the `/drain` skill folds each into the journal, wiki, and agent knowledge bases.
 
-Two verified teams ship in the catalog today: `software-project-team` (13 agents — .NET API + Flutter + React + Docker stack) and `design-system-team` (2 agents + `/dst-*` skills for design-system + prototype tooling). The whole platform is MIT-licensed and open for contributions.
+Teams are discovered through the open catalog — any public repo tagged with the [`atl-team`](https://github.com/topics/atl-team) topic is listed, and `atl search` finds it by name (the v1-era first-party teams were retired in 2026-07; their v2 rebuild is pending). The whole platform is MIT-licensed and open for contributions.
 
 Next up:
 - **[Install `atl`](/guide/install)**

@@ -16,7 +16,7 @@ Bir takımı kur, içeriği `.claude/` dizininde kopyalar olarak belirir. Claude
 
 ## Ajan
 
-Bir ajan, bir rolü tanımlayan bir Markdown dosyasıdır. `api-agent`, `flutter-agent`, `code-reviewer` — her biri kendi sorumluluk alanı ve kendi bilgi tabanı olan, odaklanmış bir kişiliktir.
+Bir ajan, bir rolü tanımlayan bir Markdown dosyasıdır. `backend-agent`, `code-reviewer` — her biri kendi sorumluluk alanı ve kendi bilgi tabanı olan, odaklanmış bir kişiliktir.
 
 Karmaşık ajanlar için benimsenen yaklaşım **children deseni**dir: üst düzey `agent.md` dosyası kısadır (kimlik, kapsam, ilkeler) ve ayrıntılı bilgi `children/` altında, dosya başına bir konu olarak yaşar. Bu, üst düzey dosyayı sıkı tutar ve tek bir konuyu, gerisine dokunmadan ucuza güncellemeyi sağlar. Her çocuk dosyası, `/drain`'in `agent.md`'nin kendiliğinden yeniden inşa edilen **Knowledge Base** bölümüne taşıdığı bir `knowledge-base-summary` frontmatter satırı taşır — böylece üst dosyadaki dizin daima çocuklardan türetilir, asla elle düzenlenmez.
 
@@ -24,11 +24,11 @@ Tüm yapı için bkz. [Children + learnings](/tr/guide/children-and-learnings).
 
 ## Beceri {#skill}
 
-Bir beceri, kullanıcının çağırabileceği bir slash komutudur. `/create-new-project`, `/verify-system`, `/drain`. Beceriler, kök dizininde bir `SKILL.md` bulunan dizinler olarak gelir; o dosya, becerinin ne zaman kullanılacağını ve ne yapması gerektiğini anlatır.
+Bir beceri, kullanıcının çağırabileceği bir slash komutudur. `/drain`, `/create-pr`, `/docs-audit`. Beceriler, kök dizininde bir `SKILL.md` bulunan dizinler olarak gelir; o dosya, becerinin ne zaman kullanılacağını ve ne yapması gerektiğini anlatır.
 
 Beceriler ajan yapısını yansıtır: karmaşık beceriler, dosya başına bir konu olarak uç durumların ve birikmiş bilgeliğin tutulduğu bir `learnings/` alt dizini taşır; aynı `knowledge-base-summary` frontmatter sözleşmesiyle. `/drain`, `SKILL.md`'nin **Accumulated Learnings** bölümünü bu frontmatter satırlarından yeniden inşa eder — `learnings/`, becerilerde `children/`'ın ajanlarda olduğu şeydir.
 
-Beceriler **global** (`atl`'nin kendisiyle birlikte gelen) ya da **takım kapsamlı** (belirli bir takımca getirilen ve yalnızca o takım kurulduktan sonra görünen) olabilir. `/create-new-project`, `/verify-system` ve `/design-screen` takım kapsamlıdır çünkü yaptıkları iş daima yığına özgüdür. `/drain`, `/create-pr`, `/create-code-diagram`, `/brainstorm`, `/rule` ve `/rule-wizard` ise globaldir çünkü her yere uygulanır.
+Beceriler **global** (`atl`'nin kendisiyle birlikte gelen) ya da **takım kapsamlı** (belirli bir takımca getirilen ve yalnızca o takım kurulduktan sonra görünen) olabilir. Yaptığı iş yığına özgü olan beceriler — örneğin bir takımın proje iskeleti kuran becerisi — takım kapsamlıdır. `/drain`, `/create-pr`, `/create-code-diagram`, `/brainstorm`, `/rule` ve `/rule-wizard` ise globaldir çünkü her yere uygulanır.
 
 Beceri ile CLI arasındaki ayrım bilinçlidir: **CLI deterministiktir** (aynı girdiler, aynı sonuç, LLM yok); **beceriler LLM güdümlüdür** (senin özel kodun üzerinde akıl yürütürler). `/drain`, öğrenme döngüsünün muhakeme yarısıdır; `atl learnings` ise deterministik yarısı. Aşağıdaki [CLI](#the-cli) bölümüne bak.
 
@@ -51,7 +51,7 @@ ATL'ye ait ayrı bir varlık deposu yoktur. Varlıklar Claude Code'un kendi dizi
 
 ## Takım kataloğu
 
-Takımlar bir **katalog** üzerinden keşfedilir — [`atl-team`](https://github.com/topics/atl-team) konusuyla etiketlenmiş herkese açık GitHub depolarından oluşturulan, üretilmiş bir dizin. `atl install software-project-team` çalıştırmak, adı o dizine karşı çözer ve eşleşen depodan kurar.
+Takımlar bir **katalog** üzerinden keşfedilir — [`atl-team`](https://github.com/topics/atl-team) konusuyla etiketlenmiş herkese açık GitHub depolarından oluşturulan, üretilmiş bir dizin. `atl install <handle>/<takım>` çalıştırmak, referansı o dizine karşı çözer ve eşleşen depodan kurar.
 
 Kayıt defteri deposu da yok, gönderim PR'ı da. Bir takımın listelenmesi için deposunu `atl-team` ile etiketlersin (ya da takım deposundan `atl publish` çalıştırırsın) ve dizin onu alır. `atl search` dizini sorgular; `atl install` ona karşı çözer. Bir **`[verified]`** rozeti, AgentTeamLand bakımcıları tarafından incelenmiş takımları işaretler — yokluğu yalnızca takımın kendi kendine yayımlandığı anlamına gelir, güvensiz olduğu değil.
 

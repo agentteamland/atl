@@ -15,9 +15,9 @@ func TestSeedLoads(t *testing.T) {
 	if ix.SchemaVersion != 1 {
 		t.Errorf("schemaVersion = %d, want 1", ix.SchemaVersion)
 	}
-	if len(ix.Teams) < 2 {
-		t.Fatalf("teams = %d, want >= 2", len(ix.Teams))
-	}
+	// The seed may legitimately be empty (the v1-era first-party teams were
+	// retired 2026-07; the catalog refills as teams are rebuilt/published) —
+	// but any entry it does carry must be complete.
 	for _, e := range ix.Teams {
 		if e.Handle == "" || e.Name == "" || e.Source.Repo == "" || e.Source.Ref == "" {
 			t.Errorf("seed entry %q has empty required field: %+v", e.Ref(), e)
@@ -25,22 +25,38 @@ func TestSeedLoads(t *testing.T) {
 	}
 }
 
-func TestLookup(t *testing.T) {
-	ix, err := Seed()
+// fixtureIndex is a synthetic two-team catalog for Lookup/Search tests, so they
+// don't depend on what the embedded seed happens to contain.
+func fixtureIndex(t *testing.T) *Index {
+	t.Helper()
+	ix, err := Load([]byte(`{"schemaVersion":1,"teams":[
+		{"handle":"acme","name":"example-team","version":"1.0.0",
+		 "description":"An example team for mobile apps built with Flutter.",
+		 "keywords":["flutter","mobile"],
+		 "source":{"repo":"agentteamland/atl","subpath":"teams/example-team","ref":"v1"}},
+		{"handle":"acme","name":"proto-team","version":"0.1.0",
+		 "description":"UI prototypes and design tokens.",
+		 "keywords":["design"],
+		 "source":{"repo":"acme/proto-team","subpath":"","ref":"v2"}}]}`))
 	if err != nil {
-		t.Fatalf("Seed: %v", err)
+		t.Fatalf("fixture Load: %v", err)
 	}
-	e, err := ix.Lookup("agentteamland", "software-project-team")
+	return ix
+}
+
+func TestLookup(t *testing.T) {
+	ix := fixtureIndex(t)
+	e, err := ix.Lookup("acme", "example-team")
 	if err != nil {
 		t.Fatalf("Lookup: %v", err)
 	}
 	if e.Source.Repo != "agentteamland/atl" {
 		t.Errorf("source repo = %q", e.Source.Repo)
 	}
-	if e.Source.Subpath != "teams/software-project-team" {
+	if e.Source.Subpath != "teams/example-team" {
 		t.Errorf("source subpath = %q", e.Source.Subpath)
 	}
-	if e.Ref() != "agentteamland/software-project-team" {
+	if e.Ref() != "acme/example-team" {
 		t.Errorf("Ref() = %q", e.Ref())
 	}
 	if _, err := ix.Lookup("nobody", "ghost"); err == nil {
@@ -49,23 +65,20 @@ func TestLookup(t *testing.T) {
 }
 
 func TestSearch(t *testing.T) {
-	ix, err := Seed()
-	if err != nil {
-		t.Fatalf("Seed: %v", err)
-	}
+	ix := fixtureIndex(t)
 	// Blank query browses the whole catalog.
 	if got := ix.Search(""); len(got) != len(ix.Teams) {
 		t.Errorf("Search(\"\") = %d, want all %d teams", len(got), len(ix.Teams))
 	}
-	// A keyword unique to one seed team matches exactly it, case-insensitively.
+	// A keyword unique to one team matches exactly it, case-insensitively.
 	for _, q := range []string{"flutter", "FLUTTER"} {
-		if hits := ix.Search(q); len(hits) != 1 || hits[0].Ref() != "agentteamland/software-project-team" {
-			t.Errorf("Search(%q) = %v, want [software-project-team]", q, refs(hits))
+		if hits := ix.Search(q); len(hits) != 1 || hits[0].Ref() != "acme/example-team" {
+			t.Errorf("Search(%q) = %v, want [acme/example-team]", q, refs(hits))
 		}
 	}
-	// Description text matches too (only design-system-team mentions prototypes).
-	if hits := ix.Search("prototyp"); len(hits) != 1 || hits[0].Ref() != "agentteamland/design-system-team" {
-		t.Errorf("Search(prototyp) = %v, want [design-system-team]", refs(hits))
+	// Description text matches too (only proto-team mentions prototypes).
+	if hits := ix.Search("prototyp"); len(hits) != 1 || hits[0].Ref() != "acme/proto-team" {
+		t.Errorf("Search(prototyp) = %v, want [acme/proto-team]", refs(hits))
 	}
 	// A miss returns nothing.
 	if hits := ix.Search("no-such-team-xyz"); len(hits) != 0 {
@@ -132,8 +145,12 @@ func TestResolveFallsBackToSeed(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Resolve: %v", err)
 	}
-	if len(ix.Teams) < 2 {
-		t.Errorf("expected seed (>=2 teams), got %d", len(ix.Teams))
+	seed, err := Seed()
+	if err != nil {
+		t.Fatalf("Seed: %v", err)
+	}
+	if ix.SchemaVersion != seed.SchemaVersion || len(ix.Teams) != len(seed.Teams) {
+		t.Errorf("Resolve without a cache should return the seed: got %d teams, seed has %d", len(ix.Teams), len(seed.Teams))
 	}
 }
 

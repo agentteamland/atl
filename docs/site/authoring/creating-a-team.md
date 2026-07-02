@@ -248,7 +248,7 @@ my-team/
 │   │       ├── routing.md
 │   │       ├── data-fetching.md
 │   │       └── testing.md
-│   └── api-agent/
+│   └── backend-agent/
 │       ├── agent.md
 │       └── children/ ...
 │
@@ -271,7 +271,7 @@ Every file under `agents/`, `skills/`, and `rules/` that `team.json` lists becom
 
 When someone runs `atl install you/my-team`:
 
-1. **Resolve.** The handle is looked up in the GitHub-backed catalog (generated from public `atl-team`-tagged repos). A first-party team resolves to a monorepo subpath; a third-party team to its standalone repo.
+1. **Resolve.** The handle is looked up in the GitHub-backed catalog (generated from public `atl-team`-tagged repos). A team published from a monorepo subpath resolves to that subpath; a standalone team resolves to its own repo root.
 2. **Fetch.** The team is downloaded as a ref-pinned HTTPS tarball into a temp directory — no `git` binary required. The temp directory is deleted after the install.
 3. **Validate.** `atl` parses `team.json`, checks that it has a name, and confirms every declared agent/skill/rule actually exists on disk. Anything missing fails here.
 4. **Write.** Agents, skills, and rules are **copied** into the scope's `.claude/` — `~/.claude` for a global install, `<project>/.claude` for a project install.

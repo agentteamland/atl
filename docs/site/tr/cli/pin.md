@@ -20,11 +20,11 @@ atl unpin <path>      # bir pini kaldırır
 `path`, bu projenin `.claude` dizinine göredir ve eğik çizgiyle ayrılır. Ya tek bir dosyayı ya da bir alt ağacı adlandırır — tamamını pin'lemek için bir agent/skill/rule birimine yönlendir:
 
 ```bash
-atl pin agents/api-agent       # tüm api-agent alt ağacını pinler
+atl pin agents/backend-agent   # tüm backend-agent alt ağacını pinler
 atl pin rules/house-style.md   # tek bir rule dosyasını pinler
 ```
 
-Yollar normalize edilir (baştaki `./`, çevreleyen eğik çizgiler ve `.` / `..` parçaları temizlenir); böylece `./rules/house-style.md/` ile `rules/house-style.md` aynı pini kaydeder. Bir alt ağaç pini, altında yuvalanmış her dosyayı kapsar — `agents/api-agent` pin'lendiğinde `agents/api-agent/agent.md`, onun `children/` dizini, `learnings/` dizini vb. hepsi muaf tutulur.
+Yollar normalize edilir (baştaki `./`, çevreleyen eğik çizgiler ve `.` / `..` parçaları temizlenir); böylece `./rules/house-style.md/` ile `rules/house-style.md` aynı pini kaydeder. Bir alt ağaç pini, altında yuvalanmış her dosyayı kapsar — `agents/backend-agent` pin'lendiğinde `agents/backend-agent/agent.md`, onun `children/` dizini, `learnings/` dizini vb. hepsi muaf tutulur.
 
 Pinler `<project>/.atl/pins.json` içinde yaşar — proje başına tek dosya, atomik biçimde yazılır ve liste sıralı tutulur. Dosyanın bulunmaması yalnızca "pin yok" demektir.
 
@@ -40,7 +40,7 @@ atl pin
 
 ```
 atl pin — project-only paths (never promoted):
-  agents/api-agent
+  agents/backend-agent
   rules/house-style.md
 ```
 

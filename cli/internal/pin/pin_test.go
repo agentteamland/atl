@@ -28,13 +28,13 @@ func TestAddRemoveDup(t *testing.T) {
 
 func TestPinnedPrefix(t *testing.T) {
 	s := &Set{}
-	s.Add("agents/api-agent")
+	s.Add("agents/backend-agent")
 	s.Add("rules/house-style.md")
 
 	pinned := []string{
-		"agents/api-agent",               // exact
-		"agents/api-agent/agent.md",      // nested file
-		"agents/api-agent/children/x.md", // deeper nested
+		"agents/backend-agent",               // exact
+		"agents/backend-agent/agent.md",      // nested file
+		"agents/backend-agent/children/x.md", // deeper nested
 		"rules/house-style.md",           // exact file pin
 	}
 	for _, p := range pinned {
@@ -44,7 +44,7 @@ func TestPinnedPrefix(t *testing.T) {
 	}
 	notPinned := []string{
 		"agents/api",            // prefix-of-pin but not a path boundary (no false match)
-		"agents/api-agent2",     // sibling sharing a string prefix
+		"agents/backend-agent2",     // sibling sharing a string prefix
 		"agents/db-agent/x.md",  // unrelated agent
 		"rules/house-style.mdx", // not the pinned file
 	}

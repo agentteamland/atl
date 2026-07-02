@@ -78,4 +78,5 @@ echo "✓ atl ${VERSION} installed to ${INSTALL_DIR}/${BINARY_NAME}"
 "${INSTALL_DIR}/${BINARY_NAME}" --version
 echo ""
 echo "Next: cd into a project and run:"
-echo "  atl install agentteamland/software-project-team"
+echo "  atl search            # browse the team catalog"
+echo "  atl install <handle>/<team>"

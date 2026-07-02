@@ -18,7 +18,7 @@ atl rules scan --record   # HEAD'i son distill olarak damgala (bir /rules-distil
 
 ```
 core/skills/drain/SKILL.md:49  Be strict — mine only what's worth never-repeating.
-teams/software-project-team/agents/api-agent/agent.md:88  Never expose the domain entity directly …
+core/skills/create-pr/SKILL.md:118  Never merge directly — auto-merge preserves the required-check gate …
 ```
 
 **Bilerek fazla toplar** — toplama adımı yalnızca zeminli adayları derler; hangilerinin gerçek tekrar eden ilke olduğuna LLM karar verir. `rules/` alt ağaçları atlanır, çünkü kurallar distill'in *hedefidir*, kaynağı değil.

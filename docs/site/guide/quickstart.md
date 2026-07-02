@@ -35,7 +35,7 @@ mkdir my-new-app && cd my-new-app
 ## 3. Find a team
 
 ```bash
-atl search dotnet
+atl search example
 ```
 
 [`atl search`](/cli/search) queries the GitHub-backed catalog — generated from public repos tagged with the [`atl-team`](https://github.com/topics/atl-team) topic. Each result prints the `<handle>/<team>@<version>` reference (the handle is the team's GitHub owner — ownership is authorship) and the exact `atl install` command to copy. There is no central registry repo to PR against any more; tagging a repo `atl-team` (or running [`atl publish`](/cli/publish) from it) is how a team gets listed.
@@ -43,17 +43,19 @@ atl search dotnet
 ## 4. Install the team
 
 ```bash
-atl install agentteamland/software-project-team
+atl install acme/example-team
 ```
+
+> `acme/example-team` is an illustrative reference — substitute the `<handle>/<team>` that `atl search` printed for the team you picked.
 
 In a few seconds:
 
-- The team is resolved from the index and fetched (cached for reuse).
-- 13 agents and 3 skills (`create-new-project`, `verify-system`, `design-screen`) are written into `.claude/`.
+- The team is resolved from the index and fetched as an ephemeral tarball (no persistent cache).
+- The team's agents, skills, and rules are written into `.claude/`.
 - A manifest of baseline file hashes is recorded under `.atl/` so future updates can tell your edits from upstream changes.
 - The automation hooks are bound into Claude Code as part of the install — automation is on by default, not opt-in.
 
-You now have a full .NET + Flutter + React + Docker agent team wired into the project.
+You now have the team's full agent stack wired into the project.
 
 ::: tip Global vs. project scope
 A team is installed wherever its publisher's default points. Override with `--global` (every project) or `--project` (this one only); when both layers carry a team, the project copy shadows the global one. See [Concepts](/guide/concepts) for the scope axis.
@@ -69,12 +71,9 @@ atl list
 
 ## 6. Use it in Claude Code
 
-Open Claude Code in this directory. The team's skills are available as slash commands:
+Open Claude Code in this directory. The team's skills are available as slash commands — by convention, stack teams ship `/create-new-project` (scaffold a full stack: gather → scaffold → build → verify → commit) and `/verify-system` (an end-to-end health check).
 
-- `/create-new-project MyApp` — scaffolds a full stack (gather → scaffold → build → verify → commit).
-- `/verify-system` — runs an end-to-end health check on containers, ports, apps, and pipelines.
-
-Every agent the team ships (api-agent, socket-agent, worker-agent, flutter-agent, react-agent, infra-agent, database-agent, redis-agent, rmq-agent, code-reviewer, project-reviewer, design-system-agent, ux-agent) is available for Claude to delegate to.
+Every agent the team ships is available for Claude to delegate to.
 
 The platform's own global skills are there too — `/drain`, `/create-pr`, `/create-code-diagram`, `/brainstorm`, `/rule`, `/rule-wizard` — usable in any project regardless of which team you installed.
 
@@ -107,25 +106,6 @@ All installed teams refresh; copies you haven't modified are updated in place, a
 ## What just happened?
 
 You installed a curated, version-pinned set of agents into a project with one command, and turned on a self-running maintenance loop. Every other project that installs the same team gets the same configuration — and the same updates when the author ships them — while the gains your agents learn circulate back through `atl promote` and `atl publish`.
-
-## Add design tooling (optional)
-
-For design-system + screen-prototype tooling, install `design-system-team`:
-
-```bash
-atl install agentteamland/design-system-team
-```
-
-Then in your Claude Code chat:
-
-```
-/dst-init
-/dst-new-ds primary
-/dst-new-prototype --ds primary login-screen
-/dst-open
-```
-
-You'll get token-aligned design systems and multi-state HTML prototypes under `.dst/`, viewable in any browser. See [design-system-team](/teams/design-system-team) for the full skill set.
 
 ## Next
 
