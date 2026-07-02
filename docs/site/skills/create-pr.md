@@ -185,7 +185,7 @@ The user ends the skill on the target branch, with the merged change incorporate
 ✅ /create-pr complete
    Branch:      feat/create-pr-skill
    PR:          https://github.com/.../pull/N
-   Review:      generic + 1 team reviewer (software-project-team) + adversarial verify
+   Review:      generic + 1 team reviewer (example-team) + adversarial verify
                 3 issues, 1 concern surviving (2 dropped: no evidence), all addressed
    Drain:       /drain ran — 2 wiki pages updated, 1 journal entry
    Auto-merge:  enabled, merged after 4 min (1 auto-fix: prettier formatting)

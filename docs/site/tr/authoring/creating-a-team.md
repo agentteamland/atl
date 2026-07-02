@@ -248,7 +248,7 @@ my-team/
 │   │       ├── routing.md
 │   │       ├── data-fetching.md
 │   │       └── testing.md
-│   └── api-agent/
+│   └── backend-agent/
 │       ├── agent.md
 │       └── children/ ...
 │
@@ -271,7 +271,7 @@ my-team/
 
 `atl install you/my-team` çalıştırıldığında:
 
-1. **Çöz.** Handle, GitHub tabanlı katalogda aranır (herkese açık `atl-team` etiketli depolardan üretilen dizin). Birinci parti takım, monorepo'nun bir alt yoluna; üçüncü parti takım kendi bağımsız deposuna çözülür.
+1. **Çöz.** Handle, GitHub tabanlı katalogda aranır (herkese açık `atl-team` etiketli depolardan üretilen dizin). Monorepo alt yolundan yayımlanan bir takım o alt yola; bağımsız bir takım kendi deposunun köküne çözülür.
 2. **İndir.** Takım, geçici bir dizine ref-sabitli HTTPS tarball'ı olarak indirilir — `git` ikili dosyası gerekmez. Geçici dizin kurulumdan sonra silinir.
 3. **Doğrula.** `atl`, `team.json` dosyasını ayrıştırır, bir `name` alanı olduğunu kontrol eder ve bildirilen her ajan/beceri/kuralın diskte gerçekten var olduğunu doğrular. Eksik olan varsa burada hata verir.
 4. **Yaz.** Ajanlar, beceriler ve kurallar kapsamın `.claude/` dizinine **kopyalanır** — global kurulum için `~/.claude`, proje kurulumu için `<proje>/.claude`.

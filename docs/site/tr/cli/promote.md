@@ -27,7 +27,7 @@ Başarılı bir geçiş, global nesil sayacını artırır; bu da diğer projele
 atl promote [handle/team]
 ```
 
-Argümansız çalıştırıldığında promote, mevcut projedeki her takımda dolaşır ve her birinin uygun kazanımlarını yükseltir. Geçişi tek bir takımla sınırlamak için isteğe bağlı bir `handle/team` referansı ver (örneğin `agentteamland/software-project-team`).
+Argümansız çalıştırıldığında promote, mevcut projedeki her takımda dolaşır ve her birinin uygun kazanımlarını yükseltir. Geçişi tek bir takımla sınırlamak için isteğe bağlı bir `handle/team` referansı ver (örneğin `acme/example-team`).
 
 `atl promote` hiçbir flag almaz.
 
@@ -46,7 +46,7 @@ atl promote: lifted 3 file(s) to the global layer
 Yükseltmeyi tek bir takımla sınırla:
 
 ```bash
-atl promote agentteamland/software-project-team
+atl promote acme/example-team
 ```
 
 Global katmanın da değiştirdiği bir dosya yükseltildiğinde çakışma raporlanır ve önceki değer arşivlenir:

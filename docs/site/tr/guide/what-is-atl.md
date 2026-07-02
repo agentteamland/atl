@@ -28,7 +28,7 @@ Her takım, kök dizininde `team.json` dosyası bulunan herkese açık bir GitHu
 
 `atl` **v2** sürümünde — tek bir monorepo ([`agentteamland/atl`](https://github.com/agentteamland/atl)), şu an **alpha** aşamasında. Kurulum topolojisi proje-yerel kopyalardan oluşur (diskte kalıcı klon önbelleği yoktur — kaynaklar kurulumdan sonra atılır), otomatik güncelleme yolu Claude Code'un `SessionStart` ve `UserPromptSubmit` hook'larından geçer, öğrenme döngüsü ise oturum bilgisini kalıcı biçimde saklar: satır içi işaretçiler (marker) kuyruğa alınır ve `/drain` becerisi her birini günlük, wiki ve ajan bilgi tabanlarına işler.
 
-Katalogda bugün iki doğrulanmış takım yayında: `software-project-team` (13 ajan — .NET API + Flutter + React + Docker yığını) ve `design-system-team` (2 ajan + tasarım sistemi ve prototip araçları için `/dst-*` becerileri). Platformun tamamı MIT lisanslı ve katkılara açık.
+v1 dönemi first-party takımlar Temmuz 2026'da emekliye ayrıldı; katalog bugün açık yayımlamayla büyüyor — [`atl-team`](https://github.com/topics/atl-team) topic'iyle etiketlenmiş herkese açık her depo kataloğa girer. Platformun tamamı MIT lisanslı ve katkılara açık.
 
 Sıradakiler:
 - **[`atl`'yi kur](/tr/guide/install)**

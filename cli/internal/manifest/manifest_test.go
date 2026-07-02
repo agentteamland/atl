@@ -9,17 +9,17 @@ import (
 func TestWriteRead(t *testing.T) {
 	layer := t.TempDir()
 	m := &Manifest{
-		Handle:  "agentteamland",
-		Name:    "software-project-team",
+		Handle:  "acme",
+		Name:    "example-team",
 		Version: "1.2.1",
 		Scope:   "project",
-		Source:  Source{Repo: "agentteamland/software-project-team", Subpath: "", Ref: "v1.2.1"},
+		Source:  Source{Repo: "acme/example-team", Subpath: "", Ref: "v1.2.1"},
 		Files:   map[string]string{"agents/api/agent.md": "abc123"},
 	}
 	if err := m.Write(layer); err != nil {
 		t.Fatalf("Write: %v", err)
 	}
-	got, err := Read(layer, "agentteamland", "software-project-team")
+	got, err := Read(layer, "acme", "example-team")
 	if err != nil {
 		t.Fatalf("Read: %v", err)
 	}

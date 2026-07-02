@@ -30,8 +30,8 @@ features:
     title: Self-driving updates + learning
     details: Hooks keep your teams current and fold in-session learnings into their knowledge base automatically — promote gains to your global layer, publish them upstream.
   - icon: 🧪
-    title: Two first-party teams
-    details: software-project-team (13 agents — .NET, Flutter, React, Docker) and design-system-team (DS + prototype tooling, /dst-* skills). Discover more with atl search.
+    title: A community catalog
+    details: No central gatekeeper — the catalog is generated from public GitHub repos tagged with the atl-team topic. Anything listed installs with one command.
   - icon: 🔍
     title: Open self-publish
     details: Tag your repo with the atl-team GitHub topic and run atl publish — no central gatekeeper. Discover any team by name with atl search.
@@ -62,16 +62,15 @@ irm https://raw.githubusercontent.com/agentteamland/atl/main/scripts/install.ps1
 
 ```bash
 # Then, in any project:
-atl install software-project-team
-atl install design-system-team    # optional: design-system + prototype tooling
+atl install <handle>/<team>
 atl setup-hooks                   # optional: auto-update + learning capture every Claude Code session
 ```
 
-A full 13-agent stack (API, web, mobile, database, infra, review) wired into your project's `.claude/` directory, ready for Claude Code. Add design-system-team alongside for `/dst-*` design tooling.
+The team's agents, skills, and rules are wired into your project's `.claude/` directory, ready for Claude Code.
 
 ## What's next?
 
 - **[What is `atl`?](/guide/what-is-atl)** — the big idea in five minutes.
 - **[Quickstart](/guide/quickstart)** — first team installed in under a minute.
-- **[Browse teams](/teams/)** — the first-party teams.
+- **[Browse teams](/teams/)** — how the catalog works and how to discover teams.
 - **[Team authoring](/authoring/team-json)** — publish your own team.

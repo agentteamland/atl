@@ -43,17 +43,19 @@ atl search dotnet
 ## 4. Takımı kur
 
 ```bash
-atl install agentteamland/software-project-team
+atl install acme/example-team
 ```
+
+(`acme/example-team` kurgusal bir örnek referanstır — 3. adımda bulduğun gerçek `<handle>/<takım>` referansını kullan.)
 
 Birkaç saniye içinde:
 
 - Takım, indeksten çözümlenir ve indirilir (yeniden kullanım için önbelleğe alınır).
-- 13 ajan ve 3 beceri (`create-new-project`, `verify-system`, `design-screen`) `.claude/` dizinine yazılır.
+- Takımın ajanları, becerileri ve kuralları `.claude/` dizinine yazılır.
 - Temel dosya hash'lerinden oluşan bir manifest `.atl/` altına kaydedilir; böylece ileride güncellemeler senin düzenlemelerini yukarı-akış (upstream) değişikliklerinden ayırt edebilir.
 - Otomasyon hook'ları, kurulumun bir parçası olarak Claude Code'a bağlanır — otomasyon, opt-in değil, varsayılan olarak açıktır.
 
-Artık projeye bağlı tam bir .NET + Flutter + React + Docker ajan takımın var.
+Artık projeye bağlı eksiksiz bir ajan takımın var.
 
 ::: tip Global ve proje kapsamı
 Bir takım, yayıncısının varsayılanının işaret ettiği yere kurulur. `--global` (her proje) ya da `--project` (yalnızca bu proje) ile bastır; bir takım her iki katmanda da bulunduğunda, proje kopyası global olanı gölgeler. Kapsam ekseni için [Kavramlar](/tr/guide/concepts) sayfasına bak.
@@ -69,12 +71,7 @@ atl list
 
 ## 6. Claude Code'da kullan
 
-Bu dizinde Claude Code'u aç. Takımın becerileri eğik çizgili komut olarak hazırdır:
-
-- `/create-new-project MyApp` — tam bir yığını iskeletler (topla → iskeletle → derle → doğrula → commit'le).
-- `/verify-system` — konteynerler, portlar, uygulamalar ve boru hatları üzerinde uçtan uca bir sağlık denetimi çalıştırır.
-
-Takımın gönderdiği her ajan (api-agent, socket-agent, worker-agent, flutter-agent, react-agent, infra-agent, database-agent, redis-agent, rmq-agent, code-reviewer, project-reviewer, design-system-agent, ux-agent) Claude'un devredebilmesi için hazırdır.
+Bu dizinde Claude Code'u aç. Takımın gönderdiği beceriler eğik çizgili komut olarak hazırdır; ajanları da (örneğin `agents/backend-agent`) Claude'un devredebilmesi için hazır bekler.
 
 Platformun kendi global becerileri de orada — `/drain`, `/create-pr`, `/create-code-diagram`, `/brainstorm`, `/rule`, `/rule-wizard` — hangi takımı kurduğundan bağımsız olarak her projede kullanılabilir.
 
@@ -107,25 +104,6 @@ Kurulu tüm takımlar tazelenir; değiştirmediğin kopyalar yerinde güncelleni
 ## Az önce ne oldu?
 
 Tek bir komutla, özenle seçilmiş ve sürüme sabitlenmiş bir ajan kümesini bir projeye kurdun ve kendi kendine çalışan bir bakım döngüsünü açtın. Aynı takımı kuran diğer her proje aynı yapılandırmayı alır — ve yazar gönderdiğinde aynı güncellemeleri — ajanlarının öğrendiği kazanımlar ise `atl promote` ve `atl publish` aracılığıyla geri dolaşıma girer.
-
-## Tasarım araçları ekle (isteğe bağlı)
-
-Tasarım-sistemi ve ekran-prototipi araçları için `design-system-team`'i kur:
-
-```bash
-atl install agentteamland/design-system-team
-```
-
-Ardından Claude Code sohbetinde:
-
-```
-/dst-init
-/dst-new-ds primary
-/dst-new-prototype --ds primary login-screen
-/dst-open
-```
-
-`.dst/` altında token-hizalı tasarım sistemleri ve çok-durumlu HTML prototipler elde edersin; herhangi bir tarayıcıda görüntülenebilir. Tüm beceri kümesi için [design-system-team](/tr/teams/design-system-team) sayfasına bak.
 
 ## Sıradaki
 

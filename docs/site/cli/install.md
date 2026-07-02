@@ -13,14 +13,14 @@ atl install <handle>/<team> --project    # force project scope (this project onl
 `<handle>/<team>` is the catalog reference — the handle is the team's GitHub owner (ownership is authorship) and the team is its name within that handle. There is no `@version` pin, no Git URL, no local filesystem path: install always resolves through the catalog. Find a reference with [`atl search`](/cli/search).
 
 ```bash
-atl install agentteamland/software-project-team
+atl install acme/example-team
 ```
 
 `--global` and `--project` are mutually exclusive. With neither flag, the team installs at the scope its publisher declared (see [Scope](#scope) below).
 
 ## What happens
 
-1. **Resolve.** The `<handle>/<team>` reference is looked up in the GitHub-backed catalog — generated from public repos tagged with the [`atl-team`](https://github.com/topics/atl-team) topic. The catalog resolves offline-first from `~/.atl/index.json` (the out-of-band-refreshed cache), falling back to the copy embedded in the binary, so the lookup never blocks on the network. A first-party team resolves to a subpath inside the `agentteamland/atl` monorepo; a standalone team resolves to its own repo root.
+1. **Resolve.** The `<handle>/<team>` reference is looked up in the GitHub-backed catalog — generated from public repos tagged with the [`atl-team`](https://github.com/topics/atl-team) topic. The catalog resolves offline-first from `~/.atl/index.json` (the out-of-band-refreshed cache), falling back to the copy embedded in the binary, so the lookup never blocks on the network. A team published from a monorepo subpath resolves to that subpath; a standalone team resolves to its own repo root.
 2. **Fetch.** The team's source is downloaded as a single ref-pinned HTTPS tarball straight from GitHub — **no `git` binary required** — into a temporary directory that is deleted as soon as the install finishes. There is no persistent clone cache on disk.
 3. **Read.** `team.json` is parsed. Validation is minimal: it must be valid JSON and have a `name`. There is no JSON-Schema validator — see [Schema](/reference/schema) for exactly what the CLI checks and [`team.json`](/authoring/team-json) for the full field contract.
 4. **Write assets.** The team's `agents/`, `skills/`, and `rules/` subtrees are copied straight into the scope's Claude Code directory — `~/.claude` for a global install, `<project>/.claude` for a project install. Nothing else from the repo (`team.json`, `README`, `LICENSE`) is copied.
@@ -49,8 +49,8 @@ Each team's publisher declares a default scope in `team.json` — `project` (the
 When the same capability exists at both layers, the **project layer shadows global** — nearest wins, the same mental model as Claude Code's own `CLAUDE.md` layering. See [Concepts](/guide/concepts#scope-global-and-project) for the full scope axis.
 
 ```bash
-atl install agentteamland/software-project-team            # publisher default (project)
-atl install agentteamland/software-project-team --global   # every project on this machine
+atl install acme/example-team            # publisher default (project)
+atl install acme/example-team --global   # every project on this machine
 ```
 
 ## The install manifest

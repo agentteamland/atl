@@ -10,7 +10,7 @@
 
 **Bağımlılıklar** — bir takımın gereksinim duyduğu ek takımlar; `team.json` içindeki `dependencies` alanıyla belirtilir (takım adı → sürüm kısıtı eşlemesi). Takımın kendisiyle birlikte çözülür ve kurulur.
 
-**Tanıtıcı (Handle)** — katalogda kullanılan kurulum kimliği; `<tanıtıcı>/<takım>` biçimindedir (örn. `agentteamland/software-project-team`). Tanıtıcı yayıncı ad alanıdır; `atl install <tanıtıcı>/<takım>` onu dizinde arar ve eşleşen depodan kurar.
+**Tanıtıcı (Handle)** — katalogda kullanılan kurulum kimliği; `<tanıtıcı>/<takım>` biçimindedir (örn. `acme/example-team`). Tanıtıcı yayıncı ad alanıdır; `atl install <tanıtıcı>/<takım>` onu dizinde arar ve eşleşen depodan kurar.
 
 **Manifesto (Manifest)** — her takım için kapsamına göre ayrı tutulan kurulum kaydı; `<katman>/.atl/installed/<tanıtıcı>__<ad>.json` konumundadır (`<katman>` global için `~/.atl`, proje için `<proje>/.atl`). `schemaVersion`, tanıtıcı, ad, sürüm, kapsam, kaynak (`repo`, `subpath`, `ref`), `installedAt` ve kurulu yol → SHA-256 eşlemesini içeren `files` haritasını kaydeder. `atl remove`, `atl update` ve `atl doctor` tarafından kullanılır.
 
@@ -24,7 +24,7 @@
 
 **SemVer kısıtı** — `dependencies` ve `requires.atl` alanlarında kullanılan sürüm aralığı sözdizimi. `^1.0.0` (caret), `~1.2.0` (tilde), `1.2.3` (kesin), `>=1.2.0` (açık uçlu).
 
-**Beceri (skill)** — kullanıcı tarafından çağrılan eğik çizgili komut (örneğin `/verify-system`). Kök dizininde `skill.md` bulunan bir dizin olarak gelir. Global beceriler `~/.claude/skills/` altında yaşar; takım kapsamlı beceriler bir takımla birlikte gelir ve kurulumun ardından `.claude/skills/` altında görünür.
+**Beceri (skill)** — kullanıcı tarafından çağrılan eğik çizgili komut (örneğin `/drain`). Kök dizininde `skill.md` bulunan bir dizin olarak gelir. Global beceriler `~/.claude/skills/` altında yaşar; takım kapsamlı beceriler bir takımla birlikte gelir ve kurulumun ardından `.claude/skills/` altında görünür.
 
 **Takım (team)** — kökünde `team.json` bulunan bir Git deposu; belirli bir iş türü için ajanları, becerileri ve kuralları bir araya paketler.
 

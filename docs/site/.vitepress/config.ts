@@ -120,11 +120,9 @@ export default defineConfig({
           ],
           '/teams/': [
             {
-              text: 'Verified Teams',
+              text: 'Teams',
               items: [
-                { text: 'Browse', link: '/teams/' },
-                { text: 'software-project-team', link: '/teams/software-project-team' },
-                { text: 'design-system-team', link: '/teams/design-system-team' }
+                { text: 'Browse', link: '/teams/' }
               ]
             }
           ],
@@ -256,11 +254,9 @@ export default defineConfig({
           ],
           '/tr/teams/': [
             {
-              text: 'Onaylı Takımlar',
+              text: 'Takımlar',
               items: [
-                { text: 'Göz at', link: '/tr/teams/' },
-                { text: 'software-project-team', link: '/tr/teams/software-project-team' },
-                { text: 'design-system-team', link: '/tr/teams/design-system-team' }
+                { text: 'Göz at', link: '/tr/teams/' }
               ]
             }
           ],

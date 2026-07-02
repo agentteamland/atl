@@ -8,7 +8,7 @@ The AgentTeamLand v2 monorepo: the `atl` CLI (Go), the platform core (rules + sk
 |---|---|
 | `cli/` | the `atl` binary (Go) — the deterministic plumbing layer. Build/test: `cd cli && go build ./... && go vet ./... && go test ./...` |
 | `core/` | global rules + skills, embedded in the binary (`cli/internal/coreassets`) and reflected to `~/.claude` on install / update / session-start |
-| `teams/` | first-party teams (`software-project-team`, `design-system-team`) |
+| `teams/` | first-party teams (currently empty — the v1-era teams were retired 2026-07; rebuild pending, profile-team first) |
 | `docs/site/` | the VitePress docs site (EN canonical + a `tr/` mirror) |
 | `.atl/` | architecture decisions (`docs/`), the reasoning behind them (`brain-storms/`), and living knowledge (`wiki/`) |
 

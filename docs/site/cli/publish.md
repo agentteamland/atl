@@ -57,12 +57,12 @@ You own github.com/mesut/my-team — these would re-publish to it (commit + vers
 Preview an apply for a team you don't own, then act once the `/publish` skill has written the PR body:
 
 ```bash
-atl publish agentteamland/software-project-team --dry-run --apply
-atl publish agentteamland/software-project-team --apply --body-file pr-body.md
+atl publish acme/example-team --dry-run --apply
+atl publish acme/example-team --apply --body-file pr-body.md
 ```
 
 ```
-atl publish: opened https://github.com/agentteamland/software-project-team/pull/42
+atl publish: opened https://github.com/acme/example-team/pull/42
 ```
 
 ## Notes

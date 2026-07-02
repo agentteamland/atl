@@ -4,7 +4,7 @@ When responding to a user prompt, the agent must give explicit consideration to 
 
 ## Why this rule exists
 
-ATL projects can have multiple teams installed at once (e.g. `software-project-team` for codebase work + a personal-advisory team for life-advice work, both rooted in the same `.atl/`). Their skill sets don't overlap, but their *trigger surfaces* can — a prompt may sound applicable to either, neither, or both. Selecting the wrong skill produces bad output (a software answer to a personal question) or missed automation (a turn that should have invoked a skill but didn't).
+ATL projects can have multiple teams installed at once (e.g. a software team for codebase work + a personal-advisory team for life-advice work, both rooted in the same `.atl/`). Their skill sets don't overlap, but their *trigger surfaces* can — a prompt may sound applicable to either, neither, or both. Selecting the wrong skill produces bad output (a software answer to a personal question) or missed automation (a turn that should have invoked a skill but didn't).
 
 Auto-activation (per-team watch hooks, central dispatchers, lazy-load arbitration) was considered and rejected on cost × determinism grounds: no candidate is both fully deterministic and cheap. Skill selection therefore stays the agent's responsibility, and this rule codifies the diligence that makes it reliable.
 

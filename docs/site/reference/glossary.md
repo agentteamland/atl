@@ -10,7 +10,7 @@
 
 **Dependencies** — additional teams a team requires, specified via the `dependencies` field in `team.json` (a map of team name → version constraint). Resolved and installed at the same time as the team itself.
 
-**Handle** — the catalog identifier you install by, in the form `<handle>/<team>` (e.g. `agentteamland/software-project-team`). The handle is the publisher namespace; `atl install <handle>/<team>` looks it up in the index and installs from the matching repo.
+**Handle** — the catalog identifier you install by, in the form `<handle>/<team>` (e.g. `acme/example-team`). The handle is the publisher namespace; `atl install <handle>/<team>` looks it up in the index and installs from the matching repo.
 
 **Manifest** — the per-team, per-scope install record at `<layer>/.atl/installed/<handle>__<name>.json` (`<layer>` is `~/.atl` for global, `<project>/.atl` for project). Records `schemaVersion`, handle, name, version, scope, source (`repo`, `subpath`, `ref`), `installedAt`, and a `files` map of installed path → SHA-256. Used by `atl remove`, `atl update`, and `atl doctor`.
 
@@ -24,7 +24,7 @@
 
 **SemVer constraint** — version range syntax used in `dependencies` and `requires.atl`. `^1.0.0` (caret), `~1.2.0` (tilde), `1.2.3` (exact), `>=1.2.0` (open-ended).
 
-**Skill** — a user-invocable slash command (e.g. `/verify-system`). Shipped as a directory with `skill.md` at its root. Global skills live in `~/.claude/skills/`; team-scoped skills ship with a team and appear in `.claude/skills/` after install.
+**Skill** — a user-invocable slash command (e.g. `/drain`). Shipped as a directory with `skill.md` at its root. Global skills live in `~/.claude/skills/`; team-scoped skills ship with a team and appear in `.claude/skills/` after install.
 
 **Team** — a Git repository with `team.json` at its root, bundling agents, skills, and rules for a specific kind of work.
 

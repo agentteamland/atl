@@ -118,4 +118,5 @@ Remove-Item -Recurse -Force $Tmp.FullName -ErrorAction SilentlyContinue
 
 Write-Host ''
 Write-Host 'Next: cd into a project and run:'
-Write-Host '  atl install agentteamland/software-project-team'
+Write-Host '  atl search            # browse the team catalog'
+Write-Host '  atl install <handle>/<team>'

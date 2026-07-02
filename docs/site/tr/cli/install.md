@@ -13,14 +13,14 @@ atl install <handle>/<team> --project    # proje kapsamı (yalnızca bu proje)
 `<handle>/<team>`, katalog referansıdır — handle takımın GitHub sahibidir (sahiplik, yazarlıktır) ve team o handle içindeki addır. `@version` sabitleme, Git URL'si ya da yerel dosya sistemi yolu yoktur: install her zaman katalog üzerinden çözümlenir. Bir referans bulmak için [`atl search`](/tr/cli/search) komutunu kullan.
 
 ```bash
-atl install agentteamland/software-project-team
+atl install acme/example-team
 ```
 
 `--global` ve `--project` birbirini dışlar. İkisi de verilmezse takım, yayıncısının bildirdiği kapsamda kurulur (aşağıdaki [Kapsam](#kapsam) bölümüne bak).
 
 ## Ne olur?
 
-1. **Çözümleme.** `<handle>/<team>` referansı, GitHub'daki [`atl-team`](https://github.com/topics/atl-team) konusuyla etiketlenmiş herkese açık depolardan üretilen GitHub tabanlı katalogda aranır. Katalog, `~/.atl/index.json` önbelleğinden çevrimdışı-önce (offline-first) çözümlenir; bu nedenle arama asla ağı beklemez. First-party bir takım `agentteamland/atl` monoreposundaki bir alt yola, bağımsız bir takım kendi deposunun köküne çözümlenir.
+1. **Çözümleme.** `<handle>/<team>` referansı, GitHub'daki [`atl-team`](https://github.com/topics/atl-team) konusuyla etiketlenmiş herkese açık depolardan üretilen GitHub tabanlı katalogda aranır. Katalog, `~/.atl/index.json` önbelleğinden çevrimdışı-önce (offline-first) çözümlenir; bu nedenle arama asla ağı beklemez. Monorepo alt yolundan yayımlanan bir takım o alt yola, bağımsız bir takım kendi deposunun köküne çözümlenir.
 2. **Getirme.** Takımın kaynağı, **`git` binary'si gerekmeden** doğrudan GitHub'dan ref'e sabitlenmiş tek bir HTTPS tarball olarak geçici bir dizine indirilir; kurulum tamamlanır tamamlanmaz bu dizin silinir. Diskte kalıcı bir klon önbelleği yoktur.
 3. **Okuma.** `team.json` ayrıştırılır. Doğrulama minimaldir: geçerli JSON olmalı ve bir `name` alanı içermelidir. JSON-Schema doğrulayıcısı yoktur — CLI'nin tam olarak neyi denetlediği için [Şema](/tr/reference/schema), tam alan sözleşmesi için [`team.json`](/tr/authoring/team-json) sayfalarına bak.
 4. **Varlıkları yaz.** Takımın `agents/`, `skills/` ve `rules/` ağaçları doğrudan kapsamın Claude Code dizinine kopyalanır — global kurulum için `~/.claude`, proje kurulumu için `<project>/.claude`. Depodan başka hiçbir şey (`team.json`, `README`, `LICENSE`) kopyalanmaz.
@@ -49,8 +49,8 @@ Her takımın yayıncısı `team.json`'da varsayılan bir kapsam bildirir — `p
 Aynı yetenek her iki katmanda da mevcutsa **proje katmanı global'i gölgeler** — en yakın kazanır; bu zihniyet modeli Claude Code'un kendi `CLAUDE.md` katmanlamasıyla aynıdır. Tam kapsam eksenini [Kavramlar](/tr/guide/concepts#scope-global-and-project) sayfasında incele.
 
 ```bash
-atl install agentteamland/software-project-team            # yayıncı varsayılanı (project)
-atl install agentteamland/software-project-team --global   # makinedeki her proje
+atl install acme/example-team            # yayıncı varsayılanı (project)
+atl install acme/example-team --global   # makinedeki her proje
 ```
 
 ## Kurulum manifestası

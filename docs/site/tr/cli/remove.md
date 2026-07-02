@@ -14,15 +14,15 @@ atl remove <handle>/<team> --global   # kullanıcı-global katmandan kaldır
 ## Örnek
 
 ```bash
-$ atl remove agentteamland/software-project-team
-atl remove: removed agentteamland/software-project-team (17 files) from project scope
+$ atl remove acme/example-team
+atl remove: removed acme/example-team (17 files) from project scope
 ```
 
 Takım o kapsamda kurulu değilse:
 
 ```bash
-$ atl remove agentteamland/software-project-team
-agentteamland/software-project-team is not installed at project scope
+$ atl remove acme/example-team
+acme/example-team is not installed at project scope
 ```
 
 ## Ne olur?

@@ -27,7 +27,7 @@ A successful pass bumps the global generation counter, which is what tells your 
 atl promote [handle/team]
 ```
 
-With no argument, promote walks every team in the current project and lifts each one's eligible gains. Pass an optional `handle/team` reference (e.g. `agentteamland/software-project-team`) to restrict the pass to that single team.
+With no argument, promote walks every team in the current project and lifts each one's eligible gains. Pass an optional `handle/team` reference (e.g. `acme/example-team`) to restrict the pass to that single team.
 
 `atl promote` takes no flags.
 
@@ -46,7 +46,7 @@ atl promote: lifted 3 file(s) to the global layer
 Restrict the lift to one team:
 
 ```bash
-atl promote agentteamland/software-project-team
+atl promote acme/example-team
 ```
 
 When a file the global layer also moved gets lifted, the conflict is reported and the prior value is archived:

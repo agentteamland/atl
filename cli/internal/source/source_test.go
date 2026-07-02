@@ -83,8 +83,8 @@ func TestExtractTraversal(t *testing.T) {
 }
 
 func TestTarballURL(t *testing.T) {
-	got := TarballURL("agentteamland/software-project-team", "v1.2.1")
-	want := "https://github.com/agentteamland/software-project-team/archive/v1.2.1.tar.gz"
+	got := TarballURL("acme/example-team", "v1.2.1")
+	want := "https://github.com/acme/example-team/archive/v1.2.1.tar.gz"
 	if got != want {
 		t.Errorf("TarballURL = %q, want %q", got, want)
 	}

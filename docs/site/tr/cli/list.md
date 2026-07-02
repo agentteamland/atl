@@ -16,9 +16,9 @@ Takımlar [kapsama](/tr/guide/concepts#scope-global-and-project) göre gruplanı
 
 ```
 global:
-  agentteamland/software-project-team@1.2.1
+  acme/example-team@1.2.0
 project:
-  agentteamland/design-system-team@0.8.1
+  acme/proto-team@0.3.0
 ```
 
 Her iki kapsamda da kurulu bir takım her ikisinin altında görünür. `<handle>` takımın GitHub sahibidir; `<name>` ve `<version>` takımın `team.json` dosyasından gelir.
