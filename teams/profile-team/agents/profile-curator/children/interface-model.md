@@ -82,20 +82,22 @@ The interface evolves under standard semver, protected by the consumer contract
 (`requires: profile-team@^1.0.0`):
 
 - **Add-only field expansion = minor bump.** BC preserved; lazy fill covers it end-to-end.
-  This is the common case and fully implemented in v1.
+  This is the common case and fully implemented.
 - **Rename / remove / type change = major bump.** BC broken; the changelog gets a
-  `breaking: [...]` entry. The convention is defined now; the lazy-*migration*
-  implementation (an optional `_interfaces/migrations/<from>-to-<to>.md` mapping drain
-  applies on touch) is a v2 concern — v1 ships no breaking change, so nothing needs it yet.
-  If a migration file is ever missing on a major bump, drain leaves the profile on its old
-  schema and notes it, rather than guessing.
+  `breaking: [...]` entry, and the change is applied by a **migration**, not a fill — see
+  `schema-migration.md` for the file format (`_interfaces/migrations/<type>/<from>-to-<to>.md`)
+  and the apply-on-touch algorithm. A migration is applied only from an explicit migration
+  file: **present** → apply its ops (gate-never-weakened, `_sources` carried, add-only fill
+  on the remaining span); **missing or malformed** → leave the profile on its old schema and
+  note it, rather than guessing. v1 ships no breaking change, so no canonical migration file
+  exists yet — the mechanism is defined and ready for the first one.
 
-## Type detection (v1 note)
+## Type detection
 
-v1 seeds only the `person` interface, so type detection is trivial — every entity is a
-person. The `thresholds.type-match` value (0.80) and the interface's `matches` /
-`examples-*` fields exist so that when v2 adds more types (and auto-creation of new-type
-interfaces), the curator can score an entity against each interface's self-description and
-reuse the best fit at/above threshold, or create a new interface below it. Authoring a
-brand-new interface from scratch is deferred to v2 (the highest-risk piece); v1's
-interface-evolution is the person interface *growing*, which is in scope.
+Each seeded interface carries `matches` / `examples-*` self-descriptions and a
+`thresholds.type-match` (0.80): the curator scores an entity against every interface, reuses
+the best fit at/above threshold, and below it either authors a new interface for a coherent
+novel kind or holds an `unknown` stub — see `type-detection.md` and `interface-creation.md`.
+Type *detection* and interface *evolution* are two halves of one self-describing-interface
+model: types are detected, and an interface then **grows** (add-only lazy fill, above) or
+**migrates** (a breaking change, `schema-migration.md`).

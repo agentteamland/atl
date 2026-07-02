@@ -60,11 +60,20 @@ For every `field-path: value` in `fields`:
    (`user-confirmed` | `agent-inferred-<today>` | `lens-set`).
 5. Update `meta.last-updated` to today.
 
-### 4. Lazy-fill (existing profile)
-Compare `meta.schema-version` against the interface's `schema-version`. If behind, run the
-changelog-driven fill from `interface-model.md`: add the missing fields, fill what the
-evidence supports (inference tolerated + flagged; Tier-3+ inference still rejected), set
-`meta.schema-version` to the interface version. Then go to §6.
+### 4. Lazy-fill / migrate (existing profile)
+Compare `meta.schema-version` P against the interface's `schema-version` I. If behind,
+branch on whether the bump crosses a major boundary:
+- **Same major** (minor/patch, `I.major == P.major`) → the changelog-driven **add-only
+  fill** from `interface-model.md`: add the missing fields, fill what the evidence supports
+  (inference tolerated + flagged; Tier-3+ inference still rejected), set `meta.schema-version`
+  to I.
+- **Major boundary** (`I.major > P.major`) → a **breaking migration**, per
+  `schema-migration.md`: apply the `_interfaces/migrations/<type>/<from>-to-<to>.md` file
+  (validated so no op weakens a tier gate; `_sources` carried atomically), then the add-only
+  fill on the remaining span, advancing one major hop at a time. If the migration file is
+  missing or malformed, leave the profile on P and note it — never guess a breaking change.
+
+Then go to §6.
 
 ### 5. Create a new profile
 1. **Type** — detect the entity type (`type-detection.md`): the marker's `type:` hint, else
@@ -103,6 +112,6 @@ When every item is processed, rebuild `~/.atl/profiles/_index.md` (`index-rebuil
 - [ ] Each field tier-gated; Tier-3 inference / un-consented Tier-4 skipped + reported
 - [ ] Change-policy applied (overwrite vs history-tracked)
 - [ ] `_sources.<path>` set for every written field
-- [ ] `meta.schema-version` current (lazy-fill run)
+- [ ] `meta.schema-version` current (add-only lazy-fill, or a breaking migration per `schema-migration.md`)
 - [ ] Salience recomputed (manual override respected)
 - [ ] Item acked **after** integration; index rebuilt after the batch

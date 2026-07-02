@@ -135,6 +135,12 @@ The canonical project interface — the seed schema I materialize to ~/.atl/prof
 
 ---
 
+### Schema Migration
+How a BREAKING interface change (major bump) is applied to existing profiles on touch: the `_interfaces/migrations/<type>/<from>-to-<to>.md` file format (rename/remove/transform/remap-values ops), the apply algorithm with its gate-never-weakens + source-preserved + _sources-atomic invariants, ordered multi-major sequencing, the present/missing decision (missing → leave-on-old-schema + note), and how a curator-authored migration is stamped agent-<date>. The breaking-change sibling of interface-creation.md.
+-> [Details](children/schema-migration.md)
+
+---
+
 ### Type Detection
 How I decide an entity's type: score it against every seeded interface's matches + examples, reuse the best fit at/above the 0.80 threshold, else hold it as a minimal unknown stub. Six types are seeded (person, org, animal, place, object, project); an explicit type: marker hint short-circuits scoring.
 -> [Details](children/type-detection.md)

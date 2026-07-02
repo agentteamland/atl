@@ -97,9 +97,13 @@ silent but guardrailed (a small extension over the core, conservative default ti
 the curator's discipline is to *fill fields to the extent the evidence supports*, never to
 validate. When the interface grows (a minor version adds fields), older profiles are not
 batch-migrated; each catches up **lazily** the next time drain touches it — the changelog's
-`added` lists drive a deterministic fill. Inference is tolerated but flagged
-(`agent-inferred-<date>`), so a wrong guess self-corrects in a later conversation rather
-than hardening into fact. Thresholds live in the interface frontmatter (v2 has no config
+`added` lists drive a deterministic fill. A **breaking** change (a major version that renames,
+removes, or reshapes a field) is applied instead by a **migration file**
+(`_interfaces/migrations/<type>/<from>-to-<to>.md`) the curator runs on touch — validated so
+it never weakens a privacy gate and carries each value's source across the move; if the file
+is missing the profile is simply left on its old schema and flagged, never guessed. Inference
+is tolerated but flagged (`agent-inferred-<date>`), so a wrong guess self-corrects in a later
+conversation rather than hardening into fact. Thresholds live in the interface frontmatter (v2 has no config
 system by design — they are type-specific, so the interface is their home).
 
 ## Privacy
@@ -135,15 +139,14 @@ the contract exists now so it is in place before third-party teams read freely.
 profile-team ships the full loop over **six entity types** (person, org, animal, place,
 object, project), each with its own self-describing interface, plus **auto-creation** of a
 new interface for a coherent novel kind and interface **evolution** (changelog-driven
-lazy-fill). The whole thing runs on the north-star consumer (personal-advisory-team) it was
-built for.
+lazy-fill for add-only growth, plus breaking-change migration files applied on touch). The
+whole thing runs on the north-star consumer (personal-advisory-team) it was built for.
 
 Deferred to a later version (design captured, trigger-gated): **scheduled / interval drain**
 (today it runs at session start — gated on a separate ATL scheduling primitive); **structured
-cross-links** between the profile and project worlds (free markdown links today); the
-lazy-**migration** implementation for breaking schema changes; and the consumer-side pieces
-that arrive with the first consuming team — **transitive dependency install** and
-**`capabilities.profile` enforcement**.
+cross-links** between the profile and project worlds (free markdown links today); and
+**`capabilities.profile` enforcement**, the consumer-side access gate that arrives with the
+first consuming team.
 
 ## See also
 

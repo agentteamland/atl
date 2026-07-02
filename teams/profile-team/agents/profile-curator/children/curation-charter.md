@@ -19,6 +19,8 @@ Everything under the global layer at `~/.atl/profiles/`:
 ├── _interfaces/                  # the self-describing schemas — six types seeded
 │   ├── person.md                 #   (+ agent-authored interfaces for novel types)
 │   ├── org.md · animal.md · place.md · object.md · project.md
+│   └── migrations/<type>/        # breaking-change migration files (<from>-to-<to>.md);
+│                                 #   applied on touch, see schema-migration.md
 └── <type-dir>/                   # one directory per type: people · orgs · animals ·
     └── <slug>/                   #   places · objects · projects (+ unknown/ for stubs)
         ├── profile.md            # frontmatter core + narrative body
