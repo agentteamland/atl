@@ -17,6 +17,8 @@ atl install --global agentteamland/profile-team || bad "global install errored"
 
 [ -f "$HOME/.claude/agents/profile-curator/agent.md" ]                 && ok "curator agent reflected"      || bad "curator agent missing"
 [ -f "$HOME/.claude/agents/profile-curator/children/marker-drain.md" ] && ok "curator children reflected"   || bad "curator children missing"
+[ -f "$HOME/.claude/agents/profile-curator/children/animal-interface.md" ]     && ok "multi-type interface reflected (animal)" || bad "type interfaces missing"
+[ -f "$HOME/.claude/agents/profile-curator/children/interface-creation.md" ]   && ok "auto-creation logic reflected"           || bad "interface-creation missing"
 [ -f "$HOME/.claude/skills/profile-drain/SKILL.md" ]                   && ok "profile-drain skill reflected" || bad "profile-drain skill missing"
 [ -f "$HOME/.claude/rules/profile-capture.md" ]                        && ok "profile-capture rule reflected" || bad "profile-capture rule missing"
 ls "$HOME/.atl/installed/"*profile-team*.json >/dev/null 2>&1          && ok "install manifest written"     || bad "manifest missing"
