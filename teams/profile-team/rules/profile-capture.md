@@ -54,9 +54,10 @@ Multi-line YAML body, one marker per entity, multiple fields at once:
 
 - **`entity`** — a canonical lowercase-kebab slug. Reuse the same slug for the same entity
   every time; put alternate names in `identity.aliases` so the curator can match them.
-- **`type`** — optional hint (`person` | `org` | `animal` | `place` | `object` | `project`).
-  Include it when you know it — it saves the curator from having to infer the type. Omit it
-  and the curator fit-scores; a genuinely novel kind it can't place becomes a light stub.
+- **`type`** — optional hint (`person` | `org` | `animal` | `place` | `object` | `project`,
+  or a novel type you name). Include it when you know it — it saves the curator inferring.
+  Omit it and the curator fit-scores; a coherent novel kind gets its own new interface, a
+  genuine one-off becomes a light stub.
 - **`fields`** — a map of `field-path: value` (paths follow that type's interface, e.g.
   `traits.fears`, `anchors.birthday` for a person; `state.status`, `provenance.acquired-from`
   for an object). Group everything you learned about one entity in one marker.

@@ -28,13 +28,14 @@ create it against before scaffolding it. Six interfaces are seeded:
 3. **Reuse at/above threshold.** If the best fit is ≥ the interface's `thresholds.type-match`
    (0.80), the entity is that type — create its profile against that interface, in that
    type's directory.
-4. **Below threshold → `unknown` stub.** If nothing fits well, I do **not** force the entity
-   into the closest type. I create a minimal `unknown`-type stub: `meta.type-id: unknown` +
-   `identity.name` + whatever Tier-1 identity/relation/emotional-tags facts the marker
-   carries, under `~/.atl/profiles/unknown/<slug>/`. It is a valid, honest placeholder — the
-   entity and how the user feels about it are still remembered, just without a rich typed
-   schema. (Authoring a brand-new interface for a genuinely novel type is the
-   `interface-creation` job.)
+4. **Below threshold → author a new interface, or stub.** If nothing fits well, I do **not**
+   force the entity into the closest type. I judge (per `interface-creation.md`): if it is a
+   *coherent, recurring kind* I can name and give a small honest schema, I **author a new
+   interface** for it (guardrailed, silent-autosave) and grow the profile against that. If it
+   is a genuine *one-off* I can't type cleanly, it stays a minimal `unknown` stub
+   (`meta.type-id: unknown` + `identity.name` + whatever Tier-1 identity/relation/emotional-tags
+   facts the marker carries, under `~/.atl/profiles/unknown/<slug>/`) — still remembered, just
+   not richly typed. Reuse-a-seeded-type and the stub both beat inventing a shaky type.
 
 ## Reading the fit
 
