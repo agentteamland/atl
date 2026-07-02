@@ -47,6 +47,16 @@ write_test_index() {
   jq -n --argjson teams "$teams" '{schemaVersion:1,generatedAt:"2026-06-15T00:00:00Z",teams:$teams}' > "$HOME/.atl/index.json"
 }
 
+# write_test_index_profile seeds ~/.atl/index.json with the first-party
+# profile-team entry, pointing at the monorepo subpath on `main`. profile-team
+# is a real monorepo team (not a standalone fixture repo), so `atl install`
+# fetches teams/profile-team from the atl repo tarball over public HTTPS — the
+# blueprint stays hermetic (no dedicated fixture repo) and auth-free.
+write_test_index_profile() {
+  mkdir -p "$HOME/.atl"
+  jq -n '{schemaVersion:1,generatedAt:"2026-07-02T00:00:00Z",teams:[{handle:"agentteamland",name:"profile-team",version:"1.0.0",description:"profile-team e2e (monorepo subpath).",keywords:["profile"],scope:"global",verified:true,source:{repo:"agentteamland/atl",subpath:"teams/profile-team",ref:"main"}}]}' > "$HOME/.atl/index.json"
+}
+
 # gh_login echoes the authenticated GitHub login (GH_TOKEN is passed through by
 # the runner); empty if gh isn't authenticated.
 gh_login() {
