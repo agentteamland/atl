@@ -87,6 +87,12 @@ How I rebuild ~/.atl/profiles/_index.md after a drain — the on-demand discover
 
 ---
 
+### Interface Creation
+How I author a brand-new interface when a below-threshold entity is a coherent novel type no seeded interface fits. Silent-autosave but guardrailed: conservative default tiers, a small extension over the inherited core, marked authored: agent-<date> (distinguishable + refinable), noted in the drain report. A one-off stays an unknown stub — I don't invent a type for it.
+-> [Details](children/interface-creation.md)
+
+---
+
 ### Interface Model
 How interfaces evolve and profiles stay current: the profile.md layout, schema-version + changelog diff, changelog-driven lazy fill (inference tolerated + source-flagged, Tier-3+ inference rejected), the override/history policy, and BC via semver.
 -> [Details](children/interface-model.md)

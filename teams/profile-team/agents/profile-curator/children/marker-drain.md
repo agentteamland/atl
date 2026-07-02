@@ -68,11 +68,13 @@ evidence supports (inference tolerated + flagged; Tier-3+ inference still reject
 
 ### 5. Create a new profile
 1. **Type** — detect the entity type (`type-detection.md`): the marker's `type:` hint, else
-   fit-score against the six seeded interfaces. A below-threshold entity is held as a minimal
-   `unknown`-type stub (core-only), not forced into the closest type.
-2. **Interface** — for a seeded type, ensure `~/.atl/profiles/_interfaces/<type>.md` exists;
-   if absent, materialize it verbatim from the matching `<type>-interface.md` child. An
-   `unknown` stub needs no interface (it carries the common core only).
+   fit-score against the seeded interfaces. Below threshold, judge per `interface-creation.md`:
+   author a new interface for a coherent novel kind, else hold a minimal `unknown` stub
+   (core-only) — never force it into the closest type.
+2. **Interface** — for a seeded type, ensure `~/.atl/profiles/_interfaces/<type>.md` exists,
+   materializing it from the matching `<type>-interface.md` child if absent; for a newly
+   authored type, `interface-creation.md` has already written the interface; an `unknown`
+   stub needs no interface (common core only).
 3. **Scaffold** `~/.atl/profiles/<type-dir>/<slug>/profile.md` (the type→dir map is in
    `curation-charter.md`) with `meta` (`type-id`,
    `schema-version` from the interface, `created`/`last-updated` = today, `confidence`,
