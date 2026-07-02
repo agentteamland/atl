@@ -14,7 +14,7 @@ headless_claude_setup
 cd "$PROJ" || exit 2
 atl install --global agentteamland/profile-team >/dev/null || bad "install errored"
 [ -f "$HOME/.claude/rules/profile-capture.md" ]      && ok "profile-capture rule active" || bad "rule missing"
-[ -f "$HOME/.claude/skills/profile-drain/skill.md" ] && ok "profile-drain skill active"  || bad "skill missing"
+[ -f "$HOME/.claude/skills/profile-drain/SKILL.md" ] && ok "profile-drain skill active"  || bad "skill missing"
 
 claude_turn() { ( cd "$PROJ" && claude -p "$1" --dangerously-skip-permissions --output-format json ) >>"$HOME/turns.log" 2>&1; }
 
