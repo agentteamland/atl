@@ -68,7 +68,16 @@ That `files` map is a dual-purpose record: `atl update` compares the current byt
 
 Several teams can coexist in one project — each install copies its assets into the same `.claude/` directory and writes its own manifest. If two installed teams ship an asset with the same name, the most recently written copy is the one on disk. Remove a team with [`atl remove`](/cli/remove); it deletes only that team's manifest-recorded files.
 
-A team can also declare other teams as `dependencies` in its `team.json`; those are installed alongside it. See [`team.json`](/authoring/team-json) for the dependency field.
+## Dependencies
+
+A team can declare other teams in its `team.json` `dependencies` (a map of team name → semver range). `atl install` resolves and installs them **transitively** — installing a team pulls in the teams it needs, and the teams those need, and so on. So installing an advisory team that depends on `profile-team` pulls `profile-team` automatically.
+
+- **A dependency installs at its own declared scope**, not the consumer's. A global dependency stays global even when you install the consumer with `--project`.
+- `core` (the platform core) is always present — it ships in the binary and is skipped.
+- Diamonds and cycles are safe: each team is installed once.
+- A dependency the index can't resolve is skipped with a warning, not a hard failure.
+
+See [`team.json`](/authoring/team-json) for the dependency field.
 
 ## Troubleshooting
 

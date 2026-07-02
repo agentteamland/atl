@@ -76,3 +76,16 @@ func TestCopyAssetsNoAssets(t *testing.T) {
 		t.Error("expected error when team ships no assets")
 	}
 }
+
+func TestReadManifestDependencies(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "team.json"),
+		`{"name":"consumer","version":"1.0.0","dependencies":{"core":"^1.0.0","profile-team":"^1.1.0"}}`)
+	tm, err := ReadManifest(dir)
+	if err != nil {
+		t.Fatalf("ReadManifest: %v", err)
+	}
+	if tm.Dependencies["profile-team"] != "^1.1.0" || tm.Dependencies["core"] != "^1.0.0" {
+		t.Errorf("dependencies = %+v", tm.Dependencies)
+	}
+}

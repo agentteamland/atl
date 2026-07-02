@@ -154,6 +154,28 @@ func (ix *Index) Lookup(handle, name string) (*Entry, error) {
 	return nil, fmt.Errorf("team %q not found in index", handle+"/"+name)
 }
 
+// LookupByName finds an entry by bare name (handle unknown), preferring a
+// verified one when several handles publish the same name. Used to resolve a
+// dependency declared as a bare team name rather than "<handle>/<name>".
+func (ix *Index) LookupByName(name string) (*Entry, error) {
+	var match *Entry
+	for i := range ix.Teams {
+		if ix.Teams[i].Name != name {
+			continue
+		}
+		if ix.Teams[i].Verified {
+			return &ix.Teams[i], nil // a verified match wins outright
+		}
+		if match == nil {
+			match = &ix.Teams[i]
+		}
+	}
+	if match == nil {
+		return nil, fmt.Errorf("team %q not found in index", name)
+	}
+	return match, nil
+}
+
 // Search returns every entry whose handle, name, description, or one of its
 // keywords contains query (case-insensitive). A blank query matches all teams,
 // so the catalog can be browsed. Results keep the index's order.

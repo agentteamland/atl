@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/agentteamland/atl/cli/internal/generation"
 	"github.com/agentteamland/atl/cli/internal/index"
@@ -18,13 +19,16 @@ import (
 
 var installCmd = &cobra.Command{
 	Use:   "install <handle>/<team>",
-	Short: "Install a team from the index",
-	Long: "Resolve a team from the GitHub-backed index and install it.\n\n" +
+	Short: "Install a team (and its dependencies) from the index",
+	Long: "Resolve a team from the GitHub-backed index and install it, together\n" +
+		"with any teams it declares in team.json `dependencies` (transitively).\n\n" +
 		"Scope follows the v2 axis: the publisher declares a default; --global or\n" +
 		"--project overrides it. A 'both' default installs at both layers, and\n" +
-		"project shadows global on conflict. Assets are written into Claude Code's\n" +
-		"directory directly (~/.claude or <project>/.claude); ATL records a manifest\n" +
-		"of baseline hashes under the matching .atl directory. Automation hooks are\n" +
+		"project shadows global on conflict. A dependency installs at its OWN\n" +
+		"declared scope (a global dependency stays global regardless of how the\n" +
+		"consumer is installed). Assets are written into Claude Code's directory\n" +
+		"directly (~/.claude or <project>/.claude); ATL records a manifest of\n" +
+		"baseline hashes under the matching .atl directory. Automation hooks are\n" +
 		"installed as a mandatory part of install — automation is on by default.",
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -56,37 +60,18 @@ var installCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		declared, err := scope.Parse(entry.Scope)
-		if err != nil {
-			return fmt.Errorf("team %s declares an %w", entry.Ref(), err)
-		}
-		eff := scope.Resolve(declared, override)
 
 		projectRoot, err := os.Getwd()
 		if err != nil {
 			return err
 		}
 
-		// Fetch the source once; reflect into each target layer.
-		srcDir, err := source.Fetch(entry.Source.Repo, entry.Source.Subpath, entry.Source.Ref)
-		if err != nil {
+		// Install the team + its transitive dependencies. Fetch is the real
+		// network fetcher here; tests inject a fake.
+		visited := map[string]bool{}
+		var installed []installedTeam
+		if err := installWithDeps(ix, entry, override, projectRoot, source.Fetch, visited, &installed, false); err != nil {
 			return err
-		}
-		defer os.RemoveAll(srcDir)
-
-		tm, err := teampkg.ReadManifest(srcDir)
-		if err != nil {
-			return err
-		}
-
-		targets := installTargets(eff)
-		for _, target := range targets {
-			if err := installAt(target, projectRoot, handle, name, entry, tm, srcDir); err != nil {
-				return err
-			}
-			if target == scope.Global {
-				_ = generation.Bump() // global layer changed → other projects fan out
-			}
 		}
 
 		// Automation is mandatory (decision doc D-3): bind the hooks on install.
@@ -107,9 +92,106 @@ var installCmd = &cobra.Command{
 			fmt.Printf("atl: created %s — a project CLAUDE.md starter; fill in the sections marked for you.\n", path)
 		}
 
-		fmt.Printf("atl: installed %s@%s at %s scope\n", entry.Ref(), tm.Version, scopeLabel(targets))
+		for _, it := range installed {
+			suffix := ""
+			if it.dep {
+				suffix = " (dependency)"
+			}
+			fmt.Printf("atl: installed %s@%s at %s scope%s\n", it.ref, it.version, it.scopeLabel, suffix)
+		}
 		return nil
 	},
+}
+
+// installedTeam records one installed team for the end-of-run report.
+type installedTeam struct {
+	ref        string
+	version    string
+	scopeLabel string
+	dep        bool
+}
+
+// installWithDeps installs entry across its target layers, then recursively
+// installs the teams it declares in team.json `dependencies` — skipping "core"
+// (the always-present platform core, reflected from the binary). A dependency
+// installs at its OWN declared scope, never the consumer's override. visited
+// (keyed by "<handle>/<name>") makes diamonds and cycles safe.
+func installWithDeps(ix *index.Index, entry *index.Entry, override scope.Override, projectRoot string, fetch fetchFunc, visited map[string]bool, installed *[]installedTeam, isDep bool) error {
+	if visited[entry.Ref()] {
+		return nil
+	}
+	visited[entry.Ref()] = true
+
+	tm, targets, err := installResolved(entry, override, projectRoot, fetch)
+	if err != nil {
+		return err
+	}
+	version := tm.Version
+	if version == "" {
+		version = entry.Version
+	}
+	*installed = append(*installed, installedTeam{ref: entry.Ref(), version: version, scopeLabel: scopeLabel(targets), dep: isDep})
+
+	for dep := range tm.Dependencies {
+		if dep == "core" {
+			continue // the platform core is always present (reflected from the binary)
+		}
+		depEntry, derr := resolveDep(ix, dep)
+		if derr != nil {
+			fmt.Printf("atl: warning — dependency %q of %s is not in the index; skipping\n", dep, entry.Ref())
+			continue
+		}
+		if err := installWithDeps(ix, depEntry, scope.NoOverride, projectRoot, fetch, visited, installed, true); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// installResolved fetches one entry and reflects it into each target layer,
+// returning the parsed team.json (for dependency traversal) and the layers it
+// wrote (for the report). It does no dependency work itself.
+func installResolved(entry *index.Entry, override scope.Override, projectRoot string, fetch fetchFunc) (*teampkg.TeamManifest, []scope.Scope, error) {
+	declared, err := scope.Parse(entry.Scope)
+	if err != nil {
+		return nil, nil, fmt.Errorf("team %s declares an %w", entry.Ref(), err)
+	}
+	eff := scope.Resolve(declared, override)
+
+	srcDir, err := fetch(entry.Source.Repo, entry.Source.Subpath, entry.Source.Ref)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer os.RemoveAll(srcDir)
+
+	tm, err := teampkg.ReadManifest(srcDir)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	targets := installTargets(eff)
+	for _, target := range targets {
+		if err := installAt(target, projectRoot, entry.Handle, entry.Name, entry, tm, srcDir); err != nil {
+			return nil, nil, err
+		}
+		if target == scope.Global {
+			_ = generation.Bump() // global layer changed → other projects fan out
+		}
+	}
+	return tm, targets, nil
+}
+
+// resolveDep resolves a dependency key: "<handle>/<name>" is looked up exactly;
+// a bare name resolves by name (preferring a verified publisher).
+func resolveDep(ix *index.Index, dep string) (*index.Entry, error) {
+	if strings.Contains(dep, "/") {
+		handle, name, err := index.ParseRef(dep)
+		if err != nil {
+			return nil, err
+		}
+		return ix.Lookup(handle, name)
+	}
+	return ix.LookupByName(dep)
 }
 
 // installTargets expands an effective scope into the concrete single layers to

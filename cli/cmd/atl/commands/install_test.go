@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -103,5 +104,82 @@ func TestClaudeDirProject(t *testing.T) {
 	d, err := scope.ClaudeDir(scope.Project, filepath.FromSlash("/proj"))
 	if err != nil || d != filepath.FromSlash("/proj/.claude") {
 		t.Errorf("ClaudeDir project = %q, %v", d, err)
+	}
+}
+
+// makeSrcWith writes a fixture team dir with the given team.json plus one asset.
+func makeSrcWith(t *testing.T, teamJSON string) string {
+	t.Helper()
+	src := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(src, "agents", "x"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(src, "team.json"), []byte(teamJSON), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(src, "agents", "x", "agent.md"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return src
+}
+
+func TestInstallWithDeps(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home) // windows
+	root := t.TempDir()
+
+	ix := &index.Index{Teams: []index.Entry{
+		{Handle: "acme", Name: "consumer", Version: "1.0.0", Scope: "project",
+			Source: index.Source{Repo: "acme/consumer"}},
+		{Handle: "agentteamland", Name: "dep-team", Version: "1.1.0", Scope: "global", Verified: true,
+			Source: index.Source{Repo: "agentteamland/dep-team"}},
+	}}
+
+	// consumer depends on core (skipped) + dep-team; dep-team depends back on
+	// consumer (a cycle — must not loop).
+	consumerSrc := makeSrcWith(t, `{"name":"consumer","version":"1.0.0","scope":"project","dependencies":{"core":"^1.0.0","dep-team":"^1.0.0"}}`)
+	depSrc := makeSrcWith(t, `{"name":"dep-team","version":"1.1.0","scope":"global","dependencies":{"consumer":"^1.0.0"}}`)
+	fetch := func(repo, subpath, ref string) (string, error) {
+		switch repo {
+		case "acme/consumer":
+			return consumerSrc, nil
+		case "agentteamland/dep-team":
+			return depSrc, nil
+		}
+		return "", fmt.Errorf("unexpected fetch %q", repo)
+	}
+
+	consumer, _ := ix.Lookup("acme", "consumer")
+	visited := map[string]bool{}
+	var installed []installedTeam
+	if err := installWithDeps(ix, consumer, scope.NoOverride, root, fetch, visited, &installed, false); err != nil {
+		t.Fatalf("installWithDeps: %v", err)
+	}
+
+	// consumer + dep pulled transitively; the cycle did not re-install consumer.
+	if len(installed) != 2 {
+		t.Fatalf("installed %d, want 2 (consumer + dep, cycle-safe): %+v", len(installed), installed)
+	}
+	byRef := map[string]installedTeam{}
+	for _, it := range installed {
+		byRef[it.ref] = it
+	}
+	if c := byRef["acme/consumer"]; c.dep || c.scopeLabel != "project" {
+		t.Errorf("consumer = %+v, want project scope + not a dep", c)
+	}
+	// the dependency installs at ITS OWN scope (global), not the consumer's project.
+	if d := byRef["agentteamland/dep-team"]; !d.dep || d.scopeLabel != "global" {
+		t.Errorf("dep-team = %+v, want global scope + dep=true", d)
+	}
+	if _, err := os.Stat(filepath.Join(home, ".claude", "agents", "x", "agent.md")); err != nil {
+		t.Errorf("dependency not installed at global scope: %v", err)
+	}
+	if _, err := manifest.Read(filepath.Join(home, ".atl"), "agentteamland", "dep-team"); err != nil {
+		t.Errorf("dependency manifest not written at global: %v", err)
+	}
+	// "core" is never resolved/installed — it is the platform core.
+	if visited["agentteamland/core"] {
+		t.Error("core must be skipped, not resolved as a team")
 	}
 }

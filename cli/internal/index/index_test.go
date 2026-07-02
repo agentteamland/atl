@@ -186,3 +186,20 @@ func mustCachePath(t *testing.T) string {
 	}
 	return p
 }
+
+func TestLookupByName(t *testing.T) {
+	ix := &Index{Teams: []Entry{
+		{Handle: "user1", Name: "shared"},
+		{Handle: "agentteamland", Name: "shared", Verified: true},
+		{Handle: "acme", Name: "solo"},
+	}}
+	if e, err := ix.LookupByName("shared"); err != nil || e.Handle != "agentteamland" {
+		t.Errorf("LookupByName(shared) = %+v, %v; verified should win", e, err)
+	}
+	if e, err := ix.LookupByName("solo"); err != nil || e.Handle != "acme" {
+		t.Errorf("LookupByName(solo) = %+v, %v", e, err)
+	}
+	if _, err := ix.LookupByName("nope"); err == nil {
+		t.Error("LookupByName(nope) should error")
+	}
+}
