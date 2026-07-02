@@ -75,12 +75,30 @@ What I own under ~/.atl/profiles/, the self/third-party distinction, the 4-tier 
 
 ---
 
+### Index Rebuild
+How I rebuild ~/.atl/profiles/_index.md after a drain — the on-demand discovery file a lens reads to answer 'who exists in the user's world?'. Grouped by type; one line per entity (slug — name | salience | role). Derived wholesale from the profiles; loaded on demand, never into CLAUDE.md.
+-> [Details](children/index-rebuild.md)
+
+---
+
 ### Interface Model
 How interfaces evolve and profiles stay current: the profile.md layout, schema-version + changelog diff, changelog-driven lazy fill (inference tolerated + source-flagged, Tier-3+ inference rejected), the override/history policy, and BC via semver.
 -> [Details](children/interface-model.md)
 
 ---
 
+### Marker Drain
+The primary production unit: process one profile-fact into the right profile. Parse the body, resolve the entity, gate each field by tier + source, apply per change-policy with a source flag, run lazy-fill, ack. Create a new profile when the entity is unknown. Then rebuild the index.
+-> [Details](children/marker-drain.md)
+
+---
+
 ### Person Interface
 The canonical person interface — the seed schema I materialize to ~/.atl/profiles/_interfaces/person.md: self-describing frontmatter (matches/examples/schema-version/changelog/tier-defaults/thresholds) + the core + person field shape.
 -> [Details](children/person-interface.md)
+
+---
+
+### Type Detection
+How I decide an entity's type. v1 is person-only: every entity resolves to person, a clearly non-person entity is held as a minimal unknown stub (never fabricated into a person). The fit-scoring mechanism (matches + examples) exists for v2 multi-type + auto-creation.
+-> [Details](children/type-detection.md)
