@@ -4,8 +4,11 @@
 # profile-loop — the full real-Claude profile loop: install profile-team, a
 # `claude -p` session drops a profile-fact marker -> atl tick enqueues it ->
 # /profile-drain has the profile-curator write a profile.md under
-# ~/.atl/profiles -> ack deletes it. Assertions key off queue + file STATE
-# (never an exact filename), so the non-deterministic LLM turn stays non-flaky.
+# ~/.atl/profiles -> ack deletes it. A second segment proves breaking-change
+# migration (infra #5): a profile one MAJOR behind its interface is migrated on
+# touch, not add-only-filled. Assertions key off queue + file STATE (schema
+# version, key presence — never an exact transported value), so the
+# non-deterministic LLM turn stays non-flaky.
 source /e2e/lib.sh
 
 fresh
@@ -33,6 +36,70 @@ FOUND=$(find "$HOME/.atl/profiles/people" -name 'profile.md' -newer "$HOME/.befo
 [ -n "$FOUND" ] && ok "curator wrote a profile.md under ~/.atl/profiles/people" || bad "no profile written by /profile-drain"
 PEEK2=$(cd "$PROJ" && atl learnings peek --channel profile-fact --json 2>/dev/null)
 echo "$PEEK2" | jq -e 'length == 0' >/dev/null 2>&1 && ok "profile-fact queue drained (processed-then-deleted)" || bad "queue still has items -- [$PEEK2]"
+
+# ---- breaking-change migration (infra #5) ----
+# Seeded AFTER install (fresh wipes ~/.atl) on the `object` type, which is in the
+# resolver's scan set (marker-drain §2) so the touch resolves the existing profile
+# -> §4 sees P<I across a major -> the migration branch. Isolated from the person
+# canonical-materialization path. A `rename` op keeps the assertions grep-stable.
+mkdir -p "$HOME/.atl/profiles/objects/oldmug" "$HOME/.atl/profiles/_interfaces/migrations/object"
+
+cat > "$HOME/.atl/profiles/objects/oldmug/profile.md" <<'EOF'
+---
+meta:
+  type-id: object
+  schema-version: 1.0.0
+  is-self: false
+identity:
+  name: Old Mug
+heirloom-note: a gift from grandma
+_sources:
+  identity.name: user-confirmed
+  heirloom-note: user-confirmed
+---
+# Old Mug
+EOF
+
+cat > "$HOME/.atl/profiles/_interfaces/object.md" <<'EOF'
+---
+type-id: object
+schema-version: 2.0.0
+changelog:
+  - version: 1.0.0
+    added: [everything]
+  - version: 2.0.0
+    breaking: [rename heirloom-note -> story-note]
+tier-defaults:
+  identity.*: 1
+  story-note: 1
+---
+# Object
+EOF
+
+cat > "$HOME/.atl/profiles/_interfaces/migrations/object/1.0.0-to-2.0.0.md" <<'EOF'
+---
+type-id: object
+from: 1.0.0
+to: 2.0.0
+operations:
+  - rename: { from: heirloom-note, to: story-note }
+---
+# object 1.0.0 -> 2.0.0
+Rename heirloom-note to story-note; carry its _sources entry verbatim.
+EOF
+
+MBODY=$'entity: oldmug\ntype: object\nfields:\n  identity.name: Old Mug\nsource: user-confirmed'
+( cd "$PROJ" && atl learnings _enqueue profile-fact "$MBODY" >/dev/null 2>&1 ) || bad "_enqueue object migration fact errored"
+
+touch "$HOME/.beforemigrate"
+claude_turn "/profile-drain" || bad "migration drain turn errored (see turns.log)"
+
+MPROF="$HOME/.atl/profiles/objects/oldmug/profile.md"
+grep -q 'schema-version: 2.0.0' "$MPROF" 2>/dev/null && ok "profile migrated to schema-version 2.0.0"     || bad "schema-version not bumped to 2.0.0"
+grep -q 'story-note' "$MPROF" 2>/dev/null            && ok "renamed field present (story-note)"           || bad "new field path missing after migration"
+grep -q 'heirloom-note' "$MPROF" 2>/dev/null         && bad "old field path still present (heirloom-note)" || ok "old field path removed by migration"
+PEEK3=$(cd "$PROJ" && atl learnings peek --channel profile-fact --json 2>/dev/null)
+echo "$PEEK3" | jq -e 'length == 0' >/dev/null 2>&1  && ok "migration fact drained"                       || bad "migration fact not drained -- [$PEEK3]"
 
 # On failure, surface what's otherwise lost when the container is torn down.
 if [ "$FAIL" -gt 0 ]; then

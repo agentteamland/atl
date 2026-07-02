@@ -98,9 +98,13 @@ tutabilmesini sağlar.
 disiplini, *kanıtın desteklediği ölçüde alanları doldurmaktır*, doğrulamak değil. Interface
 büyüdüğünde (minor bir sürüm alan eklediğinde) eski profiller toplu olarak taşınmaz; her biri,
 drain bir sonraki kez dokunduğunda **tembel (lazy)** yakalar — changelog'un `added` listeleri
-deterministik bir doldurmayı yönetir. Çıkarım (inference) tolere edilir ama etiketlenir
-(`agent-inferred-<date>`), böylece yanlış bir tahmin gerçeğe sertleşmek yerine sonraki bir
-konuşmada kendini düzeltir. Eşikler interface frontmatter'ında yaşar (v2'de tasarım gereği
+deterministik bir doldurmayı yönetir. **Kırıcı** bir değişiklik (bir alanı yeniden adlandıran,
+kaldıran ya da yeniden şekillendiren major sürüm) bunun yerine, curator'ın dokununca çalıştırdığı
+bir **göç dosyasıyla** (`_interfaces/migrations/<type>/<from>-to-<to>.md`) uygulanır — bir gizlilik
+kapısını asla zayıflatmayacak şekilde doğrulanır ve her değerin kaynağını taşıma boyunca korur;
+dosya eksikse profil, tahmin edilmeden, eski şemasında bırakılır ve işaretlenir. Çıkarım
+(inference) tolere edilir ama etiketlenir (`agent-inferred-<date>`), böylece yanlış bir tahmin
+gerçeğe sertleşmek yerine sonraki bir konuşmada kendini düzeltir. Eşikler interface frontmatter'ında yaşar (v2'de tasarım gereği
 config sistemi yoktur — bunlar türe özgüdür, yani interface onların evidir).
 
 ## Gizlilik
@@ -136,14 +140,14 @@ sözleşme şimdi vardır ki üçüncü-taraf takımlar serbestçe okumadan önc
 
 profile-team, **altı varlık türü** (person, org, animal, place, object, project) üzerinde tam
 döngüyü sağlar — her biri kendi kendini-tanımlayan interface'iyle — artı tutarlı yeni bir tür
-için **auto-creation** (yeni interface yazma) ve interface **evrimi** (changelog-güdümlü
-lazy-fill). Tümü, kuzey-yıldızı tüketicisi (personal-advisory-team) üzerinde doğrulanır.
+için **auto-creation** (yeni interface yazma) ve interface **evrimi** (add-only büyüme için
+changelog-güdümlü lazy-fill, artı dokununca uygulanan kırıcı-değişiklik göç dosyaları). Tümü,
+kuzey-yıldızı tüketicisi (personal-advisory-team) üzerinde doğrulanır.
 
 Daha sonraki bir sürüme ertelenen (tasarımı yakalanmış, tetik-gözetimli): **zamanlanmış /
 aralıklı drain** (bugün oturum başlangıcında çalışır — ayrı bir ATL zamanlama primitive'ine
 bağlı); profil ve proje dünyaları arasında **yapılandırılmış çapraz-bağlantılar** (bugün serbest
-markdown linkleri); kırıcı şema değişiklikleri için tembel-**göç (migration)** uygulaması; ve
-ilk tüketen takımla gelen tüketici-tarafı parçaları — **transitive dependency install** ve
+markdown linkleri); ve ilk tüketen takımla gelen tüketici-tarafı erişim kapısı olan
 **`capabilities.profile` enforcement**.
 
 ## Ayrıca bkz.
