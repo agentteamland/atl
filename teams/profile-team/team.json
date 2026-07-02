@@ -26,8 +26,18 @@
       "description": "Drains profile-fact markers into person profiles under ~/.atl/profiles: detects the entity type, selects or evolves its interface, fills fields, and rebuilds the profile index."
     }
   ],
-  "skills": [],
-  "rules": [],
+  "skills": [
+    {
+      "name": "profile-drain",
+      "description": "/profile-drain \u2014 folds pending profile-fact queue items into the global person profiles at ~/.atl/profiles via the profile-curator (privacy-gated, source-flagged, schema lazy-filled)."
+    }
+  ],
+  "rules": [
+    {
+      "name": "profile-capture",
+      "description": "The capture reflex: drop profile-fact markers inline when a durable fact about a person the user cares about comes up; atl tick queues them for /profile-drain."
+    }
+  ],
   "capabilities": {
     "profile": {
       "role": "provider",

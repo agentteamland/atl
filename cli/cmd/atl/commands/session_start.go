@@ -68,6 +68,12 @@ var sessionStartCmd = &cobra.Command{
 			if n := counts[queue.ChannelLearning]; n > 0 {
 				fmt.Printf("atl: %d learning(s) pending — run /drain to fold them into the knowledge base\n", n)
 			}
+			// profile-team's channel: only fires when profile-team is installed and a
+			// session dropped profile-fact markers. /profile-drain is a team skill; core
+			// /drain stays learning-only (its documented boundary).
+			if n := counts[queue.ChannelProfileFact]; n > 0 {
+				fmt.Printf("atl: %d profile-fact(s) pending — run /profile-drain to fold them into the profiles\n", n)
+			}
 		}
 
 		// Docs-correctness signal — fires only in a repo that has a docs site
