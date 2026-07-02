@@ -7,25 +7,31 @@ fire-and-forget reflex as learning capture, on a separate channel. A marker is a
 HTML comment: invisible in rendered output, preserved in the transcript. ATL's automation
 does the rest — `atl tick` transfers your markers into the durable queue exactly once, and
 the `/profile-drain` skill (profile-team's `profile-curator`) folds each into the right
-person profile at `~/.atl/profiles/`. You never track state or write profile files inline.
+profile at `~/.atl/profiles/`. You never track state or write profile files inline.
 
-Profiles are **global** — the same person is one profile across every project. Capture is
-cheap (~30 tokens); free to skip when nothing durable about a person came up.
+Profiles are **global** — the same entity is one profile across every project. Capture is
+cheap (~30 tokens); free to skip when nothing durable about an entity came up.
 
 ## What counts as a profile fact
 
-A **durable** fact about a real person the user has a personal bond with:
+A **durable** fact about an entity in the user's inner world — someone or something they
+have a real personal or emotional bond with. Six kinds:
 
-- **Identity / relation** — who they are to the user (mother, friend, manager), their name, aliases.
-- **Anchors** — birthday, anniversary, a date that matters.
-- **Traits** — fears, what they enjoy, what they excel at or struggle with, values, character, communication or conflict style, skills.
-- **State** — current emotional state, goals, financial situation (these are sensitive — see tiers).
-- **Relationships** — how they relate to another person in the user's world.
+- **person** — family, friends, colleagues, partners, mentors (the richest type).
+- **org** — an employer, school, community, or club the user is genuinely tied to.
+- **animal** — a pet or an animal they bonded with (living, passed, or from childhood).
+- **place** — a hometown, a childhood home, a place loaded with meaning.
+- **object** — a cherished / feared / missed thing (an heirloom, a beloved toy, a missed car).
+- **project** — an endeavour they're invested in (a dream, a side project, a work initiative).
 
-Do **NOT** mark: public figures or fictional characters (unless directly, personally
-relevant); transient small talk ("Alex was tired today" is not durable); the assistant's
-own reasoning. Don't mark a fact you already recorded — queue dedup makes it a no-op, but
-save the tokens.
+Across all six the durable facts share a shape: **identity/relation** (what it is to the
+user), **anchors** (dates that matter), **traits/state** (what it's like, how it's doing —
+the sensitive ones are tier-gated), and **links** to other entities.
+
+Do **NOT** mark: public figures, brands, or fictional entities (unless directly, personally
+relevant); transient small talk ("Alex was tired today", "grabbed a coffee somewhere" — not
+durable); the assistant's own reasoning. Don't mark a fact you already recorded — queue dedup
+makes it a no-op, but save the tokens.
 
 ## How to mark
 
@@ -34,6 +40,7 @@ Multi-line YAML body, one marker per entity, multiple fields at once:
 ```html
 <!-- profile-fact:
   entity: alex
+  type: person
   is-self: false
   kind: friend
   role: null
@@ -45,11 +52,14 @@ Multi-line YAML body, one marker per entity, multiple fields at once:
 -->
 ```
 
-- **`entity`** — a canonical lowercase-kebab slug. Reuse the same slug for the same person
+- **`entity`** — a canonical lowercase-kebab slug. Reuse the same slug for the same entity
   every time; put alternate names in `identity.aliases` so the curator can match them.
-- **`fields`** — a map of `field-path: value` (paths follow the person interface, e.g.
-  `traits.fears`, `state.goals`, `anchors.birthday`). Group everything you learned about
-  one person in one marker.
+- **`type`** — optional hint (`person` | `org` | `animal` | `place` | `object` | `project`).
+  Include it when you know it — it saves the curator from having to infer the type. Omit it
+  and the curator fit-scores; a genuinely novel kind it can't place becomes a light stub.
+- **`fields`** — a map of `field-path: value` (paths follow that type's interface, e.g.
+  `traits.fears`, `anchors.birthday` for a person; `state.status`, `provenance.acquired-from`
+  for an object). Group everything you learned about one entity in one marker.
 - **`is-self`/`kind`/`role`** — optional hints; include when known (helps the curator
   create or route the profile). `is-self: true` only for the user themselves.
 - **`source`** — optional; defaults to `user-confirmed`. Set `source: agent-inferred` when

@@ -39,7 +39,8 @@ count: 13
 
 ## Rebuild procedure
 
-1. Glob `~/.atl/profiles/people/*/profile.md` (and any other type dirs once v2 adds them).
+1. Glob `~/.atl/profiles/*/*/profile.md` across every type directory (`people`, `orgs`,
+   `animals`, `places`, `objects`, `projects`, `unknown`, plus any agent-authored type).
 2. For each, read `meta.type-id`, `identity.name`, `relation-to-user.salience`,
    `relation-to-user.role`, `meta.is-self`.
 3. Group by type, sort each group by salience (high → low) then name.

@@ -130,5 +130,5 @@ The canonical project interface — the seed schema I materialize to ~/.atl/prof
 ---
 
 ### Type Detection
-How I decide an entity's type. v1 is person-only: every entity resolves to person, a clearly non-person entity is held as a minimal unknown stub (never fabricated into a person). The fit-scoring mechanism (matches + examples) exists for v2 multi-type + auto-creation.
+How I decide an entity's type: score it against every seeded interface's matches + examples, reuse the best fit at/above the 0.80 threshold, else hold it as a minimal unknown stub. Six types are seeded (person, org, animal, place, object, project); an explicit type: marker hint short-circuits scoring.
 -> [Details](children/type-detection.md)
