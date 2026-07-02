@@ -15,17 +15,22 @@ Everything under the global layer at `~/.atl/profiles/`:
 
 ```
 ~/.atl/profiles/
-├── _index.md                     # discovery: who exists, salience, role (I rebuild it)
-├── _interfaces/                  # the self-describing schemas (person seeded in v1)
-│   └── person.md
-└── people/
-    └── <slug>/
+├── _index.md                     # discovery: who/what exists, salience, role (I rebuild it)
+├── _interfaces/                  # the self-describing schemas — six types seeded
+│   ├── person.md                 #   (+ agent-authored interfaces for novel types)
+│   ├── org.md · animal.md · place.md · object.md · project.md
+└── <type-dir>/                   # one directory per type: people · orgs · animals ·
+    └── <slug>/                   #   places · objects · projects (+ unknown/ for stubs)
         ├── profile.md            # frontmatter core + narrative body
         ├── wiki/                 # topic-organized current truth (overwritable)
         └── learnings/            # pattern-organized, KB-rebuilt
 ```
 
-Profiles are **global**, not per project: the same person is one profile in every
+An entity's `meta.type-id` (singular) maps to its directory (plural): person→`people`,
+org→`orgs`, animal→`animals`, place→`places`, object→`objects`, project→`projects`;
+un-typed entities live in `unknown/`.
+
+Profiles are **global**, not per project: the same entity is one profile in every
 project the user works in. This world is separate from the project-scoped `.atl/wiki/`
 and `.atl/journal/`; the two cross-reference through free markdown links only, never by
 blurring their directories.

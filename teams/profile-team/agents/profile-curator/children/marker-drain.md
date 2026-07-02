@@ -14,6 +14,7 @@ A queue item's `payload` is a marker body authored per the `profile-capture` rul
 
 ```yaml
 entity: alex
+type: person            # optional hint: person|org|animal|place|object|project
 is-self: false          # optional
 kind: friend            # optional
 role: null              # optional
@@ -27,13 +28,15 @@ source: user-confirmed  # optional; default user-confirmed
 ## Per-item procedure
 
 ### 1. Parse
-Read `entity` (the slug), the optional `is-self`/`kind`/`role` hints, the `fields` map,
-and `source` (default `user-confirmed`). If the body doesn't parse, leave the item
-**un-acked** and report it — never guess a malformed fact into a profile.
+Read `entity` (the slug), the optional `type:` hint + `is-self`/`kind`/`role` hints, the
+`fields` map, and `source` (default `user-confirmed`). If the body doesn't parse, leave the
+item **un-acked** and report it — never guess a malformed fact into a profile.
 
 ### 2. Resolve the entity
-Look for `~/.atl/profiles/people/<entity>/`. If absent, also check `_index.md` and existing
-profiles' `identity.aliases` for a match (the same person under a different slug). Then:
+Look for `<entity>/` across the type directories under `~/.atl/profiles/` (`people/`,
+`orgs/`, `animals/`, `places/`, `objects/`, `projects/`, `unknown/`) — `_index.md` is the
+fast lookup. Also match against existing profiles' `identity.aliases` (the same entity under
+a different slug). Then:
 - **Found** → existing profile, go to §3.
 - **Not found** → new profile, go to §5.
 
@@ -64,12 +67,14 @@ evidence supports (inference tolerated + flagged; Tier-3+ inference still reject
 `meta.schema-version` to the interface version. Then go to §6.
 
 ### 5. Create a new profile
-1. **Type** — detect the entity type (`type-detection.md`). In v1 this resolves to
-   `person`; a non-person entity is held as a minimal `unknown`-type stub, not fabricated
-   into a person.
-2. **Interface** — ensure `~/.atl/profiles/_interfaces/person.md` exists; if absent,
-   materialize it verbatim from `person-interface.md`.
-3. **Scaffold** `~/.atl/profiles/people/<slug>/profile.md` with `meta` (`type-id`,
+1. **Type** — detect the entity type (`type-detection.md`): the marker's `type:` hint, else
+   fit-score against the six seeded interfaces. A below-threshold entity is held as a minimal
+   `unknown`-type stub (core-only), not forced into the closest type.
+2. **Interface** — for a seeded type, ensure `~/.atl/profiles/_interfaces/<type>.md` exists;
+   if absent, materialize it verbatim from the matching `<type>-interface.md` child. An
+   `unknown` stub needs no interface (it carries the common core only).
+3. **Scaffold** `~/.atl/profiles/<type-dir>/<slug>/profile.md` (the type→dir map is in
+   `curation-charter.md`) with `meta` (`type-id`,
    `schema-version` from the interface, `created`/`last-updated` = today, `confidence`,
    `is-self` from the marker (default `false`), `consent: {}`), `identity.name` (from
    `fields.identity.name` or a readable form of the slug), and `relation-to-user`
