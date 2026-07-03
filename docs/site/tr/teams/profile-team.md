@@ -66,8 +66,12 @@ yeniden kullanır — [öğrenme döngüsünün](/tr/guide/learning-marker-lifec
 
 4. **Drain.** `/profile-drain`, bekleyen bilgileri `profile-curator` ajanına devreder; ajan her
    birini doğru kişiye çözer, uygular (gizlilik-kapılı, kaynak-etiketli), şemayı evrimleştirir,
-   `_index.md`'yi yeniden kurar ve onaylar (ack). Çekirdek `/drain` yalnızca `learning`
-   kanalında kalır — `profile-fact` profile-team'in kanalıdır.
+   `_index.md`'yi yeniden kurar ve onaylar (ack). **Yeni** bir kişi oluşturmadan önce bir
+   **gerçeklik kapısı** uygular: capture taramasının süpürdüğü bir doküman örneği ya da format
+   placeholder'ı (gerçek ilişki/durum olmayan, yalnız bir kalıp-trait taşıyan çıplak isim)
+   uydurma bir kişiye dönüştürülmez, düşürülür — mevcut bir profil gerçeklik-kanıtıdır ve asla
+   kapıya tabi tutulmaz. Çekirdek `/drain` yalnızca `learning` kanalında kalır — `profile-fact`
+   profile-team'in kanalıdır.
 
 ## interface'ler
 

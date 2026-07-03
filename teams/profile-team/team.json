@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "name": "profile-team",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Curates a cross-project profile of the people in your world: drains profile-fact markers into person profiles at ~/.atl/profiles, each grown through a self-describing, versioned interface.",
   "author": {
     "name": "AgentTeamLand",
