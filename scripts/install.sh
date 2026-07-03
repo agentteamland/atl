@@ -39,8 +39,23 @@ esac
 # Resolve latest version if not pinned.
 if [ -z "$VERSION" ]; then
   echo "→ Resolving latest release..."
-  VERSION="$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" |
+  # Prefer the latest stable release.
+  VERSION="$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" 2>/dev/null |
     sed -n 's/.*"tag_name": *"\(v[^"]*\)".*/\1/p' | head -n1)"
+  # GitHub's /releases/latest excludes prereleases and 404s when only prereleases exist
+  # (e.g. during a pre-1.0 alpha train). Fall back to the highest version across ALL
+  # releases. The /releases list order is not reliably newest-first, so pick the max by
+  # version — never just the first line.
+  if [ -z "$VERSION" ]; then
+    VERSION="$(curl -fsSL "https://api.github.com/repos/${REPO}/releases" 2>/dev/null |
+      sed -n 's/.*"tag_name": *"\(v[^"]*\)".*/\1/p' |
+      awk '{
+        k=$0; sub(/^v/, "", k); gsub(/[^0-9]+/, " ", k);
+        n=split(k, p, " "); norm="";
+        for (i=1; i<=n; i++) norm = norm sprintf("%09d", p[i]);
+        if (norm > maxk) { maxk=norm; maxv=$0 }
+      } END { print maxv }')"
+  fi
   if [ -z "$VERSION" ]; then
     echo "Could not resolve latest version. Set ATL_VERSION=vX.Y.Z manually."
     exit 1
