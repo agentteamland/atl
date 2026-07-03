@@ -66,8 +66,12 @@ channel, the sibling of the [learning loop](/guide/learning-marker-lifecycle):
 
 4. **Drain.** `/profile-drain` hands the pending facts to the `profile-curator` agent,
    which resolves each to the right person, applies it (privacy-gated, source-flagged),
-   evolves the schema, rebuilds `_index.md`, and acks it. Core `/drain` stays
-   `learning`-only — `profile-fact` is profile-team's channel.
+   evolves the schema, rebuilds `_index.md`, and acks it. Before creating a **new** person
+   it applies a **reality gate**: a documentation example or format placeholder swept up by
+   the capture scan (a bare name with only a stock trait, no real relationship or situation)
+   is dropped, not turned into a fabricated person — an existing profile is proof-of-realness
+   and is never gated. Core `/drain` stays `learning`-only — `profile-fact` is profile-team's
+   channel.
 
 ## The interfaces
 

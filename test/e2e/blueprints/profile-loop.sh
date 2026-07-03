@@ -4,11 +4,14 @@
 # profile-loop — the full real-Claude profile loop: install profile-team, a
 # `claude -p` session drops a profile-fact marker -> atl tick enqueues it ->
 # /profile-drain has the profile-curator write a profile.md under
-# ~/.atl/profiles -> ack deletes it. A second segment proves breaking-change
-# migration (infra #5): a profile one MAJOR behind its interface is migrated on
-# touch, not add-only-filled. Assertions key off queue + file STATE (schema
-# version, key presence — never an exact transported value), so the
-# non-deterministic LLM turn stays non-flaky.
+# ~/.atl/profiles -> ack deletes it. The KEEP fact carries a relationship anchor
+# (friend) + a situation, so it persists even under the reality gate. A second
+# segment proves breaking-change migration (infra #5): a profile one MAJOR behind
+# its interface is migrated on touch. A third proves the reality gate (infra #2):
+# a documentation-example / placeholder profile-fact is DROPPED (acked, no profile,
+# no interface authored), not materialized into a fabricated person. Assertions key
+# off queue + file STATE (schema version, key/profile presence — never an exact
+# transported value), so the non-deterministic LLM turn stays non-flaky.
 source /e2e/lib.sh
 
 fresh
@@ -100,6 +103,23 @@ grep -q 'story-note' "$MPROF" 2>/dev/null            && ok "renamed field presen
 grep -q 'heirloom-note' "$MPROF" 2>/dev/null         && bad "old field path still present (heirloom-note)" || ok "old field path removed by migration"
 PEEK3=$(cd "$PROJ" && atl learnings peek --channel profile-fact --json 2>/dev/null)
 echo "$PEEK3" | jq -e 'length == 0' >/dev/null 2>&1  && ok "migration fact drained"                       || bad "migration fact not drained -- [$PEEK3]"
+
+# ---- reality gate (infra #2) ----
+# A documentation-example / placeholder profile-fact must be DROPPED, not made into a person.
+# Seeded via _enqueue, NOT a claude prompt: an illustrative marker in a prompt would re-pollute
+# the very queue the gate guards (self-reference), and the capture rule would refuse to emit a
+# marker for junk anyway. Unambiguous literal-placeholder class (never the bare-name-textbook
+# coin-flip) — a bare skeleton with NO relationship anchor. State-based assertions only.
+JUNK=$'entity: placeholder-example\ntype: person\nfields:\n  field: value\n  another: value'
+( cd "$PROJ" && atl learnings _enqueue profile-fact "$JUNK" >/dev/null 2>&1 ) || bad "_enqueue junk fact errored"
+BEFORE_IFACE=$(find "$HOME/.atl/profiles/_interfaces" -type f 2>/dev/null | wc -l | tr -d ' ')
+claude_turn "/profile-drain" || bad "reality-gate drain turn errored (see turns.log)"
+JPROF=$(find "$HOME/.atl/profiles" -path '*placeholder-example*' -name 'profile.md' 2>/dev/null)
+[ -z "$JPROF" ] && ok "reality gate: no profile created for the placeholder entity" || bad "gate FAILED — junk profile written: $JPROF"
+AFTER_IFACE=$(find "$HOME/.atl/profiles/_interfaces" -type f 2>/dev/null | wc -l | tr -d ' ')
+[ "$AFTER_IFACE" = "$BEFORE_IFACE" ] && ok "reality gate: no interface authored from junk" || bad "gate FAILED — interface authored from junk ($BEFORE_IFACE -> $AFTER_IFACE)"
+PEEK4=$(cd "$PROJ" && atl learnings peek --channel profile-fact --json 2>/dev/null)
+echo "$PEEK4" | jq -e 'length == 0' >/dev/null 2>&1  && ok "reality gate: junk fact acked + queue drained" || bad "junk fact not drained (stuck un-acked?) -- [$PEEK4]"
 
 # On failure, surface what's otherwise lost when the container is torn down.
 if [ "$FAIL" -gt 0 ]; then

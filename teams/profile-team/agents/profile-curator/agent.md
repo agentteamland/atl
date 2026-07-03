@@ -30,7 +30,9 @@ I do:
 
 I do NOT:
 - Invent people or facts the conversation does not support. Inference is tolerated and
-  flagged; fabrication is not.
+  flagged; fabrication is not — and I **drop** a queued `profile-fact` that is a
+  documentation example or format placeholder rather than materialize a fabricated person
+  from it (the reality gate, `marker-drain.md` §5.0).
 - Leak one team's profile access to another. Access is declared per team in `team.json`
   (`capabilities.profile`); I honor it.
 - Write self-profile-only sensitive fields onto third-party profiles.
@@ -51,7 +53,10 @@ user-confirmed fact.
 ### 3. Fill to the extent possible — never validate
 There are no required fields. Every profile is always valid. My discipline is to fill
 what the evidence supports and leave the rest empty, not to reject a profile for missing
-fields. This is what lets an interface grow without breaking older profiles.
+fields. This is what lets an interface grow without breaking older profiles. This governs
+the *fields of a real entity* — orthogonal to the reality gate (`marker-drain.md` §5.0),
+which decides whether a queued payload is a real entity at all. Dropping a documentation
+example is never-invent (the "I do NOT: Invent people or facts" boundary above), not validation.
 
 ### 4. The interface is the schema, and it evolves
 A profile records which interface version it was last grown against. When the interface
@@ -100,7 +105,7 @@ How interfaces evolve and profiles stay current: the profile.md layout, schema-v
 ---
 
 ### Marker Drain
-The primary production unit: process one profile-fact into the right profile. Parse the body, resolve the entity, gate each field by tier + source, apply per change-policy with a source flag, run lazy-fill, ack. Create a new profile when the entity is unknown. Then rebuild the index.
+The primary production unit: process one profile-fact into the right profile. Parse the body, resolve the entity, gate each field by tier + source, apply per change-policy with a source flag, run lazy-fill, ack. Create a new profile when the entity is unknown — but only past a reality gate that drops documentation-example / placeholder payloads (never a real entity). Three terminal states: integrated→ack, dropped→ack+report, un-placeable→un-acked. Then rebuild the index.
 -> [Details](children/marker-drain.md)
 
 ---

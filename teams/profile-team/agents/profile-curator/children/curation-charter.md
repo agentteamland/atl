@@ -60,6 +60,16 @@ frontmatter (`tier-defaults`), with field-level overrides. The runtime behavior:
 The rule of thumb: **when a tier gate is not satisfied, skip the field** — never lower
 the gate to fit the fact.
 
+**Two orthogonal gates — don't conflate them.** The tier gate governs the *fields of a fact
+about a real entity*: fill what the evidence and tier allow, skip what they don't, never
+reject a profile for being thin (the "fill to the extent possible — never validate"
+discipline). The **reality gate** (`marker-drain.md` §5.0) governs a different axis — *whether
+the payload is about a real entity at all*: a documentation example or a format placeholder
+(`entity: ahmet` with only a stock trait, `serbest metin`, `entity/field/value`) is not a
+thin real profile, it is **not a profile** — dropping it is a corollary of *"I do not invent
+people"*, not a violation of *"never validate"*. Reality-gate only new-entity creation; an
+existing profile is proof-of-realness and is never reality-gated.
+
 ## Source-flag discipline
 
 Every field records where its value came from, so a wrong value can be corrected in the

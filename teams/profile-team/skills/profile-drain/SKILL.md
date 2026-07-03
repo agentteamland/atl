@@ -38,10 +38,15 @@ Spawn the **`profile-curator`** agent (the agent named in profile-team's `team.j
 > `~/.atl/profiles/`. For each pending item: parse the body, resolve the entity, and
 > apply it per your charter — honor the 4-tier privacy gate and `source` flags, follow
 > the change-policy (overwrite vs history-tracked), and run the schema-version lazy-fill.
-> Create a new profile (person interface) when the entity is unknown. After each item is
-> integrated, `atl learnings ack <id>` it. When all items are done, rebuild `_index.md`.
-> Return a short report: per entity what changed, any new profiles, and anything skipped
-> by a privacy gate.
+> Create a new profile when the entity is unknown — but first apply the **reality gate**
+> (`marker-drain.md` §5.0): if a new-entity payload is a documentation example or format
+> placeholder (a bare name with only a stock trait, `serbest metin`, `entity/field/value`),
+> **drop** it (ack + report) instead of materializing a fabricated person; an existing
+> profile is proof-of-realness and is never reality-gated. After each item is integrated
+> **or dropped**, `atl learnings ack <id>` it; leave only an un-placeable item un-acked.
+> When all items are done, rebuild `_index.md`. Return a short report: per entity what
+> changed, any new profiles, anything a privacy gate skipped, and anything the reality gate
+> dropped as a non-real example.
 
 The curator has `Read`/`Write`/`Edit`/`Glob`/`Grep`/`Bash`, so it does the full
 peek → apply → ack loop itself. Its `children/` (`marker-drain`, `type-detection`,
@@ -50,15 +55,21 @@ detailed playbook.
 
 ### 3. Relay the report
 
-Surface the curator's summary to the user: which people were updated or created, and
-anything a privacy tier held back (so a consent-gated fact isn't silently dropped without
-the user knowing it was seen).
+Surface the curator's summary to the user: which people were updated or created, anything a
+privacy tier held back (so a consent-gated fact isn't silently dropped without the user
+knowing it was seen), and anything the **reality gate dropped as a non-real example** (so a
+real fact wrongly dropped is visible, never silent).
 
 ## Boundaries
 
 - **Never write profile files from this skill directly** — the curator is the single
   writer, so privacy gating and source discipline live in exactly one place.
-- **Ack only after a fact is integrated.** A fact the curator could not place (e.g. an
-  unresolvable entity) is left un-acked and reported, not dropped.
+- **Three terminal states, not two.** A fact *integrated* into a profile is acked. A payload
+  the reality gate judges *not a real entity* (a documentation example / placeholder) is
+  **acked + reported as dropped** — it was processed, it just wasn't real. Only a fact the
+  curator *could not place* (an unresolvable entity, a corrupt-looking body) is left
+  **un-acked** and reported for a human. Ack deletes the item, so an example the assistant
+  keeps writing in the current session may re-surface + re-drop until its transcript ages out
+  — bounded and visible, never a fabricated profile.
 - This skill does not read or interpret profiles for advice — that is a consuming team's
   lens, not the drain.

@@ -1,5 +1,5 @@
 ---
-knowledge-base-summary: "The primary production unit: process one profile-fact into the right profile. Parse the body, resolve the entity, gate each field by tier + source, apply per change-policy with a source flag, run lazy-fill, ack. Create a new profile when the entity is unknown. Then rebuild the index."
+knowledge-base-summary: "The primary production unit: process one profile-fact into the right profile. Parse the body, resolve the entity, gate each field by tier + source, apply per change-policy with a source flag, run lazy-fill, ack. Create a new profile when the entity is unknown — but only past a reality gate that drops documentation-example / placeholder payloads (never a real entity). Three terminal states: integrated→ack, dropped→ack+report, un-placeable→un-acked. Then rebuild the index."
 ---
 
 # Marker Drain (blueprint)
@@ -29,8 +29,14 @@ source: user-confirmed  # optional; default user-confirmed
 
 ### 1. Parse
 Read `entity` (the slug), the optional `type:` hint + `is-self`/`kind`/`role` hints, the
-`fields` map, and `source` (default `user-confirmed`). If the body doesn't parse, leave the
-item **un-acked** and report it — never guess a malformed fact into a profile.
+`fields` map, and `source` (default `user-confirmed`). If the body doesn't parse:
+- if it is recognizably an **illustrative placeholder** — literal skeleton tokens
+  (`entity`/`field`/`value` as the actual values, `serbest metin`, `<...>`, `…`), or a bare
+  `entity:`/`fields:` husk with no real values — **Drop** it (ack + report, per the reality
+  gate §5.0). This is documentation shrapnel the capture scan swept up, not a fact.
+- otherwise it looks like a real fact but is corrupt → leave it **un-acked** and report it;
+  never guess a malformed fact into a profile, and a corrupt-looking real fact is worth a
+  human's eye.
 
 ### 2. Resolve the entity
 Look for `<entity>/` across the type directories under `~/.atl/profiles/` (`people/`,
@@ -76,6 +82,49 @@ branch on whether the bump crosses a major boundary:
 Then go to §6.
 
 ### 5. Create a new profile
+A new profile is the **one place a fabricated entity can enter the store**, so creation runs
+a reality gate first. An *existing* entity (§2 Found → §3) is already corroborated-real by
+its own profile and is **never** reality-gated — this gate guards only new-entity creation.
+(A stray archetypal-filler field on an existing real profile is not scrubbed here either:
+§3 applies it tier+source-gated, and its source flag + next-conversation overwrite are the
+tolerance — consistent with the never-validate discipline.)
+
+**5.0 Reality gate — is this a real entity, or a documentation example?**
+The `profile-fact` queue can carry markers that never came from a deliberate `profile-capture`
+emission: the capture scan reads the assistant's own prose, and an assistant *illustrating*
+the marker format writes example markers the scan can't tell from real ones (this is why the
+queue sometimes holds `entity: ahmet`/`emre` with only a stock trait, `serbest metin`,
+`entity/field/value`). Before creating a new profile, judge:
+
+- **Drop** (ack + report; create **nothing** — no `profile.md`, no `_interfaces/` file, no
+  index entry, and never reaching the interface-authoring path in §5.1) when the payload is
+  an illustration/placeholder, not a real entity:
+  - a literal format placeholder / skeleton (also caught at §1 — listed here for completeness);
+  - a new entity with **no relationship anchor and no situational specificity**: no `kind`/
+    `role`, no real situation in the fields, and nothing in the drained conversation that
+    references it as a real person — carrying only archetypal filler (a bare name + a stock
+    trait like `fears: confrontation`). That bare shape is exactly how the docs illustrate the
+    format.
+- **Proceed** to 5.1 otherwise.
+
+**The discriminator is the relationship anchor / specificity, NOT the trait's shape.**
+`kind: friend` + "just started an anxious new job" is a real, plainly-stated fact and MUST be
+created — brevity is not archetypality, and a stated relationship is the tell of a real person
+the user actually knows. **When genuinely uncertain whether a new entity is real, Proceed**
+(create it, source-flagged): a wrongly-created profile self-corrects (source flag +
+next-conversation overwrite), whereas the gate exists to catch *clear* illustrations, not to
+adjudicate borderline-real people. Corroboration in the drained conversation
+(`atl learnings transcript`) may only **rescue** a would-be-Drop (an entity that turns out to
+be a discussed real person → Proceed); its *absence* is never itself grounds to Drop — a fact
+mined from a prior session is legitimately absent from the current conversation.
+
+This gate owns exactly one case — **not-a-real-entity** (illustration/placeholder → Drop,
+write nothing). It does not touch the two cases `type-detection.md` already owns: a
+real-but-untypeable entity still becomes a minimal `unknown` stub, and a public figure /
+fictional character is still skipped there. Neither is a reality-gate Drop.
+
+Once past the gate:
+
 1. **Type** — detect the entity type (`type-detection.md`): the marker's `type:` hint, else
    fit-score against the seeded interfaces. Below threshold, judge per `interface-creation.md`:
    author a new interface for a coherent novel kind, else hold a minimal `unknown` stub
@@ -99,19 +148,42 @@ Recompute `relation-to-user.salience` from recent activity using the interface
 `low`). Track enough recent-touch dates in `meta` to compute this across drains. **Respect
 a manual override:** if `salience-source` is `user-set`/`lens-set`, leave it.
 
-### 7. Ack
-Only once the item is fully integrated: `atl learnings ack <id>`. The queue deletes it, so
-re-drains are safe (dedup) and nothing re-reports.
+### 7. Ack — three terminal states
+Every item ends in exactly one of three states:
+- **Integrated** (applied to a profile, §3–§6) → `atl learnings ack <id>`.
+- **Dropped** (reality gate §5.0, or a §1 placeholder) → `atl learnings ack <id>` **and**
+  name it in the report. A Drop is a real *processing* outcome, not a failure — the item was
+  handled, it just wasn't a real fact.
+- **Un-placeable** (a corrupt-looking real fact, an unresolvable entity) → leave it
+  **un-acked** and report it; a human looks next time.
+
+Ack deletes the item. It leaves no tombstone, and the capture cursor re-scans a
+still-growing transcript, so a Dropped illustration the assistant keeps writing in the
+*current* session can re-enqueue and re-Drop until that transcript ages behind the cursor —
+**bounded, always visible in the report, and never a fabricated profile.** This is not silent
+data loss: the gate's promise is that the junk never becomes a profile, not that it never
+re-appears in the queue.
 
 ## After the batch — rebuild the index
 When every item is processed, rebuild `~/.atl/profiles/_index.md` (`index-rebuild.md`).
 
 ## Completion checklist
-- [ ] Body parsed (malformed → un-acked + reported)
-- [ ] Entity resolved (slug or alias) or created
+Each item resolves to one of three shapes:
+
+**Dropped** (reality gate §5.0 / §1 placeholder):
+- [ ] Verdict = Drop → nothing written (no profile, no interface, no index entry)
+- [ ] Acked + named in the report (the resolve/apply/tier/salience lines are N/A)
+
+**Un-placeable** (a corrupt-looking real fact, an unresolvable entity):
+- [ ] Left **un-acked** and named in the report (the resolve/apply/tier/salience lines are N/A)
+
+**Integrated:**
+- [ ] Body parsed (corrupt-looking → un-acked; illustrative placeholder → Drop)
+- [ ] Entity resolved (slug or alias); a **new** entity passed the reality gate (§5.0)
 - [ ] Each field tier-gated; Tier-3 inference / un-consented Tier-4 skipped + reported
 - [ ] Change-policy applied (overwrite vs history-tracked)
 - [ ] `_sources.<path>` set for every written field
 - [ ] `meta.schema-version` current (add-only lazy-fill, or a breaking migration per `schema-migration.md`)
 - [ ] Salience recomputed (manual override respected)
-- [ ] Item acked **after** integration; index rebuilt after the batch
+
+- [ ] Item acked (integrated **or** dropped); un-acked only if un-placeable; every Drop named in the report; index rebuilt after the batch
