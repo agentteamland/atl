@@ -9,9 +9,10 @@ import (
 // the publish apply_test.go fakeGH idiom, so worktree management is asserted
 // without touching a real repo.
 type fakeRunner struct {
-	calls        [][]string
-	worktreeList string
-	revListCount string
+	calls           [][]string
+	worktreeList    string
+	revListCount    string
+	statusPorcelain string
 }
 
 func (f *fakeRunner) run(name string, args ...string) ([]byte, error) {
@@ -22,6 +23,8 @@ func (f *fakeRunner) run(name string, args ...string) ([]byte, error) {
 		return []byte(f.worktreeList), nil
 	case strings.Contains(joined, "rev-list"):
 		return []byte(f.revListCount), nil
+	case strings.Contains(joined, "status --porcelain"):
+		return []byte(f.statusPorcelain), nil
 	default:
 		return nil, nil
 	}
@@ -131,6 +134,50 @@ func TestReconcilePreservesUnmerged(t *testing.T) {
 	}
 	if f.called("worktree remove") {
 		t.Error("SAFETY VIOLATION: Reconcile removed an unmerged worktree")
+	}
+}
+
+// Regression for the adversarial-review CRITICAL: an orphan with NO commits
+// beyond dev but a DIRTY working tree (a worker killed mid-implement before its
+// first commit) holds real uncommitted work — it must be preserved, never
+// --force-removed.
+func TestReconcilePreservesDirtyWorktree(t *testing.T) {
+	f := &fakeRunner{
+		worktreeList:    "worktree /repo/.delivery/worktrees/s1/50\nHEAD b\nbranch refs/heads/delivery/s1/50\n",
+		revListCount:    "0",                               // no commits beyond dev...
+		statusPorcelain: " M feature.go\n?? scratch.txt\n", // ...but real uncommitted work
+	}
+	w := newWorktree(f)
+	orphans, err := w.Reconcile(map[string]bool{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(orphans) != 1 || !orphans[0].Unmerged {
+		t.Fatalf("dirty orphan must be surfaced as unmerged, got %+v", orphans)
+	}
+	if f.called("worktree remove") || f.called("branch -D") || f.called("branch -d") {
+		t.Error("SAFETY VIOLATION: Reconcile destroyed a worktree with uncommitted work")
+	}
+}
+
+// A worktree whose only untracked file is the transient status.json telemetry is
+// NOT real work — it stays reclaimable when it has no commits beyond dev.
+func TestReconcileReclaimsIgnoringStatusJson(t *testing.T) {
+	f := &fakeRunner{
+		worktreeList:    "worktree /repo/.delivery/worktrees/s1/51\nHEAD b\nbranch refs/heads/delivery/s1/51\n",
+		revListCount:    "0",
+		statusPorcelain: "?? " + StatusFileName + "\n",
+	}
+	w := newWorktree(f)
+	orphans, err := w.Reconcile(map[string]bool{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(orphans) != 1 || orphans[0].Unmerged {
+		t.Fatalf("status.json-only orphan should be reclaimable, got %+v", orphans)
+	}
+	if !f.called("worktree remove --force") || !f.called("branch -D delivery/s1/51") {
+		t.Error("clean orphan (telemetry only) should be reclaimed")
 	}
 }
 

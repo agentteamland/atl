@@ -26,11 +26,11 @@ func ExecRunner(name string, args ...string) ([]byte, error) {
 // git call routes through Run so the branch-hygiene asymmetry (merged branches
 // deleted freely; unmerged branches NEVER auto-deleted) is testable.
 type Worktree struct {
-	RepoDir  string // the delivery repo root (where `dev` lives)
-	Root     string // base dir under which per-unit worktrees are created
-	BaseRef  string // the branch worktrees fork from + merge back to (e.g. "dev")
+	RepoDir   string // the delivery repo root (where `dev` lives)
+	Root      string // base dir under which per-unit worktrees are created
+	BaseRef   string // the branch worktrees fork from + merge back to (e.g. "dev")
 	RemoteRef string // the fetched ref to branch off (e.g. "origin/dev")
-	Run      Runner
+	Run       Runner
 }
 
 // Orphan is a leftover worktree found at startup that no live worker owns.
@@ -113,13 +113,30 @@ func (w *Worktree) Reconcile(active map[string]bool) ([]Orphan, error) {
 		if err != nil {
 			return nil, err
 		}
-		if unmerged {
+		// "Unmerged work" is not commits-only: a worker killed mid-implement by
+		// the reclaim ladder has real UNCOMMITTED work in its working tree, which
+		// rev-list reports as zero. Check the working tree too, or a --force
+		// removal would silently destroy that work.
+		dirty := false
+		if !unmerged {
+			dirty, err = w.hasUncommittedWork(e.path)
+			if err != nil {
+				return nil, err
+			}
+		}
+		if unmerged || dirty {
+			detail := "has commits not in " + w.BaseRef
+			if !unmerged {
+				detail = "has uncommitted working-tree changes"
+			}
 			orphans = append(orphans, Orphan{
 				Branch: e.branch, Path: e.path, Unmerged: true,
-				Detail: "has commits not in " + w.BaseRef + "; preserved for diagnosis, not deleted",
+				Detail: detail + "; preserved for diagnosis, not deleted",
 			})
 			continue
 		}
+		// Proven safe: no commits beyond BaseRef AND no uncommitted work (only
+		// transient telemetry). --force here can discard nothing but status.json.
 		if _, err := w.git("worktree", "remove", "--force", e.path); err != nil {
 			return nil, err
 		}
@@ -128,7 +145,7 @@ func (w *Worktree) Reconcile(active map[string]bool) ([]Orphan, error) {
 		}
 		orphans = append(orphans, Orphan{
 			Branch: e.branch, Path: e.path, Unmerged: false,
-			Detail: "no commits beyond " + w.BaseRef + "; worktree + branch reclaimed",
+			Detail: "no commits beyond " + w.BaseRef + " and a clean working tree; worktree + branch reclaimed",
 		})
 	}
 	return orphans, nil
@@ -141,6 +158,28 @@ func (w *Worktree) hasUnmergedCommits(branch string) (bool, error) {
 		return false, err
 	}
 	return strings.TrimSpace(out) != "0", nil
+}
+
+// hasUncommittedWork reports whether the worktree at path has any modified or
+// untracked file OTHER than the supervisor's own status.json telemetry — i.e.
+// real uncommitted work that a --force removal would destroy. Runs against the
+// worktree dir itself (not RepoDir).
+func (w *Worktree) hasUncommittedWork(worktreePath string) (bool, error) {
+	out, err := w.Run("git", "-C", worktreePath, "status", "--porcelain")
+	if err != nil {
+		return false, fmt.Errorf("git status %s: %w\n%s", worktreePath, err, strings.TrimSpace(string(out)))
+	}
+	for _, line := range strings.Split(string(out), "\n") {
+		if len(line) < 3 {
+			continue // blank / too short to be a porcelain entry
+		}
+		// Porcelain: two status chars, a space, then the path.
+		if strings.TrimSpace(line[2:]) == StatusFileName {
+			continue // transient telemetry, not work
+		}
+		return true, nil
+	}
+	return false, nil
 }
 
 type worktreeEntry struct {
