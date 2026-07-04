@@ -4,17 +4,27 @@ import (
 	"os"
 	"os/exec"
 	"sync"
+	"time"
 )
+
+// workerWaitDelay bounds how long the reaper's cmd.Wait() waits for the worker's
+// stderr pipe to close AFTER the process has exited. os/exec's Wait blocks on the
+// stderr copier goroutine, which only returns once EVERY holder of the inherited
+// pipe closes it — a surviving grandchild (e.g. an Azure MCP server that outlives
+// a SIGKILL'd worker) would otherwise hang Wait() forever and deadlock the
+// single-threaded supervisor. WaitDelay force-closes the pipe and lets Wait return.
+const workerWaitDelay = 10 * time.Second
 
 // Handle is a spawned worker process the supervisor can wait on and signal. It
 // is the observable surface of a running `claude -p` worker; the scheduler polls
 // the worker's status.json for progress and uses this handle for the recovery
 // ladder (SIGTERM → SIGKILL) and for post-mortem diagnostics.
 type Handle interface {
-	Wait() error                 // blocks until the process exits
-	Signal(sig os.Signal) error  // deliver a signal (SIGTERM, then os.Kill)
-	ExitCode() int               // exit code after Wait; -1 if not yet exited
-	StderrTail() string          // last stderr, for a mark-blocked diagnostic
+	Wait() error                // blocks until the process exits
+	Exited() (bool, int)        // non-blocking: (has-exited, exit-code); code is -1 while still running — the scheduler poll seam
+	Signal(sig os.Signal) error // deliver a signal (SIGTERM, then os.Kill)
+	ExitCode() int              // exit code after exit; -1 if not yet exited
+	StderrTail() string         // last stderr, for a mark-blocked diagnostic
 	PID() int
 }
 
@@ -56,27 +66,63 @@ func execSpawner(spec WorkerSpec) (Handle, error) {
 	cmd.Env = append(os.Environ(), spec.ExtraEnv...)
 	tail := &tailWriter{}
 	cmd.Stderr = tail
+	cmd.WaitDelay = workerWaitDelay // bound Wait() so a lingering grandchild can't hang the supervisor
+	configureProcAttr(cmd)          // own process group → the recovery ladder can kill the whole tree
 	if err := cmd.Start(); err != nil {
 		return nil, err
 	}
-	return &execHandle{cmd: cmd, stderr: tail}, nil
+	return newReapedHandle(cmd, tail), nil
+}
+
+// newReapedHandle wraps a started command in a Handle with a background reaper so
+// Exited() is a non-blocking poll: os/exec only populates ProcessState after Wait
+// returns, so a single reaper waits once and every Exited()/Wait()/ExitCode()
+// reads the reaped result. Closing done happens-after the ProcessState + waitErr
+// writes, so the poll reads are race-free.
+func newReapedHandle(cmd *exec.Cmd, tail *tailWriter) *execHandle {
+	h := &execHandle{cmd: cmd, stderr: tail, done: make(chan struct{})}
+	go func() {
+		h.waitErr = cmd.Wait()
+		close(h.done)
+	}()
+	return h
 }
 
 type execHandle struct {
-	cmd    *exec.Cmd
-	stderr *tailWriter
+	cmd     *exec.Cmd
+	stderr  *tailWriter
+	done    chan struct{}
+	waitErr error
 }
 
-func (h *execHandle) Wait() error                { return h.cmd.Wait() }
-func (h *execHandle) Signal(sig os.Signal) error { return h.cmd.Process.Signal(sig) }
+func (h *execHandle) Wait() error {
+	<-h.done
+	return h.waitErr
+}
+
+// Exited is the scheduler's non-blocking liveness poll: it never blocks on the
+// process, returning (false, -1) while the worker still runs and (true, code)
+// once the reaper has reaped it.
+func (h *execHandle) Exited() (bool, int) {
+	select {
+	case <-h.done:
+		return true, h.cmd.ProcessState.ExitCode()
+	default:
+		return false, -1
+	}
+}
+
+func (h *execHandle) Signal(sig os.Signal) error { return signalProcess(h.cmd.Process, sig) }
 func (h *execHandle) StderrTail() string         { return h.stderr.String() }
 func (h *execHandle) PID() int                   { return h.cmd.Process.Pid }
 
 func (h *execHandle) ExitCode() int {
-	if h.cmd.ProcessState == nil {
+	select {
+	case <-h.done:
+		return h.cmd.ProcessState.ExitCode()
+	default:
 		return -1
 	}
-	return h.cmd.ProcessState.ExitCode()
 }
 
 // stderrTailMax caps the retained stderr so a chatty worker can't grow the

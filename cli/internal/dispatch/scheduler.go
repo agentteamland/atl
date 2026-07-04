@@ -1,0 +1,521 @@
+package dispatch
+
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"sort"
+	"strconv"
+	"strings"
+	"syscall"
+	"time"
+)
+
+// Scheduler is the deterministic run loop of `atl work dispatch` (#15): it admits
+// ready units up to a fixed concurrency cap over the plan's dependency DAG,
+// refills on merge-gated completion, and runs the #12 recovery ladder
+// (reclaim → retry-once → mark-blocked) on stalls and crashes. It holds ZERO LLM
+// context and makes ZERO Azure calls — it observes workers only through the
+// status.json each writes and the process handle. Every external effect is an
+// injected seam (Spawn, the git Runner inside Worktree, ReadStatus, the clock),
+// so the whole loop is deterministic under injection and Layer-A testable with no
+// real workers.
+type Scheduler struct {
+	Plan        *Plan
+	ProjectRoot string
+	Worktree    *Worktree
+	Spawn       Spawner
+	Cfg         Config
+
+	// Seams — NewScheduler defaults each to its real implementation; tests inject
+	// fakes to make the loop deterministic.
+	ReadStatus func(worktreePath string) (*Status, error)
+	Now        func() time.Time
+	Sleep      func(time.Duration)
+	BuildSpec  func(u WorkUnit, worktreeDir string) WorkerSpec
+	Log        func(string)
+
+	units map[int]*unitSched
+}
+
+// Config tunes the scheduler. Cap is the concurrency limit (keystone #4, ~4–6);
+// PollInterval spaces the supervisor's status/liveness sweep; TermGrace is how
+// long a SIGTERM'd worker gets before SIGKILL in the reclaim step; Stall maps a
+// worker phase to its (phase-aware) breach thresholds.
+type Config struct {
+	Cap          int
+	PollInterval time.Duration
+	TermGrace    time.Duration
+	Stall        func(phase string) StallConfig
+}
+
+// Defaults for an unset Config field.
+const (
+	DefaultCap          = 4
+	DefaultPollInterval = 5 * time.Second
+	DefaultTermGrace    = 30 * time.Second
+	pollKillInterval    = 500 * time.Millisecond
+)
+
+// unitState is a work-unit's scheduler lifecycle.
+type unitState int
+
+const (
+	statePending unitState = iota // not yet admitted (waiting on predecessors or a slot)
+	stateRunning                  // a worker is live in its worktree
+	stateDone                     // merged to dev, worktree reclaimed, slot freed
+	stateBlocked                  // terminal failure, surfaced + reported, slot freed
+)
+
+// unitSched is the scheduler's per-unit bookkeeping. It is distinct from the
+// durable UnitRunState (which mirrors only running units, for restart
+// reconciliation); this struct also carries the in-memory handle + retry count.
+type unitSched struct {
+	unit    WorkUnit
+	state   unitState
+	handle  Handle
+	rs      *UnitRunState // non-nil only while running
+	retries int           // reclaim-and-retry count (0, then at most 1 per #12)
+}
+
+// Summary is the terminal outcome of a dispatch run, partitioned by unit fate.
+// SkippedByDep are pending units that never became ready because a predecessor
+// was blocked — surfaced so no work silently disappears.
+type Summary struct {
+	Done         []int
+	Blocked      []int
+	SkippedByDep []int
+}
+
+// NewScheduler builds a scheduler over plan, defaulting every seam + Config field
+// to its real implementation. The caller wires the real Worktree + Spawner (or
+// injects fakes in a test).
+func NewScheduler(plan *Plan, projectRoot string, wt *Worktree, spawn Spawner, cfg Config) *Scheduler {
+	if cfg.Cap <= 0 {
+		cfg.Cap = DefaultCap
+	}
+	if cfg.PollInterval <= 0 {
+		cfg.PollInterval = DefaultPollInterval
+	}
+	if cfg.TermGrace <= 0 {
+		cfg.TermGrace = DefaultTermGrace
+	}
+	if cfg.Stall == nil {
+		cfg.Stall = DefaultStallConfig
+	}
+	s := &Scheduler{
+		Plan:        plan,
+		ProjectRoot: projectRoot,
+		Worktree:    wt,
+		Spawn:       spawn,
+		Cfg:         cfg,
+		ReadStatus:  ReadStatus,
+		Now:         time.Now,
+		Sleep:       time.Sleep,
+		BuildSpec:   defaultWorkerSpec,
+		Log:         func(string) {},
+		units:       make(map[int]*unitSched, len(plan.Units)),
+	}
+	for _, u := range plan.Units {
+		s.units[u.ID] = &unitSched{unit: u, state: statePending}
+	}
+	return s
+}
+
+// Run drives the scheduler to completion: reconcile leftover worktrees from a
+// prior (crashed) run, then loop step() on the poll interval until the sprint is
+// terminal, then return the outcome summary. Resumability rests on Azure state +
+// branches (#11) — a fresh Run owns no live process handles, so every leftover
+// delivery/* worktree is reconciled (clean reclaimed, unmerged preserved) and the
+// plan is re-driven from durable state (workers are idempotent per #16).
+func (s *Scheduler) Run() (Summary, error) {
+	// On any exit — an aborting error OR normal completion — make sure no worker is
+	// left running detached; orphaned claude -p processes would burn budget with no
+	// supervisor. On normal completion nothing is running, so this is a no-op.
+	defer s.abortRunning()
+
+	// Respect a prior run's give-up decisions: a durable BlockedReport means the
+	// #12 ladder already exhausted its retries, so skip re-admitting that unit
+	// (which would reset its retry budget across the restart).
+	s.markPreviouslyBlocked()
+
+	orphans, err := s.Worktree.Reconcile(map[string]bool{})
+	if err != nil {
+		return Summary{}, err
+	}
+	for _, o := range orphans {
+		s.Log("reconcile: " + o.Branch + " — " + o.Detail)
+	}
+
+	for {
+		terminal, err := s.step()
+		if err != nil {
+			return Summary{}, err
+		}
+		if terminal {
+			break
+		}
+		s.Sleep(s.Cfg.PollInterval)
+	}
+	return s.summary(), nil
+}
+
+// step runs one scheduling pass: poll every running worker and act on
+// completion / crash / stall, persist the run-state mirror, then refill ready
+// units up to the cap. Deterministic given the injected clock + seams. Returns
+// true when the sprint is terminal — nothing is running after admission, so any
+// still-pending unit is permanently stranded behind a blocked predecessor.
+func (s *Scheduler) step() (bool, error) {
+	now := s.Now()
+
+	for _, id := range s.sortedUnitIDs() {
+		u := s.units[id]
+		if u.state != stateRunning {
+			continue
+		}
+		if err := s.poll(u, now); err != nil {
+			return false, err
+		}
+	}
+
+	if err := s.persist(now); err != nil {
+		return false, err
+	}
+
+	if err := s.admit(now); err != nil {
+		return false, err
+	}
+
+	return s.runningCount() == 0, nil
+}
+
+// poll observes one running unit and dispatches on its terminal/liveness state.
+func (s *Scheduler) poll(u *unitSched, now time.Time) error {
+	status, statusErr := s.ReadStatus(u.rs.WorktreePath)
+	if statusErr == nil {
+		u.rs.ObservePhase(status.Phase, status.HeartbeatTS, now)
+	}
+	exited, code := u.handle.Exited()
+
+	switch {
+	case exited && code == 0 && (statusErr != nil || status.Blocker == ""):
+		// Merge-gated completion (Resolution #8): the supervisor verifies the
+		// merge landed on origin/dev before tearing down, so a successor's fresh
+		// fetch always contains this unit's merge (or the unit is mark-blocked).
+		return s.complete(u, now)
+
+	case exited && statusErr == nil && status.Blocker != "":
+		// The worker deliberately reported a blocker (#5 real-test-failure /
+		// azure-auth row) and exited — honour it, no retry.
+		return s.block(u, now, "worker-reported: "+status.Blocker, status.Phase, status.LastOutputSummary, u.handle.StderrTail())
+
+	case exited:
+		// Hard crash: non-zero exit, no terminal status → reclaim + retry-once.
+		return s.recover(u, now, fmt.Sprintf("worker crashed (exit %d)", code))
+
+	default:
+		// Still running — liveness (#12).
+		if statusErr != nil {
+			// No status.json yet. Before the first heartbeat this is expected, but
+			// a worker that never produces one within the heartbeat window is wedged.
+			if now.Sub(u.rs.CreatedAt) > s.Cfg.Stall("").HeartbeatThreshold {
+				return s.recover(u, now, "stalled: no first heartbeat")
+			}
+			return nil
+		}
+		if breach := Classify(status, u.rs.PhaseEnteredAt, now, s.Cfg.Stall(status.Phase)); breach != Alive {
+			return s.recover(u, now, "stalled: "+breach.String())
+		}
+		return nil
+	}
+}
+
+// complete finalizes a worker that exited 0. It does NOT trust the exit code as
+// proof of merge — the PR-A branch-hygiene lesson applied to the merge itself:
+// the worker is a non-deterministic LLM, so the supervisor VERIFIES against the
+// durable git state (MergedToBase) before it force-deletes anything.
+//
+//   - branch confirmed contained in origin/dev → tear down, mark done.
+//   - branch NOT merged (exited 0 without completing merge-to-dev) → preserve +
+//     mark-BLOCKED (never force-deleted, never counted done), so no unmerged work
+//     is lost and no successor is admitted onto work that isn't on dev (Res #8).
+//   - merged but the worktree still holds uncommitted leftovers → done, but the
+//     leftover is preserved in place, never force-removed.
+func (s *Scheduler) complete(u *unitSched, now time.Time) error {
+	merged, err := s.Worktree.MergedToBase(s.Plan.SprintSlug, u.unit.ID)
+	if err != nil {
+		return err
+	}
+	if !merged {
+		phase, summary := u.rs.Phase, ""
+		if st, e := s.ReadStatus(u.rs.WorktreePath); e == nil {
+			phase, summary = st.Phase, st.LastOutputSummary
+		}
+		return s.block(u, now, "worker exited 0 but its branch is not merged to "+s.Worktree.BaseRef,
+			phase, summary, u.handle.StderrTail())
+	}
+
+	dirty, derr := s.Worktree.hasUncommittedWork(u.rs.WorktreePath)
+	if derr != nil {
+		dirty = true // a bad read is not a licence to force-delete
+	}
+	if dirty {
+		s.Log(fmt.Sprintf("unit %d done (merged to %s) but left uncommitted changes at %s — preserved; inspect + remove when reviewed", u.unit.ID, s.Worktree.BaseRef, u.rs.WorktreePath))
+		u.state = stateDone
+		s.finishRunning(u)
+		return nil
+	}
+	if err := s.Worktree.Teardown(s.Plan.SprintSlug, u.unit.ID); err != nil {
+		return err
+	}
+	s.Log(fmt.Sprintf("unit %d done — merged to %s, worktree reclaimed", u.unit.ID, s.Worktree.BaseRef))
+	u.state = stateDone
+	s.finishRunning(u)
+	return nil
+}
+
+// recover runs the #12 ladder for a stalled or crashed worker: kill it, then
+// either reclaim-and-retry-once (first failure) or mark-blocked (second).
+func (s *Scheduler) recover(u *unitSched, now time.Time, reason string) error {
+	stderrTail := u.handle.StderrTail()
+	s.kill(u)
+
+	// Snapshot the last status BEFORE Quarantine may move the worktree.
+	phase, summary := "", ""
+	if st, e := s.ReadStatus(u.rs.WorktreePath); e == nil {
+		phase, summary = st.Phase, st.LastOutputSummary
+	}
+
+	if u.retries == 0 {
+		orphan, err := s.Worktree.Quarantine(s.Plan.SprintSlug, u.unit.ID, "stall0")
+		if err != nil {
+			return err
+		}
+		s.Log(fmt.Sprintf("unit %d %s — reclaimed (%s); retrying once", u.unit.ID, reason, orphan.Detail))
+		u.retries = 1
+		u.state = statePending // re-admitted this same step onto a fresh worktree off dev
+		s.finishRunning(u)
+		return nil
+	}
+	return s.block(u, now, reason+" (retry also failed)", phase, summary, stderrTail)
+}
+
+// block is the terminal mark-blocked step: quarantine-or-reclaim the worktree
+// (branch-hygiene), write the durable BlockedReport for a ceremony skill to
+// reflect to Azure, free the slot, and surface it. The worker process is already
+// dead here (it exited, or recover killed it).
+func (s *Scheduler) block(u *unitSched, now time.Time, reason, phase, summary, stderrTail string) error {
+	orphan, err := s.Worktree.Quarantine(s.Plan.SprintSlug, u.unit.ID, fmt.Sprintf("blocked%d", u.retries))
+	if err != nil {
+		return err
+	}
+	report := &BlockedReport{
+		ID:          u.unit.ID,
+		Branch:      orphan.Branch,
+		Reason:      reason,
+		Phase:       phase,
+		LastSummary: summary,
+		StderrTail:  stderrTail,
+		Preserved:   orphan.Unmerged,
+		BlockedAt:   now,
+	}
+	if orphan.Unmerged {
+		report.WorktreePath = orphan.Path
+	}
+	if err := WriteBlockedReport(s.ProjectRoot, report); err != nil {
+		return err
+	}
+	s.Log(fmt.Sprintf("unit %d BLOCKED — %s (%s)", u.unit.ID, reason, orphan.Detail))
+	u.state = stateBlocked
+	s.finishRunning(u)
+	return nil
+}
+
+// kill sends SIGTERM, waits up to TermGrace for the process to exit, then SIGKILL
+// + reaps — so the worktree move that follows never races a live process. The
+// wait is a bounded poll (deterministic under an injected clock + Sleep).
+func (s *Scheduler) kill(u *unitSched) {
+	if u.handle == nil {
+		return
+	}
+	if exited, _ := u.handle.Exited(); exited {
+		return // already dead (the crash path)
+	}
+	_ = u.handle.Signal(syscall.SIGTERM)
+	polls := int(s.Cfg.TermGrace/pollKillInterval) + 1
+	for i := 0; i < polls; i++ {
+		if exited, _ := u.handle.Exited(); exited {
+			return
+		}
+		s.Sleep(pollKillInterval)
+	}
+	_ = u.handle.Signal(syscall.SIGKILL)
+	_ = u.handle.Wait()
+}
+
+// admit fills free concurrency slots with the highest-ranked ready units. Ready()
+// gives the DAG frontier (all predecessors done) ordered by StackRank; the
+// scheduler layers the cap + the running/blocked filter on top (#15 step 3/4).
+func (s *Scheduler) admit(now time.Time) error {
+	slots := s.Cfg.Cap - s.runningCount()
+	if slots <= 0 {
+		return nil
+	}
+	done := s.doneSet()
+	for _, u := range Ready(s.Plan, done) {
+		if slots == 0 {
+			break
+		}
+		us := s.units[u.ID]
+		if us.state != statePending {
+			continue // Ready still lists running/blocked units (not done) — skip them
+		}
+		if err := s.spawnUnit(us, now); err != nil {
+			return err
+		}
+		slots--
+	}
+	return nil
+}
+
+// spawnUnit creates a fresh worktree off dev and starts a worker for the unit.
+func (s *Scheduler) spawnUnit(us *unitSched, now time.Time) error {
+	slug := s.Plan.SprintSlug
+	id := us.unit.ID
+	path, err := s.Worktree.Create(slug, id)
+	if err != nil {
+		return err
+	}
+	handle, err := s.Spawn(s.BuildSpec(us.unit, path))
+	if err != nil {
+		return err
+	}
+	us.handle = handle
+	us.state = stateRunning
+	us.rs = &UnitRunState{
+		ID:             id,
+		Branch:         BranchName(slug, id),
+		WorktreePath:   path,
+		PID:            handle.PID(),
+		CreatedAt:      now,
+		PhaseEnteredAt: now,
+	}
+	s.Log(fmt.Sprintf("unit %d admitted — worker pid %d in %s", id, handle.PID(), path))
+	return nil
+}
+
+// persist writes the durable run-state mirror of the currently-running units
+// (restart reconciliation, #11/#12).
+func (s *Scheduler) persist(now time.Time) error {
+	rs := &RunState{SprintSlug: s.Plan.SprintSlug, Units: make(map[int]*UnitRunState)}
+	for id, u := range s.units {
+		if u.state == stateRunning && u.rs != nil {
+			rs.Units[id] = u.rs
+		}
+	}
+	return WriteRunState(RunStatePath(s.ProjectRoot), rs, now)
+}
+
+func (s *Scheduler) finishRunning(u *unitSched) {
+	u.handle = nil
+	u.rs = nil
+}
+
+// abortRunning SIGKILLs (process-group, so grandchildren die too) and reaps every
+// worker still marked running. Deferred by Run() so an aborting error never leaves
+// detached claude -p workers burning budget with no supervisor. On normal
+// completion nothing is running, so it is a no-op.
+func (s *Scheduler) abortRunning() {
+	for _, id := range s.sortedUnitIDs() {
+		u := s.units[id]
+		if u.state == stateRunning && u.handle != nil {
+			_ = u.handle.Signal(syscall.SIGKILL)
+			_ = u.handle.Wait() // WaitDelay-bounded, so this never hangs the abort
+		}
+	}
+}
+
+// markPreviouslyBlocked marks any unit with a durable BlockedReport from a prior
+// run as blocked, so a restart does not re-admit a unit the #12 ladder already
+// exhausted (which would reset its retry budget). The report persists until a
+// ceremony skill reflects it to Azure and clears it.
+func (s *Scheduler) markPreviouslyBlocked() {
+	entries, err := os.ReadDir(BlockedDir(s.ProjectRoot))
+	if err != nil {
+		return // no blocked dir yet — nothing to skip
+	}
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".json") {
+			continue
+		}
+		id, err := strconv.Atoi(strings.TrimSuffix(e.Name(), ".json"))
+		if err != nil {
+			continue
+		}
+		if u, ok := s.units[id]; ok && u.state == statePending {
+			u.state = stateBlocked
+			s.Log(fmt.Sprintf("unit %d was blocked in a prior run (%s) — skipping; clear the report to retry",
+				id, filepath.Join(BlockedDir(s.ProjectRoot), e.Name())))
+		}
+	}
+}
+
+func (s *Scheduler) runningCount() int {
+	n := 0
+	for _, u := range s.units {
+		if u.state == stateRunning {
+			n++
+		}
+	}
+	return n
+}
+
+func (s *Scheduler) doneSet() map[int]bool {
+	d := make(map[int]bool, len(s.units))
+	for id, u := range s.units {
+		if u.state == stateDone {
+			d[id] = true
+		}
+	}
+	return d
+}
+
+func (s *Scheduler) sortedUnitIDs() []int {
+	ids := make([]int, 0, len(s.units))
+	for id := range s.units {
+		ids = append(ids, id)
+	}
+	sort.Ints(ids)
+	return ids
+}
+
+func (s *Scheduler) summary() Summary {
+	var sum Summary
+	for _, id := range s.sortedUnitIDs() {
+		switch s.units[id].state {
+		case stateDone:
+			sum.Done = append(sum.Done, id)
+		case stateBlocked:
+			sum.Blocked = append(sum.Blocked, id)
+		default: // pending at terminal = never ready (a blocked predecessor stranded it)
+			sum.SkippedByDep = append(sum.SkippedByDep, id)
+		}
+	}
+	return sum
+}
+
+// defaultWorkerSpec is the engine's minimal worker invocation for a unit — enough
+// to run a `claude -p` developer in the unit's isolated worktree. The actual
+// delivery micro-loop prompt (and any per-unit MCP config) is delivery-team
+// content refined in a later stone by extending the plan contract; the engine
+// only needs a runnable spec here. The Azure PAT is forwarded via env by the
+// caller, never embedded in the argv (spawn.go), so it is never logged.
+func defaultWorkerSpec(u WorkUnit, worktreeDir string) WorkerSpec {
+	return WorkerSpec{
+		Prompt: fmt.Sprintf(
+			"You are a delivery-team developer. Implement Azure work-item #%d (%q) in this git "+
+				"worktree following the delivery micro-loop, then merge to dev and set it Done.",
+			u.ID, u.Title),
+		WorktreeDir: worktreeDir,
+	}
+}
