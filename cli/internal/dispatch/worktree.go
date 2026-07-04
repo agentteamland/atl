@@ -90,6 +90,104 @@ func (w *Worktree) Teardown(slug string, id int) error {
 	return nil
 }
 
+// MergedToBase reports whether the unit's branch is fully contained in the
+// freshly-fetched base — every commit on the branch already reachable from
+// origin/dev, so the branch carries NO work that is not integrated. It fetches
+// first (the local BaseRef is never fast-forwarded, so it would be stale) and
+// compares against RemoteRef. This is the supervisor's DETERMINISTIC merge
+// confirmation: it does not trust a worker's exit code, it verifies the durable
+// git state before any force-delete. (It requires the delivery workers to
+// integrate to dev with a history-reachable strategy — a merge commit or
+// rebase/ff, not a squash — so a merged branch's commits are ancestors of dev.)
+func (w *Worktree) MergedToBase(slug string, id int) (bool, error) {
+	branch := BranchName(slug, id)
+	if _, err := w.git("fetch", "origin", w.BaseRef); err != nil {
+		return false, err
+	}
+	out, err := w.git("rev-list", "--count", w.RemoteRef+".."+branch)
+	if err != nil {
+		return false, err
+	}
+	return strings.TrimSpace(out) == "0", nil
+}
+
+// branchExists reports whether a local branch of the given name exists.
+func (w *Worktree) branchExists(name string) bool {
+	_, err := w.git("show-ref", "--verify", "--quiet", "refs/heads/"+name)
+	return err == nil
+}
+
+// Quarantine retires the worktree + branch of a unit whose worker the recovery
+// ladder (#12) just killed — the reclaim step that must free the canonical
+// delivery/<slug>/<id> name for a retry WITHOUT ever destroying real work. It
+// applies the same branch-hygiene asymmetry as Reconcile: a worktree with NO
+// commits beyond BaseRef AND a clean working tree is reclaimed outright (only
+// transient status.json telemetry could be lost); a worktree with real unmerged
+// commits OR uncommitted work is PRESERVED — the checkout is moved aside with
+// `git worktree move` (which keeps the working tree, uncommitted changes and
+// all) and its branch renamed with the suffix, so the canonical name is freed
+// for the retry while the stalled work survives for diagnosis, never
+// force-deleted. Returns the Orphan record (reclaimed or preserved) to surface.
+func (w *Worktree) Quarantine(slug string, id int, suffix string) (Orphan, error) {
+	branch := BranchName(slug, id)
+	path := w.path(slug, id)
+
+	unmerged, err := w.hasUnmergedCommits(branch)
+	if err != nil {
+		return Orphan{}, err
+	}
+	dirty := false
+	if !unmerged {
+		dirty, err = w.hasUncommittedWork(path)
+		if err != nil {
+			return Orphan{}, err
+		}
+	}
+
+	if !unmerged && !dirty {
+		// Proven safe: no commits beyond BaseRef and a clean working tree.
+		if _, err := w.git("worktree", "remove", "--force", path); err != nil {
+			return Orphan{}, err
+		}
+		if _, err := w.git("branch", "-D", branch); err != nil {
+			return Orphan{}, err
+		}
+		return Orphan{
+			Branch: branch, Path: path, Unmerged: false,
+			Detail: "no commits beyond " + w.BaseRef + " and a clean working tree; worktree + branch reclaimed",
+		}, nil
+	}
+
+	// Real work — preserve, never delete. Move the checkout aside (working tree
+	// intact) and rename the branch so the canonical name is free for the retry.
+	// Probe for a free suffix: a persisted quarantine from a PRIOR run (Reconcile
+	// preserves it) would otherwise collide — a fixed suffix makes the branch -m
+	// fail and abort the sprint.
+	qSuffix := suffix
+	for n := 2; w.branchExists(branch + "-" + qSuffix); n++ {
+		qSuffix = fmt.Sprintf("%s-%d", suffix, n)
+	}
+	qPath := filepath.Join(w.Root, ".quarantine", slug, strconv.Itoa(id)+"-"+qSuffix)
+	qBranch := branch + "-" + qSuffix
+	if err := os.MkdirAll(filepath.Dir(qPath), 0o755); err != nil {
+		return Orphan{}, err
+	}
+	if _, err := w.git("worktree", "move", path, qPath); err != nil {
+		return Orphan{}, err
+	}
+	if _, err := w.git("branch", "-m", branch, qBranch); err != nil {
+		return Orphan{}, err
+	}
+	detail := "has commits not in " + w.BaseRef
+	if !unmerged {
+		detail = "has uncommitted working-tree changes"
+	}
+	return Orphan{
+		Branch: qBranch, Path: qPath, Unmerged: true,
+		Detail: detail + "; preserved at " + qPath + " for diagnosis, not deleted",
+	}, nil
+}
+
 // Reconcile classifies leftover delivery/* worktrees no live worker owns
 // (active = branch names currently in use) and applies the branch-hygiene
 // asymmetry. A worktree with NO commits beyond BaseRef is safely reclaimed
