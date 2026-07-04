@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "name": "delivery-team",
+  "version": "0.1.0",
+  "description": "Azure DevOps work-item-driven, sprint-based autonomous software delivery: role-agents + ceremony skills orchestrated by atl work dispatch over isolated claude -p workers in git worktrees.",
+  "author": {
+    "name": "AgentTeamLand",
+    "url": "https://github.com/agentteamland"
+  },
+  "license": "MIT",
+  "keywords": [
+    "delivery",
+    "azure-devops",
+    "scrum",
+    "sprint",
+    "orchestration",
+    "software-team",
+    "project"
+  ],
+  "repository": "https://github.com/agentteamland/atl",
+  "homepage": "https://github.com/agentteamland",
+  "scope": "project",
+  "agents": [],
+  "skills": [],
+  "rules": [],
+  "extends": null,
+  "excludes": [],
+  "dependencies": {
+    "core": "^1.0.0"
+  },
+  "requires": {
+    "atl": ">=2.0.0"
+  }
+}
