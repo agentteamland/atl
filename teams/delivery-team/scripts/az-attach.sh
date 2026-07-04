@@ -12,7 +12,7 @@
 # with quotes / newlines / URL-reserved chars can't corrupt the request.
 #
 # Env (same names the worker's MCP already has; PAT never on the argv, never logged):
-#   AZURE_DEVOPS_ORG       e.g. "beekod"           (required)
+#   AZURE_DEVOPS_ORG       e.g. "contoso"          (required)
 #   AZURE_DEVOPS_PROJECT   the project name/id     (required)
 #   AZURE_DEVOPS_PAT       the PAT (Basic auth)     (required; falls back to PERSONAL_ACCESS_TOKEN)
 #   AZURE_DEVOPS_API_VERSION   default 7.1
