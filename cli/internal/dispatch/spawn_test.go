@@ -1,7 +1,9 @@
 package dispatch
 
 import (
+	"os/exec"
 	"strings"
+	"syscall"
 	"testing"
 )
 
@@ -73,4 +75,45 @@ func TestNewSpawnerNonNil(t *testing.T) {
 	if NewSpawner() == nil {
 		t.Error("NewSpawner should return a real Spawner")
 	}
+}
+
+// startReaped runs a benign shell command through the real reaper so the
+// non-blocking Exited() poll is proven against an actual process (execSpawner
+// hardcodes `claude`, so it can't be unit-tested directly).
+func startReaped(t *testing.T, script string) *execHandle {
+	t.Helper()
+	cmd := exec.Command("sh", "-c", script)
+	tail := &tailWriter{}
+	cmd.Stderr = tail
+	if err := cmd.Start(); err != nil {
+		t.Skipf("sh unavailable: %v", err)
+	}
+	return newReapedHandle(cmd, tail)
+}
+
+func TestExecHandleExitedAfterReap(t *testing.T) {
+	h := startReaped(t, "exit 7")
+	if err := h.Wait(); err == nil {
+		t.Error("a non-zero exit should surface a Wait error")
+	}
+	exited, code := h.Exited()
+	if !exited || code != 7 {
+		t.Errorf("Exited() = (%v, %d) after reap, want (true, 7)", exited, code)
+	}
+	if h.ExitCode() != 7 {
+		t.Errorf("ExitCode() = %d, want 7", h.ExitCode())
+	}
+}
+
+func TestExecHandleExitedIsNonBlockingWhileRunning(t *testing.T) {
+	h := startReaped(t, "sleep 3")
+	// The poll must return immediately with (false, -1) — never block on Wait.
+	if exited, code := h.Exited(); exited || code != -1 {
+		t.Errorf("a still-running worker: Exited() = (%v, %d), want (false, -1)", exited, code)
+	}
+	if h.ExitCode() != -1 {
+		t.Errorf("ExitCode() while running = %d, want -1", h.ExitCode())
+	}
+	_ = h.Signal(syscall.SIGKILL) // don't leak the process
+	_ = h.Wait()
 }
