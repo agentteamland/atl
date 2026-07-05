@@ -27,6 +27,13 @@ frontmatter in both scope layers:
 - `<project>/.atl/brain-storms/` (current project)
 - `~/.atl/brain-storms/` (global, cross-project)
 
+**Parse the frontmatter, don't raw-grep the body.** Extract the frontmatter
+block (between the leading `---` fences) and check its `status:` there — a
+`grep -rl "status: active"` over the file body is wrong, because a
+correctly-closed brainstorm legitimately quotes the literal string `status:
+active` in its prose (historical notes, config tables, "when promoted to
+`status: active`…"). Matching the body flags closed brainstorms as active.
+
 If a `status: active` file exists but no marker block does (e.g., the brainstorm
 predates this rule, or someone hand-edited files), restore the marker via the
 same format the `start` skill writes — and tell the user the marker was
