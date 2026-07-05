@@ -47,7 +47,7 @@ func TestEnqueueDedup(t *testing.T) {
 	}
 }
 
-// TestProcessedThenDeleted asserts deletion frees the queue (and the ID).
+// TestProcessedThenDeleted asserts deletion frees the pending queue.
 func TestProcessedThenDeleted(t *testing.T) {
 	s := newTestStore(t)
 	it := Item{ID: NewID(ChannelLearning, "fact B"), Channel: ChannelLearning, Payload: "fact B"}
@@ -64,6 +64,56 @@ func TestProcessedThenDeleted(t *testing.T) {
 	// Deleting again is a no-op, not an error.
 	if err := s.Delete("proj", it.ID); err != nil {
 		t.Fatalf("re-delete should be a no-op: %v", err)
+	}
+}
+
+// TestAckedMarkerDoesNotReReport is the re-report regression test: once a marker
+// is acked (Delete), re-enqueuing the same marker — as a transcript re-scan does
+// after the coarse modtime cursor lets a still-growing session file through —
+// must be a dedup no-op. Before the processed-set tombstone, ack deleted the
+// pending item and the next tick re-added it (the confirmed live re-report bug).
+func TestAckedMarkerDoesNotReReport(t *testing.T) {
+	s := newTestStore(t)
+	it := Item{ID: NewID(ChannelLearning, "drained fact"), Channel: ChannelLearning, Payload: "drained fact"}
+
+	if added, err := s.Enqueue("proj", it); err != nil || !added {
+		t.Fatalf("first enqueue: added=%v err=%v", added, err)
+	}
+	if err := s.Delete("proj", it.ID); err != nil { // ack / drain
+		t.Fatalf("ack: %v", err)
+	}
+
+	// The next tick re-scans the transcript and re-enqueues the same marker.
+	added, err := s.Enqueue("proj", it)
+	if err != nil {
+		t.Fatalf("re-enqueue err: %v", err)
+	}
+	if added {
+		t.Fatal("re-enqueue of an acked marker must dedup against the tombstone (added=false)")
+	}
+	if pending, _ := s.Pending("proj", ""); len(pending) != 0 {
+		t.Fatalf("acked marker re-reported: want 0 pending, got %d", len(pending))
+	}
+}
+
+// TestTombstoneIsPerProject proves the processed-set is scoped per project — an
+// acked ID in one project must not suppress the same marker in another.
+func TestTombstoneIsPerProject(t *testing.T) {
+	s := newTestStore(t)
+	it := Item{ID: NewID(ChannelLearning, "shared fact"), Channel: ChannelLearning, Payload: "shared fact"}
+
+	if _, err := s.Enqueue("projA", it); err != nil {
+		t.Fatalf("enqueue A: %v", err)
+	}
+	if err := s.Delete("projA", it.ID); err != nil {
+		t.Fatalf("ack A: %v", err)
+	}
+	added, err := s.Enqueue("projB", it)
+	if err != nil || !added {
+		t.Fatalf("projB must not inherit projA's tombstone: added=%v err=%v", added, err)
+	}
+	if pending, _ := s.Pending("projB", ""); len(pending) != 1 {
+		t.Fatalf("want 1 pending in projB, got %d", len(pending))
 	}
 }
 

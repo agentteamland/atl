@@ -2,10 +2,13 @@
 //
 // Transcripts are JSONL files under ~/.claude/projects/<slug>/, one JSON
 // record per line. The drain reads the assistant's text content (where capture
-// markers are emitted) and feeds it to the queue. v2 keeps only the coarse
-// modtime cursor for performance — correctness (exactly-once) comes from the
-// queue's marker-hash dedup, so v1's per-marker processed-hash state file is
-// gone.
+// markers are emitted) and feeds it to the queue. The coarse modtime cursor is
+// only a performance filter (skip transcripts untouched since the last tick) —
+// exactly-once correctness comes from the queue's marker-hash dedup, which
+// spans processed items via a tombstone (a still-growing session file can be
+// re-scanned whole after its markers were acked, so the dedup must outlive
+// deletion). v1's separate per-marker processed-hash state file is gone; the
+// same guarantee now lives inside the durable queue.
 package transcript
 
 import (

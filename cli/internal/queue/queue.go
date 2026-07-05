@@ -2,11 +2,13 @@
 // v2 learning loop.
 //
 // Markers captured in conversation are transferred here exactly once
-// (idempotent by item ID), processed by per-channel handlers, then deleted —
-// so a processed item can never be re-reported. This structurally eliminates
-// the v1 re-report bug class (H-3): reports come from the queue, never from
-// re-scanning an ever-growing transcript, and deletion leaves nothing to
-// re-surface.
+// (idempotent by item ID), processed by per-channel handlers, then deleted.
+// Deletion tombstones the item ID in a processed-set, so a re-scanned transcript
+// can never re-enqueue an already-drained marker. This keeps the v1 re-report
+// bug class (H-3) dead: reports come from the queue, and the coarse modtime
+// cursor is only a performance filter — exactly-once holds because Enqueue
+// dedups against BOTH the pending items and the processed tombstones, not just
+// the (deleted-on-ack) pending set.
 //
 // Backed by bbolt: a single embedded file (~/.atl/queue.db), no server, no
 // CGo — which keeps cross-platform builds trivial (the v2 script-only
@@ -99,12 +101,21 @@ func (s *Store) Enqueue(project string, it Item) (added bool, err error) {
 		it.EnqueuedAt = time.Now().UTC()
 	}
 	err = s.db.Update(func(tx *bolt.Tx) error {
+		// Tombstone check: a marker already processed (acked, so its queue item
+		// was deleted) must not re-enqueue when a transcript is re-scanned. This
+		// is what makes transfer exactly-once across a re-scan — the modtime
+		// cursor is coarse (a still-growing session file re-reads whole).
+		if pb := tx.Bucket([]byte(processedBucket)); pb != nil {
+			if pb.Get(processedKey(project, it.ID)) != nil {
+				return nil // already processed — dedup no-op
+			}
+		}
 		b, err := tx.CreateBucketIfNotExists([]byte(project))
 		if err != nil {
 			return err
 		}
 		if b.Get([]byte(it.ID)) != nil {
-			return nil // already present — dedup no-op
+			return nil // already pending — dedup no-op
 		}
 		buf, err := json.Marshal(it)
 		if err != nil {
@@ -151,15 +162,28 @@ func (s *Store) Pending(project string, channel Channel) ([]Item, error) {
 	return items, nil
 }
 
-// Delete removes a processed item (processed-then-deleted). Idempotent:
-// deleting a missing item is a no-op.
+// Delete removes a processed item (processed-then-deleted) and tombstones its
+// ID in the processed-set, so a later transcript re-scan can never re-enqueue
+// this already-drained marker (the re-report bug: ack deleted the item, so the
+// pending-dedup forgot it). Only the ID hash is retained; the payload is freed.
+// Idempotent: deleting a missing item still records the tombstone (Delete is the
+// ack path, so the ID is always one we've decided is processed).
 func (s *Store) Delete(project, id string) error {
 	err := s.db.Update(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(project))
-		if b == nil {
-			return nil
+		if b := tx.Bucket([]byte(project)); b != nil {
+			if err := b.Delete([]byte(id)); err != nil {
+				return err
+			}
 		}
-		return b.Delete([]byte(id))
+		pb, err := tx.CreateBucketIfNotExists([]byte(processedBucket))
+		if err != nil {
+			return err
+		}
+		ts, err := time.Now().UTC().MarshalBinary()
+		if err != nil {
+			return err
+		}
+		return pb.Put(processedKey(project, id), ts)
 	})
 	if err != nil {
 		return fmt.Errorf("delete: %w", err)
@@ -185,6 +209,19 @@ func (s *Store) Counts(project string) (map[Channel]int, error) {
 // cursorBucket holds per-project last-tick timestamps. It is a reserved bucket
 // name a project key (an absolute path) can never collide with.
 const cursorBucket = "__cursors__"
+
+// processedBucket holds tombstones for acked (processed-then-deleted) item IDs
+// so a re-scanned transcript can't re-enqueue an already-drained marker. Keyed
+// by project + "\x00" + id (one bucket across all projects, like __cursors__);
+// the value is the processed timestamp (informational). A reserved name a
+// project key (an absolute path) can never collide with.
+const processedBucket = "__processed__"
+
+// processedKey is the composite (project, id) tombstone key. The NUL separator
+// can't appear in an absolute path or a hex id, so keys never alias.
+func processedKey(project, id string) []byte {
+	return []byte(project + "\x00" + id)
+}
 
 // Cursor returns the last-tick time for project (zero if never ticked). It is
 // the coarse modtime filter for transcript scanning — only a performance
