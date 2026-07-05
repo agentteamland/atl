@@ -139,8 +139,10 @@ Search **both locations**:
 - `<project>/.atl/brain-storms/` (project)
 - `~/.atl/brain-storms/` (global)
 
-Find files with `status: active`. If multiple, list them (showing each one's
-scope) and ask which to complete.
+Find files whose **frontmatter** `status:` is `active` — parse the frontmatter
+block (between the leading `---` fences), don't raw-grep the body (a closed
+brainstorm can quote the literal string `status: active` in its prose). If
+multiple, list them (showing each one's scope) and ask which to complete.
 
 ### 2. Complete the brainstorm file
 - `status: active` → `status: completed`
