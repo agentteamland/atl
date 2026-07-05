@@ -65,9 +65,13 @@ logic a unit check covers far more cheaply and in parallel — is how team throu
 
 ## The mobile-emulator lease — how I use it (I don't stand it up)
 
-When my unit has a mobile criterion, I treat the emulator as a lease with a strict lifecycle. **This
-is the discipline; the runtime wiring — how the emulator process launches, how the lease is
-implemented — is stone #7. I describe how I *use* it, I don't build it.**
+When my unit has a mobile criterion, I treat the emulator as a lease with a strict lifecycle. **The
+runtime wiring is shipped — [`knowledge/testing-surfaces.md`](../../../knowledge/testing-surfaces.md)
+§3 + its helper scripts — so I *drive* the mechanism, I don't hand-roll it:** I run my mobile command
+through the single-slot lease composed with the bootability preflight —
+`scripts/emulator-lease.sh bash -c 'scripts/emulator-preflight.sh <platform> && <pack mobile test cmd>'`
+— and both exit non-zero (block, never silent-pass) if the slot can't be acquired or the device won't
+boot.
 
 1. **Acquire the single-slot lease.** If another work-unit holds it, I **wait** — this wait is
    *expected*, not a failure; serialization is the design. I do **not** spin up a second emulator to
