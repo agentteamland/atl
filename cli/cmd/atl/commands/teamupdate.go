@@ -86,7 +86,7 @@ func upgradeTeam(m *manifest.Manifest, entry *index.Entry, layer, claude string)
 // added. Returns the next baseline (the new files map).
 func reflectWithFanout(srcDir, claudeDir string, baseline map[string]string) (map[string]string, error) {
 	next := map[string]string{}
-	for _, ad := range []string{"agents", "skills", "rules"} {
+	for _, ad := range teampkg.AssetDirs {
 		root := filepath.Join(srcDir, ad)
 		info, err := os.Stat(root)
 		if err != nil || !info.IsDir() {

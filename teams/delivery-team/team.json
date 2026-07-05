@@ -21,7 +21,12 @@
   "homepage": "https://github.com/agentteamland",
   "scope": "project",
   "agents": [],
-  "skills": [],
+  "skills": [
+    {
+      "name": "delivery-init",
+      "description": "/delivery-init — connect a project to Azure DevOps: discover org/project/repo, probe the MCP, resolve the wiki, and write .delivery/config.json (secret-by-reference) + methodology.json."
+    }
+  ],
   "rules": [],
   "extends": null,
   "excludes": [],
