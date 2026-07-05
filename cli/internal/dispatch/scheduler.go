@@ -112,7 +112,7 @@ func NewScheduler(plan *Plan, projectRoot string, wt *Worktree, spawn Spawner, c
 		ReadStatus:  ReadStatus,
 		Now:         time.Now,
 		Sleep:       time.Sleep,
-		BuildSpec:   defaultWorkerSpec,
+		BuildSpec:   DeliveryWorkerSpec(projectRoot),
 		Log:         func(string) {},
 		units:       make(map[int]*unitSched, len(plan.Units)),
 	}
@@ -504,18 +504,50 @@ func (s *Scheduler) summary() Summary {
 	return sum
 }
 
-// defaultWorkerSpec is the engine's minimal worker invocation for a unit — enough
-// to run a `claude -p` developer in the unit's isolated worktree. The actual
-// delivery micro-loop prompt (and any per-unit MCP config) is delivery-team
-// content refined in a later stone by extending the plan contract; the engine
-// only needs a runnable spec here. The Azure PAT is forwarded via env by the
-// caller, never embedded in the argv (spawn.go), so it is never logged.
-func defaultWorkerSpec(u WorkUnit, worktreeDir string) WorkerSpec {
-	return WorkerSpec{
-		Prompt: fmt.Sprintf(
-			"You are a delivery-team developer. Implement Azure work-item #%d (%q) in this git "+
-				"worktree following the delivery micro-loop, then merge to dev and set it Done.",
-			u.ID, u.Title),
-		WorktreeDir: worktreeDir,
+// DeliveryWorkerSpec builds a unit's worker invocation: a `claude -p` developer in
+// the unit's isolated worktree, running the delivery micro-loop. It closes over the
+// project root so the prompt can point at the reflected developer agent + packs by
+// absolute path (the worktree lives under root, so a root-anchored path is readable
+// regardless of the worktree's own checkout).
+//
+// Fork A (worker-fetches-from-Azure): the plan carries only the work-item id, so the
+// assembled prompt directs the worker to fetch the rest — brief, area tag, pack, wiki
+// — from Azure over the inherited MCP at runtime. This keeps the engine zero-Azure and
+// the plan contract minimal (no area/brief duplicated into plan.json). MCPConfigPath is
+// left empty (the worker inherits the worktree's .mcp.json — the azureDevOps server
+// /delivery-init configured, #17); ExtraEnv is left nil (the PAT, named by config.pat.ref
+// and defaulting to AZURE_DEVOPS_PAT, is inherited from this process's env and never
+// placed in the argv, so it can't leak into logs — spawn.go). The real runtime wiring
+// (MCP reachable, PAT set, the reflected .claude assets present for the worker) is what
+// the stone-#9 Layer-B e2e validates; this stone assembles the invocation.
+func DeliveryWorkerSpec(root string) func(u WorkUnit, worktreeDir string) WorkerSpec {
+	return func(u WorkUnit, worktreeDir string) WorkerSpec {
+		return WorkerSpec{
+			Prompt:      deliveryWorkerPrompt(u, root),
+			WorktreeDir: worktreeDir,
+		}
 	}
+}
+
+// deliveryWorkerPrompt assembles the headless worker's task prompt. It is a lean
+// bootstrap: the developer agent (+ its children/) is the authoritative operating
+// manual, so the prompt points the worker at it, names the one work-item, and inlines
+// the load-bearing invariants (fetch-from-Azure, the six phases, block-never-fake,
+// job-ends-at-PR) as a self-documenting safety net — it does not duplicate the agent's
+// role-craft, which would drift.
+func deliveryWorkerPrompt(u WorkUnit, root string) string {
+	agentDir := filepath.Join(root, ".claude", "agents", "developer")
+	configPath := filepath.Join(root, ".delivery", "config.json")
+	packsDir := filepath.Join(root, ".claude", "packs")
+	return fmt.Sprintf(`You are the delivery-team developer — a fresh, isolated worker spawned for exactly one Azure work-item. Your complete operating manual is the developer agent at %[2]s/agent.md and every file under %[2]s/children/. Read them first and follow them exactly; they are authoritative over the summary below.
+
+Assignment: Azure work-item #%[1]d — %[4]q. Run your micro-loop to turn it into a green, review-ready pull request in this worktree, then stop.
+
+Ground rules (your agent manual holds the full detail):
+- Read %[3]s for the Azure org/project/repo, branchPair, and pat.ref. Reach Azure ONLY through the azureDevOps MCP — never a raw call, never an invented tool name, and never a hardcoded state literal (resolve state and type at runtime via wit_get_work_item_type).
+- The engine handed you only this work-item's id; fetch everything else from Azure at runtime: claim the item (transition it to the runtime-resolved in-progress state plus a claim comment), then read the work-item, its **[Technical Analysis]** sentinel comment, and the tech-lead's canonical brief; resolve your area:<name> tag and load ONLY that area's pack under %[5]s/<area>/; read the brief-named Architecture/ and Conventions/ wiki pages.
+- Your six phases, in order: claim -> plan -> implement -> self-test -> comment -> pr. Write each phase and a fresh heartbeat to status.json as you go.
+- Self-test every surface the unit touches and attach evidence via scripts/az-attach.sh. A surface you could not run is UNVERIFIED — set status.json blocker and stop; never fake a green.
+- Your job ENDS at the pull request: do NOT review your own PR, do NOT merge, and do NOT set the work-item Done — the tech-lead reviews, and the engine merges and drives the Done transition after verifying the merge.`,
+		u.ID, agentDir, configPath, u.Title, packsDir)
 }
