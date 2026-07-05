@@ -170,9 +170,10 @@ stack — chosen so the pack exercises all three test surfaces (see the tester's
 Each is `pack.md` + topic files, release-grade and real (not stubs) but minimal and
 focused. The `mobile` pack carries the *knowledge* of how to boot and drive an
 emulator for its `integration_test` runs (single-slot lease, preflight bootability,
-block-never-silent-pass, screenshot evidence via `scripts/az-attach.sh`) — but the
-emulator runtime/lease wiring itself is a later stone; the pack describes how to *use*
-that surface, it does not stand it up.
+block-never-silent-pass, screenshot evidence via `scripts/az-attach.sh`) — the emulator
+runtime/lease wiring itself lives in [`testing-surfaces.md`](testing-surfaces.md) §3 + the
+`scripts/emulator-lease.sh` / `emulator-preflight.sh` helpers; the pack describes how to *use*
+that surface, driving those.
 
 ### How a real software team ships packs
 

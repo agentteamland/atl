@@ -92,7 +92,7 @@ How I capture and attach verification evidence: the scripts/az-attach.sh REST he
 ---
 
 ### Mobile And Web Surfaces
-The test surfaces and their concurrency discipline: the web surface (preview / chrome-devtools MCP, runs at full concurrency) vs the serialized single-slot mobile-emulator lease. How I acquire and release the emulator gate, the preflight bootability check (never silent-pass a surface that couldn't run), and WHY mobile serializes while non-mobile runs parallel — a shared single-slot resource under N parallel workers. Discipline-level; the runtime wiring is stone #7.
+The test surfaces and their concurrency discipline: the web surface (preview / chrome-devtools MCP, runs at full concurrency) vs the serialized single-slot mobile-emulator lease. How I acquire and release the emulator gate, the preflight bootability check (never silent-pass a surface that couldn't run), and WHY mobile serializes while non-mobile runs parallel — a shared single-slot resource under N parallel workers. Discipline-level; the runtime wiring is shipped in knowledge/testing-surfaces.md + the emulator-lease/preflight scripts.
 -> [Details](children/mobile-and-web-surfaces.md)
 
 ---

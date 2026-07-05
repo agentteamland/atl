@@ -97,15 +97,16 @@ no unsatisfied predecessor; if nodes remain when none can be removed, the remain
 If **any** admitted unit carries `area:mobile` / `area:ios` / `area:android` in its `System.Tags`,
 run the mobile-emulator preflight before dispatch (the discipline is the tester's
 [`../../agents/tester/agent.md`](../../agents/tester/agent.md) `children/mobile-and-web-surfaces.md`
-— single-slot lease, preflight bootability, block-never-silent-pass; the lease *runtime* wiring is
-a later stone, this ceremony probes bootability):
+— single-slot lease, preflight bootability, block-never-silent-pass; the runtime wiring is
+[`../../knowledge/testing-surfaces.md`](../../knowledge/testing-surfaces.md) §3 + its scripts, which
+this ceremony runs):
 
-- **Probe bootability** — list the available devices (`xcrun simctl list` for iOS,
-  `emulator -list-avds` for Android) and attempt a **trial boot** of the shared device. Gate the
-  wait on the device's **readiness signal** (iOS: `xcrun simctl` `bootstatus`; Android:
-  `adb wait-for-device` + `sys.boot_completed`) with a **timeout + bounded retry — NEVER a fixed
-  `sleep`**: iOS simulators in particular have real boot latency (30–90s+) and a GUI requirement, so
-  a fixed sleep either flakes or wastes the whole team's time.
+- **Probe bootability** — run [`scripts/emulator-preflight.sh`](../../scripts/emulator-preflight.sh)
+  (`ios`/`android`) for each mobile platform the sprint touches. It lists the available devices
+  (`xcrun simctl list` / `emulator -list-avds`), attempts a **trial boot** of the shared device, and
+  gates the wait on the device's **readiness signal** (iOS `simctl bootstatus`; Android
+  `adb wait-for-device` + `sys.boot_completed`) with a bounded poll — **never a fixed `sleep`** (iOS
+  boot is 30–90s+ and needs a GUI, so a fixed sleep flakes or wastes the whole team's time).
 - **No bootable device → REFUSE to start.** Surface the **exact** missing prerequisite — no GUI
   session, no AVD configured, an unaccepted Xcode license — so the human can fix it. A mobile unit
   dispatched with no emulator would be forced to either block or (the cardinal sin) silently pass an

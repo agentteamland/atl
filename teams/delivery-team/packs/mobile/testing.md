@@ -7,8 +7,9 @@ developer's self-test is the author's own fast pass; the independent thorough pa
 tester's, whose surface discipline is authoritative in
 [`agents/tester/children/mobile-and-web-surfaces.md`](../../agents/tester/children/mobile-and-web-surfaces.md).
 This topic carries the **how-to-boot / how-to-drive the emulator** knowledge both rely on —
-but the *runtime* lease and its wiring are **stone #7**: this file describes how a worker
-*uses* the mobile surface, it does not stand the lease up.
+the *runtime* lease and its wiring are shipped in
+[`knowledge/testing-surfaces.md`](../../knowledge/testing-surfaces.md) §3 + the emulator-lease /
+preflight scripts: this file describes how a worker *uses* the mobile surface, driving those.
 
 ## The three widths — most weight at the bottom
 
@@ -47,7 +48,8 @@ the same thing on both passes.
 
 **Do not dodge the wait by booting a second emulator** — that reintroduces the very race the
 single slot exists to prevent. The lease *runtime* (how the slot is acquired/released across
-parallel workers) is **stone #7**; here the developer's obligation is only to *respect* it:
+parallel workers) is `scripts/emulator-lease.sh` (knowledge/testing-surfaces.md §3); here the
+developer's obligation is to *drive* it correctly:
 acquire, use, release promptly (win or lose — holding the slot after finishing starves the
 next unit for no reason), and never assume a second device is available.
 
@@ -62,9 +64,10 @@ came up is meaningless.
 Concretely, the preflight is: start/target a device, **wait for it to reach a booted,
 responsive state, and only then drive it** — and give the boot a bounded retry budget (a
 second boot attempt before calling it a failure is a common, worth-it allowance) rather than a
-single shot. The *mechanics* of launching and detecting the boot (the specific device tooling)
-are the stone-#7 runtime's to provide; the developer's discipline is to **gate on
-booted-and-responsive**, never to run against an unconfirmed device.
+single shot. The *mechanics* of launching and detecting the boot are provided by
+`scripts/emulator-preflight.sh` (knowledge/testing-surfaces.md §3 — the bounded-poll boot gate); the
+developer's discipline is to **gate on booted-and-responsive**, never to run against an unconfirmed
+device.
 
 ## Block, never silently pass — the cardinal rule
 

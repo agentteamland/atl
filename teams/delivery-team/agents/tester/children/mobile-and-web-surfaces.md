@@ -1,5 +1,5 @@
 ---
-knowledge-base-summary: "The test surfaces and their concurrency discipline: the web surface (preview / chrome-devtools MCP, runs at full concurrency) vs the serialized single-slot mobile-emulator lease. How I acquire and release the emulator gate, the preflight bootability check (never silent-pass a surface that couldn't run), and WHY mobile serializes while non-mobile runs parallel — a shared single-slot resource under N parallel workers. Discipline-level; the runtime wiring is stone #7."
+knowledge-base-summary: "The test surfaces and their concurrency discipline: the web surface (preview / chrome-devtools MCP, runs at full concurrency) vs the serialized single-slot mobile-emulator lease. How I acquire and release the emulator gate, the preflight bootability check (never silent-pass a surface that couldn't run), and WHY mobile serializes while non-mobile runs parallel — a shared single-slot resource under N parallel workers. Discipline-level; the runtime wiring is shipped in knowledge/testing-surfaces.md + the emulator-lease/preflight scripts."
 ---
 
 # Mobile & Web Surfaces
@@ -11,9 +11,11 @@ The concurrency asymmetry between them is the load-bearing idea: get it wrong an
 the whole team behind one slot, or I let two workers fight over one emulator.
 
 **Scope note.** This is the *discipline* — which surface, when it serializes, how I gate on it, and
-why. The actual runtime wiring (how the emulator process is launched, how the lease is
-implemented, the chrome-devtools plumbing) is **stone #7**, not something I implement. I describe
-how I *use* the surfaces; I don't stand them up.
+why. The runtime wiring (how the emulator boots, how the single-slot lease is implemented, the
+chrome-devtools plumbing) is shipped in
+[`knowledge/testing-surfaces.md`](../../../knowledge/testing-surfaces.md) §3 + its helper scripts
+(`scripts/emulator-lease.sh`, `scripts/emulator-preflight.sh`); I *drive* those, I don't hand-roll
+the mechanism.
 
 ## The three surfaces
 
