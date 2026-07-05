@@ -44,12 +44,15 @@ func TestReflectWithFanout(t *testing.T) {
 	w(src, "agents/a/unchanged.md", "NEW-A")
 	w(src, "agents/b/edited.md", "NEW-B")
 	w(src, "agents/c/brandnew.md", "C")
+	w(src, "knowledge/adapter.md", "NEW-K") // non-agent/skill/rule asset must refresh too
 	// installed copy
 	w(claude, "agents/a/unchanged.md", "OLD-A")  // == baseline → refresh
 	w(claude, "agents/b/edited.md", "USER-EDIT") // != baseline → preserve
+	w(claude, "knowledge/adapter.md", "OLD-K")   // == baseline → refresh
 	baseline := map[string]string{
 		"agents/a/unchanged.md": fanout.Hash([]byte("OLD-A")),
 		"agents/b/edited.md":    fanout.Hash([]byte("OLD-B")),
+		"knowledge/adapter.md":  fanout.Hash([]byte("OLD-K")),
 	}
 
 	next, err := reflectWithFanout(src, claude, baseline)
@@ -64,6 +67,12 @@ func TestReflectWithFanout(t *testing.T) {
 	}
 	if b, _ := os.ReadFile(filepath.Join(claude, "agents/c/brandnew.md")); string(b) != "C" {
 		t.Errorf("brandnew should be added, got %q", b)
+	}
+	if b, _ := os.ReadFile(filepath.Join(claude, "knowledge/adapter.md")); string(b) != "NEW-K" {
+		t.Errorf("knowledge asset should refresh to NEW-K, got %q", b)
+	}
+	if next["knowledge/adapter.md"] != fanout.Hash([]byte("NEW-K")) {
+		t.Error("knowledge asset must stay in the manifest (advance to NEW-K), not be dropped")
 	}
 	if next["agents/a/unchanged.md"] != fanout.Hash([]byte("NEW-A")) {
 		t.Error("baseline a should advance to NEW-A")

@@ -3,10 +3,12 @@
 //
 // v2 keeps a single copy: assets go straight into the scope's .claude dir
 // (~/.claude or <project>/.claude), not a parallel ATL-owned store (decision
-// 2026-06-14, asset model (b)). Only agents/skills/rules are reflected — the
-// directories Claude Code reads; team.json and repo chrome (README, LICENSE)
-// stay behind. Each copied file's SHA-256 is recorded into the returned files
-// map, which becomes the install manifest's fanout baseline + integrity set.
+// 2026-06-14, asset model (b)). agents/skills/rules are the directories Claude
+// Code reads directly; knowledge/scripts carry a team's runtime reference docs +
+// helper scripts (consulted by its agents/skills/workers at run time) — team.json
+// and repo chrome (README, LICENSE) stay behind. Each copied file's SHA-256 is
+// recorded into the returned files map, which becomes the install manifest's
+// fanout baseline + integrity set.
 package teampkg
 
 import (
@@ -18,9 +20,15 @@ import (
 	"github.com/agentteamland/atl/cli/internal/fanout"
 )
 
-// assetDirs are the top-level subtrees reflected into .claude. Everything else
-// in the team repo (team.json, README, LICENSE, ...) is not an installable asset.
-var assetDirs = []string{"agents", "skills", "rules"}
+// AssetDirs are the top-level subtrees reflected into .claude, and the single
+// source of truth for "what counts as an installable asset" — shared by install
+// (CopyAssets), update (reflectWithFanout), and reclamation (gc.Scan) so the three
+// can never drift. agents/skills/rules are what Claude Code reads directly;
+// knowledge/scripts carry a team's runtime reference docs + helper scripts (e.g.
+// delivery-team's Azure adapter contract + attachment helper) that its
+// agents/skills/workers consult at run time. Everything else in the team repo
+// (team.json, README, LICENSE, ...) is not an installable asset.
+var AssetDirs = []string{"agents", "skills", "rules", "knowledge", "scripts"}
 
 // TeamManifest is the subset of team.json install needs. Extra v1 fields
 // (agents[], capabilities, extends, ...) are tolerated and ignored.
@@ -52,12 +60,12 @@ func ReadManifest(dir string) (*TeamManifest, error) {
 	return &tm, nil
 }
 
-// CopyAssets reflects srcDir's agents/skills/rules subtrees into claudeDir and
+// CopyAssets reflects srcDir's asset subtrees (see AssetDirs) into claudeDir and
 // returns a map of each written file's path (relative to claudeDir,
 // slash-separated) to its SHA-256. Errors if the team ships no assets.
 func CopyAssets(srcDir, claudeDir string) (map[string]string, error) {
 	files := map[string]string{}
-	for _, ad := range assetDirs {
+	for _, ad := range AssetDirs {
 		srcAd := filepath.Join(srcDir, ad)
 		info, err := os.Stat(srcAd)
 		if err != nil || !info.IsDir() {
@@ -90,7 +98,7 @@ func CopyAssets(srcDir, claudeDir string) (map[string]string, error) {
 		}
 	}
 	if len(files) == 0 {
-		return nil, fmt.Errorf("team ships no installable assets (agents/skills/rules)")
+		return nil, fmt.Errorf("team ships no installable assets (agents/skills/rules/knowledge/scripts)")
 	}
 	return files, nil
 }
@@ -101,9 +109,20 @@ func CopyFile(src, dst string) error {
 	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 		return err
 	}
+	info, err := os.Stat(src)
+	if err != nil {
+		return err
+	}
 	b, err := os.ReadFile(src)
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(dst, b, 0o644)
+	if err := os.WriteFile(dst, b, info.Mode().Perm()); err != nil {
+		return err
+	}
+	// WriteFile's perm only applies when creating; on a fan-out / integrity
+	// overwrite the file already exists, so chmod explicitly to preserve the
+	// source mode — an executable helper script (scripts/*.sh) must stay +x when
+	// reflected, not silently drop to 0644.
+	return os.Chmod(dst, info.Mode().Perm())
 }

@@ -37,6 +37,7 @@ func TestScanOwnedVsUnowned(t *testing.T) {
 	writeFile(t, filepath.Join(claudeDir, "agents/api/agent.md"), "owned")        // owned → not orphan
 	writeFile(t, filepath.Join(claudeDir, "agents/api/children/gain.md"), "gain") // sibling of an owned unit → orphan, Owned
 	writeFile(t, filepath.Join(claudeDir, "skills/rogue/SKILL.md"), "rogue")      // wholly unowned unit → orphan
+	writeFile(t, filepath.Join(claudeDir, "knowledge/stale.md"), "stale")        // unowned knowledge asset → orphan (gc must walk knowledge/)
 
 	orphans, err := Scan(proj, time.Now())
 	if err != nil {
@@ -56,6 +57,9 @@ func TestScanOwnedVsUnowned(t *testing.T) {
 	rogue, ok := byRel["skills/rogue/SKILL.md"]
 	if !ok || rogue.Owned {
 		t.Errorf("a rogue file should be an unowned-unit orphan: %+v (ok=%v)", rogue, ok)
+	}
+	if _, ok := byRel["knowledge/stale.md"]; !ok {
+		t.Error("an unowned knowledge/ asset must be reported as an orphan (gc must walk knowledge/)")
 	}
 }
 

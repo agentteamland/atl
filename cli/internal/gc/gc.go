@@ -29,9 +29,6 @@ import (
 	"github.com/agentteamland/atl/cli/internal/teampkg"
 )
 
-// assetDirs are the reflected asset roots under a .claude dir.
-var assetDirs = []string{"agents", "skills", "rules"}
-
 // HistoryMaxAge is how long a promote conflict-archive survives before gc treats
 // it as reclaimable. Conflict archives are content-addressed and never pruned by
 // anything else, so they accumulate forever without this.
@@ -137,7 +134,7 @@ func scanLayer(scopeName, layerDir, claudeDir string, extraOwned map[string]bool
 	}
 
 	var out []Orphan
-	for _, dir := range assetDirs {
+	for _, dir := range teampkg.AssetDirs {
 		root := filepath.Join(claudeDir, dir)
 		err := filepath.WalkDir(root, func(path string, d fs.DirEntry, walkErr error) error {
 			if walkErr != nil {

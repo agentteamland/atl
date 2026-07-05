@@ -44,13 +44,15 @@ func TestCopyAssets(t *testing.T) {
 	writeFile(t, filepath.Join(src, "agents/api/agent.md"), "API")
 	writeFile(t, filepath.Join(src, "skills/build/skill.md"), "BUILD")
 	writeFile(t, filepath.Join(src, "rules/r.md"), "RULE")
+	writeFile(t, filepath.Join(src, "knowledge/adapter.md"), "ADAPTER")
+	writeFile(t, filepath.Join(src, "scripts/helper.sh"), "#!/usr/bin/env bash\necho hi\n")
 
 	claude := t.TempDir()
 	files, err := CopyAssets(src, claude)
 	if err != nil {
 		t.Fatalf("CopyAssets: %v", err)
 	}
-	for _, rel := range []string{"agents/api/agent.md", "skills/build/skill.md", "rules/r.md"} {
+	for _, rel := range []string{"agents/api/agent.md", "skills/build/skill.md", "rules/r.md", "knowledge/adapter.md", "scripts/helper.sh"} {
 		if _, err := os.Stat(filepath.Join(claude, rel)); err != nil {
 			t.Errorf("missing copied %s: %v", rel, err)
 		}
@@ -74,6 +76,24 @@ func TestCopyAssetsNoAssets(t *testing.T) {
 	writeFile(t, filepath.Join(src, "team.json"), `{"name":"x"}`)
 	if _, err := CopyAssets(src, t.TempDir()); err == nil {
 		t.Error("expected error when team ships no assets")
+	}
+}
+
+func TestCopyFilePreservesExecBit(t *testing.T) {
+	src := filepath.Join(t.TempDir(), "helper.sh")
+	if err := os.WriteFile(src, []byte("#!/usr/bin/env bash\necho hi\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	dst := filepath.Join(t.TempDir(), "helper.sh")
+	if err := CopyFile(src, dst); err != nil {
+		t.Fatalf("CopyFile: %v", err)
+	}
+	fi, err := os.Stat(dst)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fi.Mode().Perm() != 0o755 {
+		t.Errorf("exec bit not preserved: dst mode = %v, want 0755", fi.Mode().Perm())
 	}
 }
 
