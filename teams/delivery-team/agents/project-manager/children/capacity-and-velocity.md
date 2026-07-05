@@ -79,18 +79,20 @@ ceiling isn't a blind guess *and* isn't frozen at the guess:
   `/kickoff`). If `seedVelocity` is `null`, I cannot compute a defensible ceiling: I surface that
   the cold-start seed is missing and ask the PO to set it, rather than inventing a number.
 - **Sprints 2 … N-1 (fewer than N closed)** — **blend** the seed with the real closed-sprint
-  data, decaying the seed's weight as real sprints accumulate. A principled blend: the ceiling is
-  the mean of *all closed sprints so far* plus the seed weighted as one "virtual sprint" whose
-  influence decays as the real count grows —
+  data, decaying the seed's weight as real sprints accumulate. The seed fills the not-yet-existing
+  sprints of the N-window: over a fixed N-denominator, each of the `N − count_closed` missing sprints
+  contributes the seed and each closed sprint contributes its actual points —
 
   ```
-  blended = (seed + Σ closed_sprint_points) / (1 + count_closed_sprints)
+  blended = (Σ closed_sprint_points + seed × (N − count_closed_sprints)) / N
   ```
 
-  After 1 real sprint the seed is half the estimate; after 2 it is a third; by the time
-  `count_closed_sprints == velocityWindowN` the blend is retired entirely.
+  So the seed's weight is `(N − count_closed) / N`: full at cold-start, `2/3` after one closed sprint
+  (N=3), `1/3` after two, and **exactly zero** once `count_closed_sprints == velocityWindowN` — the
+  blend retires itself at N with no special-case switch.
 - **Sprint N onward** — `count_closed_sprints ≥ velocityWindowN`: the plain N-sprint mean takes
-  over; the seed is gone. Empirical data has fully replaced the guess.
+  over; the seed is gone (the formula above already yields it — `seed × 0`). Empirical data has fully
+  replaced the guess.
 
 > **WHY blend + decay rather than "seed until N, then switch."** A hard switch makes the ceiling
 > lurch at sprint N (the seed's error snaps out all at once). Decaying the seed's weight lets each
