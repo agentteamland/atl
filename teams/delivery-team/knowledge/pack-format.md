@@ -230,11 +230,14 @@ claim → plan → implement → self-test → comment → pr
 - `pr` — open the PR and link it to the work-item
   (`wit_link_work_item_to_pull_request`). **This is where the worker's job ends.**
 
-`review` and `merge` are **not** developer phases: the tech-lead reviews, and the
-**deterministic engine** merges to `dev` and verifies the durable git state before the
-Azure→Done transition (strict ordering — merge precedes the Done that triggers refill).
+`review` and `merge` are **not** developer phases: the tech-lead reviews, and — on green
+— the **tech-lead completes the Azure PR (= the merge to `dev`, non-squash) and sets the
+runtime-resolved Done**; the **deterministic engine** (zero-Azure) then *verifies* the
+merge landed on the durable git state and never merges itself (strict ordering — merge
+precedes the Done that triggers refill; the engine gates refill on the verified merge).
 A worker that self-merged would violate both NEVER-merge and the engine's
 durable-state verification (the dispatch worker contract; adapter §6 keeps the Done
-transition runtime-resolved). The developer's contract ends at handoff
+transition runtime-resolved; [pr-and-review.md](pr-and-review.md) §4–§5 owns the
+actor split). The developer's contract ends at handoff
 to review — that boundary is what keeps the merge gate deterministic and the loop
 resumable.

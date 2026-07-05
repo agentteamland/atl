@@ -91,6 +91,9 @@
     }
   ],
   "rules": [],
+  "capabilities": {
+    "review": "tech-lead"
+  },
   "extends": null,
   "excludes": [],
   "dependencies": {

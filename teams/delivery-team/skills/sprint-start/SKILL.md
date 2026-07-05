@@ -154,11 +154,13 @@ refills as units complete, and runs the recovery ladder. **The ceremony does not
 `developer`/`tester` worker** — that is the engine's job (the `worker`-dispatch roles; the ceremony
 only ever adopts the `subagent` roles above).
 
-**Strict milestone ordering (adapter §5 idempotency + the engine's durable-state discipline):** the
-engine **merges a green unit to `dev` BEFORE** the runtime-resolved **Completed**-category
-transition that triggers a refill — the Done transition never precedes the merge, so a
-crash between the two never loses a merge and never refills against an un-merged unit. This ordering
-is the engine's contract; the ceremony's only obligation is to hand it a well-formed, acyclic plan.
+**Strict milestone ordering (adapter §5 idempotency + the engine's durable-state discipline):** on a
+green unit the **tech-lead completes the Azure PR (= the merge to `dev`, non-squash) BEFORE** setting
+the runtime-resolved **Completed**-category transition; the **engine** (zero-Azure) then *verifies*
+the merge landed and gates refill on it — it never merges itself. The Done transition never precedes
+the merge, so a crash between the two never loses a merge and never refills against an un-merged unit.
+This ordering is the contract ([pr-and-review.md](../../knowledge/pr-and-review.md) §4–§5); the
+ceremony's only obligation is to hand the engine a well-formed, acyclic plan.
 
 ## Idempotent re-run
 

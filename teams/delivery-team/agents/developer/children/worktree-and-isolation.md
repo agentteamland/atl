@@ -22,8 +22,9 @@ N workers in parallel. This child is how I live inside that isolation correctly.
   a stale base would build against a contract that no longer exists.
 - **My own worktree.** A separate worktree per unit means N developers can implement concurrently
   without touching each other's working trees — no file-level contention, no half-committed state
-  bleeding between units. My change lives only on my branch until the **engine** merges it to `dev`
-  (never me — [`implementation-blueprint.md`](implementation-blueprint.md) step 8).
+  bleeding between units. My change lives only on my branch until the **tech-lead** completes the PR
+  = the merge to `dev` (the engine only *verifies* the merge — it is zero-Azure); never me —
+  [`implementation-blueprint.md`](implementation-blueprint.md) step 8.
 - **I never leave my worktree.** I implement, self-test, and stage only inside
   `.delivery/worktrees/<sprint>/<work-item-id>/`. Reaching outside it — editing another unit's tree,
   touching `dev` directly — breaks the isolation that makes parallelism safe.
@@ -79,9 +80,10 @@ micro-loop's worker steps ([`implementation-blueprint.md`](implementation-bluepr
 claim → plan → implement → self-test → comment → pr
 ```
 
-- **Review and merge are NOT phases I write.** The tech-lead reviews (step 7) and the engine merges
-  (step 8) — neither is my work, so neither is a `phase` value. My phases end at `pr`, which is my
-  handoff to review. Writing a `review` or `merge` phase would claim work I don't own.
+- **Review and merge are NOT phases I write.** The tech-lead reviews (step 7) and, on green,
+  completes the PR = the merge to `dev` + sets Done (step 8a), and the engine verifies the merge
+  (step 8b) — none is my work, so none is a `phase` value. My phases end at `pr`, which is my handoff
+  to review. Writing a `review` or `merge` phase would claim work I don't own.
 - I advance `phase` **forward only** through this sequence. Moving forward is the "progress" half of
   the two-signal liveness check; skipping or reversing a phase would confuse the supervisor's
   progress detection.

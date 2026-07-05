@@ -1,5 +1,5 @@
 ---
-knowledge-base-summary: "My primary production unit: the 8-step per-work-unit micro-loop — claim → plan → implement → self-test → comment → pr, then [tech-lead review] → [engine merge]. What each step does, why the ordering is load-bearing, and the completion checklist. Steps 7–8 are NOT mine (review = tech-lead, merge = the engine); my job ends at `pr` — I never self-review and never self-merge."
+knowledge-base-summary: "My primary production unit: the 8-step per-work-unit micro-loop — claim → plan → implement → self-test → comment → pr, then [tech-lead review] → [tech-lead completes the PR = merge to dev + sets Done] → [engine verifies the merge]. What each step does, why the ordering is load-bearing, and the completion checklist. Steps 7–8 are NOT mine (review + merge + Done = tech-lead; merge-verify = the zero-Azure engine); my job ends at `pr` — I never self-review and never self-merge."
 ---
 
 # Implementation Blueprint
@@ -39,9 +39,11 @@ The ordered loop (the Azure mechanics of each milestone write live in
 7. **[tech-lead review]** — the `tech-lead` (the team's `capabilities.review` provider) reviews the
    PR. **NOT my step.** I never review my own work — a self-review shares the blind spot that wrote
    the code, which is the whole reason review is a separate role.
-8. **[engine merge]** — after `green = (all test-gates passed) ∧ (review passed)`, the deterministic
-   engine merges to `dev`, verifies the durable git state, then the Azure→Done transition follows.
-   **NOT my step.** I never merge and never self-set Done — see below.
+8. **[tech-lead merge + engine verify]** — after `green = (all test-gates passed) ∧ (review passed)`,
+   the tech-lead **completes the Azure PR (= the merge to `dev`, non-squash) and sets the
+   runtime-resolved Done** (8a); the deterministic engine then **verifies the merge landed**
+   (`MergedToBase`) and gates refill on it (8b) — it never merges (it is zero-Azure). **NOT my step.**
+   I never merge and never self-set Done — see below.
 
 ## Why the loop ends at `pr`, not at merge
 
@@ -52,15 +54,19 @@ deliberately **not** worker phases, and that boundary is load-bearing:
   tech-lead's review reflex is "find where it's wrong." If I reviewed my own PR, I would carry the
   same mental model that wrote the code — the misread criterion or unpictured edge survives because
   one mind produced both. The value of step 7 is precisely that it is *not* me.
-- **Merge is the engine's, for durable-state safety.** The engine merges to `dev` and then
-  **verifies the durable git state** (the merge actually landed) before the Azure→Done transition
-  that triggers backlog refill. A worker self-merging would (a) violate the NEVER-merge discipline
-  and (b) bypass the durable-state verification the engine exists to provide — an exit-0 from an LLM
-  worker is not proof a git merge happened. So I open the PR and stop; the engine closes the loop.
+- **Merge is the tech-lead's; verification is the engine's — durable-state safety.** On green the
+  **tech-lead completes the Azure PR (= the merge to `dev`, non-squash)** — the engine is zero-Azure
+  and cannot complete an Azure PR. The engine then **verifies the durable git state** (`MergedToBase`
+  — the merge actually landed) and gates refill on it. A worker self-merging would (a) violate the
+  NEVER-merge discipline and (b) bypass the durable-state verification the engine exists to provide —
+  an exit-0 from an LLM worker is not proof a git merge happened. So I open the PR and stop; the
+  tech-lead merges and the engine verifies ([`../../../knowledge/pr-and-review.md`](../../../knowledge/pr-and-review.md)).
 - **The ordering `merge-to-dev precedes Done` is strict.** Done is what triggers refill; if Done
-  were set before the merge verified, a lost merge would silently refill against un-merged work. I
-  never set Done myself for exactly this reason (adapter §6 — the Done state is runtime-resolved,
-  and the engine drives the transition after the verified merge).
+  were set before the merge landed, a lost merge would silently refill against un-merged work. The
+  tech-lead completes the PR *then* sets Done, and the engine gates refill on the verified merge — so
+  a mis-set Done can never race unlanded work. I never set Done myself for exactly this reason
+  (adapter §6 — the Done state is runtime-resolved; the tech-lead drives the transition after
+  completing the PR).
 
 ## Why the earlier ordering is load-bearing too
 
@@ -99,6 +105,6 @@ My work on a unit is done — handed off at `pr` — when:
 - [ ] **pr:** delivery-native PR opened on Azure Repos and linked to the work-item
       (`wit_link_work_item_to_pull_request`).
 - [ ] **status.json** reflects the final phase (`pr`) with a fresh heartbeat, `blocker` empty.
-- [ ] **Did NOT:** review my own PR (step 7 = tech-lead), merge (step 8 = engine), set Done (engine,
-      after merge-verify), or write the project wiki
-      ([`learning-routing.md`](learning-routing.md)).
+- [ ] **Did NOT:** review my own PR (step 7 = tech-lead), merge or set Done (step 8a = tech-lead
+      completes the PR + sets Done; step 8b = the engine verifies the merge), or write the project
+      wiki ([`learning-routing.md`](learning-routing.md)).

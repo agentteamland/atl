@@ -122,10 +122,12 @@ of that proof; the tester adds the independent Level-2 evidence on top.
 - **Not the mobile surface.** `area:web` work is verified on code + web; the serialized
   emulator lease is the `mobile` pack's concern. A web work-unit has no mobile gate.
 - **Not merge, not Done.** The self-test gates the developer's own `pr` handoff; it does not merge and
-  does not set Done — the deterministic engine merges to `dev` after the PR is green (test-gates ∧
-  review) and verifies the durable git state, then the Azure→Done transition follows (dispatch worker
-  contract §2, adapter merge note). A self-merging worker would violate both NEVER-merge and the
-  engine's durable-state verification.
+  does not set Done — on green (test-gates ∧ review) the **tech-lead completes the Azure PR (= the
+  merge to `dev`, non-squash) and sets the runtime-resolved Done**; the **engine** (zero-Azure) then
+  *verifies* the merge landed (`MergedToBase`) and never merges itself. Merge precedes Done, and the
+  engine gates refill on the verified merge — it never trusts a worker's exit-0
+  ([pr-and-review.md](../../knowledge/pr-and-review.md) §4–§5). A self-merging worker would violate
+  both NEVER-merge and the engine's durable-state verification.
 
 ## What travels here, and what doesn't
 
