@@ -54,6 +54,26 @@
     {
       "name": "delivery-init",
       "description": "/delivery-init — connect a project to Azure DevOps: discover org/project/repo, probe the MCP, resolve the wiki, and write .delivery/config.json (secret-by-reference) + methodology.json."
+    },
+    {
+      "name": "kickoff",
+      "description": "/kickoff — greenfield cold-start: live PO intake, then the business-analyst + technical-analyst create the first Epics/Features and seed the Domain/Architecture wiki. Run once after /delivery-init."
+    },
+    {
+      "name": "refine",
+      "description": "/refine — recurring backlog refinement: the analysts + tech-lead decompose analyzed Features into keyed, area-tagged, dependency-linked work-units, each with a canonical developer brief."
+    },
+    {
+      "name": "sprint-plan",
+      "description": "/sprint-plan — velocity-driven sprint selection: capacity from the last N=3 closed sprints, then the project-manager admits backlog units by stack-rank at one granularity and assigns IterationPath."
+    },
+    {
+      "name": "sprint-start",
+      "description": "/sprint-start — build the sprint's dependency DAG, fail-fast on a cycle or a missing mobile emulator, materialize .delivery/plan.json, and hand off to the atl work dispatch engine."
+    },
+    {
+      "name": "sprint-review",
+      "description": "/sprint-review — sprint-end: compile the Sprint Review Report (completed, PRs, evidence, dev preview, velocity, findings) and run the PO Approve/Reject gate that alone triggers dev→release."
     }
   ],
   "areas": [
