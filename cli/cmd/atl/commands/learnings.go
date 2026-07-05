@@ -89,7 +89,7 @@ var learningsPeekCmd = &cobra.Command{
 			return nil
 		}
 		for _, it := range items {
-			fmt.Printf("%-12s  %-12s  %s\n", it.ID[:12], it.Channel, firstLine(it.Payload))
+			fmt.Printf("%-12s  %-12s  %s\n", shortID(it.ID), it.Channel, firstLine(it.Payload))
 		}
 		return nil
 	},
@@ -97,6 +97,9 @@ var learningsPeekCmd = &cobra.Command{
 
 // learningsAckCmd deletes a processed item — processed-then-deleted, so it can
 // never be re-reported. The /drain skill calls this after integrating an item.
+// The id may be a full id or an unambiguous prefix (peek shows a short prefix),
+// resolved git-style against the pending set so a wrong/ambiguous id fails loudly
+// instead of silently no-op'ing (bbolt Delete on a missing key is a no-op).
 var learningsAckCmd = &cobra.Command{
 	Use:   "ack <id>",
 	Short: "Mark an item processed (delete it from the queue)",
@@ -107,10 +110,18 @@ var learningsAckCmd = &cobra.Command{
 			return err
 		}
 		defer st.Close()
-		if err := st.Delete(project, args[0]); err != nil {
+		items, err := st.Pending(project, "")
+		if err != nil {
 			return err
 		}
-		fmt.Printf("acked %s\n", args[0])
+		id, err := resolveAckID(items, args[0])
+		if err != nil {
+			return err
+		}
+		if err := st.Delete(project, id); err != nil {
+			return err
+		}
+		fmt.Printf("acked %s\n", id)
 		return nil
 	},
 }
@@ -204,6 +215,45 @@ var learningsTranscriptCmd = &cobra.Command{
 		}
 		return nil
 	},
+}
+
+// shortID is the 12-char id prefix shown by peek (and echoed in ack's ambiguity
+// error). Guarded so it never panics on an unexpectedly short id.
+func shortID(id string) string {
+	if len(id) <= 12 {
+		return id
+	}
+	return id[:12]
+}
+
+// resolveAckID resolves an id or an unambiguous id-prefix against the pending
+// items, git-short-SHA style: it returns the single full ID that idArg is a
+// prefix of. peek displays a 12-char prefix, so copy-pasting that into ack must
+// resolve to the right item; and a non-matching or ambiguous id must fail loudly
+// rather than let ack print "acked" on a Delete that removed nothing.
+func resolveAckID(items []queue.Item, idArg string) (string, error) {
+	idArg = strings.TrimSpace(idArg)
+	if idArg == "" {
+		return "", fmt.Errorf("ack: empty id")
+	}
+	var matches []string
+	for _, it := range items {
+		if strings.HasPrefix(it.ID, idArg) {
+			matches = append(matches, it.ID)
+		}
+	}
+	switch len(matches) {
+	case 1:
+		return matches[0], nil
+	case 0:
+		return "", fmt.Errorf("ack: no queued item matches id %q (run `atl learnings peek` to list ids)", idArg)
+	default:
+		shorts := make([]string, len(matches))
+		for i, id := range matches {
+			shorts[i] = shortID(id)
+		}
+		return "", fmt.Errorf("ack: ambiguous id %q — matches %d items: %s", idArg, len(matches), strings.Join(shorts, ", "))
+	}
 }
 
 // firstLine returns the first line of s, marked with an ellipsis if truncated.
