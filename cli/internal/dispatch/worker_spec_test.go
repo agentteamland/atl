@@ -36,7 +36,7 @@ func TestDeliveryWorkerPrompt_Invariants(t *testing.T) {
 		"status.json",                  // the only channel back to the supervisor
 		"never fake a green",           // block-never-silent-pass
 		"do NOT merge",                 // job ends at PR
-		"do NOT set the work-item Done", // the engine drives Done after verifying the merge
+		"do NOT set the work-item Done", // the tech-lead completes the PR + sets Done; the engine only verifies
 	}
 	for _, want := range must {
 		if !strings.Contains(got, want) {

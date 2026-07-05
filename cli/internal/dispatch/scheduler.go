@@ -548,6 +548,6 @@ Ground rules (your agent manual holds the full detail):
 - The engine handed you only this work-item's id; fetch everything else from Azure at runtime: claim the item (transition it to the runtime-resolved in-progress state plus a claim comment), then read the work-item, its **[Technical Analysis]** sentinel comment, and the tech-lead's canonical brief; resolve your area:<name> tag and load ONLY that area's pack under %[5]s/<area>/; read the brief-named Architecture/ and Conventions/ wiki pages.
 - Your six phases, in order: claim -> plan -> implement -> self-test -> comment -> pr. Write each phase and a fresh heartbeat to status.json as you go.
 - Self-test every surface the unit touches and attach evidence via scripts/az-attach.sh. A surface you could not run is UNVERIFIED — set status.json blocker and stop; never fake a green.
-- Your job ENDS at the pull request: do NOT review your own PR, do NOT merge, and do NOT set the work-item Done — the tech-lead reviews, and the engine merges and drives the Done transition after verifying the merge.`,
+- Your job ENDS at the pull request: do NOT review your own PR, do NOT merge, and do NOT set the work-item Done — the tech-lead reviews and, on green, completes the Azure PR (= the merge to dev) and sets Done; the engine only verifies the merge landed.`,
 		u.ID, agentDir, configPath, u.Title, packsDir)
 }

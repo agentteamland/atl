@@ -1,5 +1,5 @@
 ---
-knowledge-base-summary: "My contract-faithful Azure touches via the azureDevOps MCP — the real tool for each op: read work-item (wit_get_work_item), read the [Technical Analysis] sentinel comment (wit_list_work_item_comments), claim via runtime-resolved state (wit_get_work_item_type → wit_update_work_item + wit_add_work_item_comment), read brief-named wiki pages (wiki_get_page_content), link the PR (wit_link_work_item_to_pull_request), attach evidence (scripts/az-attach.sh). I never invent a tool, never write a literal state, never write the wiki, never create items, never self-merge or self-set Done."
+knowledge-base-summary: "My contract-faithful Azure touches via the azureDevOps MCP — the real tool for each op: read work-item (wit_get_work_item), read the [Technical Analysis] sentinel comment (wit_list_work_item_comments), claim via runtime-resolved state (wit_get_work_item_type → wit_update_work_item + wit_add_work_item_comment), read brief-named wiki pages (wiki_get_page_content), open the delivery-native PR to dev (repo_create_pull_request) + link it (wit_link_work_item_to_pull_request), attach evidence (scripts/az-attach.sh). I never invent a tool, never write a literal state, never write the wiki, never create items; I never merge or set Done — on green the tech-lead completes the PR (= merge to dev) + sets Done, the engine only verifies the merge landed."
 ---
 
 # Azure Touchpoints
@@ -23,6 +23,7 @@ These are every Azure touch I make across the micro-loop, with the exact tool fo
 | Write a claim / progress comment | `wit_add_work_item_comment` |
 | Read a project-wiki page the canonical brief names | `wiki_get_page_content` |
 | Discover a wiki page when the brief didn't pre-name its path | `search_wiki` |
+| **Open** the delivery-native PR to `dev` (step 6) | `repo_create_pull_request` |
 | Link my opened PR ↔ the work-item | `wit_link_work_item_to_pull_request` |
 | Attach test evidence (screenshots / result files) | **no MCP tool → `scripts/az-attach.sh`** (adapter §9 REST carve-out) |
 
@@ -62,8 +63,9 @@ template that spells it differently. I pair the transition with a claim comment
   mid-unit and am re-dispatched, I **converge on the existing item** (read it, continue from its
   state) — I do not duplicate it. Creation and its keying are not my job.
 - **§6 runtime state resolution — never a literal state.** Every state I set is resolved via
-  `wit_get_work_item_type` first. And I do **not** set `Done` at all — the engine sets it after the
-  merge-verify (see below).
+  `wit_get_work_item_type` first. And I do **not** set `Done` at all — the **tech-lead** sets the
+  runtime-resolved Done after completing the PR, and the engine gates refill on the verified merge
+  (see below).
 - **§7 content-placement — I read the sentinel comment, I never write it.** The `**[Technical
   Analysis]**` comment is the technical-analyst's; my comments are plain progress comments. I read
   analysis back by location, not by scanning.
@@ -91,9 +93,11 @@ is the adapter's, not mine to reimplement). Coding work must never fail because 
 - **I never write the project wiki** — the tech-lead owns write-authority (§8); I surface, they
   promote.
 - **I never merge and never self-set `Done`.** After my PR is green
-  (`green = (all test-gates passed) ∧ (review passed)`), the **deterministic engine merges to `dev`
-  and verifies the durable git state**, and only then does the Azure→Done transition follow (strict
-  ordering: merge-to-dev precedes the Done that triggers refill). Me opening a PR and self-merging
-  would violate both the NEVER-merge discipline and the engine's durable-state verification — an
-  LLM worker's exit-0 is not proof a git merge landed. So I stop at the PR link; the engine closes
-  the loop.
+  (`green = (all test-gates passed) ∧ (review passed)`), the **tech-lead completes the Azure PR (= the
+  merge to `dev`, non-squash) and sets the runtime-resolved Done**; the **deterministic engine then
+  verifies the merge landed** (`MergedToBase`, a pure git read) and gates refill on it — it never
+  merges (it is zero-Azure and cannot complete an Azure PR). Merge-to-dev precedes the Done that
+  triggers refill (strict ordering). Me opening a PR and self-merging would violate both the
+  NEVER-merge discipline and the engine's durable-state verification — an LLM worker's exit-0 is not
+  proof a git merge landed. So I stop at the PR link; the tech-lead merges and the engine verifies
+  ([`pr-and-review.md`](../../../knowledge/pr-and-review.md)).
