@@ -20,7 +20,32 @@
   "repository": "https://github.com/agentteamland/atl",
   "homepage": "https://github.com/agentteamland",
   "scope": "project",
-  "agents": [],
+  "agents": [
+    {
+      "name": "intake",
+      "description": "The delivery org's conversational front door — runs live in /kickoff, elicits vision and requirements from the human PO, and hands a structured framing to the business-analyst."
+    },
+    {
+      "name": "business-analyst",
+      "description": "Turns intake discovery into Epics and Features with fixed-heading business analysis, and owns the Domain and business-side Analysis wiki knowledge for the delivery org."
+    },
+    {
+      "name": "technical-analyst",
+      "description": "Enriches Features/PBIs after the business-analyst with technical analysis — approach, feasibility, NFRs, dependencies, suggested areas — as a sentinel-labeled comment."
+    },
+    {
+      "name": "project-manager",
+      "description": "Plans sprints for the delivery org: computes capacity from velocity, builds the dependency DAG, admits the right unblocked items, and writes the sprint-review report."
+    },
+    {
+      "name": "tech-lead",
+      "description": "The delivery-team's highest-context technical role: decomposes Features into keyed work-units, owns the architecture + conventions wiki, briefs workers, and gates review pre-merge."
+    },
+    {
+      "name": "tester",
+      "description": "Independent Level-2 verification — a fresh delivery-team worker per work-unit that probes coverage, edges, and regression, attaches evidence, and gates the loop with a verdict."
+    }
+  ],
   "skills": [
     {
       "name": "delivery-init",
