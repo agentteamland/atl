@@ -42,6 +42,10 @@
       "description": "The delivery-team's highest-context technical role: decomposes Features into keyed work-units, owns the architecture + conventions wiki, briefs workers, and gates review pre-merge."
     },
     {
+      "name": "developer",
+      "description": "The delivery-team's generic implementer: a fresh isolated claude -p worker per work-unit that loads its tagged area's stack-pack, builds and self-tests in its own worktree, and hands off at PR."
+    },
+    {
       "name": "tester",
       "description": "Independent Level-2 verification — a fresh delivery-team worker per work-unit that probes coverage, edges, and regression, attaches evidence, and gates the loop with a verdict."
     }
@@ -50,6 +54,20 @@
     {
       "name": "delivery-init",
       "description": "/delivery-init — connect a project to Azure DevOps: discover org/project/repo, probe the MCP, resolve the wiki, and write .delivery/config.json (secret-by-reference) + methodology.json."
+    }
+  ],
+  "areas": [
+    {
+      "name": "web",
+      "description": "React + TypeScript + Vite frontend — the web surface (preview / chrome-devtools MCP + code CI)."
+    },
+    {
+      "name": "mobile",
+      "description": "Flutter + Dart mobile app — the emulator surface (booted simulator/emulator + code CI)."
+    },
+    {
+      "name": "api",
+      "description": "Node.js + Express + TypeScript backend API — the code surface (unit + integration CI)."
     }
   ],
   "rules": [],
