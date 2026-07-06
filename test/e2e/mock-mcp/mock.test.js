@@ -172,6 +172,13 @@ test('curated-map boundary: off-contract tools are absent', () => {
   assert.ok(tools['work_get_team_capacity']);
 });
 
+test('repo_list_repos_by_project is on-contract (delivery-init repo discovery)', () => {
+  const { st } = tmpStore();
+  assert.ok(tools['repo_list_repos_by_project'], 'listed in the curated adapter map (delivery-init discovery)');
+  const r = call(st, 'repo_list_repos_by_project', { project: 'DeliveryTest' });
+  assert.ok(r.value.length >= 1, 'returns the project repos for the user to pick');
+});
+
 test('persistence: a fresh Store process reloads the prior mutations', () => {
   const { st, dir } = tmpStore();
   call(st, 'wit_create_work_item', { workItemType: 'Epic', fields: [{ name: 'System.Title', value: 'Persist me' }] });
