@@ -256,6 +256,11 @@ const tools = {
   },
 
   // ---- repos / PRs (repo_*) ----
+  repo_list_repos_by_project: {
+    description: "List a project's repos (discovery — /delivery-init lets the user pick one).",
+    inputSchema: { type: 'object', properties: { project: { type: 'string' } } },
+    handler: (st) => ({ count: st.state.repos.length, value: st.state.repos }),
+  },
   repo_get_repo_by_name_or_id: {
     description: 'Read a repo.',
     inputSchema: { type: 'object', properties: { project: {}, repositoryNameOrId: {} } },

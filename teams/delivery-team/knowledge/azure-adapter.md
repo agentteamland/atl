@@ -50,6 +50,7 @@ rules below or is escalated, not guessed.
 | List / create / assign iterations | `work_list_iterations` / `work_create_iterations` / `work_assign_iterations` |
 | Read / write team capacity | `work_get_team_capacity` / `work_update_team_capacity` |
 | Create / update / vote / thread a PR | `repo_create_pull_request` / `repo_update_pull_request` / `repo_vote_pull_request` / `repo_create_pull_request_thread` / `repo_list_pull_request_threads` / `repo_reply_to_comment` |
+| List a project's repos (discovery, e.g. `/delivery-init`) | `repo_list_repos_by_project` |
 | Read repo/branch/file | `repo_get_repo_by_name_or_id` / `repo_get_branch_by_name` / `repo_get_file_content` |
 | Read / upsert / list wiki pages | `wiki_get_page_content` / `wiki_create_or_update_page` / `wiki_list_pages` / `wiki_get_wiki` / `wiki_list_wikis` |
 | Discovery search | `search_workitem` / `search_wiki` / `search_code` |
