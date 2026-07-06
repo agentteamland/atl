@@ -57,6 +57,18 @@ write_test_index_profile() {
   jq -n '{schemaVersion:1,generatedAt:"2026-07-02T00:00:00Z",teams:[{handle:"agentteamland",name:"profile-team",version:"1.0.0",description:"profile-team e2e (monorepo subpath).",keywords:["profile"],scope:"global",verified:true,source:{repo:"agentteamland/atl",subpath:"teams/profile-team",ref:"main"}}]}' > "$HOME/.atl/index.json"
 }
 
+# write_test_index_delivery seeds ~/.atl/index.json with the first-party
+# delivery-team entry, pointing at the monorepo subpath on `main` (delivery-team
+# is not yet in the published catalog, so the e2e injects it the same way
+# write_test_index_profile does). It is project-scope, so the blueprint installs
+# it into the project, not globally. The ceremony CONTENT comes from `main`; the
+# mock MCP server + this blueprint come from the image (COPY test/e2e/), so a
+# delivery-team change on the branch still tests against the merged ceremonies.
+write_test_index_delivery() {
+  mkdir -p "$HOME/.atl"
+  jq -n '{schemaVersion:1,generatedAt:"2026-07-06T00:00:00Z",teams:[{handle:"agentteamland",name:"delivery-team",version:"0.1.0",description:"delivery-team e2e (monorepo subpath).",keywords:["delivery"],scope:"project",verified:true,source:{repo:"agentteamland/atl",subpath:"teams/delivery-team",ref:"main"}}]}' > "$HOME/.atl/index.json"
+}
+
 # gh_login echoes the authenticated GitHub login (GH_TOKEN is passed through by
 # the runner); empty if gh isn't authenticated.
 gh_login() {
