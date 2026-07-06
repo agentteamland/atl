@@ -210,24 +210,40 @@ class Store {
   queryWiql(wiql, top) {
     const q = String(wiql || '');
     const conds = [];
-    const re = /\[([\w.]+)\]\s*(=|<>|CONTAINS|contains|Contains)\s*'([^']*)'/g;
+    // = / <> / CONTAINS / UNDER against a quoted value. UNDER is the iteration-path
+    // scope operator (at-or-below a path node); ceremonies emit it for velocity/
+    // backlog reads, so it must NARROW like the others, not be dropped.
+    const re = /\[([\w.]+)\]\s*(=|<>|CONTAINS|UNDER)\s*'([^']*)'/gi;
     let m;
-    while ((m = re.exec(q)) !== null) {
-      conds.push({ field: m[1], op: m[2].toUpperCase(), value: m[3] });
+    while ((m = re.exec(q)) !== null) conds.push({ field: m[1], op: m[2].toUpperCase(), value: m[3] });
+    // IN ('a','b',...) — multi-value membership (e.g. State IN ('New','Approved')).
+    const reIn = /\[([\w.]+)\]\s+IN\s*\(([^)]*)\)/gi;
+    while ((m = reIn.exec(q)) !== null) {
+      conds.push({ field: m[1], op: 'IN', values: m[2].split(',').map((s) => s.trim().replace(/^'|'$/g, '')) });
     }
     let items = Object.values(this.state.workItems).filter((wi) =>
       conds.every((c) => {
         const fv = wi.fields[c.field];
         if (c.op === 'CONTAINS') return String(fv || '').includes(c.value);
+        if (c.op === 'UNDER') { const s = String(fv || ''); return s === c.value || s.startsWith(c.value + '\\'); }
+        if (c.op === 'IN') return c.values.includes(String(fv));
         if (c.op === '<>') return String(fv) !== c.value;
         return String(fv) === c.value;
       })
     );
+    // Safety: a WHERE clause that yielded NO recognized conditions means an
+    // unsupported operator slipped through — narrow to empty, never widen to a
+    // full-store scan (which would corrupt velocity/selection).
+    if (/\bWHERE\b/i.test(q) && conds.length === 0) items = [];
     const orderM = /ORDER BY\s+\[([\w.]+)\]\s*(ASC|DESC)?/i.exec(q);
     if (orderM) {
       const f = orderM[1], dir = (orderM[2] || 'ASC').toUpperCase() === 'DESC' ? -1 : 1;
       items = items.slice().sort((a, b) => {
         const av = a.fields[f], bv = b.fields[f];
+        const an = av === undefined || av === null, bn = bv === undefined || bv === null;
+        if (an && bn) return 0;
+        if (an) return 1;   // missing sort field sorts last (stable trailing), regardless of dir
+        if (bn) return -1;
         if (av === bv) return 0;
         return (av > bv ? 1 : -1) * dir;
       });
@@ -241,10 +257,15 @@ class Store {
     return this.state.iterations.filter((it) => (it.attributes || {}).timeFrame === 'past');
   }
 
-  itemsForIteration(pathOrName) {
+  itemsForIteration(key) {
+    // `key` may be the iteration id ('iter-1' — what the real
+    // wit_get_work_items_for_iteration takes, resolved from work_list_iterations),
+    // its name ('Sprint 1'), or a full path. Resolve any of them to the path first.
+    const it = this.state.iterations.find((i) => i.id === key || i.name === key || i.path === key);
+    const path = it ? it.path : key;
     return Object.values(this.state.workItems).filter((wi) => {
       const ip = wi.fields['System.IterationPath'] || '';
-      return ip === pathOrName || ip.endsWith('\\' + pathOrName) || ip.endsWith(pathOrName);
+      return ip === path || ip === key || ip.endsWith('\\' + key) || ip.endsWith(key);
     });
   }
 

@@ -208,8 +208,13 @@ const tools = {
     description: 'List work-items on a backlog level.',
     inputSchema: { type: 'object', properties: { project: {}, team: {}, backlogId: {} } },
     handler: (st) => {
+      // The active backlog excludes Completed-category items — a Done PBI has left
+      // the backlog. Resolve the Completed state names at runtime (never hardcode).
+      const completed = st.workItemType('Product Backlog Item').states
+        .filter((s) => s.category === 'Completed').map((s) => s.name);
       const items = Object.values(st.state.workItems)
         .filter((wi) => wi.fields['System.WorkItemType'] === 'Product Backlog Item')
+        .filter((wi) => !completed.includes(wi.fields['System.State']))
         .sort((a, b) => (a.fields['Microsoft.VSTS.Common.StackRank'] || 0) - (b.fields['Microsoft.VSTS.Common.StackRank'] || 0));
       return { value: items.map((wi) => ({ id: wi.id })) };
     },

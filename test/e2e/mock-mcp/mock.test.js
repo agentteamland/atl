@@ -102,6 +102,45 @@ test('velocity read: closed-iteration Done points are summable', () => {
   assert.ok(pts > 0, 'Sprint 3 has summable story points');
 });
 
+test('wit_get_work_items_for_iteration resolves an iteration by ITS ID, not just name', () => {
+  const { st } = tmpStore();
+  // the real flow: work_list_iterations hands the LLM the id, which it passes back
+  const closed = call(st, 'work_list_iterations', {}).value.find((i) => (i.attributes || {}).timeFrame === 'past');
+  const byId = call(st, 'wit_get_work_items_for_iteration', { iterationId: closed.id });
+  assert.ok(byId.value.length >= 1, 'resolves the closed sprint by id (velocity would be 0 otherwise)');
+  const pts = byId.value.reduce((n, wi) => n + (wi.fields['Microsoft.VSTS.Scheduling.StoryPoints'] || 0), 0);
+  assert.ok(pts > 0, 'story points summable via the id path');
+});
+
+test('WIQL UNDER scopes to a path; IN matches a value set; an unknown operator narrows to empty', () => {
+  const { st } = tmpStore();
+  const allDone = call(st, 'wit_query_by_wiql', { wiql: "SELECT [System.Id] FROM WorkItems WHERE [System.State] = 'Done'" });
+  const under = call(st, 'wit_query_by_wiql', { wiql: "SELECT [System.Id] FROM WorkItems WHERE [System.IterationPath] UNDER 'DeliveryTest\\Sprint 1' AND [System.State] = 'Done'" });
+  assert.ok(under.workItems.length >= 1);
+  assert.ok(under.workItems.length < allDone.workItems.length, 'UNDER narrows to one sprint, not the whole store');
+  call(st, 'wit_create_work_item', { workItemType: 'Product Backlog Item', fields: [{ name: 'System.Title', value: 'fresh' }, { name: 'System.State', value: 'New' }] });
+  const inq = call(st, 'wit_query_by_wiql', { wiql: "SELECT [System.Id] FROM WorkItems WHERE [System.State] IN ('New','Approved')" });
+  assert.equal(inq.workItems.length, 1, "IN matches the value set");
+  const unknown = call(st, 'wit_query_by_wiql', { wiql: "SELECT [System.Id] FROM WorkItems WHERE [System.Title] LIKE 'foo'" });
+  assert.equal(unknown.workItems.length, 0, 'unsupported operator narrows to empty, never a full-store scan');
+});
+
+test('wit_list_backlog_work_items excludes Completed (Done) items — active backlog only', () => {
+  const { st } = tmpStore();
+  assert.equal(call(st, 'wit_list_backlog_work_items', {}).value.length, 0, 'the seed is all Done -> active backlog empty');
+  call(st, 'wit_create_work_item', { workItemType: 'Product Backlog Item', fields: [{ name: 'System.Title', value: 'new work' }] });
+  assert.equal(call(st, 'wit_list_backlog_work_items', {}).value.length, 1, 'a New PBI is an active backlog candidate');
+});
+
+test('WIQL ORDER BY places a missing-sort-field item last (stable)', () => {
+  const { st } = tmpStore();
+  const a = call(st, 'wit_create_work_item', { workItemType: 'Product Backlog Item', fields: [{ name: 'System.Title', value: 'A' }, { name: 'System.State', value: 'New' }, { name: 'Microsoft.VSTS.Common.StackRank', value: 2 }] });
+  const b = call(st, 'wit_create_work_item', { workItemType: 'Product Backlog Item', fields: [{ name: 'System.Title', value: 'B' }, { name: 'System.State', value: 'New' }] });
+  const c = call(st, 'wit_create_work_item', { workItemType: 'Product Backlog Item', fields: [{ name: 'System.Title', value: 'C' }, { name: 'System.State', value: 'New' }, { name: 'Microsoft.VSTS.Common.StackRank', value: 1 }] });
+  const r = call(st, 'wit_query_by_wiql', { wiql: "SELECT [System.Id] FROM WorkItems WHERE [System.State] = 'New' ORDER BY [Microsoft.VSTS.Common.StackRank] ASC" });
+  assert.deepEqual(r.workItems.map((w) => w.id), [c.id, a.id, b.id], 'ranked first (C,A), unranked (B) last');
+});
+
 test('wiki upsert is idempotent (§8)', () => {
   const { st } = tmpStore();
   call(st, 'wiki_create_or_update_page', { wikiId: 'wiki-1', path: 'Sprints/Sprint-4-Review', content: 'v1' });
