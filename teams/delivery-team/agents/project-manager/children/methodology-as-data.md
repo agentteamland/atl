@@ -1,5 +1,5 @@
 ---
-knowledge-base-summary: "Methodology is data, not hardcoded logic: I read roles/dispatch, cadence, capacityModel, artifactHierarchy, and branches from .delivery/methodology.json and act. config.json is read-only (only /delivery-init writes it). Resolve concrete type/state/iteration names at runtime (wit_get_work_item_type), never a literal Done/Blocked. The branchPair-vs-methodology.branches reconciliation (config wins)."
+knowledge-base-summary: "Methodology is data, not hardcoded logic: I read roles/dispatch, cadence, capacityModel, artifactHierarchy, and branches from .delivery/methodology.json and act. config.json is read-only (only /delivery-init writes it). Resolve concrete type/state/iteration names at runtime (wit_get_work_item_type), never a literal Done ('blocked' is a tag/field, not a state). The branchPair-vs-methodology.branches reconciliation (config wins)."
 ---
 
 # Methodology as Data
@@ -52,16 +52,19 @@ state names are process-template-dependent (Scrum `Product Backlog Item`/`Done` 
 `User Story`/`Closed`). So, before I touch a type or a state:
 
 - **Types/states** → resolve via `wit_get_work_item_type` (adapter §6). "Done" for velocity is the
-  resolved **Completed** state-category, not the literal string `"Done"`. "Mark blocked" resolves
-  the **blocked-category** state name (`Blocked` / `On Hold` / custom). I never write a literal
-  state into my reasoning.
+  resolved **Completed** state-category, not the literal string `"Done"`. "Mark blocked" is **not**
+  a state — Azure has no blocked state-category; it is a `blocked` tag (plus the
+  `Microsoft.VSTS.CMMI.Blocked` field where the type exposes it), leaving `System.State` unchanged.
+  I never write a literal state into my reasoning, and I never invent a `Blocked` state.
 - **Iteration names/paths** → resolve at runtime via `work_list_iterations`
   ([iteration-management.md](iteration-management.md)) — the concrete
   `Sprint <n>` path is a live fact, never a constructed string.
 
-> **WHY runtime resolution is non-negotiable.** Hardcoding `"Done"` or `"Blocked"` silently breaks
-> the moment a project uses a different process template — the query matches nothing, velocity
-> reads zero, the plan admits garbage. Resolving at runtime is what makes the team work on *any*
+> **WHY runtime resolution is non-negotiable.** Hardcoding `"Done"` (or assuming a `"Blocked"`
+> state that no standard template even has) silently breaks the moment a project uses a different
+> process template — the query matches nothing, velocity reads zero, the plan admits garbage.
+> Resolving real states at runtime (and treating "blocked" as a tag/field, not a state) is what
+> makes the team work on *any*
 > process template (Scrum/Agile/CMMI/custom) with zero org-admin setup.
 
 ## The branchPair ↔ methodology.branches reconciliation

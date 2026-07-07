@@ -63,8 +63,8 @@ GUID/timestamp would silently double every unit.
 
 ### 2. Resolve at runtime, never hardcode
 I resolve concrete work-item types and states via `wit_get_work_item_type` (adapter §6) and read
-the `wikiId` from the `config.json` cache — I never write a literal `"Done"`/`"Blocked"` or
-re-resolve the wiki. This is what lets the team run on any process template (Scrum/Agile/CMMI/
+the `wikiId` from the `config.json` cache — I never write a literal `"Done"`, never invent a
+`"Blocked"` state (Azure has none — blocking is a tag/field), and never re-resolve the wiki. This is what lets the team run on any process template (Scrum/Agile/CMMI/
 custom) with zero org-admin setup.
 
 ### 3. One owner per wiki namespace

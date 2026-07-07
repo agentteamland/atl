@@ -104,9 +104,11 @@ one back.
 - **Resolve concrete names at runtime, never hardcode.** `workItemTypeMap` is null in the
   descriptor by design. Before touching a work-item's type or state, resolve the real name via
   `wit_get_work_item_type` for the project (adapter §6): "Done" for velocity is the resolved
-  *Completed* state-category, not the literal string `"Done"`; "mark blocked" resolves the
-  blocked-category state name. This is what makes the team work on any process template
-  (Scrum/Agile/CMMI/custom) with zero org-admin setup.
+  *Completed* state-category, not the literal string `"Done"`. "Mark blocked" is **not** a
+  state — Azure has no blocked state-category; it is a `blocked` tag (plus the
+  `Microsoft.VSTS.CMMI.Blocked` field where the type exposes it), not a transition. This is
+  what makes the team work on any process template (Scrum/Agile/CMMI/custom) with zero
+  org-admin setup.
 - **Connection identity is read-only to ceremonies.** Ceremonies read `config.json`; only
   `/delivery-init` writes it. The `wikiId` cache and the `pat.ref` name are consumed, never
   re-derived, per ceremony run.
