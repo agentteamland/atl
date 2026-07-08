@@ -25,6 +25,7 @@ type UnitRunState struct {
 	ID             int       `json:"id"`
 	Branch         string    `json:"branch"`
 	WorktreePath   string    `json:"worktreePath"`
+	Stage          string    `json:"stage"` // current pipeline stage: developer | tester | tech-lead
 	PID            int       `json:"pid"`
 	CreatedAt      time.Time `json:"createdAt"`
 	Phase          string    `json:"phase"`          // last observed phase (from status.json)

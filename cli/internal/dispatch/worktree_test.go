@@ -86,6 +86,53 @@ func TestCreate(t *testing.T) {
 	}
 }
 
+// A mid-pipeline engine restart leaves the unit's canonical branch/worktree in place
+// (Reconcile preserves unmerged work under the canonical name). Re-admission's Create
+// must free the name WITHOUT deleting the unmerged work — quarantine it aside, then
+// create a fresh worktree. A regression here re-introduces the sprint-wedge (Create's
+// `worktree add -b` colliding on the existing branch) or, worse, deletes unmerged work.
+func TestCreateQuarantinesUnmergedRestartLeftover(t *testing.T) {
+	f := &fakeRunner{
+		branches:     map[string]bool{"delivery/s1/5": true}, // a leftover from a prior run
+		revListCount: "3",                                    // it carries unmerged commits
+	}
+	w := newWorktree(f)
+	w.Root = t.TempDir()
+	if _, err := w.Create("s1", 5); err != nil {
+		t.Fatal(err)
+	}
+	if !f.called("worktree move") || !f.called("branch -m delivery/s1/5 delivery/s1/5-restart") {
+		t.Errorf("an unmerged leftover must be moved aside + renamed (quarantined), not left to collide: %v", f.calls)
+	}
+	if f.called("branch -D delivery/s1/5") {
+		t.Error("DATA LOSS: the unmerged leftover branch must NEVER be force-deleted")
+	}
+	if !f.called("worktree add -b delivery/s1/5") {
+		t.Errorf("after freeing the name, Create must add the fresh worktree: %v", f.calls)
+	}
+}
+
+// The clean-leftover variant: a merged/empty leftover is safely reclaimed (not moved
+// aside), then the fresh worktree is created — no collision, no needless quarantine.
+func TestCreateReclaimsCleanRestartLeftover(t *testing.T) {
+	f := &fakeRunner{
+		branches:        map[string]bool{"delivery/s1/6": true},
+		revListCount:    "0", // no commits beyond dev
+		statusPorcelain: "",  // and a clean working tree → safe to reclaim
+	}
+	w := newWorktree(f)
+	w.Root = t.TempDir()
+	if _, err := w.Create("s1", 6); err != nil {
+		t.Fatal(err)
+	}
+	if !f.called("worktree remove --force") || !f.called("branch -D delivery/s1/6") {
+		t.Errorf("a clean leftover should be reclaimed outright: %v", f.calls)
+	}
+	if !f.called("worktree add -b delivery/s1/6") {
+		t.Errorf("after reclaiming, Create must add the fresh worktree: %v", f.calls)
+	}
+}
+
 func TestTeardown(t *testing.T) {
 	f := &fakeRunner{}
 	w := newWorktree(f)
