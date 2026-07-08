@@ -32,7 +32,7 @@ type Scheduler struct {
 	ReadStatus func(worktreePath string) (*Status, error)
 	Now        func() time.Time
 	Sleep      func(time.Duration)
-	BuildSpec  func(u WorkUnit, worktreeDir string) WorkerSpec
+	BuildSpec  func(u WorkUnit, stage Stage, worktreeDir string) WorkerSpec
 	Log        func(string)
 
 	// deliveryCfg is the project's .delivery/config.json, loaded once at Run()
@@ -77,11 +77,12 @@ const (
 // durable UnitRunState (which mirrors only running units, for restart
 // reconciliation); this struct also carries the in-memory handle + retry count.
 type unitSched struct {
-	unit    WorkUnit
-	state   unitState
-	handle  Handle
-	rs      *UnitRunState // non-nil only while running
-	retries int           // reclaim-and-retry count (0, then at most 1 per #12)
+	unit     WorkUnit
+	state    unitState
+	stageIdx int           // index into deliveryPipeline of the CURRENTLY running stage (0 = developer)
+	handle   Handle
+	rs       *UnitRunState // non-nil only while running
+	retries  int           // reclaim-and-retry count for the unit (0, then at most 1 per #12)
 }
 
 // Summary is the terminal outcome of a dispatch run, partitioned by unit fate.
@@ -215,10 +216,13 @@ func (s *Scheduler) poll(u *unitSched, now time.Time) error {
 
 	switch {
 	case exited && code == 0 && (statusErr != nil || status.Blocker == ""):
-		// Merge-gated completion (Resolution #8): the supervisor verifies the
-		// merge landed on origin/dev before tearing down, so a successor's fresh
-		// fetch always contains this unit's merge (or the unit is mark-blocked).
-		return s.complete(u, now)
+		// A pipeline stage worker finished cleanly. Advance to the next stage
+		// (developer→tester→tech-lead) — or, after the FINAL stage, run merge-gated
+		// completion (Resolution #8): the supervisor verifies the tech-lead's merge
+		// landed on origin/dev before tearing down. A non-final stage never triggers
+		// the merge-verify (only the tech-lead merges), which is exactly the seam
+		// §7 deferred to this window.
+		return s.advanceOrComplete(u, now)
 
 	case exited && statusErr == nil && status.Blocker != "":
 		// The worker deliberately reported a blocker (#5 real-test-failure /
@@ -244,6 +248,18 @@ func (s *Scheduler) poll(u *unitSched, now time.Time) error {
 		}
 		return nil
 	}
+}
+
+// advanceOrComplete routes a stage worker's clean exit: advance to the next
+// pipeline stage if any remain, else finalize the unit (merge-verify + teardown)
+// after the tech-lead stage. Only the final stage runs complete(), so a developer
+// or tester exit-0 — neither of which merges — never mark-blocks on an unmerged
+// branch (the §7 pitfall the single-worker model would have hit).
+func (s *Scheduler) advanceOrComplete(u *unitSched, now time.Time) error {
+	if u.stageIdx < len(deliveryPipeline)-1 {
+		return s.advanceStage(u, now)
+	}
+	return s.complete(u, now)
 }
 
 // complete finalizes a worker that exited 0. It does NOT trust the exit code as
@@ -394,26 +410,63 @@ func (s *Scheduler) admit(now time.Time) error {
 	return nil
 }
 
-// spawnUnit creates a fresh worktree off dev and starts a worker for the unit.
+// spawnUnit admits a pending unit: it creates the unit's worktree off dev ONCE and
+// starts the FIRST pipeline stage (the developer). The tester + tech-lead stages
+// reuse this same worktree via advanceStage — they work over the developer's branch,
+// not a fresh checkout (pr-and-review §1). Re-admission after a #12 retry re-enters
+// here, resetting the pipeline to stage 0 on a fresh worktree.
 func (s *Scheduler) spawnUnit(us *unitSched, now time.Time) error {
-	slug := s.Plan.SprintSlug
-	id := us.unit.ID
-	path, err := s.Worktree.Create(slug, id)
+	path, err := s.Worktree.Create(s.Plan.SprintSlug, us.unit.ID)
 	if err != nil {
 		return err
 	}
-	spec := s.BuildSpec(us.unit, path)
-	// Wire the worker's Azure access from config (D3 / #17): an azureDevOps MCP
-	// scoped to the project's org (so it can never inherit the operator's global
-	// employer MCP) + the PAT env the MCP server and az-attach.sh consume. Skipped
-	// when there's no config (ambient inheritance, the pre-#8 / Layer-A path).
+	us.stageIdx = 0 // (re-)admission always re-drives the pipeline from the developer
+	if err := s.spawnStage(us, path, now); err != nil {
+		return err
+	}
+	s.Log(fmt.Sprintf("unit %d admitted — %s worker pid %d in %s", us.unit.ID, deliveryPipeline[0], us.handle.PID(), path))
+	return nil
+}
+
+// advanceStage moves a unit to its next pipeline stage after the current stage's
+// worker exited 0. It spawns the next stage's worker in the SAME worktree (no new
+// Create — the tester/tech-lead need the developer's commits in place), gives the
+// fresh stage its own liveness clock, and clears the finished stage's status.json so
+// the next stage's first-heartbeat window starts clean. The #12 retry budget is NOT
+// reset here: it is a unit-level budget (a crash re-drives the WHOLE pipeline from the
+// developer on a fresh worktree, since recover can't preserve mid-pipeline work), so
+// resetting per stage would let a unit retry indefinitely.
+func (s *Scheduler) advanceStage(us *unitSched, now time.Time) error {
+	worktreePath := us.rs.WorktreePath
+	us.stageIdx++
+	// The worktree is reused, so the prior stage's telemetry would otherwise linger
+	// and mislead the new stage's liveness read; drop it (best-effort).
+	_ = os.Remove(filepath.Join(worktreePath, StatusFileName))
+	if err := s.spawnStage(us, worktreePath, now); err != nil {
+		return err
+	}
+	s.Log(fmt.Sprintf("unit %d → %s stage — worker pid %d (same worktree %s)", us.unit.ID, deliveryPipeline[us.stageIdx], us.handle.PID(), worktreePath))
+	return nil
+}
+
+// spawnStage builds + starts the current stage's worker in worktreePath and records
+// its run-state. Shared by spawnUnit (stage 0, fresh worktree) and advanceStage
+// (later stages, reused worktree). The per-worker Azure wiring (D3 / #17) is applied
+// here so EVERY stage's worker — not just the developer — gets the project-scoped
+// azureDevOps MCP + PAT env: the tester attaches evidence and the tech-lead completes
+// the PR + sets Done, both over Azure. Skipped when there's no config (ambient
+// inheritance, the pre-#8 / Layer-A path).
+func (s *Scheduler) spawnStage(us *unitSched, worktreePath string, now time.Time) error {
+	id := us.unit.ID
+	stage := deliveryPipeline[us.stageIdx]
+	spec := s.BuildSpec(us.unit, stage, worktreePath)
 	if s.deliveryCfg != nil {
 		mcpPath, mErr := writeMCPConfig(s.ProjectRoot, s.deliveryCfg.Org, id)
 		if mErr != nil {
 			return mErr
 		}
 		spec.MCPConfigPath = mcpPath
-		spec.ExtraEnv = deliveryWorkerEnv(s.deliveryCfg)
+		spec.ExtraEnv = append(spec.ExtraEnv, deliveryWorkerEnv(s.deliveryCfg)...)
 	}
 	handle, err := s.Spawn(spec)
 	if err != nil {
@@ -423,13 +476,13 @@ func (s *Scheduler) spawnUnit(us *unitSched, now time.Time) error {
 	us.state = stateRunning
 	us.rs = &UnitRunState{
 		ID:             id,
-		Branch:         BranchName(slug, id),
-		WorktreePath:   path,
+		Branch:         BranchName(s.Plan.SprintSlug, id),
+		WorktreePath:   worktreePath,
+		Stage:          string(stage),
 		PID:            handle.PID(),
 		CreatedAt:      now,
 		PhaseEnteredAt: now,
 	}
-	s.Log(fmt.Sprintf("unit %d admitted — worker pid %d in %s", id, handle.PID(), path))
 	return nil
 }
 
@@ -533,38 +586,72 @@ func (s *Scheduler) summary() Summary {
 	return sum
 }
 
-// DeliveryWorkerSpec builds a unit's worker invocation: a `claude -p` developer in
-// the unit's isolated worktree, running the delivery micro-loop. It closes over the
-// project root so the prompt can point at the reflected developer agent + packs by
-// absolute path (the worktree lives under root, so a root-anchored path is readable
-// regardless of the worktree's own checkout).
+// Stage is one step of a work-unit's delivery pipeline. Each unit runs the stages
+// in order, each a fresh `claude -p` worker in the SAME worktree (pr-and-review §1):
+// the developer implements + opens the PR, the tester runs independent Level-2
+// verification, and the tech-lead reviews + — on green — completes the Azure PR
+// (= the merge to dev) + sets Done. The engine advances stage on a worker's exit-0
+// and only runs the merge-verify (complete()) after the final stage.
+type Stage string
+
+const (
+	StageDeveloper Stage = "developer"
+	StageTester    Stage = "tester"
+	StageTechLead  Stage = "tech-lead"
+)
+
+// deliveryPipeline is the fixed ordered pipeline every work unit runs. D5 (v1): a
+// failure at ANY stage → mark-blocked; the stage-level rework loop is deferred.
+var deliveryPipeline = []Stage{StageDeveloper, StageTester, StageTechLead}
+
+// DeliveryWorkerSpec builds a unit's worker invocation for a given pipeline stage: a
+// `claude -p` worker (developer | tester | tech-lead) in the unit's worktree, running
+// that stage's slice of the delivery micro-loop. It closes over the project root so
+// each stage's prompt can point at its reflected role-agent + packs by absolute path
+// (the worktree lives under root, so a root-anchored path is readable regardless of the
+// worktree's own checkout).
 //
-// Fork A (worker-fetches-from-Azure): the plan carries only the work-item id, so the
-// assembled prompt directs the worker to fetch the rest — brief, area tag, pack, wiki
-// — from Azure over its MCP at runtime. This keeps the engine zero-Azure and the plan
-// contract minimal (no area/brief duplicated into plan.json). This builder returns the
-// base spec (prompt + worktree); the scheduler's spawnUnit augments MCPConfigPath +
-// ExtraEnv per-unit from .delivery/config.json (D3 / #17 — an azureDevOps MCP scoped to
-// the project's org so it can't inherit the operator's global MCP, plus the PAT env the
-// MCP server + az-attach.sh consume). The PAT never enters the argv (spawn.go), so it
-// can't leak into logs. The real runtime wiring (MCP reachable, PAT format accepted by
-// the live server) is what the stone-#9 Layer-B run validates; this assembles it.
-func DeliveryWorkerSpec(root string) func(u WorkUnit, worktreeDir string) WorkerSpec {
-	return func(u WorkUnit, worktreeDir string) WorkerSpec {
+// Fork A (worker-fetches-from-Azure): the plan carries only the work-item id, so each
+// assembled prompt directs the worker to fetch the rest — brief, area tag, pack, wiki,
+// PR — from Azure over its MCP at runtime. This keeps the engine zero-Azure and the
+// plan contract minimal. This builder returns the base spec (prompt + worktree); the
+// scheduler's spawnStage augments MCPConfigPath + ExtraEnv per-worker from
+// .delivery/config.json (D3 / #17 — an azureDevOps MCP scoped to the project's org so a
+// worker can't inherit the operator's global MCP, plus the PAT env the MCP server +
+// az-attach.sh consume). The PAT never enters the argv (spawn.go), so it can't leak
+// into logs. The real runtime wiring (MCP reachable, PAT format accepted by the live
+// server) is what the stone-#9 Layer-B / #17 run validates; this assembles it.
+func DeliveryWorkerSpec(root string) func(u WorkUnit, stage Stage, worktreeDir string) WorkerSpec {
+	return func(u WorkUnit, stage Stage, worktreeDir string) WorkerSpec {
 		return WorkerSpec{
-			Prompt:      deliveryWorkerPrompt(u, root),
+			Prompt:      deliveryStagePrompt(u, root, stage),
 			WorktreeDir: worktreeDir,
 		}
 	}
 }
 
-// deliveryWorkerPrompt assembles the headless worker's task prompt. It is a lean
-// bootstrap: the developer agent (+ its children/) is the authoritative operating
-// manual, so the prompt points the worker at it, names the one work-item, and inlines
-// the load-bearing invariants (fetch-from-Azure, the six phases, block-never-fake,
-// job-ends-at-PR) as a self-documenting safety net — it does not duplicate the agent's
-// role-craft, which would drift.
-func deliveryWorkerPrompt(u WorkUnit, root string) string {
+// deliveryStagePrompt assembles the headless prompt for one pipeline stage. Each
+// stage points the worker at its authoritative role-agent (developer/tester/tech-lead)
+// and inlines that stage's load-bearing invariants as a self-documenting safety net —
+// it never duplicates the agent's role-craft, which would drift. The stage's role name
+// ("delivery-team developer|tester|tech-lead") in the opening line is also the token
+// the Layer-A fake worker keys off to simulate each stage.
+func deliveryStagePrompt(u WorkUnit, root string, stage Stage) string {
+	switch stage {
+	case StageTester:
+		return deliveryTesterPrompt(u, root)
+	case StageTechLead:
+		return deliveryTechLeadPrompt(u, root)
+	default:
+		return deliveryDeveloperPrompt(u, root)
+	}
+}
+
+// deliveryDeveloperPrompt is the stage-1 prompt: the developer agent (+ its children/)
+// is the authoritative manual, so the prompt points the worker at it, names the one
+// work-item, and inlines the load-bearing invariants (fetch-from-Azure, the six phases,
+// block-never-fake, job-ends-at-PR) as a safety net.
+func deliveryDeveloperPrompt(u WorkUnit, root string) string {
 	agentDir := filepath.Join(root, ".claude", "agents", "developer")
 	configPath := filepath.Join(root, ".delivery", "config.json")
 	packsDir := filepath.Join(root, ".claude", "packs")
@@ -577,6 +664,48 @@ Ground rules (your agent manual holds the full detail):
 - The engine handed you only this work-item's id; fetch everything else from Azure at runtime: claim the item (transition it to the runtime-resolved in-progress state plus a claim comment), then read the work-item, its **[Technical Analysis]** sentinel comment, and the tech-lead's canonical brief; resolve your area:<name> tag and load ONLY that area's pack under %[5]s/<area>/; read the brief-named Architecture/ and Conventions/ wiki pages.
 - Your six phases, in order: claim -> plan -> implement -> self-test -> comment -> pr. Write each phase and a fresh heartbeat to status.json as you go.
 - Self-test every surface the unit touches and attach evidence via scripts/az-attach.sh. A surface you could not run is UNVERIFIED — set status.json blocker and stop; never fake a green.
-- Your job ENDS at the pull request: do NOT review your own PR, do NOT merge, and do NOT set the work-item Done — the tech-lead reviews and, on green, completes the Azure PR (= the merge to dev) and sets Done; the engine only verifies the merge landed.`,
+- Your job ENDS at the pull request: do NOT review your own PR, do NOT merge, and do NOT set the work-item Done — the tester verifies next, then the tech-lead reviews and, on green, completes the Azure PR (= the merge to dev) and sets Done; the engine only verifies the merge landed.`,
 		u.ID, agentDir, configPath, u.Title, packsDir)
+}
+
+// deliveryTesterPrompt is the stage-2 prompt: independent Level-2 verification over the
+// developer's branch. It points at the tester agent (children/verification-blueprint.md
+// is the operative file) and inlines the re-derive-intent-fresh, evidence-attach, and
+// hard-boundary invariants (owns tests, not code/review/state).
+func deliveryTesterPrompt(u WorkUnit, root string) string {
+	agentDir := filepath.Join(root, ".claude", "agents", "tester")
+	configPath := filepath.Join(root, ".delivery", "config.json")
+	return fmt.Sprintf(`You are the delivery-team tester — a fresh, isolated worker spawned to independently verify one Azure work-item that the developer has just turned into a pull request in this worktree. Your complete operating manual is the tester agent at %[2]s/agent.md and every file under %[2]s/children/ (start with children/verification-blueprint.md). Read them first and follow them exactly; they are authoritative over the summary below.
+
+Assignment: Azure work-item #%[1]d — %[4]q. Run your Level-2 verification micro-loop over the developer's branch in this worktree, then stop.
+
+Ground rules (your agent manual holds the full detail):
+- Read %[3]s for the Azure org/project/repo and pat.ref. Reach Azure ONLY through the azureDevOps MCP — never a raw call, never an invented tool name, and never a hardcoded state literal.
+- Re-derive intent FRESH from Azure — never inherit the developer's: read the work-item (System.Description acceptance criteria = the spec), its **[Technical Analysis]** sentinel comment, and the tech-lead's canonical brief; resolve the area:<name> tag.
+- Build a risk-ranked strategy, then run the test-gates on the right surface (code; web via the preview MCP; or — only after acquiring the serialized single-slot emulator lease with a bootability preflight — mobile) and hunt edges + regression.
+- Attach every piece of evidence to the work-item via scripts/az-attach.sh, then emit ONE verdict comment (pass/fail + criteria covered + edges probed + evidence pointers). A surface you could NOT run is UNVERIFIED — set status.json blocker and stop; never fake a green.
+- Your boundaries: do NOT write or fix implementation code, do NOT judge code quality or architecture (that is the tech-lead), do NOT transition the work-item state, do NOT open or merge a PR. You own the test half of green = tests then review; the tech-lead reviews next and, on green, completes the PR (= the merge to dev) and sets Done; the engine only verifies the merge.
+- Write your phase and a fresh heartbeat to status.json as you go.`,
+		u.ID, agentDir, configPath, u.Title)
+}
+
+// deliveryTechLeadPrompt is the stage-3 prompt: the single review gate + the closer.
+// It points at the tech-lead agent (children/review-craft.md is the operative file) and
+// inlines the ordered test-gate-first, the delivery-native-on-the-Azure-PR review with
+// refute-to-keep, and the on-green complete-then-Done contract (§1/§4/§5).
+func deliveryTechLeadPrompt(u WorkUnit, root string) string {
+	agentDir := filepath.Join(root, ".claude", "agents", "tech-lead")
+	configPath := filepath.Join(root, ".delivery", "config.json")
+	return fmt.Sprintf(`You are the delivery-team tech-lead — a fresh, isolated worker spawned to review one Azure work-item's pull request and, on green, land it. Your complete operating manual is the tech-lead agent at %[2]s/agent.md and every file under %[2]s/children/ (the operative file for THIS stage is children/review-craft.md). Read them first and follow them exactly; they are authoritative over the summary below.
+
+Assignment: Azure work-item #%[1]d — %[4]q. Review its pull request to dev, then either return it with findings or land it, then stop.
+
+Ground rules (your agent manual holds the full detail):
+- Read %[3]s for the Azure org/project/repo and pat.ref. Reach Azure ONLY through the azureDevOps MCP — never a raw call, never an invented tool name, and never a hardcoded state literal (resolve state and type at runtime via wit_get_work_item_type).
+- Test-gate FIRST (green = tests then review, in that order): confirm the required evidence is ATTACHED to the work-item — code, web if a web surface, and the mobile-emulator run if a mobile surface (a MUST; missing = NOT green, full stop). Read it back via wit_get_work_item_attachment and confirm it matches the changed surfaces. Evidence missing → return the unit via a PR thread; do NOT weigh the diff.
+- Then run the delivery-native review ON THE AZURE PR (never /create-pr): a generic baseline read + your tech-lead specialist read (against the Architecture/ boundaries, Conventions/, ADRs, and the AC + Scope you own) + a refute-to-keep pass — every finding needs a file:line / grep / failing-test anchor or it is DROPPED; each survivor is actively refuted and kept only if refutation fails. Raise surviving findings as PR threads (repo_create_pull_request_thread / repo_reply_to_comment).
+- On green: vote (repo_vote_pull_request), then COMPLETE the Azure PR (repo_update_pull_request with autoComplete + a history-reachable mergeStrategy — NoFastForward or Rebase, never Squash — and transitionWorkItems:false); completing the PR IS the merge to dev. Then set the work-item to the runtime-resolved Done (wit_get_work_item_type, never a literal). Merge first, then Done.
+- If the review is not green, hand the findings back as PR threads and set a status.json blocker rather than merging — never fake a green. The engine only VERIFIES your merge landed on dev; it never merges for you.
+- Write your phase and a fresh heartbeat to status.json as you go.`,
+		u.ID, agentDir, configPath, u.Title)
 }

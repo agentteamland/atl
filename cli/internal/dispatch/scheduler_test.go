@@ -104,6 +104,31 @@ func planOf(slug string, units ...WorkUnit) *Plan {
 
 func (s *Scheduler) stateOf(id int) unitState { return s.units[id].state }
 
+// driveUnitDone exits the unit's current-stage worker 0 and steps until the unit
+// leaves stateRunning — walking it through the whole developer→tester→tech-lead
+// pipeline (each step advances one stage; the final step merge-verifies + completes).
+// The spawner installs a fresh handle per stage under the same id, so each iteration
+// re-exits the current stage's handle. The completing step also runs admit(), so a
+// refilled successor is already running when this returns.
+func driveUnitDone(t *testing.T, s *Scheduler, w *fakeWorld, id int) {
+	t.Helper()
+	for i := 0; i <= len(deliveryPipeline); i++ {
+		h := w.handles[id]
+		if h == nil {
+			t.Fatalf("unit %d has no live handle at stage %d", id, i)
+		}
+		h.exited = true
+		h.code = 0
+		if _, err := s.step(); err != nil {
+			t.Fatal(err)
+		}
+		if s.stateOf(id) != stateRunning {
+			return
+		}
+	}
+	t.Fatalf("unit %d never left running after %d stage exits", id, len(deliveryPipeline)+1)
+}
+
 // --- admission: cap + stack-rank order ---------------------------------------
 
 func TestAdmitRespectsCapAndStackRank(t *testing.T) {
@@ -152,14 +177,11 @@ func TestRefillGatesSuccessorOnPredecessorDone(t *testing.T) {
 		t.Fatalf("B must NOT start before A is done (merge-gate), got %v", s.stateOf(2))
 	}
 
-	// A completes (exit-0, no blocker) → step 2 completes A and refills B.
-	w.handles[1].exited = true
-	w.handles[1].code = 0
-	if _, err := s.step(); err != nil {
-		t.Fatal(err)
-	}
+	// A runs its full pipeline (developer→tester→tech-lead); the completing step
+	// refills B. Only A's tech-lead merge makes it done — and only then may B start.
+	driveUnitDone(t, s, w, 1)
 	if s.stateOf(1) != stateDone {
-		t.Errorf("A should be done after exit-0, got %v", s.stateOf(1))
+		t.Errorf("A should be done after its pipeline completes, got %v", s.stateOf(1))
 	}
 	if s.stateOf(2) != stateRunning {
 		t.Errorf("B should be admitted once A is done (refill), got %v", s.stateOf(2))
@@ -171,17 +193,33 @@ func TestRefillGatesSuccessorOnPredecessorDone(t *testing.T) {
 func TestCompleteTearsDownAndFreesSlot(t *testing.T) {
 	plan := planOf("s1", WorkUnit{ID: 7})
 	s, w := newTestScheduler(t, plan, 1)
-	if _, err := s.step(); err != nil { // admit
+	if _, err := s.step(); err != nil { // admit → developer stage
 		t.Fatal(err)
 	}
+	// The developer + tester exit-0 advance the pipeline WITHOUT completing — neither
+	// merges, so the unit stays running and rolls to the next stage.
+	for _, wantStage := range []Stage{StageTester, StageTechLead} {
+		w.handles[7].exited = true
+		w.handles[7].code = 0
+		if _, err := s.step(); err != nil {
+			t.Fatal(err)
+		}
+		if s.stateOf(7) != stateRunning {
+			t.Fatalf("a non-final stage exit-0 must keep the unit running, got %v", s.stateOf(7))
+		}
+		if got := deliveryPipeline[s.units[7].stageIdx]; got != wantStage {
+			t.Fatalf("expected the %s stage next, got %s", wantStage, got)
+		}
+	}
+	// The tech-lead exit-0 → merge verified → done + terminal.
 	w.handles[7].exited = true
 	w.handles[7].code = 0
-	term, err := s.step() // complete
+	term, err := s.step()
 	if err != nil {
 		t.Fatal(err)
 	}
 	if s.stateOf(7) != stateDone {
-		t.Errorf("unit should be done, got %v", s.stateOf(7))
+		t.Errorf("unit should be done after the tech-lead stage, got %v", s.stateOf(7))
 	}
 	if !term {
 		t.Error("the only unit is done → the run should be terminal")
@@ -193,21 +231,100 @@ func TestCompleteTearsDownAndFreesSlot(t *testing.T) {
 func TestCompleteBlocksWhenNotMerged(t *testing.T) {
 	plan := planOf("s1", WorkUnit{ID: 6})
 	s, w := newTestScheduler(t, plan, 1)
-	if _, err := s.step(); err != nil { // admit
+	if _, err := s.step(); err != nil { // admit → developer stage
 		t.Fatal(err)
 	}
-	// The worker exits 0, but its branch is NOT contained in origin/dev (the merge
-	// never landed) — MergedToBase sees commits beyond origin/dev.
+	// The branch is unmerged for the WHOLE run (commits beyond origin/dev). The
+	// developer + tester exit-0 must still ADVANCE — they never merge, so the engine
+	// must NOT merge-verify at a non-final stage (that would falsely block every unit).
+	w.fr.revListCount = "2"
+	for i := 0; i < 2; i++ {
+		w.handles[6].exited = true
+		w.handles[6].code = 0
+		if _, err := s.step(); err != nil {
+			t.Fatal(err)
+		}
+		if s.stateOf(6) != stateRunning {
+			t.Fatalf("a non-final stage must advance even on an unmerged branch (no merge-check yet), got %v", s.stateOf(6))
+		}
+	}
+	// Only the tech-lead exit-0 triggers the merge-verify — and its branch is NOT in
+	// origin/dev (it exited 0 without completing the PR), so the unit must block.
 	w.handles[6].exited = true
 	w.handles[6].code = 0
-	w.fr.revListCount = "2"
 	if _, err := s.step(); err != nil {
 		t.Fatal(err)
 	}
 	if s.stateOf(6) != stateBlocked {
-		t.Fatalf("exit-0 without a verified merge must block (not force-delete + mark done); got %v", s.stateOf(6))
+		t.Fatalf("tech-lead exit-0 without a verified merge must block (not force-delete + mark done); got %v", s.stateOf(6))
 	}
 	assertBlockedReport(t, s.ProjectRoot, 6, "not merged")
+}
+
+// --- pipeline: the three stages share ONE worktree ----------------------------
+
+func TestPipelineReusesOneWorktreeAcrossStages(t *testing.T) {
+	plan := planOf("s1", WorkUnit{ID: 3})
+	s, w := newTestScheduler(t, plan, 1)
+	if _, err := s.step(); err != nil { // admit → developer (the ONE Create)
+		t.Fatal(err)
+	}
+	worktreePath := s.units[3].rs.WorktreePath
+	// Advance developer→tester→tech-lead; every stage must reuse the same worktree
+	// (the tester + tech-lead need the developer's commits), never a fresh checkout.
+	for i := 0; i < len(deliveryPipeline)-1; i++ {
+		w.handles[3].exited = true
+		w.handles[3].code = 0
+		if _, err := s.step(); err != nil {
+			t.Fatal(err)
+		}
+		if s.units[3].rs.WorktreePath != worktreePath {
+			t.Fatalf("stage %d changed the worktree: got %q want %q", i+1, s.units[3].rs.WorktreePath, worktreePath)
+		}
+	}
+	adds := 0
+	for _, c := range w.fr.calls {
+		if strings.Contains(strings.Join(c, " "), "worktree add") {
+			adds++
+		}
+	}
+	if adds != 1 {
+		t.Errorf("the 3-stage pipeline must create the worktree ONCE and reuse it; got %d `worktree add` calls", adds)
+	}
+}
+
+// --- pipeline: a failure at ANY stage marks the unit blocked (D5) --------------
+
+func TestBlockerAtNonFinalStageBlocksUnit(t *testing.T) {
+	plan := planOf("s1", WorkUnit{ID: 2})
+	s, w := newTestScheduler(t, plan, 1)
+	if _, err := s.step(); err != nil { // admit → developer
+		t.Fatal(err)
+	}
+	// developer exits clean → advance to the tester stage.
+	w.handles[2].exited = true
+	w.handles[2].code = 0
+	if _, err := s.step(); err != nil {
+		t.Fatal(err)
+	}
+	if deliveryPipeline[s.units[2].stageIdx] != StageTester {
+		t.Fatalf("expected the tester stage after the developer, got %s", deliveryPipeline[s.units[2].stageIdx])
+	}
+	// The tester reports a blocker (an un-runnable surface) and exits → mark-blocked
+	// (D5: v1 is fail-at-any-stage, no stage-level rework loop).
+	w.handles[2].exited = true
+	w.handles[2].code = 1
+	w.statuses[2] = &Status{Phase: "verify", Blocker: "mobile emulator would not boot"}
+	if _, err := s.step(); err != nil {
+		t.Fatal(err)
+	}
+	if s.stateOf(2) != stateBlocked {
+		t.Fatalf("a blocker at the tester stage must block the unit (D5), got %v", s.stateOf(2))
+	}
+	if s.units[2].retries != 0 {
+		t.Error("a worker-reported blocker must not be retried, even mid-pipeline")
+	}
+	assertBlockedReport(t, s.ProjectRoot, 2, "worker-reported")
 }
 
 // --- restart respects a prior run's give-up (durable BlockedReport) ------------

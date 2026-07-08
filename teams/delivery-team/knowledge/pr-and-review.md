@@ -98,15 +98,37 @@ delivery-team's path reads it today. What *actually* makes the tech-lead the rev
 micro-loop step 7 above (team content + the engine spawning the tech-lead per unit). The declaration
 is kept because it is the correct vocabulary and future-proofs a validator or a later consumer.
 
-## §7 — Deferred: the per-unit orchestration (a Go seam, validatable at Layer-B)
+## §7 — The per-unit pipeline orchestration (built — #8 back-half Phase 2)
 
-This contract pins **who does what**. One mechanism it depends on is **not yet built**: today the
-engine spawns only the **developer** worker per unit (stone #6a `BuildSpec`), which exits at the PR —
-so the tester (4b) and the tech-lead review/merge (7, 8a) have **no per-unit spawner yet**, and the
-engine's `complete()` would verify-merge immediately (and mark-block, since nothing merged). Making
-the engine run the per-unit **pipeline** (developer → tester → tech-lead-reviewer/closer, each a
-spawned worker), plus emitting a **success signal** symmetric to the `BlockedReport` so a close-skill
-can drive Azure→Done, is a **deterministic Go change deferred to the stone-#9 Layer-B window** — the
-full loop can only be *live-validated* against a real Azure test project (which Layer-B provisions),
-so the orchestration lands when it is validatable, not speculatively. Until then, this contract is the
-spec the pipeline will implement.
+The engine runs each unit as a **three-stage pipeline** in one worktree —
+**developer → tester → tech-lead** (`Stage` + `deliveryPipeline` in `internal/dispatch/scheduler.go`).
+`spawnUnit` creates the worktree once and starts the developer; `advanceStage` starts the next stage's
+worker in the **same** worktree on each clean exit-0 (the tester + tech-lead need the developer's
+commits in place); and `complete()` — the `MergedToBase` verify of §5 — runs **only after the final
+(tech-lead) stage**, so a developer or tester exit-0 (neither merges) is never mistaken for a completed
+unit. Each stage's prompt points at its role-agent (`DeliveryWorkerSpec` → `deliveryStagePrompt`), and
+every stage's worker is wired with the project-scoped `azureDevOps` MCP + PAT env (D3 / §4), so the
+tester can attach evidence and the tech-lead can complete the PR + set Done over Azure.
+
+Two settled decisions shape it:
+
+- **No success-signal file (D4).** An earlier draft imagined a success artifact symmetric to
+  `BlockedReport`, to drive Azure→Done from a skill. That is superseded by §1: the **tech-lead** sets
+  the runtime-resolved Done directly over MCP (it has the context and the PR), and the engine only
+  **verifies** the merge (§5). The only durable engine artifact is still the `BlockedReport`.
+- **Fail-at-any-stage → mark-blocked (D5).** A worker-reported blocker or a crash at any stage marks
+  the unit blocked; the #12 crash-retry budget is **unit-level** — a crash re-drives the whole pipeline
+  from the developer on a **fresh** worktree off dev (the crashed attempt's work is quarantined aside,
+  never resumed and never deleted), so the retry is not per-stage. A stage-level rework loop is deferred.
+- **Restart-resilient (no wedge).** Because a mid-pipeline unit holds a committed-but-unmerged branch
+  through its tester + tech-lead stages, an engine restart leaves that branch under the canonical name
+  (`Run`'s `Reconcile` preserves unmerged work in place, never deletes it). Re-admission's
+  `Worktree.Create` therefore quarantines a canonical-name leftover aside before it adds the fresh
+  worktree — so the re-drive can't collide on the existing branch (the sprint never wedges), and the
+  prior work is preserved for diagnosis.
+
+**Layer-A-proven, one live-validation remaining.** The pipeline is deterministically exercised by the
+auth-free `work-dispatch` e2e blueprint (a fake worker keys off each stage's role token; only the
+tech-lead stage merges). The remaining proof is the **real-Azure #17 run**: a genuinely spawned
+`claude -p` worker inheriting the test-org MCP + PAT and doing its Azure ops end-to-end — the semantic
+validation a mock/fake cannot give ([mock-validates-shape-not-semantics]).

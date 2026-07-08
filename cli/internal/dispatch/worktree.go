@@ -55,9 +55,25 @@ func (w *Worktree) path(slug string, id int) string {
 // Create adds a fresh worktree for the unit, branched off a freshly-fetched
 // base so the branch never starts from a stale local ref (#11). Returns the
 // worktree path.
+//
+// If the unit's canonical branch/worktree already exists, it is a leftover from a
+// prior run that must be freed before `worktree add -b` (which errors on an existing
+// branch or path). This happens on an engine RESTART mid-pipeline: with the per-unit
+// pipeline, a unit holds a committed-but-unmerged branch through its tester + tech-lead
+// stages, and Run()'s Reconcile PRESERVES an unmerged leftover in place under the
+// canonical name (it never deletes unmerged work) — so re-admission would collide.
+// Quarantine applies the branch-hygiene asymmetry (a clean leftover is reclaimed; a
+// leftover with real work is moved aside + renamed, never deleted), freeing the name so
+// the re-drive gets a fresh worktree off dev. On the in-process retry path recover()
+// already quarantined, so branchExists is false there and this is a no-op.
 func (w *Worktree) Create(slug string, id int) (string, error) {
 	branch := BranchName(slug, id)
 	path := w.path(slug, id)
+	if w.branchExists(branch) {
+		if _, err := w.Quarantine(slug, id, "restart"); err != nil {
+			return "", err
+		}
+	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return "", err
 	}
