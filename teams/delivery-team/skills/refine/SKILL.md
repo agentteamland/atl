@@ -173,8 +173,10 @@ consuming the analysts' just-produced output. This is the ceremony's core write.
 Still as the `tech-lead`, for each work-unit created in step 4, write its **canonical brief** — the
 artifact that lets a fresh, isolated `developer` worker load the right project knowledge without
 carry-over (see [`canonical-brief.md`](../../agents/tech-lead/children/canonical-brief.md)). Record
-each brief durably on its unit (`wit_add_work_item_comment` on the work-unit, keyed to its
-`atl-key` so a re-run updates in place). A brief bounds context; it does not dump it:
+each brief durably on its unit as a **single labeled comment** (`wit_add_work_item_comment`) whose
+**first line is the exact sentinel `**[Canonical Brief]**`** — the same machine-locatable placement
+the `**[Technical Analysis]**` comment uses (adapter §7) — keyed to its `atl-key` so a re-run updates
+in place. A brief bounds context; it does not dump it:
 
 - The unit's **goal** restated in one or two sentences, traced to the Feature's Acceptance Criteria.
 - The **area** (`area:<name>`) — binds the knowledge-pack (`packs/<area>/`).
@@ -216,9 +218,11 @@ ledger (adapter §5).
   409/duplicate on create is caught and resolved to the existing item, never surfaced.
 - **The Description/wiki writes are idempotent updates/upserts** — `wit_update_work_item` updates the
   Description/fields in place and `wiki_create_or_update_page` is an idempotent upsert. Comments are
-  add-only (no update-comment tool): a re-run refreshes the canonical-brief comment by adding **one**
-  fresh superseding comment keyed to its unit's `atl-key` — read-back takes the latest brief for that
-  key — never appending an uncontrolled second one.
+  add-only (no update-comment tool): a re-run first **sentinel-matches** the existing
+  `**[Canonical Brief]**` comment (`wit_list_work_item_comments`, not "the newest comment") — found →
+  add **one** fresh superseding comment keyed to its unit's `atl-key`; not-found → add the first. The
+  sentinel is the read-back locator; the `atl-key` is the convergence guard. Never append an
+  uncontrolled second brief.
 - **Ordinal-stability rules:** once assigned, an ordinal never changes for a surviving unit; a
   removed unit's ordinal is retired (never backfilled or reused); a re-plan adds units at fresh
   higher ordinals and bumps the plan version.

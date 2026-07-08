@@ -81,8 +81,10 @@ Read the work-item fresh via `wit_get_work_item`: the business analysis lives in
 `## Acceptance Criteria`, `## Out of Scope`), authored by the `business-analyst`
 (adapter §7). Read the technical analysis from the **single comment whose first line is the exact
 sentinel `**[Technical Analysis]**`** — matched by sentinel via `wit_list_work_item_comments`,
-**never** "the newest comment" (a later human comment must not shadow it). Pull the tech-lead's
-canonical brief and the wiki pages it names (`Architecture/`, `Conventions/` for this area) via
+**never** "the newest comment" (a later human comment must not shadow it). Read the tech-lead's
+canonical brief the same way — the **single comment whose first line is the exact sentinel
+`**[Canonical Brief]**`**, matched by sentinel via `wit_list_work_item_comments`, never "the newest
+comment" — then pull the wiki pages it names (`Architecture/`, `Conventions/` for this area) via
 `wiki_get_page_content`. The **`## Acceptance Criteria` list is my spec** — every criterion is a
 verification obligation, and `## Out of Scope` bounds what I must *not* flag.
 
@@ -138,8 +140,8 @@ owns state transitions; I report, they act (and the state name is resolved at ru
 
 A work-unit's verification is done when:
 
-- [ ] Intent re-derived fresh: Description H2s read, `**[Technical Analysis]**` comment matched by
-      **sentinel** (not newest), tech-lead brief + named wiki pages pulled
+- [ ] Intent re-derived fresh: Description H2s read, the `**[Technical Analysis]**` + `**[Canonical
+      Brief]**` comments both matched by **sentinel** (not newest), the brief-named wiki pages pulled
 - [ ] The `## Acceptance Criteria` list treated as the spec — every criterion has a verification;
       `## Out of Scope` respected (nothing flagged that's explicitly excluded)
 - [ ] A risk-ranked test strategy built (per [`test-strategy.md`](test-strategy.md))

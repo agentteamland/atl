@@ -166,10 +166,21 @@ guessing**:
 - **Area tags** → `System.Tags` in the `area:<name>` convention, applied by the
   **tech-lead** at decomposition (the analyst only *suggests* under `## Suggested
   Areas`) — because area→pack binding is a tech-lead responsibility.
-- **Read-back** (at `/refine`): `wit_get_work_item` (parse Description headings) +
-  `wit_list_work_item_comments` filtered to the comment starting with the
-  `**[Technical Analysis]**` sentinel — a **sentinel match, not "the newest
-  comment"**, so a later human comment never shadows the analysis.
+- **Canonical brief** (`tech-lead`, at `/refine`) → a **single labeled comment** on
+  the work-unit (`wit_add_work_item_comment`) whose first line is the exact sentinel
+  `**[Canonical Brief]**`, then fixed H2s: `## Goal`, `## Area`, `## Load These Pages`,
+  `## Depends On`, `## Evidence Before Review`. It is the per-unit bridge a `developer`
+  (and the `tester`) reads — it names the area pack and embeds the exact `Architecture/`
+  / `Conventions/` wiki paths for the task. Same placement discipline as the
+  technical-analysis comment: one comment, sentinel line one, machine-locatable — it is
+  a **work-item comment, never a wiki page**.
+- **Read-back** (at `/refine`, and by every spawned worker): `wit_get_work_item` (parse
+  Description headings) + `wit_list_work_item_comments` filtered to the comment starting
+  with its sentinel — `**[Technical Analysis]**` for the analysis, `**[Canonical Brief]**`
+  for the brief — a **sentinel match, not "the newest comment"**, so a later human comment
+  never shadows either. (The brief's `atl-key` stays the idempotency key — a re-run
+  sentinel-matches and updates in place; the sentinel is the *locator*, the key is the
+  *convergence* guard.)
 
 ## 8. Project wiki — namespaced knowledge (`wiki_*`)
 

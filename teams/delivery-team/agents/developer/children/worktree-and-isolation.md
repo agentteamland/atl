@@ -96,8 +96,8 @@ repo or the whole wiki. I bound my context to exactly what this unit needs:
 - **the task** — the work-item (`## Acceptance Criteria` and the rest of the Description H2s) +
   the `**[Technical Analysis]**` sentinel comment ([`azure-touchpoints.md`](azure-touchpoints.md));
 - **the pack** — only the tech-lead-tagged area's `packs/<area>/` ([`pack-loading.md`](pack-loading.md));
-- **the brief** — the tech-lead's canonical brief, which names the area and **embeds the exact wiki
-  page paths** I load (not "read the whole wiki");
+- **the brief** — the tech-lead's `**[Canonical Brief]**` sentinel comment, which names the area and
+  **embeds the exact wiki page paths** I load (not "read the whole wiki");
 - **the brief-named wiki pages** — pulled individually via `wiki_get_page_content`, not a wiki scan.
 
 The reason is the same isolation logic: a bounded context is what keeps me **both correct and

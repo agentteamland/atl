@@ -60,31 +60,57 @@ Bounding context is as much about exclusion as inclusion:
 - **Methodology mechanics.** The worker doesn't need the sprint model; it needs *this unit*. Cadence
   lives in `methodology.json`, read by ceremonies, not repeated to a worker.
 
+## Where the brief lives — the storage contract (adapter §7)
+
+The brief is **one labeled comment on the work-unit**, written with `wit_add_work_item_comment`,
+whose **first line is the exact sentinel** — nothing before it:
+
+```
+**[Canonical Brief]**
+```
+
+then the fixed H2s `## Goal`, `## Area`, `## Load These Pages`, `## Depends On`,
+`## Evidence Before Review`. It is a **work-item comment, never a wiki page** — the same placement
+discipline the `**[Technical Analysis]**` comment follows (adapter §7). The sentinel is what makes
+the brief machine-locatable: a spawned `developer` (and the `tester`) locates it via
+`wit_list_work_item_comments` filtered to the `**[Canonical Brief]**` sentinel — a **sentinel match,
+never "the newest comment,"** so a later human comment never shadows it.
+
+**Idempotency by sentinel.** A re-refined unit must not stack a second brief. Before I add, I
+`wit_list_work_item_comments` and sentinel-match: **found** → I update that comment in place (keyed
+by its `atl-key`); **not found** → I `wit_add_work_item_comment` with the sentinel as line one. The
+sentinel is the *locator*; the `atl-key` is the *convergence* guard. Drop the sentinel or rename a
+heading and I silently break every downstream reader.
+
 ## Worked example (generic)
 
 ```
-Canonical brief — Task #2087 (ordinal 3, area:auth)
+**[Canonical Brief]**
 
-Goal: implement the credential-validation path for the auth surface so a submitted
-credential is checked against the store and yields an authenticated session or a typed
-failure. Done = the Feature's AC "invalid credentials are rejected with a typed error"
-holds, plus the self-test + tester gates pass.
+## Goal
+Implement the credential-validation path for the auth surface so a submitted credential is
+checked against the store and yields an authenticated session or a typed failure. Done = the
+Feature's AC "invalid credentials are rejected with a typed error" holds, plus the self-test +
+tester gates pass.
 
-Area: area:auth  → knowledge-pack packs/auth/
+## Area
+area:auth  → knowledge-pack packs/auth/
 
-Load these project pages:
-  - Architecture/Auth-surface       (module boundary + the write-path owner; see ADR-3)
-  - Conventions/                    (project error-handling agreement; naming scheme)
+## Load These Pages
+- Architecture/Auth-surface       (module boundary + the write-path owner; see ADR-3)
+- Conventions/                    (project error-handling agreement; naming scheme)
 
-Depends on: Task #2085 (ordinal 1, the auth surface shell) — build against its session
-contract; do not re-declare it.
+## Depends On
+Task #2085 (ordinal 1, the auth surface shell) — build against its session contract; do not
+re-declare it.
 
-Evidence before review: unit/integration for the validation path; web evidence for the
-sign-in flow; mobile-emulator evidence if this surface renders on mobile.
+## Evidence Before Review
+unit/integration for the validation path; web evidence for the sign-in flow; mobile-emulator
+evidence if this surface renders on mobile.
 ```
 
 (Illustrative — the paths, ADR number, and IDs are examples; the real ones come from the project's
-wiki and the decomposition plan.)
+wiki and the decomposition plan. The `**[Canonical Brief]**` sentinel + the five H2s are fixed.)
 
 ## Why the brief is a tech-lead artifact, not a developer one
 

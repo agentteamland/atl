@@ -19,6 +19,7 @@ These are every Azure touch I make across the micro-loop, with the exact tool fo
 |---|---|
 | Read my assigned work-item (Description H2s `## Problem` / `## Business Value` / `## Scope` / `## Acceptance Criteria` / `## Out of Scope`) | `wit_get_work_item` |
 | Read the technical-analysis comment (the one whose **first line is the exact sentinel `**[Technical Analysis]**`**) | `wit_list_work_item_comments` |
+| Read the tech-lead's canonical brief (the one whose **first line is the exact sentinel `**[Canonical Brief]**`**) | `wit_list_work_item_comments` |
 | **Claim** — transition to the process-template's in-progress state (resolved at runtime) | `wit_get_work_item_type` **then** `wit_update_work_item` |
 | Write a claim / progress comment | `wit_add_work_item_comment` |
 | Read a project-wiki page the canonical brief names | `wiki_get_page_content` |
@@ -31,7 +32,7 @@ That is the whole surface I touch. If an operation I think I need isn't on this 
 mine (create, merge, wiki-write — see below) or it's a blocking condition I escalate
 ([`escalation-and-blocking.md`](escalation-and-blocking.md)) — never a tool I guess.
 
-## Reading the two inputs correctly (by location, not by guessing)
+## Reading the inputs correctly (by location, not by guessing)
 
 The content-placement contract (adapter §7) exists so I read analysis back **deterministically**:
 
@@ -45,6 +46,12 @@ The content-placement contract (adapter §7) exists so I read analysis back **de
   by the sentinel — never "the newest comment"** — because a later human comment must not shadow the
   analysis. I **read** this comment; I never write it — it belongs to the `technical-analyst`
   (adapter §7). My own comments are plain progress/claim comments.
+- **Canonical brief** is a **single comment** whose first line is the exact sentinel
+  `**[Canonical Brief]**` (its H2s: `## Goal`, `## Area`, `## Load These Pages`, `## Depends On`,
+  `## Evidence Before Review`). I read it the same way — `wit_list_work_item_comments`, **matched by
+  the sentinel, never "the newest comment."** It is my bridge from the `/refine` room: it names my
+  area pack and the **exact** `Architecture/` / `Conventions/` wiki paths to load (which I then pull
+  with `wiki_get_page_content`). The `tech-lead` writes it (adapter §7); I only read it.
 
 ## Claiming — state is resolved at runtime, never a literal
 

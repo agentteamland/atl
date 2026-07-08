@@ -39,11 +39,12 @@ func TestDeliveryStagePrompt_DeveloperInvariants(t *testing.T) {
 		packsDir + "/<area>/",       // load only the tagged area's pack
 		"azureDevOps MCP",           // MCP-first transport (#17)
 		"wit_get_work_item_type",    // runtime state/type resolution — never a literal
-		"**[Technical Analysis]**",  // the sentinel comment it must locate
-		"canonical brief",           // the tech-lead artifact it fetches
+		"**[Technical Analysis]**",  // the analysis sentinel comment it locates
+		"**[Canonical Brief]**",     // the tech-lead brief, located by its sentinel
 		"area:<name>",               // the pack-binding tag it resolves
 		"claim -> plan -> implement -> self-test -> comment -> pr", // the six phases, in order
 		"status.json",                   // the only channel back to the supervisor
+		"reclaimed as stalled",          // the early-heartbeat instruction (write status.json first)
 		"never fake a green",            // block-never-silent-pass
 		"do NOT merge",                  // job ends at PR
 		"do NOT set the work-item Done", // the tech-lead completes the PR + sets Done
@@ -68,6 +69,7 @@ func TestDeliveryStagePrompt_TesterInvariants(t *testing.T) {
 		"verification-blueprint", // the operative child file
 		"azureDevOps MCP",
 		"**[Technical Analysis]**",                 // re-derive intent fresh from the sentinel
+		"**[Canonical Brief]**",                    // the brief, located by its sentinel
 		"acceptance criteria = the spec",           // AC drives the strategy
 		"az-attach.sh",                             // evidence attach
 		"do NOT write or fix implementation code",  // hard boundary: not the developer
@@ -75,6 +77,7 @@ func TestDeliveryStagePrompt_TesterInvariants(t *testing.T) {
 		"do NOT transition the work-item state",    // hard boundary: not the state owner
 		"never fake a green",
 		"status.json",
+		"reclaimed as stalled",                     // the early-heartbeat instruction
 	})
 }
 
@@ -105,6 +108,7 @@ func TestDeliveryStagePrompt_TechLeadInvariants(t *testing.T) {
 		"runtime-resolved Done",        // sets Done after the merge
 		"never fake a green",
 		"status.json",
+		"reclaimed as stalled",         // the early-heartbeat instruction
 	})
 }
 
