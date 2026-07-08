@@ -661,8 +661,8 @@ Assignment: Azure work-item #%[1]d — %[4]q. Run your micro-loop to turn it int
 
 Ground rules (your agent manual holds the full detail):
 - Read %[3]s for the Azure org/project/repo, branchPair, and pat.ref. Reach Azure ONLY through the azureDevOps MCP — never a raw call, never an invented tool name, and never a hardcoded state literal (resolve state and type at runtime via wit_get_work_item_type).
-- The engine handed you only this work-item's id; fetch everything else from Azure at runtime: claim the item (transition it to the runtime-resolved in-progress state plus a claim comment), then read the work-item, its **[Technical Analysis]** sentinel comment, and the tech-lead's canonical brief; resolve your area:<name> tag and load ONLY that area's pack under %[5]s/<area>/; read the brief-named Architecture/ and Conventions/ wiki pages.
-- Your six phases, in order: claim -> plan -> implement -> self-test -> comment -> pr. Write each phase and a fresh heartbeat to status.json as you go.
+- The engine handed you only this work-item's id; fetch everything else from Azure at runtime: claim the item (transition it to the runtime-resolved in-progress state plus a claim comment), then read the work-item, its **[Technical Analysis]** sentinel comment, and the tech-lead's **[Canonical Brief]** sentinel comment (both matched by their exact first-line sentinel via wit_list_work_item_comments, never "the newest comment"); resolve your area:<name> tag and load ONLY that area's pack under %[5]s/<area>/; read the brief-named Architecture/ and Conventions/ wiki pages.
+- Before anything else, write status.json with a starting phase and a fresh heartbeat — a worker that writes no status.json within a few minutes is reclaimed as stalled. Then run your six phases, in order: claim -> plan -> implement -> self-test -> comment -> pr, writing a fresh phase + heartbeat to status.json on each and at least every couple of minutes.
 - Self-test every surface the unit touches and attach evidence via scripts/az-attach.sh. A surface you could not run is UNVERIFIED — set status.json blocker and stop; never fake a green.
 - Your job ENDS at the pull request: do NOT review your own PR, do NOT merge, and do NOT set the work-item Done — the tester verifies next, then the tech-lead reviews and, on green, completes the Azure PR (= the merge to dev) and sets Done; the engine only verifies the merge landed.`,
 		u.ID, agentDir, configPath, u.Title, packsDir)
@@ -681,11 +681,11 @@ Assignment: Azure work-item #%[1]d — %[4]q. Run your Level-2 verification micr
 
 Ground rules (your agent manual holds the full detail):
 - Read %[3]s for the Azure org/project/repo and pat.ref. Reach Azure ONLY through the azureDevOps MCP — never a raw call, never an invented tool name, and never a hardcoded state literal.
-- Re-derive intent FRESH from Azure — never inherit the developer's: read the work-item (System.Description acceptance criteria = the spec), its **[Technical Analysis]** sentinel comment, and the tech-lead's canonical brief; resolve the area:<name> tag.
+- Re-derive intent FRESH from Azure — never inherit the developer's: read the work-item (System.Description acceptance criteria = the spec), its **[Technical Analysis]** sentinel comment, and the tech-lead's **[Canonical Brief]** sentinel comment (both matched by their exact first-line sentinel via wit_list_work_item_comments, never "the newest comment"); resolve the area:<name> tag.
 - Build a risk-ranked strategy, then run the test-gates on the right surface (code; web via the preview MCP; or — only after acquiring the serialized single-slot emulator lease with a bootability preflight — mobile) and hunt edges + regression.
 - Attach every piece of evidence to the work-item via scripts/az-attach.sh, then emit ONE verdict comment (pass/fail + criteria covered + edges probed + evidence pointers). A surface you could NOT run is UNVERIFIED — set status.json blocker and stop; never fake a green.
 - Your boundaries: do NOT write or fix implementation code, do NOT judge code quality or architecture (that is the tech-lead), do NOT transition the work-item state, do NOT open or merge a PR. You own the test half of green = tests then review; the tech-lead reviews next and, on green, completes the PR (= the merge to dev) and sets Done; the engine only verifies the merge.
-- Write your phase and a fresh heartbeat to status.json as you go.`,
+- Write status.json with a starting phase and a fresh heartbeat as your FIRST action — before you read your manual or re-derive intent — because a worker that writes no status.json within a few minutes is reclaimed as stalled; then keep it fresh on every step, at least every couple of minutes.`,
 		u.ID, agentDir, configPath, u.Title)
 }
 
@@ -706,6 +706,6 @@ Ground rules (your agent manual holds the full detail):
 - Then run the delivery-native review ON THE AZURE PR (never /create-pr): a generic baseline read + your tech-lead specialist read (against the Architecture/ boundaries, Conventions/, ADRs, and the AC + Scope you own) + a refute-to-keep pass — every finding needs a file:line / grep / failing-test anchor or it is DROPPED; each survivor is actively refuted and kept only if refutation fails. Raise surviving findings as PR threads (repo_create_pull_request_thread / repo_reply_to_comment).
 - On green: vote (repo_vote_pull_request), then COMPLETE the Azure PR (repo_update_pull_request with autoComplete + a history-reachable mergeStrategy — NoFastForward or Rebase, never Squash — and transitionWorkItems:false); completing the PR IS the merge to dev. Then set the work-item to the runtime-resolved Done (wit_get_work_item_type, never a literal). Merge first, then Done.
 - If the review is not green, hand the findings back as PR threads and set a status.json blocker rather than merging — never fake a green. The engine only VERIFIES your merge landed on dev; it never merges for you.
-- Write your phase and a fresh heartbeat to status.json as you go.`,
+- Write status.json with a starting phase and a fresh heartbeat as your FIRST action — before you read your manual or re-derive intent — because a worker that writes no status.json within a few minutes is reclaimed as stalled; then keep it fresh on every step, at least every couple of minutes.`,
 		u.ID, agentDir, configPath, u.Title)
 }
