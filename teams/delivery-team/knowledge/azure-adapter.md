@@ -130,11 +130,17 @@ is what makes resume *convergent*, not merely dedup-attempted.
 State names, the type's field set, and the state→category mapping are
 **process-template-dependent** (Agile vs Scrum vs CMMI vs custom). **Resolve them at
 runtime** with `wit_get_work_item_type` (and the project's process metadata); never
-write a literal `"Done"`/`"Blocked"`/`"Active"` into a ceremony or worker prompt.
+write a literal `"Done"`/`"Active"` into a ceremony or worker prompt.
 
-- "Mark blocked" = resolve the type's blocked-category state name, then
-  `wit_update_work_item` to it — the name may be `Blocked`, `On Hold`, or a custom
-  value.
+- **"Mark blocked" is NOT a state transition.** Azure DevOps has **no blocked
+  state-category** (the categories are Proposed/InProgress/Resolved/Completed/Removed)
+  and the standard templates (Scrum/Agile/CMMI) ship **no `Blocked` state**. Signal a
+  blocker by adding a `blocked` tag to `System.Tags` (universal, template-agnostic) —
+  and, where the type exposes it, setting the `Microsoft.VSTS.CMMI.Blocked` field to
+  `Yes` (Task has it; PBI/Feature/Epic don't) — plus a diagnostic comment, leaving
+  `System.State` **unchanged**. Never resolve or invent a `Blocked` state to transition
+  to; the "resolve at runtime" rule applies to real states (the Completed category), not
+  to blocking, which is a flag on the item.
 - "Done" for velocity / completion = resolve the **Completed** state-category, not a
   literal string — different templates spell it differently.
 
@@ -186,9 +192,16 @@ no two roles fight over a page:
   (`Architecture/` + `Conventions/` for the task's area); the worker pulls them via
   `wiki_get_page_content`; `search_wiki` handles discovery when a path isn't pre-named.
 - **Write mechanics:** `wiki_create_or_update_page` is an **idempotent upsert** (safe
-  under §5 re-run); `wiki_list_pages` verifies namespace existence before a first
-  write; the target wiki is resolved once (`wiki_get_wiki`/`wiki_list_wikis`) at
-  `/delivery-init` and cached in `.delivery/config.json` (`wikiId`).
+  under §5 re-run), but it is **NOT recursive — it does not auto-create ancestor pages.**
+  Writing a nested page (`Domain/Glossary`, `Architecture/ADR/ADR-1-<slug>`,
+  `Sprints/Sprint-8-Review`) whose parent namespace page doesn't yet exist **404s
+  `WikiAncestorPageNotFoundException`**. So **ensure ancestors exist, parent-first**:
+  before a nested write, create each missing namespace page (`/Domain`, then
+  `/Architecture`, then `/Architecture/ADR`, `/Sprints`) — `wiki_list_pages` tells you
+  what's absent — then write the child. A **brand-new project wiki has no pages at all**,
+  so the very first namespace page must be created before anything can nest under it. The
+  target wiki is resolved once (`wiki_get_wiki`/`wiki_list_wikis`) at `/delivery-init` and
+  cached in `.delivery/config.json` (`wikiId`).
 
 ## 9. The one REST carve-out — attachment upload
 
@@ -205,8 +218,13 @@ gap.)
   returns a URL) then `wit_update_work_item` / a relation add to link the returned URL
   to the work-item.
 - The helper runs the worker's **env PAT** (Basic auth), never a literal in the argv;
-  it is worker-runnable (the worker already has the PAT + network). The Go
-  orchestrator stays zero-Azure — the carve-out lives in the team, not in `atl`.
+  it is worker-runnable (the worker already has the PAT + network). **PAT format (load-bearing):**
+  the helper accepts a **raw** PAT in `AZURE_DEVOPS_PAT` (it base64-encodes `:PAT` itself) **or**
+  the already-encoded `PERSONAL_ACCESS_TOKEN` = `base64("user:PAT")` that the `@azure-devops/mcp`
+  server consumes (used verbatim as the Basic header). The two env vars carry **different formats**,
+  so `atl work dispatch` must set `AZURE_DEVOPS_PAT` to a **raw** PAT — it must NOT reuse the MCP's
+  base64 `PERSONAL_ACCESS_TOKEN` as if it were raw, because `curl -u ":<base64>"` double-encodes it
+  → 401. The Go orchestrator stays zero-Azure — the carve-out lives in the team, not in `atl`.
 - Reading an attachment back (for the sprint-review report) uses the MCP
   (`wit_get_work_item_attachment`), so only the upload leg is REST.
 

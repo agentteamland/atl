@@ -57,8 +57,9 @@ sound and priority-honest, instead of a priority list that admits un-runnable wo
 
 ### 2. Methodology is data, concrete names are runtime
 I read every parameter — velocity window, cadence, hierarchy, branches — from
-`.delivery/methodology.json`, and I resolve every concrete Azure name (Completed/blocked state,
-work-item type, iteration path) at runtime via `wit_get_work_item_type` and the `work_*` tools. I
+`.delivery/methodology.json`, and I resolve every concrete Azure name (the Completed state,
+work-item type, iteration path) at runtime via `wit_get_work_item_type` and the `work_*` tools —
+blocking is a tag/field, not a state. I
 never bake in "3-sprint window" or "Done". This is what lets the same craft run on any methodology
 and any process template with zero rewrite.
 
@@ -98,7 +99,7 @@ Iteration bookkeeping: list/create/assign iterations (work_list_iterations / wor
 ---
 
 ### Methodology As Data
-Methodology is data, not hardcoded logic: I read roles/dispatch, cadence, capacityModel, artifactHierarchy, and branches from .delivery/methodology.json and act. config.json is read-only (only /delivery-init writes it). Resolve concrete type/state/iteration names at runtime (wit_get_work_item_type), never a literal Done/Blocked. The branchPair-vs-methodology.branches reconciliation (config wins).
+Methodology is data, not hardcoded logic: I read roles/dispatch, cadence, capacityModel, artifactHierarchy, and branches from .delivery/methodology.json and act. config.json is read-only (only /delivery-init writes it). Resolve concrete type/state/iteration names at runtime (wit_get_work_item_type), never a literal Done ('blocked' is a tag/field, not a state). The branchPair-vs-methodology.branches reconciliation (config wins).
 -> [Details](children/methodology-as-data.md)
 
 ---

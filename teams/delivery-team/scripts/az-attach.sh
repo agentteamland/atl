@@ -11,18 +11,33 @@
 # jq builds and parses ALL JSON (never hand-concatenated) so a comment or filename
 # with quotes / newlines / URL-reserved chars can't corrupt the request.
 #
-# Env (same names the worker's MCP already has; PAT never on the argv, never logged):
+# Env (never on the argv, never logged):
 #   AZURE_DEVOPS_ORG       e.g. "contoso"          (required)
 #   AZURE_DEVOPS_PROJECT   the project name/id     (required)
-#   AZURE_DEVOPS_PAT       the PAT (Basic auth)     (required; falls back to PERSONAL_ACCESS_TOKEN)
+#   AZURE_DEVOPS_PAT       a RAW PAT (recommended)  (required unless PERSONAL_ACCESS_TOKEN is set)
+#   PERSONAL_ACCESS_TOKEN  the @azure-devops/mcp Basic credential = base64("user:PAT"); used as-is
 #   AZURE_DEVOPS_API_VERSION   default 7.1
+#
+# PAT-FORMAT CONTRACT (the two env vars carry DIFFERENT formats — do not conflate):
+#   AZURE_DEVOPS_PAT is a RAW PAT — we base64(":PAT") it ourselves (empty user).
+#   PERSONAL_ACCESS_TOKEN is ALREADY base64("user:PAT") (what the @azure-devops/mcp server
+#   consumes) — used verbatim as the Basic header. We never route it through `curl -u`, which
+#   would base64 it a SECOND time → 401. Prefer AZURE_DEVOPS_PAT; dispatch sets it in the worker env.
 set -euo pipefail
 
 WI="${1:-}"; FILE="${2:-}"; COMMENT="${3:-test evidence}"
 ORG="${AZURE_DEVOPS_ORG:-}"
 PROJECT="${AZURE_DEVOPS_PROJECT:-}"
-PAT="${AZURE_DEVOPS_PAT:-${PERSONAL_ACCESS_TOKEN:-}}"
 APIVER="${AZURE_DEVOPS_API_VERSION:-7.1}"
+
+# Normalise auth to ONE Basic-header value so nothing double-encodes.
+if [ -n "${AZURE_DEVOPS_PAT:-}" ]; then
+  AUTH_B64="$(printf ':%s' "$AZURE_DEVOPS_PAT" | base64 | tr -d '\n')"   # raw PAT, empty user
+elif [ -n "${PERSONAL_ACCESS_TOKEN:-}" ]; then
+  AUTH_B64="$PERSONAL_ACCESS_TOKEN"                                       # already base64("user:PAT")
+else
+  AUTH_B64=""
+fi
 
 die() { echo "az-attach: $1" >&2; exit 2; }
 command -v jq   >/dev/null || die "jq is required (JSON is built + parsed with jq, never hand-concatenated)"
@@ -31,7 +46,7 @@ command -v curl >/dev/null || die "curl is required"
 [[ "$WI" =~ ^[0-9]+$ ]] || die "work-item id must be numeric, got: $WI"
 [ -f "$FILE" ] || die "file not found: $FILE"
 [ -n "$ORG" ] && [ -n "$PROJECT" ] || die "AZURE_DEVOPS_ORG and AZURE_DEVOPS_PROJECT must be set"
-[ -n "$PAT" ] || die "AZURE_DEVOPS_PAT (or PERSONAL_ACCESS_TOKEN) must be set"
+[ -n "$AUTH_B64" ] || die "AZURE_DEVOPS_PAT (a raw PAT) or PERSONAL_ACCESS_TOKEN (base64 user:PAT) must be set"
 
 BASE="https://dev.azure.com/${ORG}"
 NAME="$(basename "$FILE")"
@@ -39,12 +54,13 @@ NAME_ENC="$(jq -rn --arg n "$NAME" '$n|@uri')"   # full percent-encode (& ? # + 
 
 # curl with bounded backoff on 429/5xx (best-effort; on exhaustion the worker
 # re-invokes — the adapter §3 resilience contract lives in the MCP callers, not here).
-# The PAT rides -u ":$PAT" (empty user) as a Basic auth HEADER — never the argv, never logged.
+# Auth rides an explicit `Authorization: Basic $AUTH_B64` HEADER (never -u, never the argv,
+# never logged) — AUTH_B64 is the already-normalised Basic value (see the PAT-format contract).
 req() { # req METHOD URL CONTENT_TYPE [curl-data-args...]
   local method="$1" url="$2" ctype="$3"; shift 3
   local attempt=1 out code body
   while :; do
-    out="$(curl -sS -w '\n%{http_code}' -u ":$PAT" -X "$method" -H "Content-Type: $ctype" "$url" "$@" || true)"
+    out="$(curl -sS -w '\n%{http_code}' -H "Authorization: Basic $AUTH_B64" -X "$method" -H "Content-Type: $ctype" "$url" "$@" || true)"
     code="${out##*$'\n'}"; body="${out%$'\n'*}"
     case "$code" in
       2*) printf '%s' "$body"; return 0 ;;

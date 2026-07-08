@@ -126,7 +126,10 @@ can't see each other's output):
    the project's `Domain/` namespace (glossary, entities, business rules surfaced during analysis);
    seed the first `Architecture/` page for the system-shape starting point. Use
    `wiki_create_or_update_page` (an idempotent upsert) against the `wikiId` cached in
-   `config.json`; verify namespace existence with `wiki_list_pages` before a first write. One owner
+   `config.json`. On a greenfield project the wiki is **empty**, so **create each parent
+   namespace page first** (`/Domain`, `/Architecture`) — `wiki_create_or_update_page` does
+   not auto-create ancestors, so a nested write (`Domain/Glossary`) 404s otherwise (adapter
+   §8); `wiki_list_pages` tells you what's absent. One owner
    per namespace — `Domain/`/`Analysis/` are the analysts', `Architecture/`/`Conventions/` the
    tech-lead's; seed only what the adopted role owns.
 

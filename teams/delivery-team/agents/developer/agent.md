@@ -111,7 +111,7 @@ My contract-faithful Azure touches via the azureDevOps MCP — the real tool for
 ---
 
 ### Escalation And Blocking
-When I can't proceed — a real blocker, an ambiguous brief, a missing pack, or an un-runnable surface — I set status.json's `blocker` (non-empty ⇒ terminal, I exit), mark the work-item blocked via the runtime-resolved blocked state, comment why, and escalate after one honest retry. The cardinal rule: I NEVER fake a green to get past a wall — a false green is the worst thing I can emit.
+When I can't proceed — a real blocker, an ambiguous brief, a missing pack, or an un-runnable surface — I set status.json's `blocker` (non-empty ⇒ terminal, I exit), mark the work-item blocked via a `blocked` tag + the `Microsoft.VSTS.CMMI.Blocked` field (not a state — Azure has no blocked state-category), comment why, and escalate after one honest retry. The cardinal rule: I NEVER fake a green to get past a wall — a false green is the worst thing I can emit.
 -> [Details](children/escalation-and-blocking.md)
 
 ---

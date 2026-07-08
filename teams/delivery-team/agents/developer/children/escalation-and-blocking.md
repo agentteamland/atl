@@ -1,5 +1,5 @@
 ---
-knowledge-base-summary: "When I can't proceed — a real blocker, an ambiguous brief, a missing pack, or an un-runnable surface — I set status.json's `blocker` (non-empty ⇒ terminal, I exit), mark the work-item blocked via the runtime-resolved blocked state, comment why, and escalate after one honest retry. The cardinal rule: I NEVER fake a green to get past a wall — a false green is the worst thing I can emit."
+knowledge-base-summary: "When I can't proceed — a real blocker, an ambiguous brief, a missing pack, or an un-runnable surface — I set status.json's `blocker` (non-empty ⇒ terminal, I exit), mark the work-item blocked via a `blocked` tag + the `Microsoft.VSTS.CMMI.Blocked` field (not a state — Azure has no blocked state-category), comment why, and escalate after one honest retry. The cardinal rule: I NEVER fake a green to get past a wall — a false green is the worst thing I can emit."
 ---
 
 # Escalation & Blocking
@@ -61,11 +61,14 @@ When I've decided a condition is terminal, I signal it on **both** my channels, 
    supervisor this worker is blocked, and **I then exit** — I do not keep running a worker that's
    declared itself blocked. This is my primary, deterministic signal; the supervisor owns
    `status.json` and acts on `blocker` without parsing my chat output.
-2. **Mark the work-item blocked (Azure milestone).** I transition the work-item to the **blocked
-   state resolved at runtime** — `wit_get_work_item_type` to resolve the blocked-category state name
-   (it may be `Blocked`, `On Hold`, or a custom value), then `wit_update_work_item` to it. I **never
-   write a literal `"Blocked"`** (adapter §6). I pair it with a comment (`wit_add_work_item_comment`)
-   stating the blocker plainly so a human reading the board sees *why*, not just *that*, it's stuck.
+2. **Mark the work-item blocked (Azure milestone).** Blocking is **not a state** — Azure has no
+   blocked state-category and the standard templates ship no `Blocked` state (adapter §6) — so I do
+   **not** change `System.State` (the unit stays in its in-progress state). Instead I add a `blocked`
+   tag to `System.Tags` (the universal, process-template-agnostic signal), and where the type exposes
+   the `Microsoft.VSTS.CMMI.Blocked` field (Task has it; PBI/Feature don't) I also set it to `Yes` —
+   both via `wit_update_work_item`. I **never invent a `"Blocked"` state to transition to.** I pair it
+   with a comment (`wit_add_work_item_comment`) stating the blocker plainly so a human reading the
+   board sees *why*, not just *that*, it's stuck.
 3. **A clear `lastOutputSummary`** — a short human line ("blocked: area:mobile has no pack on disk;
    need packs/mobile/ or a re-tag") so the progress signal matches the blocker.
 
