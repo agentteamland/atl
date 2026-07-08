@@ -35,6 +35,12 @@ type Scheduler struct {
 	BuildSpec  func(u WorkUnit, worktreeDir string) WorkerSpec
 	Log        func(string)
 
+	// deliveryCfg is the project's .delivery/config.json, loaded once at Run()
+	// start; nil when no config is present (a plan-only harness) → workers fall
+	// back to ambient inheritance (pre-#8 behavior). Used to wire each worker's
+	// azureDevOps MCP (scoped to the config's org, D3) + PAT env (#17 / F8-Go).
+	deliveryCfg *DeliveryConfig
+
 	units map[int]*unitSched
 }
 
@@ -133,6 +139,16 @@ func (s *Scheduler) Run() (Summary, error) {
 	// left running detached; orphaned claude -p processes would burn budget with no
 	// supervisor. On normal completion nothing is running, so this is a no-op.
 	defer s.abortRunning()
+
+	// Load the project's Azure coordinates once (org/project/pat.ref) so each worker
+	// is spawned with an azureDevOps MCP scoped to THIS project's org (D3) + its PAT
+	// env (#17). A missing config → nil → workers fall back to ambient inheritance
+	// (the Layer-A harness has no config); a malformed config is a real error.
+	cfg, err := LoadDeliveryConfig(s.ProjectRoot)
+	if err != nil {
+		return Summary{}, err
+	}
+	s.deliveryCfg = cfg
 
 	// Respect a prior run's give-up decisions: a durable BlockedReport means the
 	// #12 ladder already exhausted its retries, so skip re-admitting that unit
@@ -386,7 +402,20 @@ func (s *Scheduler) spawnUnit(us *unitSched, now time.Time) error {
 	if err != nil {
 		return err
 	}
-	handle, err := s.Spawn(s.BuildSpec(us.unit, path))
+	spec := s.BuildSpec(us.unit, path)
+	// Wire the worker's Azure access from config (D3 / #17): an azureDevOps MCP
+	// scoped to the project's org (so it can never inherit the operator's global
+	// employer MCP) + the PAT env the MCP server and az-attach.sh consume. Skipped
+	// when there's no config (ambient inheritance, the pre-#8 / Layer-A path).
+	if s.deliveryCfg != nil {
+		mcpPath, mErr := writeMCPConfig(s.ProjectRoot, s.deliveryCfg.Org, id)
+		if mErr != nil {
+			return mErr
+		}
+		spec.MCPConfigPath = mcpPath
+		spec.ExtraEnv = deliveryWorkerEnv(s.deliveryCfg)
+	}
+	handle, err := s.Spawn(spec)
 	if err != nil {
 		return err
 	}
@@ -512,14 +541,14 @@ func (s *Scheduler) summary() Summary {
 //
 // Fork A (worker-fetches-from-Azure): the plan carries only the work-item id, so the
 // assembled prompt directs the worker to fetch the rest — brief, area tag, pack, wiki
-// — from Azure over the inherited MCP at runtime. This keeps the engine zero-Azure and
-// the plan contract minimal (no area/brief duplicated into plan.json). MCPConfigPath is
-// left empty (the worker inherits the worktree's .mcp.json — the azureDevOps server
-// /delivery-init configured, #17); ExtraEnv is left nil (the PAT, named by config.pat.ref
-// and defaulting to AZURE_DEVOPS_PAT, is inherited from this process's env and never
-// placed in the argv, so it can't leak into logs — spawn.go). The real runtime wiring
-// (MCP reachable, PAT set, the reflected .claude assets present for the worker) is what
-// the stone-#9 Layer-B e2e validates; this stone assembles the invocation.
+// — from Azure over its MCP at runtime. This keeps the engine zero-Azure and the plan
+// contract minimal (no area/brief duplicated into plan.json). This builder returns the
+// base spec (prompt + worktree); the scheduler's spawnUnit augments MCPConfigPath +
+// ExtraEnv per-unit from .delivery/config.json (D3 / #17 — an azureDevOps MCP scoped to
+// the project's org so it can't inherit the operator's global MCP, plus the PAT env the
+// MCP server + az-attach.sh consume). The PAT never enters the argv (spawn.go), so it
+// can't leak into logs. The real runtime wiring (MCP reachable, PAT format accepted by
+// the live server) is what the stone-#9 Layer-B run validates; this assembles it.
 func DeliveryWorkerSpec(root string) func(u WorkUnit, worktreeDir string) WorkerSpec {
 	return func(u WorkUnit, worktreeDir string) WorkerSpec {
 		return WorkerSpec{
