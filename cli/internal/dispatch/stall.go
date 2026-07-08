@@ -59,16 +59,21 @@ func Classify(status *Status, phaseEnteredAt, now time.Time, cfg StallConfig) Br
 	return Alive
 }
 
-// DefaultStallConfig returns the phase-aware thresholds (#12): a generous
-// ~5 min heartbeat / ~15 min phase-stall in general, widened to ~10 min /
-// ~30 min for a mobile-emulator test phase where an iOS sim boot legitimately
-// takes 30-90s+. The phase heuristic keys off the worker's phase string; it can
-// be tightened once the delivery-team's worker phase names are finalized.
+// DefaultStallConfig returns the phase-aware thresholds (#12), sized for real
+// `claude -p` (LLM) workers that run heads-down for many minutes inside a single
+// phase and re-write status.json only at phase boundaries: a generous 15 min
+// heartbeat / 30 min phase-stall in general, widened to 20 / 45 min for a
+// mobile-emulator test phase (an iOS sim boot legitimately takes 30-90s+ and a
+// device run is long). Liveness is measured from the status.json file mtime
+// (ReadStatus), accurate even though the worker's own heartbeatTs is an unreliable
+// LLM guess. Earlier 5/15 min values reclaimed a live-but-heads-down developer as
+// stalled (the real Phase-3 run). The phase heuristic keys off the worker's phase
+// string; it can be tightened once the delivery-team's worker phase names settle.
 func DefaultStallConfig(phase string) StallConfig {
 	if isMobileTestPhase(phase) {
-		return StallConfig{HeartbeatThreshold: 10 * time.Minute, PhaseStallThreshold: 30 * time.Minute}
+		return StallConfig{HeartbeatThreshold: 20 * time.Minute, PhaseStallThreshold: 45 * time.Minute}
 	}
-	return StallConfig{HeartbeatThreshold: 5 * time.Minute, PhaseStallThreshold: 15 * time.Minute}
+	return StallConfig{HeartbeatThreshold: 15 * time.Minute, PhaseStallThreshold: 30 * time.Minute}
 }
 
 func isMobileTestPhase(phase string) bool {
