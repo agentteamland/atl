@@ -56,11 +56,14 @@ surface is never a silent pass. "review passed" = the tech-lead's green vote thr
 This is the actor split the prose had drifted on. **The Go orchestrator is zero-Azure — it has no MCP
 and cannot complete an Azure PR.** So the **tech-lead** (an MCP-capable worker), on a green review:
 
-1. **Completes the Azure PR** (`repo_update_pull_request` to the completed state) — Azure Repos merges
-   the branch into `dev`. The merge strategy must be **history-reachable** (a merge commit or
-   rebase/fast-forward, **never a squash**), so the merged branch's commits become ancestors of `dev`
-   — this is exactly what the engine's verify (§5) checks. Completing the PR *is* the merge; there is
-   no separate git-push.
+1. **Completes the Azure PR** — `repo_update_pull_request` with **`autoComplete: true`** + a
+   **history-reachable `mergeStrategy`** (`NoFastForward` / `Rebase` — **never `Squash`**, so the
+   merged branch's commits become ancestors of `dev`, exactly what the engine's verify (§5) checks)
+   + **`transitionWorkItems: false`**. The tool has **no synchronous "completed" status** (only
+   `autoComplete` + `Active`/`Abandoned`), and its default **`transitionWorkItems: true` would
+   implicitly move the work-item on completion** — colliding with the explicit Done in step 2; the
+   tech-lead owns the single Done transition, so it must be off. With no blocking branch policies
+   auto-complete merges within ~2 min; completing the PR *is* the merge, there is no separate git-push.
 2. **Sets the work-item to the runtime-resolved Done** (`wit_get_work_item_type` → `wit_update_work_item`,
    never a literal `"Done"` — adapter §6). Merge first, then Done (so a Done never fronts an unlanded
    merge).
