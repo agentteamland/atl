@@ -141,8 +141,11 @@ no wiki seed for analysis that didn't land.
 **Ask the user explicitly** whether to seed a first sprint now so they can go straight to
 `/sprint-plan`; **default to skip** if they don't opt in. If they opt in:
 
-- Create iteration 1 via `work_create_iterations` (an `IterationPath`-shaped operation; assigning
-  an item to it later is an idempotent field update — a safe no-op on re-run).
+- **Resolve the first sprint iteration via `work_list_iterations` and REUSE an existing one** — a
+  Scrum process template ships `Sprint 1`–`Sprint 6` by default. Create via `work_create_iterations`
+  **only if no suitable iteration exists**: `work_create_iterations` **errors (VS402371) on a name
+  already in use**, so a blind create fails on a default Scrum project. Assigning an item to the
+  resolved iteration is then an idempotent `IterationPath` field update — a safe no-op on re-run.
 - Optionally create a small starter PBI set under the first Feature (`wit_create_work_item` /
   `wit_add_child_work_items`), each run through the **same** step-3 idempotency discipline (resolve
   type at runtime, check-first WIQL by `atl-key`, stamp `atl-run:kickoff:<id>` + `atl-key:<hash>`).

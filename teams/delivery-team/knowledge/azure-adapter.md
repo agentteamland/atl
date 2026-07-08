@@ -115,6 +115,10 @@ ledger — a lost/stale ledger silently reintroduces duplication).
   update** (converge to intended state), **not-found → create-then-stamp**. Create +
   stamp as close to atomic as the API allows; a **409/duplicate on create is caught
   and resolved to the existing item**, not surfaced as an error.
+- **`wit_add_child_work_items` takes no tags/fields** — only `wit_create_work_item`
+  accepts `System.Tags` inline. A child created with `wit_add_child_work_items` is
+  stamped (`atl-key`/`atl-run`/`area:<name>`) by a **follow-up `wit_update_work_item`**;
+  that is the create-then-stamp above, two calls, as atomic as the API allows.
 - **Iteration assignment is idempotent by nature** — it is an `IterationPath` field
   *update* (`wit_update_work_item`), so re-running sets the same path to the same
   value: a safe no-op. Never model it as a "create membership" that could double.
