@@ -26,9 +26,18 @@ func TestReadStatus(t *testing.T) {
 	if s.Phase != "self-test" {
 		t.Errorf("Phase = %q, want self-test", s.Phase)
 	}
-	want := time.Date(2026, 7, 4, 12, 0, 0, 0, time.UTC)
-	if !s.HeartbeatTS.Equal(want) {
-		t.Errorf("HeartbeatTS = %v, want %v", s.HeartbeatTS, want)
+	// HeartbeatTS is the file's mtime (accurate), NOT the worker-written
+	// "2026-07-04T12:00:00Z" — an LLM's unreliable guess, deliberately ignored for
+	// liveness (ReadStatus overwrites it with the mtime).
+	fi, statErr := os.Stat(filepath.Join(dir, StatusFileName))
+	if statErr != nil {
+		t.Fatal(statErr)
+	}
+	if !s.HeartbeatTS.Equal(fi.ModTime()) {
+		t.Errorf("HeartbeatTS = %v, want the file mtime %v (not the worker's guess)", s.HeartbeatTS, fi.ModTime())
+	}
+	if workerGuess := time.Date(2026, 7, 4, 12, 0, 0, 0, time.UTC); s.HeartbeatTS.Equal(workerGuess) {
+		t.Error("HeartbeatTS should be the file mtime, not the worker-written timestamp")
 	}
 	if s.Blocker != "" {
 		t.Errorf("Blocker = %q, want empty", s.Blocker)

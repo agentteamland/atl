@@ -484,8 +484,8 @@ func TestPhaseStallBreachRecovers(t *testing.T) {
 	orig := w.handles[4] // captured before the retry replaces it
 
 	// Keep the heartbeat FRESH (not a heartbeat breach) but pin the phase past the
-	// phase-stall window — a worker looping in place.
-	w.now = w.now.Add(20 * time.Minute)
+	// phase-stall window (30 min general) — a worker looping in place.
+	w.now = w.now.Add(35 * time.Minute)
 	w.statuses[4] = &Status{Phase: "implement", HeartbeatTS: w.now}
 	if _, err := s.step(); err != nil {
 		t.Fatal(err)
