@@ -8,7 +8,7 @@ Takımlar, ATL'nin dağıtım birimidir: tek komutla bir projeye (ya da global o
 
 v1 dönemi first-party takımlar (bir full-stack yazılım takımı ve bir design-system takımı) **Temmuz 2026'da emekliye ayrıldı** — v2 platformundan önce yazılmışlardı ve parça parça yamamak yerine v2 temeli üzerinde bilinçli bir yeniden kurulum tercih edilerek kaldırıldılar. Geçmişleri [atl deposunda](https://github.com/agentteamland/atl) korunuyor.
 
-Yeniden kurulum **[profile-team](/tr/teams/profile-team)** ile başlıyor — danışmanlık tarzı takımların üzerine kurulacağı, global ve ortak kullanıcı-profili katmanı, artık kullanılabilir — ardından yeni bir yazılım geliştirici takımı geliyor. Takımlar yayımlandıkça bu sayfa yeniden tam katalog gezinme sayfası hâline gelecek.
+Yeniden kurulum **[profile-team](/tr/teams/profile-team)** ile başlıyor — danışmanlık tarzı takımların üzerine kurulacağı, global ve ortak kullanıcı-profili katmanı — ve **[delivery-team](/tr/teams/delivery-team)**, Azure DevOps iş-öğesi güdümlü, sprint tabanlı otonom bir yazılım-teslim organizasyonu. İkisi de artık kullanılabilir. Daha fazlası yayımlandıkça bu sayfa yeniden tam katalog gezinme sayfası hâline gelecek.
 
 ## Göz at ve kur
 

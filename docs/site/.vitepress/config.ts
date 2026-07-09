@@ -123,7 +123,8 @@ export default defineConfig({
               text: 'Teams',
               items: [
                 { text: 'Browse', link: '/teams/' },
-                { text: 'profile-team', link: '/teams/profile-team' }
+                { text: 'profile-team', link: '/teams/profile-team' },
+                { text: 'delivery-team', link: '/teams/delivery-team' }
               ]
             }
           ],
@@ -258,7 +259,8 @@ export default defineConfig({
               text: 'Takımlar',
               items: [
                 { text: 'Göz at', link: '/tr/teams/' },
-                { text: 'profile-team', link: '/tr/teams/profile-team' }
+                { text: 'profile-team', link: '/tr/teams/profile-team' },
+                { text: 'delivery-team', link: '/tr/teams/delivery-team' }
               ]
             }
           ],
