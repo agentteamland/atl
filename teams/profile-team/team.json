@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "name": "profile-team",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Curates a cross-project profile of the people in your world: drains profile-fact markers into person profiles at ~/.atl/profiles, each grown through a self-describing, versioned interface.",
   "author": {
     "name": "AgentTeamLand",
@@ -30,6 +30,14 @@
     {
       "name": "profile-drain",
       "description": "/profile-drain \u2014 folds pending profile-fact queue items into the global person profiles at ~/.atl/profiles via the profile-curator (privacy-gated, source-flagged, schema lazy-filled)."
+    },
+    {
+      "name": "profile-backup",
+      "description": "/profile-backup - snapshot the global profile store (~/.atl/profiles) into the current git repo and commit it, so accumulated memory is versioned and portable; global stays authoritative."
+    },
+    {
+      "name": "profile-restore",
+      "description": "/profile-restore - bring a profile snapshot from the repo back into the global store, as a diffed dry-run-by-default overlay that requires explicit --apply and never clobbers newer memory."
     }
   ],
   "rules": [

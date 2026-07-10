@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-07-09T00:00:00Z",
+  "generatedAt": "2026-07-10T00:00:00Z",
   "teams": [
     {
       "handle": "agentteamland",
       "name": "profile-team",
-      "version": "1.3.0",
+      "version": "1.4.0",
       "description": "Curates a cross-project profile of the people in your world: drains profile-fact markers into person profiles at ~/.atl/profiles, each grown through a self-describing, versioned interface.",
       "keywords": [
         "profile",
@@ -21,7 +21,7 @@
       "source": {
         "repo": "agentteamland/atl",
         "subpath": "teams/profile-team",
-        "ref": "v2.1.0"
+        "ref": "v2.2.0"
       }
     },
     {
@@ -43,7 +43,30 @@
       "source": {
         "repo": "agentteamland/atl",
         "subpath": "teams/delivery-team",
-        "ref": "v2.1.0"
+        "ref": "v2.2.0"
+      }
+    },
+    {
+      "handle": "agentteamland",
+      "name": "personal-advisory-team",
+      "version": "0.1.0",
+      "description": "Your personal advisory team: an honest, wise primary advisor that comes to know you across every conversation and, because it will not flatter you, becomes the one you run to for real thinking.",
+      "keywords": [
+        "advisory",
+        "personal",
+        "advisor",
+        "honest",
+        "profile",
+        "memory",
+        "reflection",
+        "thinking-partner"
+      ],
+      "scope": "global",
+      "verified": true,
+      "source": {
+        "repo": "agentteamland/atl",
+        "subpath": "teams/personal-advisory-team",
+        "ref": "v2.2.0"
       }
     }
   ]
