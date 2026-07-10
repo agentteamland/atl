@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "name": "personal-advisory-team",
+  "version": "0.1.0",
+  "description": "Your personal advisory team: an honest, wise primary advisor that comes to know you across every conversation and, because it will not flatter you, becomes the one you run to for real thinking.",
+  "author": {
+    "name": "AgentTeamLand",
+    "url": "https://github.com/agentteamland"
+  },
+  "license": "MIT",
+  "keywords": [
+    "advisory",
+    "personal",
+    "advisor",
+    "honest",
+    "profile",
+    "memory",
+    "reflection",
+    "thinking-partner"
+  ],
+  "repository": "https://github.com/agentteamland/atl",
+  "homepage": "https://github.com/agentteamland",
+  "scope": "global",
+  "agents": [
+    {
+      "name": "advisor",
+      "description": "The primary voice of the personal advisory team: an honest, wise companion that comes to know the user deeply and, because it will not flatter them, becomes the one they run to with their real thoughts."
+    }
+  ],
+  "skills": [
+    {
+      "name": "advisor",
+      "description": "/advisor — begin or resume a conversation with your personal advisor: it reads your profile, runs first-use onboarding once, embodies the honest, knowing advisor persona, and records what it learns."
+    },
+    {
+      "name": "advisor-home",
+      "description": "/advisor-home — set up your always-on advisory home once: create the folder + bootstrap CLAUDE.md and install an `advisor` shell command that opens it from any terminal, so /advisor is no longer needed there."
+    }
+  ],
+  "rules": [],
+  "capabilities": {
+    "profile": {
+      "role": "consumer",
+      "reads": [
+        "is-self"
+      ],
+      "writes": [
+        "is-self"
+      ]
+    }
+  },
+  "extends": null,
+  "excludes": [],
+  "dependencies": {
+    "core": "^1.0.0",
+    "profile-team": "^1.0.0"
+  },
+  "requires": {
+    "atl": ">=2.1.0"
+  }
+}
