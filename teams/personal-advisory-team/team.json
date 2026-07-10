@@ -31,6 +31,10 @@
     {
       "name": "advisor",
       "description": "/advisor — begin or resume a conversation with your personal advisor: it reads your profile, runs first-use onboarding once, embodies the honest, knowing advisor persona, and records what it learns."
+    },
+    {
+      "name": "advisor-home",
+      "description": "/advisor-home — set up your always-on advisory home once: create the folder + bootstrap CLAUDE.md and install an `advisor` shell command that opens it from any terminal, so /advisor is no longer needed there."
     }
   ],
   "rules": [],

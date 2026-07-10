@@ -64,8 +64,14 @@ kurcalayan bir danışman değil, bir mühendis istersin. Bu yüzden konuma gör
 
 ## Danışman evini kur
 
-Danışmanlık sohbetlerin için özel bir klasör aç ve içine tam olarak şu bootstrap'ı taşıyan bir
-`CLAUDE.md` koy. O andan itibaren, o klasörü Claude Code'da açmak *danışmanınla konuşmak* demektir:
+Tek komutla: bir kez **`/advisor-home`** çalıştır. Klasörü açar, bootstrap `CLAUDE.md`'yi yazar ve bir
+`advisor` shell komutu kurar — böylece herhangi bir terminalden **`advisor`** yazınca doğrudan
+hep-açık danışmanına düşersin (orada `/advisor`'a gerek kalmaz). `/advisor` yine başka her yerde hızlı
+danışma için çalışır.
+
+Elle yapmayı mı tercih edersin? Danışmanlık sohbetlerin için özel bir klasör aç ve içine tam olarak şu
+bootstrap'ı taşıyan bir `CLAUDE.md` koy. O andan itibaren, o klasörü Claude Code'da açmak *danışmanınla
+konuşmak* demektir:
 
 ```markdown
 # Kişisel danışmanlık alanı

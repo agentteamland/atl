@@ -64,8 +64,14 @@ an advisor probing your mood. So it activates two ways, by location:
 
 ## Set up your advisory home
 
-Make a private folder for your advisory conversations, and put a `CLAUDE.md` in it with exactly this
-bootstrap. From then on, opening that folder in Claude Code *is* talking to your advisor:
+The one-command way: run **`/advisor-home`** once. It creates the folder, writes the bootstrap
+`CLAUDE.md`, and installs an `advisor` shell command — so from then on, typing **`advisor`** in any
+terminal drops you straight into your always-on advisor (no `/advisor` needed there). `/advisor` still
+works anywhere else for a quick consult.
+
+Prefer to do it by hand? Make a private folder for your advisory conversations and put a `CLAUDE.md`
+in it with exactly this bootstrap. From then on, opening that folder in Claude Code *is* talking to
+your advisor:
 
 ```markdown
 # Personal advisory space
