@@ -100,7 +100,7 @@ When wrapping up:
 ./scripts/push-all.sh      # see what's unpushed
 ```
 
-For a more thorough end-of-session pass, [`/repo-cleanup`](https://github.com/agentteamland/workspace/blob/main/.claude/skills/repo-cleanup/skill.md) automates: `/drain` → branch + commit + push + PR + auto-merge → tag + branch prune. Run it from inside Claude Code in the workspace.
+For a more thorough end-of-session pass, [`/repo-cleanup`](https://github.com/agentteamland/workspace/blob/main/.claude/skills/repo-cleanup/SKILL.md) automates: `/drain` → branch + commit + push + PR + auto-merge → tag + branch prune. Run it from inside Claude Code in the workspace.
 
 ## Related
 

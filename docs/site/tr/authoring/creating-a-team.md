@@ -176,7 +176,7 @@ atl update
 
 ### Adım 8 — (İsteğe bağlı) Beceri ve kural ekle
 
-**Beceriler** eğik çizgili komutlardır. Her biri bir frontmatter ile birlikte `skills/<skill-name>/skill.md` dosyasına yazılır:
+**Beceriler** eğik çizgili komutlardır. Her biri bir frontmatter ile birlikte `skills/<skill-name>/SKILL.md` dosyasına yazılır:
 
 ```markdown
 ---
@@ -254,9 +254,9 @@ my-team/
 │
 ├── skills/                        ← beceri başına bir dizin
 │   ├── lint-page/
-│   │   └── skill.md              ← frontmatter (name, description, argument-hint) + gövde
+│   │   └── SKILL.md              ← frontmatter (name, description, argument-hint) + gövde
 │   └── run-e2e/
-│       └── skill.md
+│       └── SKILL.md
 │
 └── rules/                         ← kural başına bir .md (düz, dizin değil)
     ├── react-19-defaults.md

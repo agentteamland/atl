@@ -15,7 +15,7 @@ Different teams will build very different scaffolders (a .NET + Docker stack vs.
 Inside the team repo:
 
 ```
-{team-repo}/skills/create-new-project/skill.md
+{team-repo}/skills/create-new-project/SKILL.md
 ```
 
 And in `team.json`:

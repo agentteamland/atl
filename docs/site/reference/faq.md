@@ -26,7 +26,7 @@ Yes. Each install adds its own copies into `.claude/`. If two teams ship an agen
 
 ### Where do teams come from? Can I install from a private repo or a Git URL?
 
-`atl install` is **catalog-only**. It takes a `<handle>/<team>` reference, resolves it against the GitHub-backed catalog (built from public repos tagged with the [`atl-team`](https://github.com/topics/atl-team) topic), fetches the source as an ephemeral HTTPS tarball, and copies the team's `agents/`, `skills/`, and `rules/` into the scope's `.claude/`.
+`atl install` is **catalog-only**. It takes a `<handle>/<team>` reference, resolves it against the GitHub-backed catalog (built from public repos tagged with the [`atl-team`](https://github.com/topics/atl-team) topic), fetches the source as an ephemeral HTTPS tarball, and copies the team's installable subtrees (`agents/`, `skills/`, `rules/`, `knowledge/`, `scripts/`, `packs/`) into the scope's `.claude/`.
 
 There is no install from a private repo, an arbitrary Git URL, SSH, or a local path — those were v1. If you want a team installable, make its repo public and tag it `atl-team` (or run [`atl publish`](/cli/publish) from the repo). See [`atl search`](/cli/search) for how the catalog is queried.
 
@@ -49,7 +49,7 @@ There is no shared clone cache to clean up — sources are fetched as throwaway 
 
 ### Can I install a team without running `atl` (by hand)?
 
-Yes — `atl` just automates a copy. Fetch the team repo, then copy its `agents/`, `skills/`, and `rules/` into the target `.claude/` yourself. There's no inheritance or excludes resolution to replicate, and no persistent cache to populate. The only thing you'd lose is the install manifest `atl` writes (see below), which `atl update` and `atl doctor` rely on for refresh and self-heal.
+Yes — `atl` just automates a copy. Fetch the team repo, then copy its installable subtrees — `agents/`, `skills/`, `rules/`, `knowledge/`, `scripts/`, `packs/` — into the target `.claude/` yourself. There's no inheritance or excludes resolution to replicate, and no persistent cache to populate. The only thing you'd lose is the install manifest `atl` writes (see below), which `atl update` and `atl doctor` rely on for refresh and self-heal.
 
 ### Where does `atl` keep the list of installed teams?
 

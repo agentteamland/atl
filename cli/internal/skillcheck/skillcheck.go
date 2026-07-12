@@ -71,10 +71,13 @@ func checkSkillDir(dir, rel string) []Finding {
 	return f
 }
 
-// skillFile resolves a skill's markdown file, accepting both conventions in the
-// repo: core skills use SKILL.md, team skills use skill.md. Returns whichever
-// exists (case-sensitively — this must be correct on Linux CI, not just
-// case-insensitive macOS); falls back to SKILL.md for the "missing" error path.
+// skillFile resolves a skill's markdown file. The correct, discoverable name is
+// SKILL.md (uppercase) — a lowercase skill.md is NOT found as a /slash command by
+// Claude Code on case-sensitive Linux. This still tolerates the lowercase form so
+// the check itself doesn't crash on a mis-named skill, but authors must ship
+// SKILL.md (the docs teach that). Resolution is case-sensitive (correct on Linux
+// CI, not just case-insensitive macOS); falls back to SKILL.md for the "missing"
+// error path.
 func skillFile(dir, rel string) (path, relPath string) {
 	names, _ := os.ReadDir(dir)
 	for _, e := range names {

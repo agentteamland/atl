@@ -26,7 +26,7 @@ Her takım, kök dizininde `team.json` dosyası bulunan herkese açık bir GitHu
 
 ## Bugün nerede?
 
-`atl` **v2** sürümünde — tek bir monorepo ([`agentteamland/atl`](https://github.com/agentteamland/atl)), şu an **alpha** aşamasında. Kurulum topolojisi proje-yerel kopyalardan oluşur (diskte kalıcı klon önbelleği yoktur — kaynaklar kurulumdan sonra atılır), otomatik güncelleme yolu Claude Code'un `SessionStart` ve `UserPromptSubmit` hook'larından geçer, öğrenme döngüsü ise oturum bilgisini kalıcı biçimde saklar: satır içi işaretçiler (marker) kuyruğa alınır ve `/drain` becerisi her birini günlük, wiki ve ajan bilgi tabanlarına işler.
+`atl` **v2** sürümünde — tek bir monorepo ([`agentteamland/atl`](https://github.com/agentteamland/atl)), artık **stabil**. Kurulum topolojisi proje-yerel kopyalardan oluşur (diskte kalıcı klon önbelleği yoktur — kaynaklar kurulumdan sonra atılır), otomatik güncelleme yolu Claude Code'un `SessionStart` ve `UserPromptSubmit` hook'larından geçer, öğrenme döngüsü ise oturum bilgisini kalıcı biçimde saklar: satır içi işaretçiler (marker) kuyruğa alınır ve `/drain` becerisi her birini günlük, wiki ve ajan bilgi tabanlarına işler.
 
 v1 dönemi first-party takımlar Temmuz 2026'da emekliye ayrıldı; katalog bugün açık yayımlamayla büyüyor — [`atl-team`](https://github.com/topics/atl-team) topic'iyle etiketlenmiş herkese açık her depo kataloğa girer. Platformun tamamı MIT lisanslı ve katkılara açık.
 

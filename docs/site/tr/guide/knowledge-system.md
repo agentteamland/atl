@@ -104,7 +104,7 @@ Somut olarak:
 - **Ajan çocuk dosyaları** (ajanın dizinindeki `children/{topic}.md`) wiki'nin ajan tarafındaki karşılığıdır — konu tabanlı, yerine yazma / güncelleme, ajan için projeler arası alan bilgisi.
 - **Beceri öğrenim dosyaları** (bir becerinin dizinindeki `learnings/{topic}.md`) beceri başına karşılıktır — aynı şekil, kapsamı beceriye sıkıştırılmış.
 
-Her ikisinde de bir `knowledge-base-summary:` frontmatter alanı bulunur ve bu alan `agent.md` (Knowledge Base bölümü) ya da `skill.md` (Accumulated Learnings bölümü) içine kendiliğinden derlenir. Tüm desen için bkz. [Children + learnings](/tr/guide/children-and-learnings).
+Her ikisinde de bir `knowledge-base-summary:` frontmatter alanı bulunur ve bu alan `agent.md` (Knowledge Base bölümü) ya da `SKILL.md` (Accumulated Learnings bölümü) içine kendiliğinden derlenir. Tüm desen için bkz. [Children + learnings](/tr/guide/children-and-learnings).
 
 ## İlgili
 

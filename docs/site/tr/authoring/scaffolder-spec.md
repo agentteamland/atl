@@ -15,7 +15,7 @@ Farklı takımlar çok farklı iskeleler kuracaktır (.NET + Docker yığını i
 Takım deposunun içinde:
 
 ```
-{team-repo}/skills/create-new-project/skill.md
+{team-repo}/skills/create-new-project/SKILL.md
 ```
 
 Ve `team.json` içinde:

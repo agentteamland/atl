@@ -6,7 +6,7 @@
 
 **Katalog / Dizin** — takımların keşfedilme biçimi. GitHub'da [`atl-team`](https://github.com/topics/atl-team) konusuyla etiketlenmiş herkese açık depolardan oluşturulan bir dizin. `atl search` bu dizini sorgular; `atl install` bir tanıtıcıyı buna göre çözümler. Önbelleğe alınmış kopya `~/.atl/index.json` konumunda yaşar. Bkz. [`atl search`](/tr/cli/search).
 
-**Children deseni** — karmaşık ajanlar için bir sözleşme: üst düzey `agent.md` kısa kalır (kimlik, kapsam, ilkeler, Knowledge Base); ayrıntılı bilgi `children/` altında konu başına bir dosya olarak yaşar. Her çocuk dosya, [`/drain`](/tr/skills/drain)'in üst `agent.md` dosyasının Knowledge Base bölümünü kendiliğinden yeniden inşa etmek için kullandığı `knowledge-base-summary` frontmatter alanını taşır. Becerilerde aynı desen `learnings/` olarak yansıtılır (`skill.md`'nin Accumulated Learnings bölümünü kendiliğinden yeniden inşa eder).
+**Children deseni** — karmaşık ajanlar için bir sözleşme: üst düzey `agent.md` kısa kalır (kimlik, kapsam, ilkeler, Knowledge Base); ayrıntılı bilgi `children/` altında konu başına bir dosya olarak yaşar. Her çocuk dosya, [`/drain`](/tr/skills/drain)'in üst `agent.md` dosyasının Knowledge Base bölümünü kendiliğinden yeniden inşa etmek için kullandığı `knowledge-base-summary` frontmatter alanını taşır. Becerilerde aynı desen `learnings/` olarak yansıtılır (`SKILL.md`'nin Accumulated Learnings bölümünü kendiliğinden yeniden inşa eder).
 
 **Bağımlılıklar** — bir takımın gereksinim duyduğu ek takımlar; `team.json` içindeki `dependencies` alanıyla belirtilir (takım adı → sürüm kısıtı eşlemesi). Takımın kendisiyle birlikte çözülür ve kurulur.
 
@@ -24,7 +24,7 @@
 
 **SemVer kısıtı** — `dependencies` ve `requires.atl` alanlarında kullanılan sürüm aralığı sözdizimi. `^1.0.0` (caret), `~1.2.0` (tilde), `1.2.3` (kesin), `>=1.2.0` (açık uçlu).
 
-**Beceri (skill)** — kullanıcı tarafından çağrılan eğik çizgili komut (örneğin `/drain`). Kök dizininde `skill.md` bulunan bir dizin olarak gelir. Global beceriler `~/.claude/skills/` altında yaşar; takım kapsamlı beceriler bir takımla birlikte gelir ve kurulumun ardından `.claude/skills/` altında görünür.
+**Beceri (skill)** — kullanıcı tarafından çağrılan eğik çizgili komut (örneğin `/drain`). Kök dizininde `SKILL.md` bulunan bir dizin olarak gelir. Global beceriler `~/.claude/skills/` altında yaşar; takım kapsamlı beceriler bir takımla birlikte gelir ve kurulumun ardından `.claude/skills/` altında görünür.
 
 **Takım (team)** — kökünde `team.json` bulunan bir Git deposu; belirli bir iş türü için ajanları, becerileri ve kuralları bir araya paketler.
 
@@ -34,7 +34,7 @@
 
 **Journal** — `.atl/journal/{date}_{agent}.md` altındaki kronolojik, ajan başına öğrenme kaydı. [`/drain`](/tr/skills/drain) öğrenme kuyruğunu bilgi tabanına işlerken yazar; ajan açılışında Claude tarafından [knowledge-system kuralı](https://github.com/agentteamland/atl/blob/main/core/rules/knowledge-system.md) gereği okunur.
 
-**knowledge-base-summary** — her `children/{topic}.md` (ve `learnings/{topic}.md`) dosyasında zorunlu olan YAML frontmatter alanı. [`/drain`](/tr/skills/drain)'in üst `agent.md`'nin Knowledge Base (ya da `skill.md`'nin Accumulated Learnings) bölümünü yeniden inşa ederken çıkardığı bir-üç satırlık özet. Kaynak doğruluktur — yeniden inşa edilmiş bölüme yapılan elle düzenlemeler bir sonraki `/drain` çalıştırmasında üzerine yazılır.
+**knowledge-base-summary** — her `children/{topic}.md` (ve `learnings/{topic}.md`) dosyasında zorunlu olan YAML frontmatter alanı. [`/drain`](/tr/skills/drain)'in üst `agent.md`'nin Knowledge Base (ya da `SKILL.md`'nin Accumulated Learnings) bölümünü yeniden inşa ederken çıkardığı bir-üç satırlık özet. Kaynak doğruluktur — yeniden inşa edilmiş bölüme yapılan elle düzenlemeler bir sonraki `/drain` çalıştırmasında üzerine yazılır.
 
 **knowledge-system** — iki katmanlı bilgi modelini (`journal/` + `wiki/`) tanımlayan çekirdek kural. `agent-memory` katmanı journal'a katıldıktan sonra `memory-system` adından yeniden adlandırıldı.
 
