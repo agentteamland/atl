@@ -111,6 +111,10 @@ type catastrophe struct {
 // must not disarm the force-clean. Within a segment there are no separators, so
 // the flags a rule sees belong to that rule's subcommand.
 func Catastrophe(command string) (reason string, blocked bool) {
+	// A backslash-newline is a shell line CONTINUATION, not a command boundary —
+	// join it to a space first, so `git push \<newline> --force` reads as one
+	// segment (the flag can't be split away from its subcommand to dodge the rule).
+	command = reLineContinuation.ReplaceAllString(command, " ")
 	for _, seg := range reSegment.Split(command, -1) {
 		for _, c := range catastrophes {
 			if c.match(seg) {
@@ -122,6 +126,9 @@ func Catastrophe(command string) (reason string, blocked bool) {
 }
 
 var (
+	// reLineContinuation matches a shell line continuation (backslash + newline),
+	// which joins two physical lines into one logical command — NOT a boundary.
+	reLineContinuation = regexp.MustCompile(`\\\r?\n`)
 	// reSegment splits a command line into shell segments at pipes, command
 	// separators, and newlines.
 	reSegment   = regexp.MustCompile(`[|;&\n]+`)
@@ -139,6 +146,13 @@ var (
 	// built from clean's own flag letters where one is n (so an unrelated dash-led
 	// token like -enode does not count as a dry-run).
 	reCleanDryRun = regexp.MustCompile(`(?:^|\s)(?:--dry-run\b|-[dfiqxX]*n[dfiqxX]*(?:\s|$))`)
+	// reNoVerify matches the --no-verify gate-bypass flag as a standalone token, so
+	// a longer compound (--no-verify-ssl) doesn't trip it.
+	reNoVerify = regexp.MustCompile(`(?:^|\s)--no-verify(?:\s|=|$)`)
+	// reQuoted matches a single- or double-quoted span. Quoted text is blanked out
+	// before flag detection so a flag merely NAMED inside a commit message
+	// (`git commit -m "note about --no-verify"`) isn't read as the real flag.
+	reQuoted = regexp.MustCompile(`"[^"]*"|'[^']*'`)
 	// reDropSQL matches an executed destructive SQL statement (word-bounded so
 	// `tablet` / `truncate file` don't trip it).
 	reDropSQL = regexp.MustCompile(`(?i)\b(?:drop\s+table\b|drop\s+database\b|truncate\s+table\b)`)
@@ -256,7 +270,13 @@ func isDestructiveSQL(seg string) bool {
 }
 
 func isNoVerify(seg string) bool {
-	return strings.Contains(seg, "--no-verify") && reGit.MatchString(seg)
+	if !reGit.MatchString(seg) {
+		return false
+	}
+	// Blank out quoted text first so a --no-verify inside a quoted commit message
+	// is not read as the actual gate-bypass flag (a false DENY breaks flow).
+	unquoted := reQuoted.ReplaceAllString(seg, " ")
+	return reNoVerify.MatchString(unquoted)
 }
 
 // isSecretExfil reports whether a segment sends a known platform credential to a
@@ -269,11 +289,15 @@ func isNoVerify(seg string) bool {
 // a path/query slip through.
 //
 // It fails toward NOT blocking: if a credential rides an outbound command but no
-// literal destination host can be parsed (e.g. the URL is a shell variable), the
-// call is allowed — a false DENY breaks legitimate flow, and a literal attacker
-// host (the realistic injection form) is still caught. Per segment, like the
-// other catastrophe rules; pipe-split and non-HTTP carriers are documented gaps
-// the untrusted-input rule covers by discipline.
+// literal http(s) destination host can be parsed, the call is allowed — a false
+// DENY breaks legitimate flow. A scheme-having attacker host (the common injection
+// form, `curl https://evil/…`) is caught. A SCHEME-LESS target (`curl evil.com/…`,
+// which curl accepts) is a known gap, deliberately not closed here: reliably
+// telling a scheme-less URL positional from a curl flag-value/output-filename
+// needs real arg parsing, and a wrong guess would false-DENY a legitimate call —
+// so it is a trigger-gated follow-up, alongside pipe-split and non-HTTP carriers,
+// which the untrusted-input rule covers by discipline. Per segment, like the other
+// catastrophe rules.
 func isSecretExfil(seg string) bool {
 	if !reOutbound.MatchString(seg) {
 		return false

@@ -103,7 +103,14 @@ func Extract(r io.Reader, subpath, dest string) error {
 			if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
 				return err
 			}
-			f, err := os.OpenFile(target, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
+			// Honor the archive's executable bit: a team's helper scripts
+			// (scripts/*.sh) ship +x on GitHub and their docs instruct direct
+			// invocation, so a hardcoded 0644 would break them on every install.
+			mode := os.FileMode(0o644)
+			if hdr.FileInfo().Mode()&0o111 != 0 {
+				mode = 0o755
+			}
+			f, err := os.OpenFile(target, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, mode)
 			if err != nil {
 				return err
 			}

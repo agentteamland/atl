@@ -106,8 +106,3 @@ what types of changes? Be specific.}
 5. **No format deviations.** All required fields must be filled: Rule, Why, Apply
    when, Examples.
 
-## Accumulated Learnings
-
-(Auto-rebuilt by /drain from this skill's knowledge files. Do not edit by hand.
-Currently empty — populates as the skill is used and edge-case learnings
-accumulate.)

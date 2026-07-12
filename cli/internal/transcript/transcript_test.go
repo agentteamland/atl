@@ -9,10 +9,23 @@ import (
 )
 
 func TestSlugForPath(t *testing.T) {
-	got := SlugForPath("/Users/foo/projects/myapp")
-	want := "-Users-foo-projects-myapp"
-	if got != want {
-		t.Fatalf("slug: got %q want %q", got, want)
+	cases := []struct{ path, want string }{
+		// dot-free path — leading slash + separators become hyphens
+		{"/Users/foo/projects/myapp", "-Users-foo-projects-myapp"},
+		// a dot in a path component (.claude) must slug to a hyphen too — this is the
+		// worktree case that silently broke capture. Verified against a real on-disk
+		// Claude Code slug: /Users/x/p/.claude/worktrees/y -> ...p--claude-worktrees-y
+		{
+			"/Users/mesutkurak/projects/beekod/BeeCommerce/.claude/worktrees/dazzling-morse-b2e4ae",
+			"-Users-mesutkurak-projects-beekod-BeeCommerce--claude-worktrees-dazzling-morse-b2e4ae",
+		},
+		// every other non-alphanumeric also folds to a hyphen
+		{"/a/b.c/d_e", "-a-b-c-d-e"},
+	}
+	for _, c := range cases {
+		if got := SlugForPath(c.path); got != c.want {
+			t.Errorf("SlugForPath(%q) = %q, want %q", c.path, got, c.want)
+		}
 	}
 }
 
