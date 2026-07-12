@@ -10,10 +10,15 @@ import (
 
 // RunState is the supervisor's durable mirror of in-flight work (#11/#12): which
 // unit is running where, since when, and the last phase the supervisor observed.
-// It is persisted via the canonical tmp+rename atomic write so a restart can
-// reconcile against it (there is a single supervisor process, so no file lock is
-// needed — rename is atomic on the same filesystem). Zero LLM context — pure
-// run-state, never a conversation.
+// It is persisted via the canonical tmp+rename atomic write.
+//
+// It is an OBSERVABILITY snapshot, not the recovery substrate: restart
+// reconciliation is worktree/branch-based (Run -> Worktree.Reconcile applies the
+// branch-hygiene asymmetry to leftover delivery/* worktrees), because the durable
+// git state — not a supervisor-written mirror — is the source of truth a fresh
+// process can trust. This file lets a human (or a future status surface) see the
+// last in-flight set; ReadRunState exists for that, not for recovery. Zero LLM
+// context — pure run-state, never a conversation.
 type RunState struct {
 	SprintSlug string                `json:"sprintSlug"`
 	Units      map[int]*UnitRunState `json:"units"` // keyed by work-item id

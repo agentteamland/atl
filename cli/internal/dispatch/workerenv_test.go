@@ -171,3 +171,22 @@ func envMap(env []string) map[string]string {
 	}
 	return m
 }
+
+func TestDevBranchDefaultAndOverride(t *testing.T) {
+	// nil config → the "dev" default.
+	if got := (*DeliveryConfig)(nil).DevBranch(); got != "dev" {
+		t.Errorf("nil config DevBranch = %q, want dev", got)
+	}
+	// config with no branchPair → still "dev".
+	if got := (&DeliveryConfig{Org: "o"}).DevBranch(); got != "dev" {
+		t.Errorf("empty branchPair DevBranch = %q, want dev", got)
+	}
+	// an overridden dev branch is honored (parsed from JSON).
+	var c DeliveryConfig
+	if err := json.Unmarshal([]byte(`{"org":"o","branchPair":{"dev":"main","release":"prod"}}`), &c); err != nil {
+		t.Fatal(err)
+	}
+	if got := c.DevBranch(); got != "main" {
+		t.Errorf("overridden DevBranch = %q, want main", got)
+	}
+}

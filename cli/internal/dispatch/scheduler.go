@@ -1,6 +1,7 @@
 package dispatch
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -61,6 +62,11 @@ const (
 	DefaultPollInterval = 5 * time.Second
 	DefaultTermGrace    = 30 * time.Second
 	pollKillInterval    = 500 * time.Millisecond
+	// mergeGraceWindow is how long a unit whose tech-lead exited 0 may sit
+	// awaiting-merge before complete() gives up and marks it blocked. Azure's PR
+	// autoComplete is asynchronous (the team docs put it at "within ~2 min"), so a
+	// single immediate merge-check would false-block a unit that IS about to merge.
+	mergeGraceWindow = 2 * time.Minute
 )
 
 // unitState is a work-unit's scheduler lifecycle.
@@ -77,12 +83,13 @@ const (
 // durable UnitRunState (which mirrors only running units, for restart
 // reconciliation); this struct also carries the in-memory handle + retry count.
 type unitSched struct {
-	unit     WorkUnit
-	state    unitState
-	stageIdx int           // index into deliveryPipeline of the CURRENTLY running stage (0 = developer)
-	handle   Handle
-	rs       *UnitRunState // non-nil only while running
-	retries  int           // reclaim-and-retry count for the unit (0, then at most 1 per #12)
+	unit           WorkUnit
+	state          unitState
+	stageIdx       int // index into deliveryPipeline of the CURRENTLY running stage (0 = developer)
+	handle         Handle
+	rs             *UnitRunState // non-nil only while running
+	retries        int           // reclaim-and-retry count for the unit (0, then at most 1 per #12)
+	mergeWaitUntil time.Time     // grace deadline while awaiting the tech-lead's async merge to land (see complete)
 }
 
 // Summary is the terminal outcome of a dispatch run, partitioned by unit fate.
@@ -129,17 +136,39 @@ func NewScheduler(plan *Plan, projectRoot string, wt *Worktree, spawn Spawner, c
 	return s
 }
 
-// Run drives the scheduler to completion: reconcile leftover worktrees from a
-// prior (crashed) run, then loop step() on the poll interval until the sprint is
-// terminal, then return the outcome summary. Resumability rests on Azure state +
-// branches (#11) — a fresh Run owns no live process handles, so every leftover
-// delivery/* worktree is reconciled (clean reclaimed, unmerged preserved) and the
-// plan is re-driven from durable state (workers are idempotent per #16).
+// Run drives the scheduler to completion under a background context (no
+// cancellation). Most callers use this; a caller that wants Ctrl-C / SIGTERM to
+// tear the worker pool down cleanly passes a cancellable context to RunContext.
 func (s *Scheduler) Run() (Summary, error) {
-	// On any exit — an aborting error OR normal completion — make sure no worker is
-	// left running detached; orphaned claude -p processes would burn budget with no
-	// supervisor. On normal completion nothing is running, so this is a no-op.
+	return s.RunContext(context.Background())
+}
+
+// RunContext drives the scheduler to completion: reconcile leftover worktrees
+// from a prior (crashed) run, then loop step() on the poll interval until the
+// sprint is terminal or ctx is cancelled, then return the outcome summary.
+// Resumability rests on Azure state + branches (#11) — a fresh run owns no live
+// process handles, so every leftover delivery/* worktree is reconciled (clean
+// reclaimed, unmerged preserved) and the plan is re-driven from durable state
+// (workers are idempotent per #16).
+//
+// ctx cancellation (a terminal Ctrl-C / SIGTERM the CLI translates into a cancel)
+// makes the loop return promptly; the deferred abortRunning then SIGKILLs the
+// whole worker process-group, so an interrupted supervisor never leaves detached
+// `claude -p` workers burning budget with no one watching them.
+func (s *Scheduler) RunContext(ctx context.Context) (Summary, error) {
+	// On any exit — a cancel, an aborting error, OR normal completion — make sure no
+	// worker is left running detached. On normal completion nothing is running, so
+	// this is a no-op.
 	defer s.abortRunning()
+
+	// Single-instance guard: a second concurrent dispatch for the same project would
+	// reconcile with an empty active set and quarantine the live run's worktrees out
+	// from under its workers. Fail fast instead.
+	lock, err := acquireRunLock(s.ProjectRoot)
+	if err != nil {
+		return Summary{}, err
+	}
+	defer lock.Release()
 
 	// Load the project's Azure coordinates once (org/project/pat.ref) so each worker
 	// is spawned with an azureDevOps MCP scoped to THIS project's org (D3) + its PAT
@@ -165,6 +194,12 @@ func (s *Scheduler) Run() (Summary, error) {
 	}
 
 	for {
+		if ctx.Err() != nil {
+			// Interrupted — return what we have; the deferred abortRunning tears
+			// down every still-running worker so nothing is orphaned.
+			s.Log("dispatch interrupted — aborting running workers")
+			return s.summary(), ctx.Err()
+		}
 		terminal, err := s.step()
 		if err != nil {
 			return Summary{}, err
@@ -236,11 +271,19 @@ func (s *Scheduler) poll(u *unitSched, now time.Time) error {
 	default:
 		// Still running — liveness (#12).
 		if statusErr != nil {
-			// No status.json yet. Before the first heartbeat this is expected, but
-			// a worker that never produces one within the heartbeat window is wedged.
-			if now.Sub(u.rs.CreatedAt) > s.Cfg.Stall("").HeartbeatThreshold {
-				return s.recover(u, now, "stalled: no first heartbeat")
+			if os.IsNotExist(statusErr) {
+				// No status.json yet. Before the first heartbeat this is expected, but
+				// a worker that never produces one within the heartbeat window is wedged.
+				if now.Sub(u.rs.CreatedAt) > s.Cfg.Stall("").HeartbeatThreshold {
+					return s.recover(u, now, "stalled: no first heartbeat")
+				}
+				return nil
 			}
+			// A torn/partial read of an EXISTING status.json (a write caught mid-flight):
+			// the file exists, so the worker just wrote it — mtime moved, which IS the
+			// heartbeat. Treat it as alive this poll and re-read next time; never conflate
+			// a transient parse error with a missing first heartbeat (which would kill a
+			// healthy long-running worker).
 			return nil
 		}
 		if breach := Classify(status, u.rs.PhaseEnteredAt, now, s.Cfg.Stall(status.Phase)); breach != Alive {
@@ -279,11 +322,25 @@ func (s *Scheduler) complete(u *unitSched, now time.Time) error {
 		return err
 	}
 	if !merged {
+		// The merge is asynchronous (the tech-lead set PR autoComplete, which lands
+		// out-of-band), so a not-yet-merged branch here is usually about-to-merge, not
+		// a real failure. Hold the unit in an awaiting-merge grace — it stays running
+		// (its slot held, so no successor is admitted onto un-integrated work) and the
+		// NEXT poll re-checks MergedToBase — and only mark it blocked once the grace
+		// window elapses without the merge landing (a recoverable false-block at worst).
+		if u.mergeWaitUntil.IsZero() {
+			u.mergeWaitUntil = now.Add(mergeGraceWindow)
+			s.Log(fmt.Sprintf("unit %d exited 0; awaiting async merge to %s (grace %s)", u.unit.ID, s.Worktree.BaseRef, mergeGraceWindow))
+			return nil
+		}
+		if now.Before(u.mergeWaitUntil) {
+			return nil // still within grace — re-check next poll
+		}
 		phase, summary := u.rs.Phase, ""
 		if st, e := s.ReadStatus(u.rs.WorktreePath); e == nil {
 			phase, summary = st.Phase, st.LastOutputSummary
 		}
-		return s.block(u, now, "worker exited 0 but its branch is not merged to "+s.Worktree.BaseRef,
+		return s.block(u, now, "worker exited 0 but its branch is not merged to "+s.Worktree.BaseRef+" after the merge-grace window",
 			phase, summary, u.handle.StderrTail())
 	}
 
@@ -704,7 +761,7 @@ Ground rules (your agent manual holds the full detail):
 - Read %[3]s for the Azure org/project/repo and pat.ref. Reach Azure ONLY through the azureDevOps MCP — never a raw call, never an invented tool name, and never a hardcoded state literal (resolve state and type at runtime via wit_get_work_item_type).
 - Test-gate FIRST (green = tests then review, in that order): confirm the required evidence is ATTACHED to the work-item — code, web if a web surface, and the mobile-emulator run if a mobile surface (a MUST; missing = NOT green, full stop). Read it back via wit_get_work_item_attachment and confirm it matches the changed surfaces. Evidence missing → return the unit via a PR thread; do NOT weigh the diff.
 - Then run the delivery-native review ON THE AZURE PR (never /create-pr): a generic baseline read + your tech-lead specialist read (against the Architecture/ boundaries, Conventions/, ADRs, and the AC + Scope you own) + a refute-to-keep pass — every finding needs a file:line / grep / failing-test anchor or it is DROPPED; each survivor is actively refuted and kept only if refutation fails. Raise surviving findings as PR threads (repo_create_pull_request_thread / repo_reply_to_comment).
-- On green: vote (repo_vote_pull_request), then COMPLETE the Azure PR (repo_update_pull_request with autoComplete + a history-reachable mergeStrategy — NoFastForward or Rebase, never Squash — and transitionWorkItems:false); completing the PR IS the merge to dev. Then set the work-item to the runtime-resolved Done (wit_get_work_item_type, never a literal). Merge first, then Done.
+- On green: vote (repo_vote_pull_request), then COMPLETE the Azure PR (repo_update_pull_request with autoComplete + mergeStrategy NoFastForward — never Rebase or Squash: both rewrite the branch's commit SHAs, so the supervisor's deterministic merge-verify (branch reachable from dev) would not recognize the landed merge and would false-block the unit — and transitionWorkItems:false); completing the PR IS the merge to dev. Then set the work-item to the runtime-resolved Done (wit_get_work_item_type, never a literal). Merge first, then Done.
 - If the review is not green, hand the findings back as PR threads and set a status.json blocker rather than merging — never fake a green. The engine only VERIFIES your merge landed on dev; it never merges for you.
 - Write status.json with a starting phase and a fresh heartbeat as your FIRST action — before you read your manual or re-derive intent — because a worker that writes no status.json within a few minutes is reclaimed as stalled; then keep it fresh on every step, at least every couple of minutes.`,
 		u.ID, agentDir, configPath, u.Title)

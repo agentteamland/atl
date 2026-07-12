@@ -113,8 +113,10 @@ func (w *Worktree) Teardown(slug string, id int) error {
 // compares against RemoteRef. This is the supervisor's DETERMINISTIC merge
 // confirmation: it does not trust a worker's exit code, it verifies the durable
 // git state before any force-delete. (It requires the delivery workers to
-// integrate to dev with a history-reachable strategy — a merge commit or
-// rebase/ff, not a squash — so a merged branch's commits are ancestors of dev.)
+// integrate to dev with NoFastForward — a merge commit that keeps the branch's
+// commits as ancestors of dev; a rebase or squash rewrites those SHAs, so a
+// genuinely-merged branch would look unmerged here and false-block, which is why
+// the tech-lead prompt permits only NoFastForward.)
 func (w *Worktree) MergedToBase(slug string, id int) (bool, error) {
 	branch := BranchName(slug, id)
 	if _, err := w.git("fetch", "origin", w.BaseRef); err != nil {

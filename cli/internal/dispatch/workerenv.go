@@ -15,12 +15,27 @@ import (
 // zero-Azure — it never touches the MCP; it only prepares the env the LLM worker's
 // MCP + az-attach.sh will use.
 type DeliveryConfig struct {
-	Org     string `json:"org"`
-	Project string `json:"project"`
-	Repo    string `json:"repo"`
-	PAT     struct {
+	Org        string `json:"org"`
+	Project    string `json:"project"`
+	Repo       string `json:"repo"`
+	BranchPair struct {
+		Dev     string `json:"dev"`
+		Release string `json:"release"`
+	} `json:"branchPair"`
+	PAT struct {
 		Ref string `json:"ref"`
 	} `json:"pat"`
+}
+
+// DevBranch is the integration branch the engine forks worktrees off and merges
+// back to — config.branchPair.dev, defaulting to "dev" (matching /delivery-init
+// and the docs). The engine reads it so a project that renamed its branch pair
+// isn't silently driven against a non-existent "dev".
+func (c *DeliveryConfig) DevBranch() string {
+	if c != nil && c.BranchPair.Dev != "" {
+		return c.BranchPair.Dev
+	}
+	return "dev"
 }
 
 // DeliveryConfigPath is <root>/.delivery/config.json (the file /delivery-init writes).

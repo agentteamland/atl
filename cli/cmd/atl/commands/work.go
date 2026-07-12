@@ -3,17 +3,19 @@ package commands
 import (
 	"fmt"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"syscall"
 
 	"github.com/agentteamland/atl/cli/internal/dispatch"
 	"github.com/spf13/cobra"
 )
 
-// workCmd groups the delivery-team orchestration commands. It is HIDDEN: `atl
-// work dispatch` is an internal engine invoked by the delivery-team's ceremony
-// skills (/sprint-start), not typed by users, and the delivery-team is not yet
-// shipped — so it stays out of `atl --help` and out of the docs-coverage gate
-// until it ships (commandDocs skips Hidden commands — see docs.go).
+// workCmd groups the delivery-team orchestration commands. It is HIDDEN by design:
+// `atl work dispatch` is an internal engine invoked by the delivery-team's ceremony
+// skills (/sprint-start), never typed by users — so it stays out of `atl --help`
+// and out of the docs-coverage gate (commandDocs skips Hidden commands — see
+// docs.go); the delivery-team docs page documents the engine's behavior instead.
 var workCmd = &cobra.Command{
 	Use:   "work",
 	Short: "Delivery-team work orchestration (internal)",
@@ -52,11 +54,21 @@ var workDispatchCmd = &cobra.Command{
 			return fmt.Errorf("plan is not schedulable: %w", err)
 		}
 
+		// Derive the integration branch from .delivery/config.json's branchPair
+		// (default "dev"), which /delivery-init lets the project override — the
+		// engine must fork/merge against the branch the project actually uses, not
+		// a hardcoded literal. A missing config → nil → the "dev" default.
+		cfg, cerr := dispatch.LoadDeliveryConfig(root)
+		if cerr != nil {
+			return cerr
+		}
+		dev := cfg.DevBranch()
+
 		wt := &dispatch.Worktree{
 			RepoDir:   root,
 			Root:      filepath.Join(root, ".delivery", "worktrees"),
-			BaseRef:   "dev",
-			RemoteRef: "origin/dev",
+			BaseRef:   dev,
+			RemoteRef: "origin/" + dev,
 			Run:       dispatch.ExecRunner,
 		}
 		sched := dispatch.NewScheduler(plan, root, wt, dispatch.NewSpawner(), dispatch.Config{Cap: workDispatchCap})
@@ -64,8 +76,18 @@ var workDispatchCmd = &cobra.Command{
 		sched.Log = func(line string) { fmt.Fprintln(out, line) }
 
 		fmt.Fprintf(out, "dispatching sprint %q — %d units, cap %d\n", plan.SprintSlug, len(plan.Units), sched.Cfg.Cap)
-		sum, err := sched.Run()
+
+		// Translate a terminal interrupt (Ctrl-C / SIGTERM) into a context cancel so
+		// the scheduler tears its worker pool down instead of leaving orphaned
+		// `claude -p` processes running detached.
+		ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
+		defer stop()
+		sum, err := sched.RunContext(ctx)
 		if err != nil {
+			if ctx.Err() != nil {
+				fmt.Fprintln(out, "\ndispatch interrupted — running workers were aborted; re-run to resume from durable state")
+				return nil
+			}
 			return err
 		}
 
