@@ -127,7 +127,11 @@ func reportRetainedGains(gains []gc.Orphan) {
 	if len(gains) == 0 {
 		return
 	}
-	fmt.Printf("gc: retained %d gain(s) beside installed units (learning-loop growth or hand edits) — `atl gc --apply --include-gains` to reclaim them too.\n", len(gains))
+	fmt.Printf("gc: retained %d gain(s) beside installed units (learning-loop growth or hand edits):\n", len(gains))
+	for _, o := range gains {
+		fmt.Printf("  [%-7s] %s  (%s)\n", o.Scope, o.Rel, o.Origin())
+	}
+	fmt.Println("Pass `atl gc --apply --include-gains` to reclaim these too.")
 }
 
 // humanBytes formats a byte count for the gc report.
