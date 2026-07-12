@@ -2,6 +2,7 @@ package commands
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/agentteamland/atl/cli/internal/settings"
 	"github.com/spf13/cobra"
@@ -17,8 +18,15 @@ var setupHooksCmd = &cobra.Command{
 		"  PreToolUse       → atl guard            (block irreversible ops + grep-before-edit nudge)\n\n" +
 		"Idempotent: re-running replaces the atl hooks without duplicating, and\n" +
 		"leaves any hooks you added yourself untouched.",
+	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		interval, _ := cmd.Flags().GetString("throttle")
+		// Validate the throttle up front: an unparsable value would be baked into
+		// settings.json and make every hooked `atl tick` fail, silently stopping the
+		// whole automation loop.
+		if _, perr := time.ParseDuration(interval); perr != nil {
+			return fmt.Errorf("invalid --throttle %q: %v (use a duration like 10m or 30s)", interval, perr)
+		}
 		path, err := settings.InstallHooks([]settings.Hook{
 			{Event: "SessionStart", Command: "atl session-start"},
 			{Event: "UserPromptSubmit", Command: "atl tick --throttle=" + interval},
