@@ -134,4 +134,4 @@ classDiagram
 
 ## Source
 
-- Spec: [core/skills/create-code-diagram/skill.md](https://github.com/agentteamland/core/blob/main/skills/create-code-diagram/skill.md)
+- Spec: [core/skills/create-code-diagram/SKILL.md](https://github.com/agentteamland/core/blob/main/skills/create-code-diagram/SKILL.md)

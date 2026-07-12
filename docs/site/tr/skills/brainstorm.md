@@ -120,5 +120,5 @@ Bir beyin fırtınası sırasında "şimdi yapmıyoruz, sonraya" diye işaretlen
 
 ## Kaynak
 
-- Belirtim: [core/skills/brainstorm/skill.md](https://github.com/agentteamland/atl/blob/main/core/skills/brainstorm/skill.md)
+- Belirtim: [core/skills/brainstorm/SKILL.md](https://github.com/agentteamland/atl/blob/main/core/skills/brainstorm/SKILL.md)
 - Kural: [core/rules/brainstorm.md](https://github.com/agentteamland/atl/blob/main/core/rules/brainstorm.md)

@@ -72,7 +72,7 @@ my-team/
 │           └── rls.md
 ├── skills/
 │   └── create-new-project/
-│       └── skill.md
+│       └── SKILL.md
 └── rules/
     └── commit-style.md
 ```

@@ -104,7 +104,7 @@ Concretely:
 - **Agent children files** (`children/{topic}.md` in the agent's directory) are the agent-side equivalent of wiki — topic-based, replace/update, cross-project domain knowledge for the agent.
 - **Skill learnings files** (`learnings/{topic}.md` in a skill's directory) are the per-skill equivalent — same shape, scoped to the skill.
 
-Both carry a `knowledge-base-summary:` frontmatter field that's auto-aggregated into `agent.md` (Knowledge Base section) or `skill.md` (Accumulated Learnings section). See [Children + learnings](/guide/children-and-learnings) for the full pattern.
+Both carry a `knowledge-base-summary:` frontmatter field that's auto-aggregated into `agent.md` (Knowledge Base section) or `SKILL.md` (Accumulated Learnings section). See [Children + learnings](/guide/children-and-learnings) for the full pattern.
 
 ## Related
 

@@ -225,4 +225,4 @@ Single message at the end:
 
 ## Source
 
-- Spec: [rule/skills/rule-wizard/skill.md](https://github.com/agentteamland/rule/blob/main/skills/rule-wizard/skill.md)
+- Spec: [rule/skills/rule-wizard/SKILL.md](https://github.com/agentteamland/rule/blob/main/skills/rule-wizard/SKILL.md)

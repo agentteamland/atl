@@ -100,7 +100,7 @@ Toparlanırken:
 ./scripts/push-all.sh      # push'lanmamış ne var, gör
 ```
 
-Daha kapsamlı bir oturum sonu geçişi için [`/repo-cleanup`](https://github.com/agentteamland/workspace/blob/main/.claude/skills/repo-cleanup/skill.md) şunları otomatikleştirir: `/drain` → dal + commit + push + PR + auto-merge → etiket + dal budama. Çalışma alanında Claude Code'un içinden çalıştır.
+Daha kapsamlı bir oturum sonu geçişi için [`/repo-cleanup`](https://github.com/agentteamland/workspace/blob/main/.claude/skills/repo-cleanup/SKILL.md) şunları otomatikleştirir: `/drain` → dal + commit + push + PR + auto-merge → etiket + dal budama. Çalışma alanında Claude Code'un içinden çalıştır.
 
 ## İlgili
 
