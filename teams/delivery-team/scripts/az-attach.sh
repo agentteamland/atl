@@ -51,6 +51,7 @@ command -v curl >/dev/null || die "curl is required"
 BASE="https://dev.azure.com/${ORG}"
 NAME="$(basename "$FILE")"
 NAME_ENC="$(jq -rn --arg n "$NAME" '$n|@uri')"   # full percent-encode (& ? # + space non-ASCII)
+PROJECT_ENC="$(jq -rn --arg p "$PROJECT" '$p|@uri')"  # a project name with a space must be encoded in the URL path too
 
 # curl with bounded backoff on 429/5xx (best-effort; on exhaustion the worker
 # re-invokes — the adapter §3 resilience contract lives in the MCP callers, not here).
@@ -73,7 +74,7 @@ req() { # req METHOD URL CONTENT_TYPE [curl-data-args...]
 
 # 1) upload the bytes → {"id":..., "url":"...attachments/<guid>"}
 UP="$(req POST \
-  "${BASE}/${PROJECT}/_apis/wit/attachments?fileName=${NAME_ENC}&api-version=${APIVER}" \
+  "${BASE}/${PROJECT_ENC}/_apis/wit/attachments?fileName=${NAME_ENC}&api-version=${APIVER}" \
   "application/octet-stream" --data-binary "@${FILE}")"
 ATT_URL="$(printf '%s' "$UP" | jq -r '.url // empty')"
 [ -n "$ATT_URL" ] || die "no attachment url in response: $UP"
