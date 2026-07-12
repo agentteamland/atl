@@ -8,6 +8,7 @@ import (
 
 	"github.com/agentteamland/atl/cli/internal/coreassets"
 	"github.com/agentteamland/atl/cli/internal/manifest"
+	"github.com/agentteamland/atl/cli/internal/pin"
 )
 
 func writeFile(t *testing.T, path, content string) {
@@ -60,6 +61,45 @@ func TestScanOwnedVsUnowned(t *testing.T) {
 	}
 	if _, ok := byRel["knowledge/stale.md"]; !ok {
 		t.Error("an unowned knowledge/ asset must be reported as an orphan (gc must walk knowledge/)")
+	}
+}
+
+// TestScanRespectsPins: a project-pinned path is treated as owned and never
+// reported as an orphan, while an unpinned sibling gain still is.
+func TestScanRespectsPins(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	proj := t.TempDir()
+
+	m := &manifest.Manifest{Handle: "acme", Name: "team",
+		Files: map[string]string{"agents/api/agent.md": "sha"}}
+	if err := m.Write(filepath.Join(proj, ".atl")); err != nil {
+		t.Fatal(err)
+	}
+	claudeDir := filepath.Join(proj, ".claude")
+	writeFile(t, filepath.Join(claudeDir, "agents/api/agent.md"), "owned")
+	writeFile(t, filepath.Join(claudeDir, "agents/api/children/pinned.md"), "gain") // pinned → not an orphan
+	writeFile(t, filepath.Join(claudeDir, "agents/api/children/free.md"), "gain2")  // unpinned gain → orphan
+
+	pins := &pin.Set{}
+	pins.Add("agents/api/children/pinned.md")
+	if err := pins.Write(filepath.Join(proj, ".atl")); err != nil {
+		t.Fatal(err)
+	}
+
+	orphans, err := Scan(proj, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	byRel := map[string]Orphan{}
+	for _, o := range orphans {
+		byRel[o.Rel] = o
+	}
+	if _, ok := byRel["agents/api/children/pinned.md"]; ok {
+		t.Error("a pinned path must not be reported as an orphan")
+	}
+	if _, ok := byRel["agents/api/children/free.md"]; !ok {
+		t.Error("an unpinned gain should still be reported as an orphan")
 	}
 }
 

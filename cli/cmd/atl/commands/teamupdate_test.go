@@ -19,7 +19,10 @@ func TestVersionLess(t *testing.T) {
 		{"1.9.0", "1.10.0", true}, // numeric, not lexicographic
 		{"v1.0.0", "v2.0.0", true},
 		{"0.8.1", "0.8.1", false},
-		{"1.0.0-beta", "1.0.0", false}, // pre-release dropped → equal → not less
+		{"1.0.0-beta", "1.0.0", true},  // a pre-release is older than its final release → upgrades
+		{"1.0.0", "1.0.0-beta", false}, // and the final is never "older" than its own pre-release
+		{"2.0.0-alpha.1", "2.0.0", true},
+		{"1.0.0-beta", "1.0.1", true}, // numeric triple still wins first
 	}
 	for _, c := range cases {
 		if got := versionLess(c.a, c.b); got != c.want {

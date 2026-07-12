@@ -246,7 +246,7 @@ func (s *Store) Cursor(project string) (time.Time, error) {
 	return t, nil
 }
 
-// SetCursor records the last-tick time for project.
+// SetCursor records the transcript high-water mark for project.
 func (s *Store) SetCursor(project string, ts time.Time) error {
 	buf, err := ts.MarshalBinary()
 	if err != nil {
@@ -261,6 +261,52 @@ func (s *Store) SetCursor(project string, ts time.Time) error {
 	})
 	if err != nil {
 		return fmt.Errorf("set cursor: %w", err)
+	}
+	return nil
+}
+
+// lastTickBucket holds the wall-clock time the maintenance pass (tick /
+// session-start) last RAN for a project — distinct from cursorBucket, which
+// holds the newest transcript modtime. Conflating the two makes doctor read a
+// transcript's age as "time since last tick"; they are different clocks.
+const lastTickBucket = "__lasttick__"
+
+// LastTick returns when the maintenance pass last ran for project (zero if
+// never). Use this — not Cursor — to judge whether ticks are actually firing.
+func (s *Store) LastTick(project string) (time.Time, error) {
+	var t time.Time
+	err := s.db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(lastTickBucket))
+		if b == nil {
+			return nil
+		}
+		v := b.Get([]byte(project))
+		if v == nil {
+			return nil
+		}
+		return t.UnmarshalBinary(v)
+	})
+	if err != nil {
+		return time.Time{}, fmt.Errorf("last-tick: %w", err)
+	}
+	return t, nil
+}
+
+// SetLastTick records that the maintenance pass ran for project at ts.
+func (s *Store) SetLastTick(project string, ts time.Time) error {
+	buf, err := ts.MarshalBinary()
+	if err != nil {
+		return fmt.Errorf("set last-tick: %w", err)
+	}
+	err = s.db.Update(func(tx *bolt.Tx) error {
+		b, err := tx.CreateBucketIfNotExists([]byte(lastTickBucket))
+		if err != nil {
+			return err
+		}
+		return b.Put([]byte(project), buf)
+	})
+	if err != nil {
+		return fmt.Errorf("set last-tick: %w", err)
 	}
 	return nil
 }

@@ -82,6 +82,50 @@ func TestExtractTraversal(t *testing.T) {
 	}
 }
 
+// TestExtractPreservesExecBit: a +x archive entry (a team's helper script) keeps
+// its executable bit through extraction; a plain file does not gain one.
+func TestExtractPreservesExecBit(t *testing.T) {
+	var buf bytes.Buffer
+	gz := gzip.NewWriter(&buf)
+	tw := tar.NewWriter(gz)
+	write := func(name string, mode int64, body string) {
+		hdr := &tar.Header{Name: name, Mode: mode, Size: int64(len(body)), Typeflag: tar.TypeReg}
+		if err := tw.WriteHeader(hdr); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := tw.Write([]byte(body)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("repo-1.0/scripts/run.sh", 0o755, "#!/bin/sh\necho hi\n")
+	write("repo-1.0/agents/a/agent.md", 0o644, "A")
+	if err := tw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := gz.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	dest := t.TempDir()
+	if err := Extract(bytes.NewReader(buf.Bytes()), "", dest); err != nil {
+		t.Fatalf("Extract: %v", err)
+	}
+	st, err := os.Stat(filepath.Join(dest, "scripts/run.sh"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st.Mode()&0o111 == 0 {
+		t.Errorf("executable bit dropped on script: mode=%v", st.Mode())
+	}
+	md, err := os.Stat(filepath.Join(dest, "agents/a/agent.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if md.Mode()&0o111 != 0 {
+		t.Errorf("a plain file must not gain +x: mode=%v", md.Mode())
+	}
+}
+
 func TestTarballURL(t *testing.T) {
 	got := TarballURL("acme/example-team", "v1.2.1")
 	want := "https://github.com/acme/example-team/archive/v1.2.1.tar.gz"

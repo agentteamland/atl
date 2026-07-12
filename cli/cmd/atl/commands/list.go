@@ -14,6 +14,7 @@ var listCmd = &cobra.Command{
 	Short: "List installed teams",
 	Long: "List the teams installed at each scope — global (`~/.claude`) and project\n" +
 		"(`<cwd>/.claude`). A team present at both is shown under each.",
+	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		projectRoot, err := os.Getwd()
 		if err != nil {
