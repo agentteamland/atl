@@ -10,7 +10,10 @@ Corpus-driven rule discovery — the complement of `/rule`. `/rule` authors a si
 rule you already have in mind; `/rules-distill` reads the corpus *itself* and
 surfaces principles that recur across many skills/agents but aren't yet a rule. It
 **proposes, never auto-writes**: a new core rule is structural growth, so the human
-confirms it and it ships through `/rule` + the new-rule-shipping-checklist.
+confirms it, then it is authored directly into `core/rules/<name>.md` and wired
+through the new-rule-shipping-checklist (the coreassets re-sync + the docs page).
+(`/rule` is the user-facing sibling — it writes project/global rules, not the
+in-monorepo `core/rules/` a distilled principle belongs to.)
 
 Auto-triggered: `atl session-start` signals "a distill is due" once corpus-
 affecting commits (`core/` `teams/`) pile up since the last distill, gated by a

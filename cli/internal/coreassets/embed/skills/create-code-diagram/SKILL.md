@@ -45,7 +45,7 @@ For each type, determine relationships:
 
 | Relationship | Mermaid Syntax | When |
 |-------------|---------------|------|
-| Inheritance | `Child --|> Parent` | class extends base class |
+| Inheritance | `Child --\|> Parent` | class extends base class |
 | Implementation | `Impl ..\|> Interface` | class implements interface |
 | Dependency | `ClassA --> ClassB` | constructor injection, method call |
 | Composition | `ClassA *-- ClassB` | has property of type ClassB |
@@ -82,7 +82,7 @@ File format:
 
 | Symbol | Meaning |
 |--------|---------|
-| `--|>` | Inherits from |
+| `--\|>` | Inherits from |
 | `..\|>` | Implements interface |
 | `-->` | Depends on (injected) |
 | `*--` | Contains (composition) |

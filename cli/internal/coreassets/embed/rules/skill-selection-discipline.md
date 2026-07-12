@@ -27,7 +27,7 @@ When the prompt could plausibly invoke a skill — i.e. it's not a trivial conve
 ## When this rule does NOT apply
 
 - **Trivial turns** (greetings, status questions, factual lookups that trigger no workflow).
-- **User explicitly named a skill** (e.g. "/drain yap" — invoke as named, no second-guessing).
+- **User explicitly named a skill** (e.g. "run /drain", in any language — invoke as named, no second-guessing).
 - **No teams installed** — only built-in Claude Code commands are in scope.
 
 ## How this rule interacts with other rules

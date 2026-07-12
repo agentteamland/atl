@@ -34,7 +34,19 @@ borderline, ask the user before including it.
 
 ### 3a. Team you DON'T own → propose upstream
 The CLI does the mechanics (fork + branch + apply the kept gains + push + open a
-PR against the source repo). You write the **PR body**:
+PR against the source repo). Drive it with the apply flags — `--only` restricts to
+the subset your step-2 judgment kept, `--body-file` hands it your authored body,
+`--dry-run` previews first:
+
+```bash
+atl publish <handle>/<team>                                            # plan only (no --apply)
+atl publish <handle>/<team> --apply --dry-run --body-file <file> --only <path>   # preview the apply
+atl publish <handle>/<team> --apply --body-file <file> --only <path> [--only <path> …]
+```
+
+Without `--only`, every gain is published — so the keep/drop judgment MUST feed
+the `--only` list, or the gains you decided to drop go upstream anyway. You write
+the **PR body** (the `--body-file`):
 - **What changed and WHY** — one short section per gain, leading with the reason.
 - Frame it as a best-effort contribution from real usage.
 - No pressure: the owner accepts or not; either way the contributor keeps the

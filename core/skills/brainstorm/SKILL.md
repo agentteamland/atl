@@ -151,6 +151,13 @@ multiple, list them (showing each one's scope) and ask which to complete.
 - Add a "Final Decisions" section — a summary of every definitive decision from
   the whole discussion
 
+### 2.5. Backlog check (mandatory — the brainstorm rule requires it here)
+Scan the brainstorm for every item marked deferred / "later" / "not now" and
+ensure each has a corresponding entry in the scope's `.atl/backlog.md` (prepend,
+newest on top). If any deferred item has no backlog entry, add it — or ask the
+user when it's ambiguous. Closing a brainstorm without this is how deferred scope
+silently disappears; it is a checklist step before the docs file is written.
+
 ### 3. Create / update the docs file
 Determine the docs location from the brainstorm's scope:
 - **Project brainstorm** → write under `<project>/.atl/docs/`
@@ -214,8 +221,3 @@ Tell the user the brainstorm is complete and list the created/updated files.
 7. **Scope is in frontmatter.** `scope: project|global` — determines the correct
    target in `done` mode.
 
-## Accumulated Learnings
-
-(Auto-rebuilt by /drain from this skill's knowledge files. Do not edit by hand.
-Currently empty — populates as the skill is used and edge-case learnings
-accumulate.)
