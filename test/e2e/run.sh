@@ -52,11 +52,19 @@ for name in $names; do
 
   echo ""
   echo "========= blueprint: $name (needs: $needs) ========="
+  # Least-privilege: inject ONLY the secret this blueprint declares it needs, so a
+  # token-tier autonomous `claude -p` blueprint never receives the GH_TOKEN (and a
+  # gh blueprint never receives the Claude token). Nothing is exported into a
+  # blueprint that declared `needs: none`.
+  secret_env=()
+  if [ "$needs" = "gh" ]; then
+    secret_env+=(-e "GH_TOKEN=$GH_TOKEN_VAL")
+  elif [ "$needs" = "token" ]; then
+    secret_env+=(-e "CLAUDE_CODE_OAUTH_TOKEN=$CLAUDE_TOK" -e "ANTHROPIC_API_KEY=$API_KEY")
+  fi
   if docker run --rm \
       -e BLUEPRINT="$name" \
-      -e GH_TOKEN="$GH_TOKEN_VAL" \
-      -e CLAUDE_CODE_OAUTH_TOKEN="$CLAUDE_TOK" \
-      -e ANTHROPIC_API_KEY="$API_KEY" \
+      ${secret_env[@]+"${secret_env[@]}"} \
       atl-e2e bash "/e2e/blueprints/$name.sh"; then
     echo "<< $name PASSED"; pass=$((pass + 1))
   else

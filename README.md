@@ -2,7 +2,7 @@
 
 The AgentTeamLand platform: install agent teams, keep them updated, circulate the gains your agents learn, and let the platform run itself in the background so you can focus on your project.
 
-> **Status:** v2 is **alpha** (`v2.0.0-alpha.1`) — macOS / Linux / Windows.
+> **Status:** v2 is **stable** — see the [latest release](https://github.com/agentteamland/atl/releases/latest). macOS / Linux / Windows.
 
 ## Install
 
