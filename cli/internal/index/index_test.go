@@ -174,20 +174,41 @@ func TestRefreshCacheThenResolveUsesCache(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Resolve: %v", err)
 	}
-	if len(ix.Teams) != 1 || ix.Teams[0].Ref() != "only/cached" {
-		t.Errorf("Resolve should use the cache, got %+v", ix.Teams)
+	// Resolve merges seed + cache, so the cache's team must be PRESENT (the cache was
+	// used) — not necessarily the only entry (seed teams merge in too).
+	found := false
+	for _, e := range ix.Teams {
+		if e.Ref() == "only/cached" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("Resolve should include the cached team, got %+v", ix.Teams)
 	}
 }
 
-// TestResolvePrefersNewerGeneratedAt: a cache older than the embedded seed must
-// not mask a freshly-upgraded binary's newer catalog; a newer cache still wins.
-func TestResolvePrefersNewerGeneratedAt(t *testing.T) {
+// TestResolveMergesSeedAndCache: Resolve is a UNION merge, not a pick-one. A team
+// that lives in only one source is always kept (so an older cache's third-party
+// teams are never dropped by a newer binary's seed); on a team in both, the source
+// with the newer generatedAt wins.
+func TestResolveMergesSeedAndCache(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
 
-	writeCache := func(generatedAt string) {
-		body := `{"schemaVersion":1,"generatedAt":"` + generatedAt + `","teams":[{"handle":"only","name":"stale","source":{"repo":"only/stale","ref":"v1"}}]}`
+	seed, err := Seed()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(seed.Teams) == 0 {
+		t.Skip("seed has no teams to exercise the conflict path")
+	}
+	shared := seed.Teams[0] // a first-party team present in the seed
+
+	writeCache := func(generatedAt, sharedVersion string) {
+		body := `{"schemaVersion":1,"generatedAt":"` + generatedAt + `","teams":[` +
+			`{"handle":"only","name":"thirdparty","version":"9.9.9","source":{"repo":"only/thirdparty","ref":"v1"}},` +
+			`{"handle":"` + shared.Handle + `","name":"` + shared.Name + `","version":"` + sharedVersion + `","source":{"repo":"x/y","ref":"v1"}}]}`
 		p := mustCachePath(t)
 		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
 			t.Fatal(err)
@@ -196,25 +217,41 @@ func TestResolvePrefersNewerGeneratedAt(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	find := func(ix *Index, ref string) *Entry {
+		for i := range ix.Teams {
+			if ix.Teams[i].Ref() == ref {
+				return &ix.Teams[i]
+			}
+		}
+		return nil
+	}
 
-	// Cache older than the seed (2026-07-10) → the seed wins (the unique cache team absent).
-	writeCache("2000-01-01T00:00:00Z")
+	// Cache OLDER than the seed: the third-party (cache-only) team must NOT be dropped,
+	// and the seed's version of the shared team wins on the conflict.
+	writeCache("2000-01-01T00:00:00Z", "1.0.0-cacheonly")
 	ix, err := Resolve()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(ix.Teams) == 1 && ix.Teams[0].Ref() == "only/stale" {
-		t.Error("a cache older than the seed must not be preferred over the seed")
+	if find(ix, "only/thirdparty") == nil {
+		t.Error("an older cache's third-party team must survive the merge (never dropped)")
+	}
+	if e := find(ix, shared.Ref()); e == nil || e.Version != shared.Version {
+		t.Errorf("older cache: the seed's version of a shared team should win, got %+v", e)
 	}
 
-	// Cache newer than the seed → the cache wins.
-	writeCache("2099-01-01T00:00:00Z")
+	// Cache NEWER than the seed: the cache's version of the shared team wins; the
+	// third-party team is present; and a seed-only team is still kept.
+	writeCache("2099-01-01T00:00:00Z", "2.0.0-cachewins")
 	ix, err = Resolve()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(ix.Teams) != 1 || ix.Teams[0].Ref() != "only/stale" {
-		t.Errorf("a cache newer than the seed should be preferred, got %+v", ix.Teams)
+	if e := find(ix, shared.Ref()); e == nil || e.Version != "2.0.0-cachewins" {
+		t.Errorf("newer cache: the cache's version of a shared team should win, got %+v", e)
+	}
+	if find(ix, "only/thirdparty") == nil {
+		t.Error("newer cache: the cache-only team must be present")
 	}
 }
 
