@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
@@ -20,18 +21,30 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: bash .github/scripts/build-index.sh
-      - name: Commit if the team set changed
+      - name: Open a PR if the team set changed
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # Compare the teams list only — a new generatedAt alone must not trigger
-          # an empty commit every run.
+          # an empty PR every run.
           old="$(git show HEAD:cli/internal/index/index.json | jq -S '.teams' 2>/dev/null || echo null)"
           new="$(jq -S '.teams' cli/internal/index/index.json)"
-          if [ "$old" != "$new" ]; then
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add cli/internal/index/index.json
-            git commit -m "chore(index): regenerate from atl-team topic"
-            git push
-          else
+          if [ "$old" = "$new" ]; then
             echo "index teams unchanged"
+            exit 0
           fi
+          # Branch protection forbids a direct push to main (required PRs +
+          # enforce_admins), so land the refresh as a PR for review/merge instead of
+          # pushing (which would fail). A stable branch name lets a later run update
+          # the same PR rather than pile up duplicates.
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          branch="chore/index-refresh"
+          git checkout -B "$branch"
+          git add cli/internal/index/index.json
+          git commit -m "chore(index): regenerate from atl-team topic"
+          git push -f origin "$branch"
+          gh pr create --base main --head "$branch" \
+            --title "chore(index): regenerate from atl-team topic" \
+            --body "Automated index refresh from the atl-team topic. Review the diff and merge." \
+            2>/dev/null || echo "a PR for $branch already exists — it now carries the latest diff"

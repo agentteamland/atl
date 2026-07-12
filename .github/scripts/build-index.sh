@@ -28,6 +28,24 @@ repos="$(gh search repos --topic atl-team --limit 200 --json fullName,name,owner
 for repo in $repos; do
   tj="$(gh api "repos/$repo/contents/team.json" -q '.content' 2>/dev/null | base64 -d 2>/dev/null || true)"
   [ -n "$tj" ] || continue
+  # Validate the UNTRUSTED third-party team.json before it enters the catalog that
+  # is auto-committed AND go:embed-shipped inside every release binary: a clean
+  # name slug, a bounded description, and a known scope. A malformed entry is
+  # dropped with a logged reason — never embedded raw (the length cap + slug guard
+  # also stop a crafted description from bloating or spoofing the catalog).
+  tname="$(printf '%s' "$tj" | jq -r '.name // ""' 2>/dev/null || echo "")"
+  tdesc="$(printf '%s' "$tj" | jq -r '.description // ""' 2>/dev/null || echo "")"
+  tscope="$(printf '%s' "$tj" | jq -r '.scope // "project"' 2>/dev/null || echo "project")"
+  if ! printf '%s' "$tname" | grep -qE '^[a-z0-9][a-z0-9-]*$'; then
+    echo "build-index: skip $repo — invalid team name '${tname}'" >&2; continue
+  fi
+  if [ "${#tdesc}" -gt 200 ]; then
+    echo "build-index: skip $repo — description exceeds 200 chars" >&2; continue
+  fi
+  case "$tscope" in
+    project|global|both) ;;
+    *) echo "build-index: skip $repo — invalid scope '${tscope}'" >&2; continue ;;
+  esac
   owner="${repo%%/*}"
   # Prefer the latest release tag; fall back to the default branch. gh prints the
   # 404 body to stdout for a release-less repo and exits non-zero, so trust the
