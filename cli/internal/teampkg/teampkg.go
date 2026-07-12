@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/agentteamland/atl/cli/internal/fanout"
 )
@@ -100,7 +101,7 @@ func CopyAssets(srcDir, claudeDir string) (map[string]string, error) {
 		}
 	}
 	if len(files) == 0 {
-		return nil, fmt.Errorf("team ships no installable assets (agents/skills/rules/knowledge/scripts)")
+		return nil, fmt.Errorf("team ships no installable assets (%s)", strings.Join(AssetDirs, "/"))
 	}
 	return files, nil
 }

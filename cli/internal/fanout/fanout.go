@@ -66,8 +66,9 @@ func Hash(b []byte) string {
 }
 
 // HashFile returns the SHA-256 hex of the file at path. A missing file hashes
-// to "" — so a deleted local copy compares unequal to any baseline and gets
-// refreshed.
+// to "" — so against a non-empty baseline a deleted local copy is Preserved by
+// fan-out (it compares equal to neither baseline nor upstream); restoring a
+// manifest-listed file that went absent is integrity/doctor's lane, not fan-out's.
 func HashFile(path string) (string, error) {
 	b, err := os.ReadFile(path)
 	if err != nil {

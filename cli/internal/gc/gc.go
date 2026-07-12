@@ -25,6 +25,7 @@ import (
 
 	"github.com/agentteamland/atl/cli/internal/coreassets"
 	"github.com/agentteamland/atl/cli/internal/manifest"
+	"github.com/agentteamland/atl/cli/internal/pin"
 	"github.com/agentteamland/atl/cli/internal/scope"
 	"github.com/agentteamland/atl/cli/internal/teampkg"
 )
@@ -84,10 +85,18 @@ func Scan(projectRoot string, now time.Time) ([]Orphan, error) {
 			return nil, err
 		}
 		var extraOwned map[string]bool
+		var pinned func(string) bool
 		if sc == scope.Global {
 			extraOwned = core
+		} else {
+			// A project pin is an explicit "keep this project-only" — a stronger
+			// ownership signal than a manifest entry, so gc must never flag (or
+			// sweep) a pinned path or its subtree.
+			if pins, perr := pin.Load(layerDir); perr == nil {
+				pinned = pins.Pinned
+			}
 		}
-		orphans, err := scanLayer(sc.String(), layerDir, claudeDir, extraOwned)
+		orphans, err := scanLayer(sc.String(), layerDir, claudeDir, extraOwned, pinned)
 		if err != nil {
 			return nil, err
 		}
@@ -110,8 +119,9 @@ func Scan(projectRoot string, now time.Time) ([]Orphan, error) {
 
 // scanLayer walks a layer's asset dirs and returns files no manifest at that
 // layer claims. extraOwned holds paths owned outside any manifest (core assets at
-// the global layer). A missing asset dir (the layer has no installs) yields nothing.
-func scanLayer(scopeName, layerDir, claudeDir string, extraOwned map[string]bool) ([]Orphan, error) {
+// the global layer). pinned, when non-nil, reports project-pinned paths to treat
+// as owned. A missing asset dir (the layer has no installs) yields nothing.
+func scanLayer(scopeName, layerDir, claudeDir string, extraOwned map[string]bool, pinned func(string) bool) ([]Orphan, error) {
 	manifests, err := manifest.List(layerDir)
 	if err != nil {
 		return nil, err
@@ -153,6 +163,9 @@ func scanLayer(scopeName, layerDir, claudeDir string, extraOwned map[string]bool
 			rel = filepath.ToSlash(rel)
 			if owned[rel] {
 				return nil // a manifest owns this file
+			}
+			if pinned != nil && pinned(rel) {
+				return nil // pinned project-only → treated as owned, never reclaimed
 			}
 			info, ierr := d.Info()
 			if ierr != nil {
