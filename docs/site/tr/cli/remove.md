@@ -1,6 +1,6 @@
 # `atl remove`
 
-Bir takımı kaldırır; yalnızca kurulumda yazılan dosyaları siler.
+Bir takımı kaldırır; yalnızca kurulumda yazılan dosyaları — geri alınabilir biçimde — kaldırır.
 
 ## Kullanım
 
@@ -15,7 +15,7 @@ atl remove <handle>/<team> --global   # kullanıcı-global katmandan kaldır
 
 ```bash
 $ atl remove acme/example-team
-atl remove: removed acme/example-team (17 files) from project scope
+atl remove: removed acme/example-team (17 files) from project scope — reversible with `atl gc --undo`
 ```
 
 Takım o kapsamda kurulu değilse:
@@ -28,14 +28,14 @@ acme/example-team is not installed at project scope
 ## Ne olur?
 
 1. Seçilen kapsamdaki takımın kurulum manifestosu `<layer>/.atl/installed/<handle>__<name>.json` konumundan okunur — `<layer>`, `--global` için `~/.atl`, proje kapsamı için `<proje>/.atl`'dir.
-2. Manifestonun kaydettiği her dosya (`.claude/agents/`, `.claude/skills/`, `.claude/rules/` altındakiler) silinir.
+2. Manifestonun kaydettiği her dosya (kurulu varlık dizinleri altındakiler — `.claude/agents/`, `skills/`, `rules/`, `knowledge/`, `scripts/`, `packs/`) kalıcı silinmez, `~/.atl/gc-trash` içine **yumuşak-silinir** — böylece manifestoya girmiş bir promote kazancı her zaman geri alınabilir.
 3. Bu dosyaları barındıran dizinler en derinden başlayarak budanır — yalnızca artık boş olanlar. Başka bir takımın dosyalarını ya da kendi içeriğini barındıran bir dizine dokunulmaz.
 4. Manifestonun kendisi kaldırılır.
 
-Çıktı, kaç dosyanın silindiğini ve hangi kapsamdan kaldırıldığını raporlar:
+Kaldırma geri alınabilir: [`atl gc --undo`](/tr/cli/gc) en son grubu geri yükler, [`atl gc --purge`](/tr/cli/gc) çöpü kalıcı temizler. Çıktı, kaç dosyanın kaldırıldığını ve hangi kapsamdan kaldırıldığını raporlar:
 
 ```
-atl remove: removed <handle>/<name> (N files) from <scope> scope
+atl remove: removed <handle>/<name> (N files) from <scope> scope — reversible with `atl gc --undo`
 ```
 
 ::: tip Yalnızca manifesto kaydındaki dosyalar kaldırılır

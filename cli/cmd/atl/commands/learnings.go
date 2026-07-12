@@ -27,6 +27,7 @@ var learningsStatusCmd = &cobra.Command{
 	Short: "Show pending queue items per channel / project",
 	Long: "Read pending counts straight from the queue — correct by construction,\n" +
 		"never inferred from re-scanning. This is what the SessionStart count uses.",
+	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		st, project, err := openQueue()
 		if err != nil {
@@ -64,6 +65,7 @@ var learningsPeekCmd = &cobra.Command{
 	Long: "List pending items the /drain skill consumes: id, channel, payload.\n" +
 		"--channel filters to one channel (e.g. learning); --json emits the full\n" +
 		"machine-readable list the skill drives off of.",
+	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		st, project, err := openQueue()
 		if err != nil {
@@ -72,6 +74,11 @@ var learningsPeekCmd = &cobra.Command{
 		defer st.Close()
 
 		channel, _ := cmd.Flags().GetString("channel")
+		// Reject an unknown channel rather than silently returning an empty list —
+		// a typo like `--channel learnings` would otherwise look like "nothing pending".
+		if channel != "" && !knownChannel(queue.Channel(channel)) {
+			return fmt.Errorf("unknown --channel %q (known: %s, %s)", channel, queue.ChannelLearning, queue.ChannelProfileFact)
+		}
 		items, err := st.Pending(project, queue.Channel(channel))
 		if err != nil {
 			return err
@@ -215,6 +222,11 @@ var learningsTranscriptCmd = &cobra.Command{
 		}
 		return nil
 	},
+}
+
+// knownChannel reports whether ch is a queue channel the platform recognizes.
+func knownChannel(ch queue.Channel) bool {
+	return ch == queue.ChannelLearning || ch == queue.ChannelProfileFact
 }
 
 // shortID is the 12-char id prefix shown by peek (and echoed in ack's ambiguity

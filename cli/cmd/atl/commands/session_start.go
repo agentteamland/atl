@@ -31,20 +31,31 @@ var sessionStartCmd = &cobra.Command{
 		if err != nil {
 			return nil // non-blocking: never fail a hook
 		}
-		defer st.Close()
 
 		// Drain the previous session's transcripts (no throttle at session start).
-		if _, _, enqueued, derr := drainProjectTranscripts(st, project); derr == nil && enqueued > 0 {
+		if _, _, enqueued, _, derr := drainProjectTranscripts(st, project); derr == nil && enqueued > 0 {
 			fmt.Printf("atl: captured %d new learning(s) from the previous session\n", enqueued)
 		}
 
 		// Doctor self-check + asset integrity restore — surface non-OK / healed.
-		checks := append(doctor.QueueChecks(st, project, time.Now()), integrityCheck(project))
+		checks := append(doctor.QueueChecks(st, project, time.Now()), integrityCheck(project), hooksCheck())
 		for _, r := range doctor.Run(checks) {
 			if r.Status != doctor.OK || r.Healed {
 				fmt.Printf("atl doctor: %s — %s\n", r.Status, r.Detail)
 			}
 		}
+
+		// Signal pending learnings before releasing the queue lock (below).
+		var learningPending, profilePending int
+		if counts, cerr := st.Counts(project); cerr == nil {
+			learningPending = counts[queue.ChannelLearning]
+			profilePending = counts[queue.ChannelProfileFact]
+		}
+
+		// Release the queue's exclusive lock before the non-queue scans (gc + the
+		// docs/skills/rules signals) so a concurrent session isn't blocked on the
+		// 1s open timeout while this one runs unrelated work.
+		st.Close()
 
 		// Reclamation awareness — surface only high-signal orphans (gains/edits
 		// beside an installed unit), not wholly-unowned dirs (usually the user's own
@@ -61,19 +72,18 @@ var sessionStartCmd = &cobra.Command{
 			}
 		}
 
-		// Signal pending learnings so Claude folds them in via /drain. The skill is
-		// LLM work the CLI can't run itself (the CLI/Skill boundary) — surfacing the
-		// count here is how it gets triggered without the user remembering to.
-		if counts, cerr := st.Counts(project); cerr == nil {
-			if n := counts[queue.ChannelLearning]; n > 0 {
-				fmt.Printf("atl: %d learning(s) pending — run /drain to fold them into the knowledge base\n", n)
-			}
-			// profile-team's channel: only fires when profile-team is installed and a
-			// session dropped profile-fact markers. /profile-drain is a team skill; core
-			// /drain stays learning-only (its documented boundary).
-			if n := counts[queue.ChannelProfileFact]; n > 0 {
-				fmt.Printf("atl: %d profile-fact(s) pending — run /profile-drain to fold them into the profiles\n", n)
-			}
+		// Signal pending learnings so Claude folds them in via /drain (counts read
+		// above, before the queue was closed). The skill is LLM work the CLI can't
+		// run itself (the CLI/Skill boundary) — surfacing the count here is how it
+		// gets triggered without the user remembering to.
+		if learningPending > 0 {
+			fmt.Printf("atl: %d learning(s) pending — run /drain to fold them into the knowledge base\n", learningPending)
+		}
+		// profile-team's channel: only fires when profile-team is installed and a
+		// session dropped profile-fact markers. /profile-drain is a team skill; core
+		// /drain stays learning-only (its documented boundary).
+		if profilePending > 0 {
+			fmt.Printf("atl: %d profile-fact(s) pending — run /profile-drain to fold them into the profiles\n", profilePending)
 		}
 
 		// Docs-correctness signal — fires only in a repo that has a docs site

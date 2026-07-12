@@ -160,8 +160,9 @@ Base` section from the children's frontmatter (sort by filename):
 ```
 
 This section is derived, not hand-edited — replace it wholesale each run; the
-source of truth is each child's frontmatter. (Same pattern applies to a skill's
-`learnings/` + `## Accumulated Learnings`, if a learning targets a skill.)
+source of truth is each child's frontmatter. (A skill-targeted learning has no
+skill-side store in v2 — skills are procedures, not knowledge bases; route it to
+the wiki, or propose an edit to the skill itself via the structural path.)
 
 ## Wiki index rebuild (the `<!-- wiki:index -->` contract)
 
@@ -201,8 +202,9 @@ the three managed blocks, so it sits last).
 
 - **Scope**: wiki + journal are project knowledge (`<proj>/.atl/`). Agent KB
   follows the agent's install scope (project `.claude/` shadows global `~/.claude/`).
-- **profile-fact channel**: not handled here — that's profile-team's drain
-  (a future first-party team). This skill processes the `learning` channel only.
+- **profile-fact channel**: not handled here — that's profile-team's
+  `/profile-drain` (a shipped first-party team; installed with profile-team). This
+  skill processes the `learning` channel only.
 - **Idempotency**: ack deletes the item, and both capture and mining dedup by
   content hash — so re-running `/drain` is safe. Mining a lesson you already saved
   re-enqueues to a no-op; an empty queue with nothing new to mine is a no-op.

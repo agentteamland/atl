@@ -38,6 +38,10 @@ Fix every **FAIL** (a missing page, an absent TR mirror, a stale install
 instruction). These are mechanical — just apply them. Warnings are advisory: judge
 each (an illustrative `{placeholder}` link is fine; a genuinely broken link is not).
 
+If invoked with **`--external`**, also run `atl docs check --external` to include
+external-world link-rot (HTTP dead-link probing — slow + networked, so it's opt-in);
+this is the "external-world rot" the skill's intro promises to cover.
+
 ### 3. Semantic sweep (the LLM half)
 Split the site into sections (`cli/`, `guide/`, `skills/`, `teams/`, `authoring/`,
 `contributing/`, `reference/`) and work them in parallel where you can:

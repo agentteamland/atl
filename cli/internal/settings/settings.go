@@ -10,6 +10,7 @@ package settings
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -44,7 +45,14 @@ func InstallHooks(hooks []Hook) (string, error) {
 
 	obj := map[string]any{}
 	if b, err := os.ReadFile(path); err == nil {
-		_ = json.Unmarshal(b, &obj) // tolerate empty/corrupt; we only own the hooks key
+		// An empty file is fine (start fresh), but a NON-empty file that won't parse
+		// must not be silently overwritten — doing so would wipe every non-hook key
+		// the user has (permissions, env, statusline, ...). Refuse and surface it.
+		if len(strings.TrimSpace(string(b))) > 0 {
+			if uerr := json.Unmarshal(b, &obj); uerr != nil {
+				return "", fmt.Errorf("%s exists but is not valid JSON (%v); refusing to overwrite it — fix or remove the file, then re-run", path, uerr)
+			}
+		}
 	}
 	hooksMap, _ := obj["hooks"].(map[string]any)
 	if hooksMap == nil {

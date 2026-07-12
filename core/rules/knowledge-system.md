@@ -15,7 +15,7 @@ A date-stamped narrative: discoveries, decisions, bug fixes, cross-cutting notes
 
 ### Wiki
 
-The living, topic-organized current truth — one page per concept. When a fact changes, the page is updated, not appended. Pages cross-link; `index.md` is the table of contents. A `<!-- wiki:index -->` block at the top of CLAUDE.md auto-aggregates the topic list, so agents discover pages at zero cost.
+The living, topic-organized current truth — one page per concept. When a fact changes, the page is updated, not appended. Pages cross-link. The table of contents is the `<!-- wiki:index -->` block at the top of CLAUDE.md, which `/drain` auto-aggregates so agents discover pages at zero cost (that marker block is the ToC — there is no separately-maintained `index.md`).
 
 Both layers are written by the `/drain` skill from your inline markers (see [learning-capture.md](learning-capture.md)) — wiki for topic-shaped current truth, journal for time-stamped narrative.
 

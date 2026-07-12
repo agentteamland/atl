@@ -92,14 +92,42 @@ func CachePath() (string, error) {
 // out of band (throttled), so a stale or absent cache degrades to the seed
 // rather than failing.
 func Resolve() (*Index, error) {
+	seed, serr := Seed()
+
+	var cache *Index
 	if path, err := CachePath(); err == nil {
 		if b, rerr := os.ReadFile(path); rerr == nil {
 			if ix, lerr := Load(b); lerr == nil && len(ix.Teams) > 0 {
-				return ix, nil
+				cache = ix
 			}
 		}
 	}
-	return Seed()
+
+	switch {
+	case cache == nil:
+		return seed, serr // no usable cache → the embedded seed
+	case seed == nil || serr != nil:
+		return cache, nil // seed unreadable (shouldn't happen) → the cache
+	case newerGeneratedAt(seed.GeneratedAt, cache.GeneratedAt):
+		// A freshly-upgraded binary can ship a NEWER catalog than a stale cache left
+		// by an earlier `atl update`; prefer whichever was generated more recently so
+		// the upgrade isn't masked by an out-of-date cache.
+		return seed, nil
+	default:
+		return cache, nil
+	}
+}
+
+// newerGeneratedAt reports whether generatedAt a is strictly newer than b. Both
+// are RFC3339 stamps; if either is missing or unparsable the comparison is
+// inconclusive and it returns false (keeping the historical cache-preference).
+func newerGeneratedAt(a, b string) bool {
+	ta, ea := time.Parse(time.RFC3339, a)
+	tb, eb := time.Parse(time.RFC3339, b)
+	if ea != nil || eb != nil {
+		return false
+	}
+	return ta.After(tb)
 }
 
 // Fetch downloads and parses an index from url.

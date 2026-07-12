@@ -103,10 +103,12 @@ func promoteGains(projectRoot, only string) (promoteResult, error) {
 	}
 
 	bumped := false
+	matched := false
 	for _, pm := range projManifests {
 		if only != "" && pm.Handle+"/"+pm.Name != only {
 			continue
 		}
+		matched = true
 		gm, gerr := manifest.Read(globLayer, pm.Handle, pm.Name)
 		if gerr != nil {
 			continue // not installed globally → no upstream copy to lift into
@@ -148,6 +150,11 @@ func promoteGains(projectRoot, only string) (promoteResult, error) {
 	}
 	if bumped {
 		_ = generation.Bump() // global layer changed → other projects fan out next tick
+	}
+	// A named team that matched no project manifest is almost always a typo — report
+	// it instead of the "nothing to lift" success message, which would mask the miss.
+	if only != "" && !matched {
+		return res, fmt.Errorf("%s is not installed at project scope — nothing to promote (check the handle/name, or run `atl list`)", only)
 	}
 	return res, nil
 }

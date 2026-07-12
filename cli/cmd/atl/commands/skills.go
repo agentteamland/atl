@@ -145,14 +145,26 @@ func stocktakeDue(repoRoot string) bool {
 // has landed since sinceSHA (or, when sinceSHA is empty, whether the repo has any
 // such commit at all — i.e. it was never stocktaken).
 func assetAffectingCommitsSince(repoRoot, sinceSHA string) bool {
-	args := []string{"-C", repoRoot, "log", "--oneline", "-1"}
-	if sinceSHA != "" {
-		args = append(args, sinceSHA+"..HEAD")
+	run := func(sha string) ([]byte, error) {
+		args := []string{"-C", repoRoot, "log", "--oneline", "-1"}
+		if sha != "" {
+			args = append(args, sha+"..HEAD")
+		}
+		args = append(args, "--", "core", "teams")
+		return exec.Command("git", args...).Output()
 	}
-	args = append(args, "--", "core", "teams")
-	out, err := exec.Command("git", args...).Output()
+	out, err := run(sinceSHA)
 	if err != nil {
-		return false
+		// A recorded SHA git no longer knows (rebase / squash / gc) makes the range
+		// query fail — treat it as never-audited (retry with no range) so the stocktake
+		// / distill signal doesn't go permanently silent, rather than reading the git
+		// failure as "nothing changed".
+		if sinceSHA == "" {
+			return false
+		}
+		if out, err = run(""); err != nil {
+			return false
+		}
 	}
 	return len(strings.TrimSpace(string(out))) > 0
 }

@@ -40,7 +40,7 @@ Fix: one shared pool. Symptom was intermittent timeouts at ~200 rps.
 
 ### The `profile-fact` channel
 
-A second channel, `profile-fact`, captures durable facts about the user or the people they work with, for the profile layer (a future first-party team). Same comment shape, `profile-fact:` prefix. `/drain` processes only the `learning` channel; `profile-fact` is handled by the profile team's own drain when installed.
+A second channel, `profile-fact`, captures durable facts about the entities in the user's world (people, orgs, and more), for the profile layer — a shipped first-party team (`profile-team`). Same comment shape, `profile-fact:` prefix; the exact marker format is owned by profile-team's own `profile-capture` rule, which installs with the team. `/drain` processes only the `learning` channel; `profile-fact` is folded in by profile-team's `/profile-drain` when installed.
 
 ## What happens after — the automatic loop
 

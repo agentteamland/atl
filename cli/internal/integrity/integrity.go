@@ -11,6 +11,7 @@
 package integrity
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -19,6 +20,12 @@ import (
 	"github.com/agentteamland/atl/cli/internal/manifest"
 	"github.com/agentteamland/atl/cli/internal/source"
 )
+
+// errChecksumMismatch marks a file whose pinned source no longer matches the
+// manifest hash — an inherently unrestorable file (e.g. a user-modified file
+// preserved across an upgrade, whose baseline hash predates the new source ref).
+// It is skipped, never fatal, so one such file cannot abort the whole restore batch.
+var errChecksumMismatch = errors.New("checksum mismatch")
 
 // Missing is one manifest-listed file that is absent on disk.
 type Missing struct {
@@ -72,6 +79,9 @@ func RestoreAll(missing []Missing, claudeDir string) (int, error) {
 		}
 		for _, m := range ms {
 			if err := restoreFromDir(srcDir, m, claudeDir); err != nil {
+				if errors.Is(err, errChecksumMismatch) {
+					continue // unrestorable file — skip it, keep healing the rest
+				}
 				os.RemoveAll(srcDir)
 				return restored, err
 			}
@@ -85,16 +95,23 @@ func RestoreAll(missing []Missing, claudeDir string) (int, error) {
 // restoreFromDir copies one missing file from a fetched source dir into
 // claudeDir, verifying it matches the manifest's recorded hash.
 func restoreFromDir(srcDir string, m Missing, claudeDir string) error {
-	b, err := os.ReadFile(filepath.Join(srcDir, m.Rel))
+	srcPath := filepath.Join(srcDir, m.Rel)
+	b, err := os.ReadFile(srcPath)
 	if err != nil {
 		return fmt.Errorf("restore %s: %w", m.Rel, err)
 	}
 	if fanout.Hash(b) != m.SHA {
-		return fmt.Errorf("restore %s: checksum mismatch (source changed?)", m.Rel)
+		return fmt.Errorf("restore %s: %w (source changed?)", m.Rel, errChecksumMismatch)
 	}
 	dst := filepath.Join(claudeDir, m.Rel)
 	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 		return err
 	}
-	return os.WriteFile(dst, b, 0o644)
+	// Preserve the source file's mode so a restored helper script keeps its +x
+	// bit (the source-extraction exec-bit fix's mirror on the restore path).
+	mode := os.FileMode(0o644)
+	if info, serr := os.Stat(srcPath); serr == nil {
+		mode = info.Mode().Perm()
+	}
+	return os.WriteFile(dst, b, mode)
 }

@@ -8,7 +8,7 @@ Diagnose the platform and self-heal what it safely can — the on-demand surface
 atl doctor
 ```
 
-There are no flags. `atl doctor` inspects the current project (its working directory is the project key) plus the global layer, runs three checks in order, repairs what a deterministic fix can repair, and prints one line per check.
+There are no flags. `atl doctor` inspects the current project (its working directory is the project key) plus the global layer, runs its checks in order, repairs what a deterministic fix can repair, and prints one line per check. It **exits non-zero when a check FAILs** (warnings never fail), so `atl doctor && …` can gate a script or CI step.
 
 ## When to use it
 
@@ -34,7 +34,11 @@ Counts the pending items in the learning queue for this project. `OK` when the q
 
 ### `tick-freshness` — is the loop still running?
 
-Looks at how long it's been since the last queue tick. `WARN` if items are queued but ticks haven't run in over 24 hours (or the queue has been written to but never ticked at all) — a sign the in-session cadence isn't firing. `OK` otherwise, reporting how long ago the last tick happened.
+Looks at how long it's been since the maintenance pass last ran (the wall-clock last-tick time, distinct from the transcript high-water mark). `WARN` if items are queued but ticks haven't run in over 24 hours (or the queue has been written to but never ticked at all) — a sign the in-session cadence isn't firing. `OK` otherwise, reporting how long ago the last tick happened.
+
+### `hooks-bound` — is the automation actually wired?
+
+Automation is mandatory in v2, but a reset or hand-edited `~/.claude/settings.json` can leave ATL's hooks unbound — silently killing the whole loop (drain, doctor, and guard stop firing). This check reads the settings file, and if any of the three atl hooks (`SessionStart`, `UserPromptSubmit`, `PreToolUse`) is missing it **re-binds them** via the same idempotent install that never touches your own hooks — a `(self-healed)` repair. A settings file it can't read is a `WARN`, not a blocker.
 
 ## The CLI / Skill split
 
@@ -49,6 +53,7 @@ $ atl doctor
 OK    queue-backlog — queue empty
 OK    tick-freshness — last tick 3m12s ago
 OK    asset-integrity — all installed files present
+OK    hooks-bound — all automation hooks bound
 
 doctor: all healthy
 ```
@@ -60,11 +65,12 @@ $ atl doctor
 WARN  queue-backlog — 63 pending items — a drain skill should process them
 OK    tick-freshness — last tick 8s ago
 OK    asset-integrity — restored 1 missing file(s) — `atl remove <handle>/<team>` removes a team for good (self-healed)
+OK    hooks-bound — all automation hooks bound
 
 doctor: warnings above (not fatal)
 ```
 
-The exit message is `doctor: all healthy`, `doctor: warnings above (not fatal)`, or `doctor: failures above`, matching the most severe line.
+The exit message is `doctor: all healthy`, `doctor: warnings above (not fatal)`, or `doctor: failures above`, matching the most severe line — and the exit code is non-zero only for `failures above`.
 
 ## Related
 
