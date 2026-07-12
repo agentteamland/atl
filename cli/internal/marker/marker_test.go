@@ -29,6 +29,13 @@ func TestParse(t *testing.T) {
 			want: []Marker{{Channel: "learning", Body: "first"}, {Channel: "learning", Body: "second"}},
 		},
 		{
+			// An unclosed marker must be discarded on its own, not swallow the next
+			// marker's close (which would garble the first and drop the second).
+			name: "unclosed marker does not swallow the following one",
+			in:   "<!-- learning: truncated\n<!-- learning: intact -->",
+			want: []Marker{{Channel: "learning", Body: "intact"}},
+		},
+		{
 			name: "unknown channel ignored",
 			in:   "<!-- todo: not ours --> <!-- learning: ours -->",
 			want: []Marker{{Channel: "learning", Body: "ours"}},
