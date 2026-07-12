@@ -50,8 +50,14 @@ acquire() {
     # Held — reclaim only if the recorded holder is truly gone (a crashed worker).
     holder="$(cat "$LOCK/pid" 2>/dev/null || true)"
     if [ -n "$holder" ] && ! kill -0 "$holder" 2>/dev/null; then
-      echo "emulator-lease: reclaiming stale lock (holder pid $holder is gone)" >&2
-      rm -rf "$LOCK"
+      # Reclaim ATOMICALLY: rename the stale lock aside — only one waiter's `mv`
+      # succeeds. A plain `rm -rf "$LOCK"` here races (two waiters both see the same
+      # stale holder, and the second's rm can delete a lock the first just recreated
+      # → two concurrent holders). The mv loser's rename fails and it loops to re-read.
+      if mv "$LOCK" "$LOCK.stale.$$" 2>/dev/null; then
+        echo "emulator-lease: reclaiming stale lock (holder pid $holder is gone)" >&2
+        rm -rf "$LOCK.stale.$$"
+      fi
       continue
     fi
     if [ "$waited" -ge "$TIMEOUT" ]; then
