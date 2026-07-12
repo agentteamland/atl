@@ -39,10 +39,18 @@ func TestCatastrophe(t *testing.T) {
 		{"truncate table", `psql -c "TRUNCATE TABLE events"`, true},
 		{"select allowed", `psql -c "SELECT * FROM users"`, false},
 
-		// --no-verify — blocked (gate bypass).
+		// --no-verify — blocked (gate bypass), but not when merely NAMED in a message.
 		{"commit no-verify", "git commit -m wip --no-verify", true},
 		{"push no-verify", "git push --no-verify", true},
 		{"commit allowed", "git commit -m wip", false},
+		{"no-verify quoted mention allowed", `git commit -m "note about --no-verify"`, false},
+		{"no-verify real after quoted msg", `git commit -m "wip" --no-verify`, true},
+		{"no-verify compound not tripped", "git commit --no-verify-ssl", false},
+
+		// line continuation — a backslash-newline is joined, so a flag can't be split
+		// onto the next physical line to dodge the rule.
+		{"force-push across continuation", "git push \\\n  --force origin main", true},
+		{"reset-hard across continuation", "git reset \\\n  --hard HEAD~1", true},
 
 		// Segment scoping — a flag in one command of a chain must not leak into
 		// another command's decision (regression for the whole-command-scan bug).
