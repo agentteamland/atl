@@ -22,9 +22,25 @@ import (
 )
 
 // SlugForPath converts an absolute project path to the Claude Code transcript
-// slug: every path separator becomes a hyphen.
+// slug. Claude Code replaces every NON-alphanumeric character with a hyphen — not
+// just the path separator — so a path component with a dot (`.claude`, a version
+// dir) or any other punctuation slugs the same way it does on disk. Getting this
+// wrong silently breaks capture for every project whose path contains a dot,
+// including all `.claude/worktrees/...` sessions (verified against real slugs on
+// disk: `/Users/x/p/.claude/worktrees/y` -> `-Users-x-p--claude-worktrees-y`).
 func SlugForPath(absPath string) string {
-	return strings.ReplaceAll(filepath.ToSlash(absPath), "/", "-")
+	s := filepath.ToSlash(absPath)
+	var b strings.Builder
+	b.Grow(len(s))
+	for _, r := range s {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9':
+			b.WriteRune(r)
+		default:
+			b.WriteByte('-')
+		}
+	}
+	return b.String()
 }
 
 // ProjectDir returns the transcript directory for projectRoot:

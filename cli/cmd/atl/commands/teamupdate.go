@@ -142,8 +142,12 @@ func reflectWithFanout(srcDir, claudeDir string, baseline map[string]string) (ma
 	return next, nil
 }
 
-// versionLess reports whether semver a is strictly older than b. Pre-release and
-// build metadata are ignored (compared as the release version).
+// versionLess reports whether semver a is strictly older than b. The numeric
+// release triple is compared first; on a tie, a pre-release (e.g. 1.0.0-beta) is
+// strictly older than the same-numbered final release (1.0.0) — so a team
+// installed at a pre-release correctly upgrades to its final. Ordering between two
+// distinct pre-releases of the same triple is not resolved (they compare equal),
+// which is enough for the install→final path.
 func versionLess(a, b string) bool {
 	pa, pb := parseSemver(a), parseSemver(b)
 	for i := 0; i < 3; i++ {
@@ -151,7 +155,16 @@ func versionLess(a, b string) bool {
 			return pa[i] < pb[i]
 		}
 	}
-	return false
+	ra, rb := hasPrerelease(a), hasPrerelease(b)
+	return ra && !rb // a is a pre-release of the same triple as final b
+}
+
+// hasPrerelease reports whether a semver string carries a pre-release segment
+// (a "-" after the numeric triple, before any "+build" metadata).
+func hasPrerelease(v string) bool {
+	v = strings.TrimPrefix(strings.TrimSpace(v), "v")
+	v = strings.SplitN(v, "+", 2)[0]
+	return strings.Contains(v, "-")
 }
 
 func parseSemver(v string) [3]int {
