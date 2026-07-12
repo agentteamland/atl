@@ -116,18 +116,21 @@ func cursorCheck(store *queue.Store, project string, now time.Time) Result {
 	if err != nil {
 		return Result{Name: "tick-freshness", Status: Fail, Detail: "cannot read queue: " + err.Error()}
 	}
-	cur, err := store.Cursor(project)
+	// Use the wall-clock last-tick time, NOT the transcript-modtime cursor — the
+	// cursor is a high-water mark over transcript files, so reading it as "time
+	// since last tick" false-warns right after a healthy tick of an old transcript.
+	lastTick, err := store.LastTick(project)
 	if err != nil {
-		return Result{Name: "tick-freshness", Status: Fail, Detail: "cannot read cursor: " + err.Error()}
+		return Result{Name: "tick-freshness", Status: Fail, Detail: "cannot read last-tick: " + err.Error()}
 	}
-	if cur.IsZero() {
+	if lastTick.IsZero() {
 		if pending > 0 {
 			return Result{Name: "tick-freshness", Status: Warn,
 				Detail: "never ticked but items are queued — is tick wired?"}
 		}
 		return Result{Name: "tick-freshness", Status: OK, Detail: "no ticks yet (nothing queued)"}
 	}
-	age := now.Sub(cur)
+	age := now.Sub(lastTick)
 	if age > CursorStaleAge && pending > 0 {
 		return Result{Name: "tick-freshness", Status: Warn,
 			Detail: fmt.Sprintf("last tick %s ago with items pending — ticks may not be running", age.Round(time.Hour))}
