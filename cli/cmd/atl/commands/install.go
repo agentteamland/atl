@@ -205,6 +205,13 @@ func installTargets(eff scope.Scope) []scope.Scope {
 
 // installAt reflects the fetched team (srcDir) into one layer and writes the
 // install manifest. It does no network I/O, so it is the unit-testable core.
+//
+// Re-installing an already-installed team — which happens on purpose (a repeat
+// `atl install`) and, more often, automatically when a consumer team pulls in a
+// dependency that is already installed — reflects under fan-out discipline against
+// the existing baseline, so files the user (or the learning loop) modified are
+// preserved and the baseline is carried forward. A first install is a clean copy.
+// This restores v1's "re-install never clobbers local mutations" guarantee.
 func installAt(target scope.Scope, projectRoot, handle, name string, entry *index.Entry, tm *teampkg.TeamManifest, srcDir string) error {
 	claudeDir, err := scope.ClaudeDir(target, projectRoot)
 	if err != nil {
@@ -214,20 +221,36 @@ func installAt(target scope.Scope, projectRoot, handle, name string, entry *inde
 	if err != nil {
 		return err
 	}
-	files, err := teampkg.CopyAssets(srcDir, claudeDir)
-	if err != nil {
-		return err
-	}
 	version := tm.Version
 	if version == "" {
 		version = entry.Version
+	}
+	src := manifest.Source{Repo: entry.Source.Repo, Subpath: entry.Source.Subpath, Ref: entry.Source.Ref}
+
+	if existing, rerr := manifest.Read(layerDir, handle, name); rerr == nil {
+		// Already installed here — reflect over the existing baseline so local
+		// edits survive (pull, never clobber), then advance version + source.
+		files, err := reflectWithFanout(srcDir, claudeDir, existing.Files)
+		if err != nil {
+			return err
+		}
+		existing.Version = version
+		existing.Scope = target.String()
+		existing.Source = src
+		existing.Files = files
+		return existing.Write(layerDir)
+	}
+
+	files, err := teampkg.CopyAssets(srcDir, claudeDir)
+	if err != nil {
+		return err
 	}
 	m := &manifest.Manifest{
 		Handle:  handle,
 		Name:    name,
 		Version: version,
 		Scope:   target.String(),
-		Source:  manifest.Source{Repo: entry.Source.Repo, Subpath: entry.Source.Subpath, Ref: entry.Source.Ref},
+		Source:  src,
 		Files:   files,
 	}
 	return m.Write(layerDir)

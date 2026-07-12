@@ -353,8 +353,3 @@ When writing is complete, give a single summary message:
 10. **The skill can run repeatedly for multiple rules.** If dynamic split mode was
     chosen in Phase 3, each rule goes through the Phase 2-4 cycle individually.
 
-## Accumulated Learnings
-
-(Auto-rebuilt by /drain from this skill's knowledge files. Do not edit by hand.
-Currently empty — populates as the skill is used and edge-case learnings
-accumulate.)

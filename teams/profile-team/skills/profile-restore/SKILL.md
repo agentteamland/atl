@@ -27,7 +27,7 @@ change and stops. Read the output *with the user* before doing anything else.
 set -euo pipefail
 
 MODE="${1:-preview}"                  # preview (default) | --apply
-SNAP="./profile-backup"               # the snapshot committed in THIS repo
+SNAP="$(git rev-parse --show-toplevel 2>/dev/null || pwd)/profile-backup"  # snapshot at the repo root (mirror /profile-backup's anchor), not the cwd
 GLOBAL="$HOME/.atl/profiles"          # the authoritative global store (restore target)
 
 # No snapshot here → nothing to restore.

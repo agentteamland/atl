@@ -3,6 +3,7 @@ package settings
 import (
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -119,5 +120,30 @@ func TestInstallHooksCommandShape(t *testing.T) {
 	cmd := groups[0].(map[string]any)["hooks"].([]any)[0].(map[string]any)["command"]
 	if cmd != "atl tick --throttle=10m" {
 		t.Fatalf("command shape: got %q", cmd)
+	}
+}
+
+// TestInstallHooksRefusesUnparseable: a non-empty settings.json that won't parse
+// must NOT be silently overwritten (which would wipe every non-hook key).
+func TestInstallHooksRefusesUnparseable(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	path, err := Path()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	corrupt := `{"permissions": {"allow": [ // trailing comma + comment = invalid`
+	if err := os.WriteFile(path, []byte(corrupt), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := InstallHooks(v2Hooks); err == nil {
+		t.Fatal("InstallHooks should refuse to overwrite an unparseable settings.json")
+	}
+	// The user's file must be left byte-for-byte intact.
+	if b, _ := os.ReadFile(path); string(b) != corrupt {
+		t.Errorf("the corrupt file was modified; got %q", b)
 	}
 }

@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -175,6 +176,45 @@ func TestRefreshCacheThenResolveUsesCache(t *testing.T) {
 	}
 	if len(ix.Teams) != 1 || ix.Teams[0].Ref() != "only/cached" {
 		t.Errorf("Resolve should use the cache, got %+v", ix.Teams)
+	}
+}
+
+// TestResolvePrefersNewerGeneratedAt: a cache older than the embedded seed must
+// not mask a freshly-upgraded binary's newer catalog; a newer cache still wins.
+func TestResolvePrefersNewerGeneratedAt(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+
+	writeCache := func(generatedAt string) {
+		body := `{"schemaVersion":1,"generatedAt":"` + generatedAt + `","teams":[{"handle":"only","name":"stale","source":{"repo":"only/stale","ref":"v1"}}]}`
+		p := mustCachePath(t)
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Cache older than the seed (2026-07-10) → the seed wins (the unique cache team absent).
+	writeCache("2000-01-01T00:00:00Z")
+	ix, err := Resolve()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ix.Teams) == 1 && ix.Teams[0].Ref() == "only/stale" {
+		t.Error("a cache older than the seed must not be preferred over the seed")
+	}
+
+	// Cache newer than the seed → the cache wins.
+	writeCache("2099-01-01T00:00:00Z")
+	ix, err = Resolve()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ix.Teams) != 1 || ix.Teams[0].Ref() != "only/stale" {
+		t.Errorf("a cache newer than the seed should be preferred, got %+v", ix.Teams)
 	}
 }
 
