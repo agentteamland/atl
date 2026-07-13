@@ -103,7 +103,8 @@ func TestDeliveryStagePrompt_TechLeadInvariants(t *testing.T) {
 		"refute-to-keep",               // the review pattern
 		"repo_vote_pull_request",       // records the verdict
 		"autoComplete",                 // completes the Azure PR
-		"never Squash",                 // history-reachable merge (§5 verify precondition)
+		"NoFastForward",                // the only permitted merge strategy — SHA-preserving
+		"never Rebase or Squash",       // both rewrite SHAs → would false-block merge-verify (§5 precondition)
 		"transitionWorkItems:false",    // F9 — the tech-lead owns the single Done transition
 		"runtime-resolved Done",        // sets Done after the merge
 		"never fake a green",

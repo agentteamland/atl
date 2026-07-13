@@ -1,6 +1,8 @@
 package dispatch
 
 import (
+	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -50,6 +52,7 @@ type fakeWorld struct {
 	fr       *fakeRunner // the injected git seam; tests flip revListCount to drive merge-verify
 	now      time.Time
 	nextPID  int
+	torn     map[int]bool // ids whose status.json read returns a torn/parse error (exists but unparseable)
 }
 
 func idFromPath(p string) int {
@@ -66,7 +69,11 @@ func (w *fakeWorld) spawner(spec WorkerSpec) (Handle, error) {
 }
 
 func (w *fakeWorld) readStatus(path string) (*Status, error) {
-	if st, ok := w.statuses[idFromPath(path)]; ok && st != nil {
+	id := idFromPath(path)
+	if w.torn[id] {
+		return nil, errors.New("parse status: unexpected end of JSON input") // exists but unparseable — NOT IsNotExist
+	}
+	if st, ok := w.statuses[id]; ok && st != nil {
 		return st, nil
 	}
 	return nil, os.ErrNotExist
@@ -90,6 +97,7 @@ func newTestScheduler(t *testing.T, plan *Plan, cap int) (*Scheduler, *fakeWorld
 		statuses: map[int]*Status{},
 		fr:       fr,
 		now:      time.Unix(1_000_000, 0),
+		torn:     map[int]bool{},
 	}
 	s := NewScheduler(plan, base, wt, world.spawner, Config{Cap: cap, PollInterval: time.Second, TermGrace: time.Second})
 	s.ReadStatus = world.readStatus
@@ -249,16 +257,64 @@ func TestCompleteBlocksWhenNotMerged(t *testing.T) {
 		}
 	}
 	// Only the tech-lead exit-0 triggers the merge-verify — and its branch is NOT in
-	// origin/dev (it exited 0 without completing the PR), so the unit must block.
+	// origin/dev (it exited 0 without completing the PR). Because Azure's autoComplete
+	// is asynchronous, the first check enters an awaiting-merge GRACE (still running,
+	// slot held) rather than blocking immediately.
 	w.handles[6].exited = true
 	w.handles[6].code = 0
 	if _, err := s.step(); err != nil {
 		t.Fatal(err)
 	}
+	if s.stateOf(6) != stateRunning {
+		t.Fatalf("tech-lead exit-0 on an unmerged branch should enter merge-grace (still running), got %v", s.stateOf(6))
+	}
+	// The merge never lands; once the grace window elapses the unverified merge is
+	// terminal — the unit blocks (never force-deleted + marked done).
+	w.now = w.now.Add(mergeGraceWindow + time.Second)
+	if _, err := s.step(); err != nil {
+		t.Fatal(err)
+	}
 	if s.stateOf(6) != stateBlocked {
-		t.Fatalf("tech-lead exit-0 without a verified merge must block (not force-delete + mark done); got %v", s.stateOf(6))
+		t.Fatalf("tech-lead exit-0 without a verified merge (after grace) must block; got %v", s.stateOf(6))
 	}
 	assertBlockedReport(t, s.ProjectRoot, 6, "not merged")
+}
+
+// TestCompleteMergeGraceThenMerges: a unit that isn't merged at the first check
+// but merges within the grace window completes normally (no false block).
+func TestCompleteMergeGraceThenMerges(t *testing.T) {
+	plan := planOf("s1", WorkUnit{ID: 8})
+	s, w := newTestScheduler(t, plan, 1)
+	if _, err := s.step(); err != nil { // admit → developer
+		t.Fatal(err)
+	}
+	// Walk developer → tester → tech-lead; the branch is unmerged the whole time.
+	w.fr.revListCount = "2"
+	for i := 0; i < len(deliveryPipeline)-1; i++ {
+		w.handles[8].exited = true
+		w.handles[8].code = 0
+		if _, err := s.step(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// tech-lead exits 0, branch not yet merged → grace.
+	w.handles[8].exited = true
+	w.handles[8].code = 0
+	if _, err := s.step(); err != nil {
+		t.Fatal(err)
+	}
+	if s.stateOf(8) != stateRunning {
+		t.Fatalf("should be awaiting merge, got %v", s.stateOf(8))
+	}
+	// The async merge lands within the window (rev-list now reports 0) → done.
+	w.fr.revListCount = "0"
+	w.now = w.now.Add(30 * time.Second) // still inside the grace window
+	if _, err := s.step(); err != nil {
+		t.Fatal(err)
+	}
+	if s.stateOf(8) != stateDone {
+		t.Fatalf("a merge that lands within grace must complete the unit, got %v", s.stateOf(8))
+	}
 }
 
 // --- pipeline: the three stages share ONE worktree ----------------------------
@@ -574,5 +630,42 @@ func assertBlockedReport(t *testing.T, root string, id int, wantReason string) {
 	}
 	if !strings.Contains(string(b), wantReason) {
 		t.Errorf("blocked report %d should mention %q, got %s", id, wantReason, b)
+	}
+}
+
+// --- torn status.json: a transient parse error must not kill a healthy worker --
+
+func TestPollTornStatusDoesNotKill(t *testing.T) {
+	plan := planOf("s1", WorkUnit{ID: 9})
+	s, w := newTestScheduler(t, plan, 1)
+	if _, err := s.step(); err != nil { // admit → developer running
+		t.Fatal(err)
+	}
+	// The worker's status.json exists but is caught mid-write (unparseable). Even
+	// well past the first-heartbeat window, a torn read is a fresh write (mtime
+	// moved), so it must NOT be reclaimed as "no first heartbeat".
+	w.torn[9] = true
+	w.now = w.now.Add(time.Hour)
+	if _, err := s.step(); err != nil {
+		t.Fatal(err)
+	}
+	if s.stateOf(9) != stateRunning {
+		t.Fatalf("a torn/parse-error status read must keep the worker alive, got %v", s.stateOf(9))
+	}
+}
+
+// --- ctx cancel: RunContext returns promptly and leaves nothing running --------
+
+func TestRunContextCancelReturns(t *testing.T) {
+	plan := planOf("s1", WorkUnit{ID: 1})
+	s, _ := newTestScheduler(t, plan, 1)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // already cancelled before Run
+	_, err := s.RunContext(ctx)
+	if err == nil {
+		t.Fatal("a cancelled context should surface a non-nil error")
+	}
+	if s.runningCount() != 0 {
+		t.Errorf("no worker should be left running after a cancel, got %d", s.runningCount())
 	}
 }
