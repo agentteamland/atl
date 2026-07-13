@@ -225,4 +225,4 @@ Sonunda tek bir mesaj:
 
 ## Kaynak
 
-- Belirtim: [rule/skills/rule-wizard/skill.md](https://github.com/agentteamland/rule/blob/main/skills/rule-wizard/skill.md).
+- Belirtim: [rule/skills/rule-wizard/SKILL.md](https://github.com/agentteamland/rule/blob/main/skills/rule-wizard/SKILL.md).

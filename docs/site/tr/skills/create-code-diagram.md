@@ -134,4 +134,4 @@ classDiagram
 
 ## Kaynak
 
-- Belirtim: [core/skills/create-code-diagram/skill.md](https://github.com/agentteamland/core/blob/main/skills/create-code-diagram/skill.md).
+- Belirtim: [core/skills/create-code-diagram/SKILL.md](https://github.com/agentteamland/core/blob/main/skills/create-code-diagram/SKILL.md).

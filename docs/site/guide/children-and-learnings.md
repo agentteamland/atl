@@ -10,7 +10,7 @@ The canonical rule lives at [`core/rules/agent-structure.md`](https://github.com
 
 Without it, complex agents and skills end up as one of two anti-shapes:
 
-1. **Monolithic files** — everything piled into one `agent.md` or `skill.md`. Hard to update one piece without touching the rest. Diffs are noisy. Re-reads burn tokens.
+1. **Monolithic files** — everything piled into one `agent.md` or `SKILL.md`. Hard to update one piece without touching the rest. Diffs are noisy. Re-reads burn tokens.
 2. **Hand-curated index sections** — a separate `agent.md` table of contents that a human maintains alongside the topic files. Drifts the moment someone forgets to update it.
 
 The children + learnings pattern resolves both:
@@ -50,7 +50,7 @@ Every complex skill mirrors the agent shape. Two locations matter:
 
 ```
 .claude/skills/{skill-name}/
-├── skill.md              ← The skill's procedure (steps, identity, flow). Stays short.
+├── SKILL.md              ← The skill's procedure (steps, identity, flow). Stays short.
 └── learnings/            ← Accumulated edge cases, successful patterns, anti-patterns
     ├── topic-1.md
     ├── topic-2.md
@@ -59,7 +59,7 @@ Every complex skill mirrors the agent shape. Two locations matter:
 
 [`atl install`](/cli/install) fetches the team from the catalog and copies skills (along with agents and rules) into your project's `.claude/` directory. [`atl update`](/cli/update) refreshes installed teams from the catalog. `/drain` writes to the project-local copy first; `atl promote` then lifts gains to your global layer, and `atl publish` can propose them upstream to the team's repo.
 
-Same shape, same rules, same `knowledge-base-summary` frontmatter convention. The skill's `skill.md` ships with an "Accumulated Learnings" section auto-aggregated from `learnings/*.md` frontmatter — same mechanism as `agent.md`'s Knowledge Base.
+Same shape, same rules, same `knowledge-base-summary` frontmatter convention. The skill's `SKILL.md` ships with an "Accumulated Learnings" section auto-aggregated from `learnings/*.md` frontmatter — same mechanism as `agent.md`'s Knowledge Base.
 
 **Why mirror agents on skills?** The "self-improving skill" framing benefits from a structured place for accumulated wisdom that agents (Claude) can see when invoking the skill. Without `learnings/`, every skill use starts from zero on edge cases that came up in prior runs.
 
@@ -97,7 +97,7 @@ When `/drain` runs, it rebuilds the parent file's index section from the frontma
 ...
 ```
 
-Hand edits to this section are **overwritten** on the next `/drain` run — the source of truth is each child file's frontmatter. The rest of `agent.md` / `skill.md` (identity, responsibility, principles, flow) is **not touched** by the rebuild.
+Hand edits to this section are **overwritten** on the next `/drain` run — the source of truth is each child file's frontmatter. The rest of `agent.md` / `SKILL.md` (identity, responsibility, principles, flow) is **not touched** by the rebuild.
 
 ## Three layers of update
 

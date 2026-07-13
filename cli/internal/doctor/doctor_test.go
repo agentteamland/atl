@@ -41,28 +41,32 @@ func TestCursorCheck(t *testing.T) {
 
 	// never ticked, nothing queued → OK
 	if r := cursorCheck(s, "p", now); r.Status != OK {
-		t.Fatalf("zero cursor, no items: want OK, got %v (%s)", r.Status, r.Detail)
+		t.Fatalf("zero last-tick, no items: want OK, got %v (%s)", r.Status, r.Detail)
 	}
 	// never ticked, items queued → Warn
 	if _, err := s.Enqueue("p", queue.Item{ID: "x", Channel: queue.ChannelLearning, Payload: "p"}); err != nil {
 		t.Fatal(err)
 	}
 	if r := cursorCheck(s, "p", now); r.Status != Warn {
-		t.Fatalf("zero cursor with items: want Warn, got %v", r.Status)
+		t.Fatalf("zero last-tick with items: want Warn, got %v", r.Status)
 	}
-	// fresh cursor → OK
-	if err := s.SetCursor("p", now.Add(-time.Minute)); err != nil {
-		t.Fatal(err)
-	}
-	if r := cursorCheck(s, "p", now); r.Status != OK {
-		t.Fatalf("fresh cursor: want OK, got %v (%s)", r.Status, r.Detail)
-	}
-	// stale cursor with items → Warn
+	// freshness is judged from the last-tick wall-clock, not the transcript cursor:
+	// a stale transcript-mtime cursor must NOT false-warn after a fresh tick.
 	if err := s.SetCursor("p", now.Add(-48*time.Hour)); err != nil {
 		t.Fatal(err)
 	}
+	if err := s.SetLastTick("p", now.Add(-time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if r := cursorCheck(s, "p", now); r.Status != OK {
+		t.Fatalf("fresh last-tick (old cursor): want OK, got %v (%s)", r.Status, r.Detail)
+	}
+	// stale last-tick with items → Warn
+	if err := s.SetLastTick("p", now.Add(-48*time.Hour)); err != nil {
+		t.Fatal(err)
+	}
 	if r := cursorCheck(s, "p", now); r.Status != Warn {
-		t.Fatalf("stale cursor with items: want Warn, got %v", r.Status)
+		t.Fatalf("stale last-tick with items: want Warn, got %v", r.Status)
 	}
 }
 

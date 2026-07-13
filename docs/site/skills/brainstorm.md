@@ -120,5 +120,5 @@ Every item marked "not doing now, later" during a brainstorm is reflected in `.a
 
 ## Source
 
-- Spec: [core/skills/brainstorm/skill.md](https://github.com/agentteamland/atl/blob/main/core/skills/brainstorm/skill.md)
+- Spec: [core/skills/brainstorm/SKILL.md](https://github.com/agentteamland/atl/blob/main/core/skills/brainstorm/SKILL.md)
 - Rule: [core/rules/brainstorm.md](https://github.com/agentteamland/atl/blob/main/core/rules/brainstorm.md)

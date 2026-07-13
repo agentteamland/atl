@@ -171,14 +171,27 @@ func docsAuditDue(repoRoot string) bool {
 // cli/ has landed since sinceSHA (or, when sinceSHA is empty, whether the repo has
 // any such commit at all — i.e. it was never audited).
 func docAffectingCommitsSince(repoRoot, sinceSHA string) bool {
-	args := []string{"-C", repoRoot, "log", "--oneline", "-1"}
-	if sinceSHA != "" {
-		args = append(args, sinceSHA+"..HEAD")
+	run := func(sha string) ([]byte, error) {
+		args := []string{"-C", repoRoot, "log", "--oneline", "-1"}
+		if sha != "" {
+			args = append(args, sha+"..HEAD")
+		}
+		args = append(args, "--", "docs", "core", "cli")
+		return exec.Command("git", args...).Output()
 	}
-	args = append(args, "--", "docs", "core", "cli")
-	out, err := exec.Command("git", args...).Output()
+	out, err := run(sinceSHA)
 	if err != nil {
-		return false
+		// A recorded SHA that git no longer knows (rebase / squash / gc pruned it)
+		// makes `<sha>..HEAD` fail — treat that as never-audited (retry with no range)
+		// so the backstop doesn't go permanently silent, rather than reading the git
+		// failure as "no doc-affecting commits". A failure with no range means it's not
+		// a git repo (or has no history), where there is genuinely nothing to audit.
+		if sinceSHA == "" {
+			return false
+		}
+		if out, err = run(""); err != nil {
+			return false
+		}
 	}
 	return len(strings.TrimSpace(string(out))) > 0
 }

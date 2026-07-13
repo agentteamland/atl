@@ -10,7 +10,7 @@ Kanonik kural [`core/rules/agent-structure.md`](https://github.com/agentteamland
 
 Onsuz, karmaşık ajanlar ve beceriler iki kötü şekilden birinde son bulur:
 
-1. **Tek parça dosyalar** — her şey tek bir `agent.md` ya da `skill.md` içine yığılmış. Bir parçayı diğerlerine dokunmadan güncellemek zor. Farklar gürültülü olur. Her yeniden okuma jeton yakar.
+1. **Tek parça dosyalar** — her şey tek bir `agent.md` ya da `SKILL.md` içine yığılmış. Bir parçayı diğerlerine dokunmadan güncellemek zor. Farklar gürültülü olur. Her yeniden okuma jeton yakar.
 2. **Elle hazırlanmış dizin bölümleri** — bir insanın konu dosyalarına paralel bakım yaptığı ayrı bir `agent.md` içindekiler tablosu. Biri güncellemeyi unuttuğu an gerçeklikten kayar.
 
 Children + learnings deseni ikisini birden çözer:
@@ -50,7 +50,7 @@ Her karmaşık beceri ajan biçimini aynalar:
 
 ```
 .claude/skills/{skill-name}/
-├── skill.md              ← Becerinin yordamı (adımlar, kimlik, akış). Kısa kalır.
+├── SKILL.md              ← Becerinin yordamı (adımlar, kimlik, akış). Kısa kalır.
 └── learnings/            ← Birikmiş sınır durumları, başarılı desenler, kötü desenler
     ├── topic-1.md
     ├── topic-2.md
@@ -59,7 +59,7 @@ Her karmaşık beceri ajan biçimini aynalar:
 
 [`atl install`](/tr/cli/install), katalogu sorgulayarak takımı getirir ve becerileri (ajanlar ve kurallarla birlikte) projenin `.claude/` dizinine kopyalar. [`atl update`](/tr/cli/update), kurulu takımları katalogdan yeniler. `/drain` önce proje-yerel kopyaya yazar; ardından `atl promote` kazanımları global katmanına taşır ve `atl publish` bunları takımın deposuna üst kaynak olarak önerebilir.
 
-Aynı şekil, aynı kurallar, aynı `knowledge-base-summary` frontmatter sözleşmesi. Becerinin `skill.md` dosyası, `learnings/*.md` frontmatter'ından kendiliğinden derlenen bir "Accumulated Learnings" bölümüyle birlikte gelir — `agent.md` Knowledge Base mekanizmasının aynısı.
+Aynı şekil, aynı kurallar, aynı `knowledge-base-summary` frontmatter sözleşmesi. Becerinin `SKILL.md` dosyası, `learnings/*.md` frontmatter'ından kendiliğinden derlenen bir "Accumulated Learnings" bölümüyle birlikte gelir — `agent.md` Knowledge Base mekanizmasının aynısı.
 
 **Beceriyi neden ajan üzerine aynalayalım?** "Kendini iyileştiren beceri" çerçevelemesi, ajanların (Claude) beceriyi çağırırken görebileceği birikmiş deneyim için yapılandırılmış bir yer kazandırır. `learnings/` olmadan her beceri kullanımı, daha önce karşılaşılmış sınır durumlarında sıfırdan başlar.
 
@@ -97,7 +97,7 @@ Bu özet, üst dosyanın Knowledge Base / Accumulated Learnings bölümünü bes
 ...
 ```
 
-Bu bölüme yapılan elle düzenlemeler bir sonraki `/drain` çalıştırmasında **üzerine yazılır** — kaynak doğruluk her çocuk dosyanın frontmatter'ıdır. `agent.md` / `skill.md` dosyasının geri kalanı (kimlik, sorumluluk, ilkeler, akış) yeniden inşa tarafından **değiştirilmez**.
+Bu bölüme yapılan elle düzenlemeler bir sonraki `/drain` çalıştırmasında **üzerine yazılır** — kaynak doğruluk her çocuk dosyanın frontmatter'ıdır. `agent.md` / `SKILL.md` dosyasının geri kalanı (kimlik, sorumluluk, ilkeler, akış) yeniden inşa tarafından **değiştirilmez**.
 
 ## Üç güncelleme katmanı
 

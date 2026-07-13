@@ -1,6 +1,8 @@
 package commands
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"time"
@@ -51,22 +53,26 @@ var tickCmd = &cobra.Command{
 
 		// Every-call fan-out, generation-guarded: a no-op (one small file read)
 		// when the global layer hasn't changed since this project last fanned out,
-		// so it's cheap enough to ride every prompt.
+		// so it's cheap enough to ride every prompt. A fan-out error is surfaced
+		// (not swallowed) so a persistently failing pass is observable.
 		if changed, gen, gerr := generation.Changed(project); gerr == nil && changed {
 			if n, ferr := fanOut(project); ferr == nil {
 				if n > 0 {
 					fmt.Printf("tick: fanned out %d file(s) from the global layer\n", n)
 				}
 				_ = generation.MarkSeen(project, gen)
+			} else {
+				fmt.Printf("tick: fan-out skipped this pass (%v)\n", ferr)
 			}
 		}
 
 		// Throttle gate (auto mode): skip the heavier drain+doctor pass if we ran
-		// it too recently.
+		// it too recently. The stamp is per-project so concurrent sessions in
+		// different projects don't starve each other's drain/doctor/promote pass.
 		throttleDur, _ := cmd.Flags().GetDuration("throttle")
 		var stamp string
 		if throttleDur > 0 {
-			if stamp, err = throttle.StampPath("last-tick"); err != nil {
+			if stamp, err = throttle.StampPath("last-tick-" + projectStamp(project)); err != nil {
 				return err
 			}
 			if !throttle.Gate(stamp, throttleDur) {
@@ -74,13 +80,17 @@ var tickCmd = &cobra.Command{
 			}
 		}
 
-		scanned, found, enqueued, err := drainProjectTranscripts(st, project)
+		scanned, found, enqueued, skipped, err := drainProjectTranscripts(st, project)
 		if err != nil {
 			return err
 		}
+		if skipped > 0 {
+			fmt.Printf("tick: skipped %d unreadable transcript(s) this pass\n", skipped)
+		}
 
-		// Doctor self-check (queue health + asset integrity), same as session-start.
-		for _, r := range doctor.Run(append(doctor.QueueChecks(st, project, time.Now()), integrityCheck(project))) {
+		// Doctor self-check (queue health + asset integrity + hook binding), same
+		// as session-start.
+		for _, r := range doctor.Run(append(doctor.QueueChecks(st, project, time.Now()), integrityCheck(project), hooksCheck())) {
 			if r.Status != doctor.OK || r.Healed {
 				fmt.Printf("tick doctor: %s — %s\n", r.Status, r.Detail)
 			}
@@ -89,8 +99,11 @@ var tickCmd = &cobra.Command{
 		// Lift this project's accumulated gains to the global layer (ring 1→2).
 		// Auto + visible (decision doc 5.1): additive, conflict-archived, and
 		// pinnable, so it's risk-free enough to ride the tick instead of waiting
-		// for a manual `atl promote`. Quiet when there's nothing to lift.
-		if pr, perr := promoteGains(project, ""); perr == nil && pr.lifted > 0 {
+		// for a manual `atl promote`. Quiet when there's nothing to lift; a promote
+		// error is surfaced rather than swallowed.
+		if pr, perr := promoteGains(project, ""); perr != nil {
+			fmt.Printf("tick: promote skipped this pass (%v)\n", perr)
+		} else if pr.lifted > 0 {
 			fmt.Printf("tick: %s\n", pr.String())
 		}
 
@@ -110,42 +123,66 @@ var tickCmd = &cobra.Command{
 // drainProjectTranscripts discovers this project's transcripts modified since
 // the cursor, drains each into the queue, and advances the cursor. Shared by
 // `atl tick` and `atl session-start`.
-func drainProjectTranscripts(st *queue.Store, project string) (scanned, found, enqueued int, err error) {
+//
+// Fail-soft per file: one unreadable/undrainable transcript is skipped (counted
+// as skipped), never aborting the batch — otherwise a single poison file wedges
+// the project's entire capture pipeline forever (the cursor never advances, so
+// every later transcript is re-blocked). Queue dedup makes any re-scan a no-op,
+// so advancing past a skipped file is safe.
+func drainProjectTranscripts(st *queue.Store, project string) (scanned, found, enqueued, skipped int, err error) {
 	dir, err := transcript.ProjectDir(project)
 	if err != nil {
-		return 0, 0, 0, err
+		return 0, 0, 0, 0, err
 	}
 	since, err := st.Cursor(project)
 	if err != nil {
-		return 0, 0, 0, err
+		return 0, 0, 0, 0, err
 	}
 	files, err := transcript.Find(dir, since)
 	if err != nil {
-		return 0, 0, 0, fmt.Errorf("find transcripts: %w", err)
+		return 0, 0, 0, 0, fmt.Errorf("find transcripts: %w", err)
 	}
 	var newest time.Time
 	for _, f := range files {
-		text, e := transcript.ExtractText(f.Path)
-		if e != nil {
-			return scanned, found, enqueued, fmt.Errorf("read %s: %w", f.Path, e)
-		}
-		r, e := drain.Drain(text, project, st)
-		if e != nil {
-			return scanned, found, enqueued, e
-		}
-		found += r.Found
-		enqueued += r.Enqueued
 		if f.ModTime.After(newest) {
 			newest = f.ModTime
 		}
+		text, e := transcript.ExtractText(f.Path)
+		if e != nil {
+			skipped++
+			continue
+		}
+		r, e := drain.Drain(text, project, st)
+		if e != nil {
+			skipped++
+			continue
+		}
+		found += r.Found
+		enqueued += r.Enqueued
 	}
 	scanned = len(files)
 	if scanned > 0 {
-		if e := st.SetCursor(project, newest); e != nil {
-			return scanned, found, enqueued, fmt.Errorf("advance cursor: %w", e)
+		// Clamp a future modtime (a wedge otherwise: the cursor would sit ahead of
+		// wall-clock forever) and back off a small slack so same-second modtime ties
+		// (coarse-FS concurrent appends) re-scan rather than skip — free via dedup.
+		now := time.Now()
+		if newest.After(now) {
+			newest = now
+		}
+		if e := st.SetCursor(project, newest.Add(-time.Second)); e != nil {
+			return scanned, found, enqueued, skipped, fmt.Errorf("advance cursor: %w", e)
 		}
 	}
-	return scanned, found, enqueued, nil
+	// Record that the maintenance pass ran, for doctor's tick-freshness check.
+	_ = st.SetLastTick(project, time.Now())
+	return scanned, found, enqueued, skipped, nil
+}
+
+// projectStamp is a short, filesystem-safe token derived from a project path,
+// used to give each project its own throttle stamp under ~/.atl/cache.
+func projectStamp(project string) string {
+	sum := sha256.Sum256([]byte(project))
+	return hex.EncodeToString(sum[:])[:16]
 }
 
 func init() {

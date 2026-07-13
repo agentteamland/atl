@@ -62,6 +62,41 @@ func TestInstallAtProject(t *testing.T) {
 	}
 }
 
+// TestInstallAtReinstallPreservesEdits proves the v2 idempotency guarantee: a
+// second installAt over an already-installed team (a repeat install, or a
+// transitive dependency re-pulled) reflects under fan-out discipline and never
+// clobbers a locally-grown/edited file.
+func TestInstallAtReinstallPreservesEdits(t *testing.T) {
+	src := makeSrc(t)
+	tm, err := teampkg.ReadManifest(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := t.TempDir()
+	if err := installAt(scope.Project, root, "acme", "demo", demoEntry(), tm, src); err != nil {
+		t.Fatalf("first installAt: %v", err)
+	}
+	agentPath := filepath.Join(root, ".claude", "agents", "api", "agent.md")
+	// The learning loop (or the user) grows the installed file locally.
+	if err := os.WriteFile(agentPath, []byte("LOCALLY GROWN"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// A re-install (directly or via a transitive dependency) must preserve it.
+	if err := installAt(scope.Project, root, "acme", "demo", demoEntry(), tm, src); err != nil {
+		t.Fatalf("reinstall installAt: %v", err)
+	}
+	if b, _ := os.ReadFile(agentPath); string(b) != "LOCALLY GROWN" {
+		t.Errorf("reinstall clobbered a local edit: got %q, want LOCALLY GROWN", b)
+	}
+	m, err := manifest.Read(filepath.Join(root, ".atl"), "acme", "demo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m.Version != "2.0.0" {
+		t.Errorf("manifest version = %q, want 2.0.0", m.Version)
+	}
+}
+
 func TestInstallAtGlobal(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)

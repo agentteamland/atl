@@ -46,10 +46,13 @@ cp -R "$SRC/." "$DEST/"
 #    artifact, so stage it even if the repo gitignores it (a plain `add` would exit 1
 #    under set -e and abort here, after the copy, with no outcome marker printed).
 git -C "$REPO_ROOT" add -f profile-backup
-if git -C "$REPO_ROOT" diff --cached --quiet; then
+# Scope the emptiness check AND the commit to the snapshot path only, so a user's
+# unrelated pre-staged changes are neither counted here nor swept into a commit
+# labelled as a profile snapshot.
+if git -C "$REPO_ROOT" diff --cached --quiet -- profile-backup; then
   echo "already-current"
 else
-  git -C "$REPO_ROOT" commit -m "chore(profile): snapshot ~/.atl/profiles ($(date +%F))"
+  git -C "$REPO_ROOT" commit -m "chore(profile): snapshot ~/.atl/profiles ($(date +%F))" -- profile-backup
   echo "committed"
 fi
 ```

@@ -92,14 +92,70 @@ func CachePath() (string, error) {
 // out of band (throttled), so a stale or absent cache degrades to the seed
 // rather than failing.
 func Resolve() (*Index, error) {
+	seed, serr := Seed()
+
+	var cache *Index
 	if path, err := CachePath(); err == nil {
 		if b, rerr := os.ReadFile(path); rerr == nil {
 			if ix, lerr := Load(b); lerr == nil && len(ix.Teams) > 0 {
-				return ix, nil
+				cache = ix
 			}
 		}
 	}
-	return Seed()
+
+	switch {
+	case cache == nil:
+		return seed, serr // no usable cache → the embedded seed
+	case seed == nil || serr != nil:
+		return cache, nil // seed unreadable (shouldn't happen) → the cache
+	default:
+		// Merge, don't pick one. The cache (from `atl update`) is the full published
+		// catalog — first-party AND third-party; the seed is first-party-only at build
+		// time. So a team present in only ONE source must always survive: preferring the
+		// seed wholesale when it's newer would DROP the third-party teams that live only
+		// in an older cache, while preferring the cache wholesale would mask a freshly-
+		// upgraded binary's newer first-party catalog. Take the union, and on a team that
+		// appears in both, let the source with the newer generatedAt win.
+		return mergeIndexes(seed, cache), nil
+	}
+}
+
+// mergeIndexes returns the union of the two indexes keyed by "<handle>/<name>".
+// The source with the newer generatedAt wins on any team that appears in both;
+// a team present in only one source is always kept. The result carries the newer
+// source's schemaVersion + generatedAt.
+func mergeIndexes(seed, cache *Index) *Index {
+	newer, older := cache, seed
+	if newerGeneratedAt(seed.GeneratedAt, cache.GeneratedAt) {
+		newer, older = seed, cache
+	}
+	out := &Index{SchemaVersion: newer.SchemaVersion, GeneratedAt: newer.GeneratedAt}
+	seen := make(map[string]bool, len(newer.Teams)+len(older.Teams))
+	add := func(teams []Entry) {
+		for _, e := range teams {
+			key := e.Handle + "/" + e.Name
+			if seen[key] {
+				continue
+			}
+			seen[key] = true
+			out.Teams = append(out.Teams, e)
+		}
+	}
+	add(newer.Teams) // newer source wins on conflict (added first)
+	add(older.Teams) // then any team the newer source didn't have
+	return out
+}
+
+// newerGeneratedAt reports whether generatedAt a is strictly newer than b. Both
+// are RFC3339 stamps; if either is missing or unparsable the comparison is
+// inconclusive and it returns false (keeping the historical cache-preference).
+func newerGeneratedAt(a, b string) bool {
+	ta, ea := time.Parse(time.RFC3339, a)
+	tb, eb := time.Parse(time.RFC3339, b)
+	if ea != nil || eb != nil {
+		return false
+	}
+	return ta.After(tb)
 }
 
 // Fetch downloads and parses an index from url.

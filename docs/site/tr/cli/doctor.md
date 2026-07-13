@@ -8,7 +8,7 @@ Platformu tanıla ve güvenle düzeltebileceklerini kendiliğinden onar — ATL'
 atl doctor
 ```
 
-Bayrak yoktur. `atl doctor`, mevcut projeyi (çalışma dizini proje anahtarıdır) ve global katmanı inceler, üç denetimi sırayla çalıştırır, deterministik bir düzeltmeyle onarılabilecek olanı onarır ve her denetim için bir satır yazdırır.
+Bayrak yoktur. `atl doctor`, mevcut projeyi (çalışma dizini proje anahtarıdır) ve global katmanı inceler, denetimlerini sırayla çalıştırır, deterministik bir düzeltmeyle onarılabilecek olanı onarır ve her denetim için bir satır yazdırır. Bir denetim **FAIL** olduğunda **sıfırdan farklı çıkış kodu döndürür** (uyarılar asla başarısız saymaz), böylece `atl doctor && …` bir script ya da CI adımını kapılayabilir.
 
 ## Ne zaman kullanılır
 
@@ -34,7 +34,11 @@ Bu proje için öğrenme kuyruğundaki bekleyen öğeleri sayar. Kuyruk boş ya 
 
 ### `tick-freshness` — döngü hâlâ çalışıyor mu?
 
-Son kuyruk tıkırtısından (tick) bu yana ne kadar geçtiğine bakar. Öğeler kuyruğa alınmışken tıkırtılar 24 saatten uzun süredir çalışmadıysa (ya da kuyruğa yazılmış ama hiç tıkırtı olmamışsa) `WARN` olur — bu, oturum-içi temponun çalışmadığının bir işaretidir. Aksi durumda `OK` olur ve son tıkırtının ne kadar önce gerçekleştiğini bildirir.
+Bakım geçişinin en son ne zaman çalıştığına bakar (transcript yüksek-su işaretinden ayrı, duvar-saati son-tick zamanı). Öğeler kuyruğa alınmışken tıkırtılar 24 saatten uzun süredir çalışmadıysa (ya da kuyruğa yazılmış ama hiç tıkırtı olmamışsa) `WARN` olur — bu, oturum-içi temponun çalışmadığının bir işaretidir. Aksi durumda `OK` olur ve son tıkırtının ne kadar önce gerçekleştiğini bildirir.
+
+### `hooks-bound` — otomasyon gerçekten bağlı mı?
+
+v2'de otomasyon zorunludur, ama sıfırlanmış ya da elle düzenlenmiş bir `~/.claude/settings.json` ATL'nin hook'larını bağsız bırakabilir — bu da tüm döngüyü sessizce öldürür (drain, doctor ve guard tetiklenmez olur). Bu denetim settings dosyasını okur ve üç atl hook'undan (`SessionStart`, `UserPromptSubmit`, `PreToolUse`) herhangi biri eksikse, senin kendi hook'larına asla dokunmayan aynı idempotent kurulumla onları **yeniden bağlar** — bir `(self-healed)` onarımı. Okuyamadığı bir settings dosyası engelleyici değil, bir `WARN`'dır.
 
 ## CLI / Beceri ayrımı
 
@@ -49,6 +53,7 @@ $ atl doctor
 OK    queue-backlog — queue empty
 OK    tick-freshness — last tick 3m12s ago
 OK    asset-integrity — all installed files present
+OK    hooks-bound — all automation hooks bound
 
 doctor: all healthy
 ```
@@ -60,11 +65,12 @@ $ atl doctor
 WARN  queue-backlog — 63 pending items — a drain skill should process them
 OK    tick-freshness — last tick 8s ago
 OK    asset-integrity — restored 1 missing file(s) — `atl remove <handle>/<team>` removes a team for good (self-healed)
+OK    hooks-bound — all automation hooks bound
 
 doctor: warnings above (not fatal)
 ```
 
-Çıkış mesajı, en ağır satıra göre `doctor: all healthy`, `doctor: warnings above (not fatal)` ya da `doctor: failures above` olur.
+Çıkış mesajı, en ağır satıra göre `doctor: all healthy`, `doctor: warnings above (not fatal)` ya da `doctor: failures above` olur — ve çıkış kodu yalnızca `failures above` için sıfırdan farklıdır.
 
 ## İlgili
 

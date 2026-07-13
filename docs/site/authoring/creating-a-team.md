@@ -176,7 +176,7 @@ atl update
 
 ### Step 8 — (Optional) Add skills and rules
 
-**Skills** are slash commands. Each gets a `skills/<skill-name>/skill.md` with frontmatter:
+**Skills** are slash commands. Each gets a `skills/<skill-name>/SKILL.md` with frontmatter:
 
 ```markdown
 ---
@@ -254,9 +254,9 @@ my-team/
 │
 ├── skills/                        ← one dir per skill
 │   ├── lint-page/
-│   │   └── skill.md              ← frontmatter (name, description, argument-hint) + body
+│   │   └── SKILL.md              ← frontmatter (name, description, argument-hint) + body
 │   └── run-e2e/
-│       └── skill.md
+│       └── SKILL.md
 │
 └── rules/                         ← one .md per rule (flat, not dir)
     ├── react-19-defaults.md
