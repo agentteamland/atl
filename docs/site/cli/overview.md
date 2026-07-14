@@ -12,6 +12,7 @@ Commands fall into three groups: **team commands** you run by hand, the **gain-c
 | [`atl list`](/cli/list) | Show teams installed in this project. |
 | [`atl remove`](/cli/remove) | Uninstall a team. |
 | [`atl update`](/cli/update) | Pull latest for one or all installed teams. |
+| [`atl upgrade`](/cli/upgrade) | Update the `atl` binary itself to the latest release (checksum-verified, atomic in-place swap). |
 | [`atl search`](/cli/search) | Search the team catalog (the GitHub-backed index). |
 | [`atl gc`](/cli/gc) | Reclaim orphaned assets no manifest owns — the reversible inverse of install (dry-run by default; soft-delete + undo). |
 
@@ -34,7 +35,7 @@ These are wired to Claude Code hooks by [`atl setup-hooks`](/cli/setup-hooks) an
 | Command | What it does |
 |---|---|
 | [`atl setup-hooks`](/cli/setup-hooks) | One-time install/remove of the Claude Code hooks (`SessionStart`, `UserPromptSubmit`) that drive the automation below. |
-| `atl session-start` | Boot-time maintenance run by the `SessionStart` hook (cache refresh + auto-update + previous-transcript marker scan + self-version check). |
+| `atl session-start` | Boot-time maintenance run by the `SessionStart` hook (core refresh + previous-transcript marker scan + doctor self-heal + a once-a-day [binary self-update](/cli/upgrade) check). |
 | `atl tick` | The in-session maintenance tick (every 5–10 minutes via prompt-piggyback): drains throttled background work. |
 | `atl doctor` | The self-heal daemon — diagnoses drift and repairs the install automatically. |
 

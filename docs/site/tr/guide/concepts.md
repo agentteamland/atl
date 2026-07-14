@@ -95,7 +95,7 @@ Bu, v1'in `/save-learnings`'ini (artık `/drain`) değiştirir ve ayrı `memory`
 **Otomasyon komutları** (Claude Code hook'larına bağlıdır; bunları nadiren yazarsın):
 
 - `atl setup-hooks` — `SessionStart` + `UserPromptSubmit` hook'larının tek seferlik kurulumu.
-- `atl session-start` — açılış zamanı bakımı (önbellek tazeleme + otomatik güncelleme + işaretçi taraması + kendi sürüm kontrolü).
+- `atl session-start` — açılış zamanı bakımı (çekirdek tazeleme + işaretçi taraması + doctor öz-onarımı + günde bir binary self-update kontrolü).
 - `atl tick` — oturum içi bakım tıkırtısı (kısıtlanmış arka plan işini birkaç dakikada bir boşaltır).
 - `atl doctor` — kendini iyileştiren artalan süreci: sapmayı teşhis eder ve kurulumu otomatik onarır.
 

@@ -114,7 +114,7 @@ atl setup-hooks
 
 Bu komut Claude Code'un hook'larını bağlar; böylece platform kendini arka planda çalıştırır:
 
-- **`SessionStart` → `atl session-start`** — önceki oturumun öğrenmelerini boşaltır ve kendini onarmak için `doctor` çalıştırır.
+- **`SessionStart` → `atl session-start`** — önceki oturumun öğrenmelerini boşaltır, kendini onarmak için `doctor` çalıştırır ve `atl` binary'sinin kendisini güncel tutar (günde bir [self-update](/tr/cli/upgrade) kontrolü).
 - **`UserPromptSubmit` → `atl tick --throttle=10m`** — oturum-içi bir bakım tıklaması (kısıtlanmış), böylece güncellemeler, fan-out (dağıtım) ve öğrenme yakalama parmağını kıpırdatmadan gerçekleşir.
 
 v2'de bunun açık olması beklenir, isteğe bağlı değil — otomasyon işin özüdür. `atl update` komutunu elle çalıştırmazsın; takımların ve `atl`'nin kendisi kendiliğinden güncel kalır. Ayrıntı için [`atl setup-hooks`](/tr/cli/setup-hooks).

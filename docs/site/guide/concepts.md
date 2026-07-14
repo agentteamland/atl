@@ -95,7 +95,7 @@ This replaces v1's `/save-learnings` (now `/drain`) and removes the separate `me
 **Automation commands** (wired to Claude Code hooks; you rarely type them):
 
 - `atl setup-hooks` — one-time install of the `SessionStart` + `UserPromptSubmit` hooks.
-- `atl session-start` — boot-time maintenance (cache refresh + auto-update + marker scan + self-version check).
+- `atl session-start` — boot-time maintenance (core refresh + marker scan + doctor self-heal + a daily binary self-update check).
 - `atl tick` — the in-session maintenance tick (drains throttled background work every few minutes).
 - `atl doctor` — the self-heal daemon: diagnoses drift and repairs the install automatically.
 
