@@ -95,8 +95,8 @@ var sessionStartCmd = &cobra.Command{
 		// above, before the queue was closed). The skill is LLM work the CLI can't
 		// run itself (the CLI/Skill boundary) — surfacing the count here is how it
 		// gets triggered without the user remembering to.
-		if learningPending > 0 {
-			fmt.Printf("atl: %d learning(s) pending — run /drain to fold them into the knowledge base\n", learningPending)
+		if msg := autoDrainNotice(learningPending); msg != "" {
+			fmt.Println(msg)
 		}
 		// profile-team's channel: only fires when profile-team is installed and a
 		// session dropped profile-fact markers. /profile-drain is a team skill; core

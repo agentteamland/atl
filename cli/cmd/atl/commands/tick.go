@@ -66,6 +66,18 @@ var tickCmd = &cobra.Command{
 			}
 		}
 
+		// Auto-drain signal (unthrottled, every turn): if the queue holds pending
+		// learnings, tell the agent to drain them now in a background subagent. This
+		// is the deterministic per-turn trigger the learning-capture rule acts on —
+		// the CLI half of automatic integration (the drain itself is the agent's LLM
+		// work). Cheap (one count read); placed before the throttle gate so it fires
+		// on every prompt the queue is non-empty, not just when the heavier pass runs.
+		if counts, cerr := st.Counts(project); cerr == nil {
+			if msg := autoDrainNotice(counts[queue.ChannelLearning]); msg != "" {
+				fmt.Println(msg)
+			}
+		}
+
 		// Throttle gate (auto mode): skip the heavier drain+doctor pass if we ran
 		// it too recently. The stamp is per-project so concurrent sessions in
 		// different projects don't starve each other's drain/doctor/promote pass.

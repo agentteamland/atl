@@ -81,9 +81,9 @@ The platform's own global skills are there too — `/drain`, `/create-pr`, `/cre
 
 This is the part that keeps your setup getting better instead of drifting. While you work, agents capture what they learn into a durable queue. The automation hooks from step 4 mean you don't manage any of it by hand:
 
-- A maintenance **tick** runs in-session (and via `atl tick`), folding queued learnings into the knowledge base.
+- A maintenance **tick** runs in-session (and via `atl tick`), capturing marked learnings into a durable queue.
 - `atl doctor` self-heals the install — it's the always-on health daemon, not a command you have to remember.
-- When something is waiting on you, `atl` reports `N learning(s) pending`; the `/drain` skill (run it in your session) routes each item to the right home — a wiki page, the journal, or an agent's knowledge base — then deletes it from the queue.
+- When learnings are queued, `atl` signals the agent to **auto-drain them in the background** — each item is routed to the right home (a wiki page, the journal, or an agent's knowledge base) and deleted from the queue, with no `/drain` command to run by hand.
 
 Peek at the queue any time:
 

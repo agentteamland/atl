@@ -2,9 +2,9 @@
 
 ## Who runs this
 
-**You (the agent) drop markers inline as you speak.** A marker is a silent HTML comment — invisible in rendered output, preserved in the transcript. ATL's automation does the rest: `atl tick` (run by a hook every few minutes and at session start) transfers your markers into a durable queue exactly once, and the `/drain` skill folds each into the knowledge base. You never track state or re-scan — capture is fire-and-forget.
+**You (the agent) mark learnings inline as you speak.** ATL's automation does the rest — `atl tick` (a hook, every turn) transfers your markers into a durable queue exactly once, and when the queue is non-empty it signals you to **drain it in the background automatically**. You never run `/drain` by hand and you never track state — capture and integration are both automatic. You do exactly two things: mark a learning when one happens, and spawn a background drain when the queue signals.
 
-Markers are the "save it if you see it" mechanism. Cheap to drop (~20 tokens), free to ignore when nothing interesting happened.
+Markers are the "save it if you see it" mechanism. Cheap to drop, free to ignore when nothing interesting happened.
 
 ## What counts as a learning moment
 
@@ -19,15 +19,17 @@ Routine Q&A, file lookups, and mechanical edits are NOT learning moments. Don't 
 
 ## How to mark
 
-Drop an HTML comment when a learning moment occurs:
+When a learning moment occurs, do **both** — a visible line so the user sees what was learned, and a hidden marker that the pipeline captures:
 
 ```
+📝 Learned: 7-day JWT refresh chosen — we want long sessions; the user logs in ~weekly.
 <!-- learning: 7-day JWT refresh chosen — we want long sessions; the user logs in about once a week. -->
 ```
 
-That is the whole format: `<!-- learning: <one to three sentences, always including the WHY> -->`. No fields, no schema — just the fact and its reason in plain text. The `/drain` skill reads the payload and decides where it belongs (a wiki topic, a journal entry, or an agent's knowledge base).
+- The **visible line** (`📝 Learned: …`) renders in the chat — it's how the user sees, in the moment, what you picked up. Keep it to one short sentence.
+- The **hidden marker** (`<!-- learning: … -->`, an HTML comment invisible in rendered output) is what `atl tick` parses into the queue. Same fact as the visible line, always **including the WHY**.
 
-Multi-line is fine for a longer thought:
+Marker format: `<!-- learning: <one to three sentences, always including the WHY> -->` — no fields, no schema, plain text. Multi-line is fine for a longer thought:
 
 ```
 <!-- learning:
@@ -36,37 +38,47 @@ Fix: one shared pool. Symptom was intermittent timeouts at ~200 rps.
 -->
 ```
 
-**Always include the WHY.** A six-month-old "we chose X" with no reasoning is useless. One marker per learning — don't bundle unrelated learnings; each deserves its own.
+**Always include the WHY.** A six-month-old "we chose X" with no reasoning is useless. One learning per mark — don't bundle unrelated learnings; each deserves its own visible line + marker.
 
 ### The `profile-fact` channel
 
-A second channel, `profile-fact`, captures durable facts about the entities in the user's world (people, orgs, and more), for the profile layer — a shipped first-party team (`profile-team`). Same comment shape, `profile-fact:` prefix; the exact marker format is owned by profile-team's own `profile-capture` rule, which installs with the team. `/drain` processes only the `learning` channel; `profile-fact` is folded in by profile-team's `/profile-drain` when installed.
+A second channel, `profile-fact`, captures durable facts about the entities in the user's world (people, orgs, and more), for the profile layer — a shipped first-party team (`profile-team`). Same hidden-comment shape, `profile-fact:` prefix; the exact marker format is owned by profile-team's own `profile-capture` rule, which installs with the team. The auto-drain here processes only the `learning` channel; `profile-fact` is folded in by profile-team's `/profile-drain` when installed.
 
 ## What happens after — the automatic loop
 
 ```
-[you drop a marker mid-conversation]          ← the only thing you do
+[you mark a learning: a visible 📝 line + a hidden <!-- learning --> marker]   ← the only thing you do by hand
         ↓
-atl tick (hook-run, every few min + session start)
-        → parses markers from the transcript
-        → enqueues each into the durable queue (~/.atl/queue.db), exactly once
+atl tick (UserPromptSubmit hook, every turn) + session-start
+        → parses hidden markers from the transcript → enqueues into the durable queue, exactly once
+        → reads the queue count; if non-empty, prints an AUTO-DRAIN signal into your context
         ↓
-session start surfaces "N learning(s) pending" + a /drain signal
+you, on seeing that signal → spawn ONE background drain subagent (session auth — no separate claude -p)
         ↓
-/drain skill: peek → route each (wiki / journal / agent KB) → ack (delete)
+the subagent runs /drain: peek → route each (wiki / journal / agent KB) → ack (delete)
         ↓
 processed items are DELETED from the queue — they can never re-report
 ```
 
-Capture is automatic and deterministic (markers → queue, exactly once); integration is the LLM half (`/drain`). The old re-scan-and-filter model — re-reading transcripts each session and filtering against a state file — is gone, and with it the re-report bug class: a processed marker physically cannot come back.
+Capture is automatic and deterministic (markers → queue, exactly once). **Integration is now automatic too:** the hook signals every turn the queue is non-empty, and you drain it in the background — no one runs `/drain` by hand. The queue is the durable safety net — if a background drain fails or you miss a turn, the items survive and the next turn's signal retries them, so **nothing is ever lost**; the worst case is a learning integrated a turn later.
+
+## Auto-drain — what you do when the queue signals
+
+When a hook prints `atl: N learning(s) pending — auto-drain …` into your context:
+
+- **Spawn ONE background drain subagent** (the Agent tool, run in the background) that runs the `/drain` procedure. It inherits this session's auth, so there is no separate `claude -p` and no auth problem.
+- **Single-in-flight:** if a drain subagent you already spawned is still running, do **not** spawn another — the signal keeps appearing until the queue drains, and the running one will clear it. Wait for its completion, then it's done.
+- **Don't ask, don't wait for the user, don't run `/drain` inline** in your own context — keep your main turn for the user's request; the background subagent does the integration alongside it.
+- **No completion log needed** — the visible `📝 Learned:` line already showed the user what was learned; the routing detail lives in the wiki/journal.
+- **Fallback:** if this harness has no background-subagent capability, run the `/drain` procedure yourself, concisely, at the end of your turn.
 
 ## Why inline markers, not a tool call?
 
-A tool call per learning would double token cost and slow the conversation. Inline markers ride in text you were already producing. A hook finds them at ~0 cost; the AI-heavy `/drain` work only runs when markers exist — boring sessions stay free.
+A tool call per learning would double token cost and slow the conversation. Inline marks ride in text you were already producing. A hook finds the hidden markers at ~0 cost; the AI-heavy drain only runs when the queue is non-empty — boring sessions stay free.
 
 ## When to skip
 
 - Purely conversational turns (greetings, clarifications, status questions)
 - Reading a file and summarizing it (no decision, no discovery)
 - Routine edits where nothing surprising happened
-- A learning already captured by a marker earlier in the same session
+- A learning already marked earlier in the same session

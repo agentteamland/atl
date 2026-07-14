@@ -2,11 +2,33 @@ package commands
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/agentteamland/atl/cli/internal/manifest"
 	"github.com/agentteamland/atl/cli/internal/scope"
 )
+
+// autoDrainNotice fires only when the queue is non-empty, and its text tells the
+// agent to auto-drain in the background (not the old passive "run /drain").
+func TestAutoDrainNotice(t *testing.T) {
+	if autoDrainNotice(0) != "" {
+		t.Error("an empty queue must produce no auto-drain signal (no false-fire)")
+	}
+	if autoDrainNotice(-1) != "" {
+		t.Error("a negative count must produce no signal")
+	}
+	msg := autoDrainNotice(3)
+	if !strings.Contains(msg, "3 learning") {
+		t.Errorf("the signal must carry the count: %q", msg)
+	}
+	if !strings.Contains(msg, "auto-drain") || !strings.Contains(msg, "background") {
+		t.Errorf("the signal must instruct a background auto-drain, not a manual /drain: %q", msg)
+	}
+	if strings.Contains(msg, "run /drain") {
+		t.Errorf("the signal must not be the old passive 'run /drain' wording: %q", msg)
+	}
+}
 
 // ownedRuleNames must protect both the platform's core rules (global only) and
 // any team-installed rule — a user rule that collides with either name must not

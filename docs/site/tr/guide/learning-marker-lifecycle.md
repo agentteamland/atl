@@ -1,41 +1,44 @@
 # Öğrenme işaretçisi yaşam döngüsü
 
-Bilginin bir konuşmadan projenin bilgi tabanına nasıl aktığının uçtan uca resmi. v2 deseni **satır içi işaretçiler → kalıcı kuyruk → drain → ack** — yazması ucuz, kendiliğinden yakalanan, tam olarak bir kez işlenen ve yeniden raporlanması imkânsız.
+Bilginin bir konuşmadan projenin bilgi tabanına nasıl aktığının uçtan uca resmi. v2 deseni **satır içi işaretçiler → kalıcı kuyruk → otomatik drain → ack** — yazması ucuz, kendiliğinden yakalanan, arka planda kendiliğinden drain edilen, tam olarak bir kez işlenen ve yeniden raporlanması imkânsız.
 
 Kanonik kural [`core/rules/learning-capture.md`](https://github.com/agentteamland/atl/blob/main/core/rules/learning-capture.md) dosyasında yaşar. Bu sayfa kullanıcıya yönelik özettir.
 
 ## Akışa bir bakış
 
 ```
-[konuşma ortasında]         Claude konuştukça <!-- learning: ... --> işaretçilerini
-                            satır içi düşürür. Araç çağrısı yok, ek maliyet yok.
+[konuşma ortasında]         Claude bir öğrenme işaretler: kullanıcının gördüğü
+                            görünür bir "📝 Öğrenildi: …" satırı, artı boru hattının
+                            yakaladığı gizli bir <!-- learning: … --> işaretçisi.
+                            Araç çağrısı yok, ek maliyet yok.
         ↓
-atl tick                    Bir hook her promptta (kısıtlanmış) ve oturum başında
-(hook-run, birkaç dakikada  `atl tick` çalıştırır. Bu projenin transkriptlerinden
- bir + oturum başında)      işaretçileri ayrıştırır ve her birini kalıcı kuyruğa
-                            sokar — içerik hash'iyle yinelenenler ayıklanarak,
-                            tam olarak bir kez.
+atl tick                    Bir hook her promptta `atl tick` çalıştırır. Bu projenin
+(UserPromptSubmit hook,     transkriptlerinden gizli işaretçileri ayrıştırır ve her
+ her tur + oturum başı)     birini kalıcı kuyruğa sokar — tam olarak bir kez, içerik
+                            hash'iyle yinelenenler ayıklanarak. Kuyruk sayısını da okur.
         ↓
 ~/.atl/queue.db             Tek bir gömülü bbolt dosyası, çalışma dizinine göre
                             anahtarlanmış proje başına kovalar. Sunucu yok, daemon yok.
         ↓
-[oturum başında]            SessionStart hook'u bir sayı yüzeye çıkarır:
-                            "N öğrenme bekliyor" + bir /drain sinyali.
+[kuyruk boş değil]          tick, Claude'un bağlamına bir OTOMATİK-DRAIN sinyali
+                            yazdırır: "N learning(s) pending — auto-drain them now …".
         ↓
-[ilk turun]                 /drain komutunu çağırırsın. Bekleyen maddeleri okur
-                            (atl learnings peek --json), her birini wiki / journal /
-                            ajan bilgi tabanına yönlendirir ve ack'ler.
+[aynı tur, arka plan]       Claude TEK bir arka plan drain alt-ajanı başlatır (çalışan
+                            oturumun kimlik doğrulamasını kullanarak). Her öğeyi
+                            wiki / journal / ajan bilgi tabanına yönlendirir ve ack'ler.
+                            /drain'i kimse elle çalıştırmaz.
         ↓
-atl learnings ack <id>      Ack'lenmiş bir madde kuyruktan SİLİNİR.
+atl learnings ack <id>      Ack'lenmiş bir öğe kuyruktan SİLİNİR.
         ↓
-[döngü kapandı]             İşlenmiş bir madde gitmiştir — asla yeniden raporlanamaz.
+[döngü kapandı]             İşlenmiş bir öğe gitmiştir — asla yeniden raporlanamaz.
                             İlerletilecek bir durum dosyası yoktur.
 ```
 
-Bu bölünme bilinçlidir: **yakalama kendiliğinden ve deterministiktir** (işaretçiler → kuyruk, tam olarak bir kez, CLI tarafından yapılır) ve **entegrasyon LLM yarısıdır** ([`/drain`](/tr/skills/drain) — her öğrenmenin nereye ait olduğuna karar verir). Tek insan dokunuş noktaları şunlardır:
+Bu bölünme bilinçlidir: **yakalama kendiliğinden ve deterministiktir** (işaretçiler → kuyruk, CLI tarafından yapılır) ve **entegrasyon da kendiliğindendir** — hook, kuyruk boş olmadığı her turda sinyal verir ve ajan onu arka planda drain eder ([`/drain`](/tr/skills/drain) yönlendirmesi LLM yarısıdır). Geriye kalan tek insan dokunuş noktası:
 
-1. **Sen (ajan)**, oturum başındaki "N bekliyor" sinyalini gördükten sonra [`/drain`](/tr/skills/drain) komutunu çağırırsın — tek bir komut.
-2. **Kullanıcı**, yalnızca `/drain` *yapısal* bir değişiklik önerdiğinde (yeni bir ajan / beceri / kural ya da bir kimlik genişletmesi) bir `AskUserQuestion` kapısını yanıtlar. Wiki / journal / ajan bilgi tabanına yapılan sıradan yazmalar sessizce gerçekleşir.
+- **Kullanıcı**, yalnızca bir drain *yapısal* bir değişiklik önerdiğinde (yeni bir ajan / beceri / kural ya da bir kimlik genişletmesi) bir `AskUserQuestion` kapısını yanıtlar. Wiki / journal / ajan KB'sine yapılan sıradan yazmalar arka planda sessizce gerçekleşir.
+
+Kullanıcının (ya da ajanın) `/drain` çalıştırmayı hatırlaması gereken hiçbir şey yok — o elle atılan adım ortadan kalktı.
 
 ## Ne öğrenme anı sayılır?
 
@@ -50,21 +53,25 @@ Bu bölünme bilinçlidir: **yakalama kendiliğinden ve deterministiktir** (işa
 
 Sıradan soru-yanıt, dosya bakışları ve mekanik düzenlemeler öğrenme anı DEĞİLDİR. Her yanıtı işaretçileme.
 
-## İşaretçi biçimi
+## İşaretçi biçimi — görünür bir satır + gizli bir işaretçi
 
-Bir öğrenme anı meydana geldiğinde yanıt metnine bir HTML yorumu düşür. Görüntülenmiş çıktıda görünmez, hook'un taradığı transkriptte korunur, ~20 jeton:
+Bir öğrenme anı meydana geldiğinde Claude **her ikisini** de yazar: kullanıcının o an ne öğrenildiğini görmesi için görünür bir satır ve hook'un yakaladığı gizli bir HTML yorumu.
 
-```html
+```
+📝 Öğrenildi: 7-day JWT refresh chosen — we want long sessions; the user logs in ~weekly.
 <!-- learning: 7-day JWT refresh chosen — we want long sessions; the user logs in about once a week. -->
 ```
 
-**Bütün** biçim bundan ibarettir:
+- **Görünür satır** (`📝 Öğrenildi: …`) sohbette görüntülenir — kullanıcının, yakalama anında neyin alındığını görme biçimidir. Bu, eski ayrı "işlendi" günlüğünün yerini alır: işaretin kendisi görünürlüktür.
+- **Gizli işaretçi** (`<!-- learning: … -->`) görüntülenmiş çıktıda görünmezdir ama hook'un taradığı transkriptte korunur. Aynı olguyu taşır, her zaman **NEDEN'i içererek**.
+
+İşaretçi, **bütün** yakalama biçimidir:
 
 ```
 <!-- learning: <her zaman NEDEN'i içeren bir-üç cümle> -->
 ```
 
-Alan yok, şema yok — yalnızca düz metinle olgunun kendisi ve gerekçesi. [`/drain`](/tr/skills/drain) becerisi yükü okur ve nereye ait olduğunu (bir wiki konusu, bir journal kaydı ya da bir ajanın bilgi tabanı) çıkarsar, içerikten kebab-case bir konu türetir. Daha uzun bir düşünce için çok satırlı kullanım da olur:
+Alan yok, şema yok — yalnızca düz metinle olgunun kendisi ve gerekçesi. [`/drain`](/tr/skills/drain) yönlendirmesi yükü okur ve nereye ait olduğunu (bir wiki konusu, bir journal kaydı ya da bir ajanın bilgi tabanı) çıkarsar, içerikten kebab-case bir konu türetir. Daha uzun bir düşünce için çok satırlı kullanım da olur:
 
 ```html
 <!-- learning:
@@ -73,23 +80,23 @@ Fix: one shared pool. Symptom was intermittent timeouts at ~200 rps.
 -->
 ```
 
-**Her zaman NEDEN'i ekle.** Gerekçesi olmayan, altı aylık bir "X seçtik" işe yaramaz. Öğrenme başına tek işaretçi — ilişkisiz öğrenmeleri tek pakette toplama; her biri kendi işaretçisini hak eder.
+**Her zaman NEDEN'i ekle.** Gerekçesi olmayan, altı aylık bir "X seçtik" işe yaramaz. İşaret başına tek öğrenme — ilişkisiz öğrenmeleri tek pakette toplama; her biri kendi satırını + işaretçisini hak eder.
 
-> **v1'den değişti.** Eski işaretçi yapılandırılmış YAML alanları taşıyordu (`topic`, `kind`, `doc-impact`, `body`). v2 bunların hepsini bırakır: yük düz nesirdir ve eskiden alanların kodladığı yönlendirmeyi `/drain` yapar. `doc-impact` alanı kalktı çünkü v2'de docs-sync adımı yoktur.
+> **v1'den değişti.** Eski işaretçi yapılandırılmış YAML alanları taşıyordu (`topic`, `kind`, `doc-impact`, `body`). v2 bunların hepsini bırakır: yük düz nesirdir ve eskiden alanların kodladığı yönlendirmeyi drain yapar.
 
 ### `profile-fact` kanalı
 
-Kuyruk çok kanallıdır. İkinci bir kanal, `profile-fact`, kullanıcı ya da birlikte çalıştığı kişiler hakkındaki kalıcı olguları yakalar — aynı yorum şekli, `profile-fact:` öneki:
+Kuyruk çok kanallıdır. İkinci bir kanal, `profile-fact`, kullanıcı ya da birlikte çalıştığı kişiler hakkındaki kalıcı olguları yakalar — aynı gizli-yorum şekli, `profile-fact:` öneki:
 
 ```html
 <!-- profile-fact: Prefers TypeScript over JavaScript for all new services. -->
 ```
 
-[`/drain`](/tr/skills/drain) yalnızca `learning` kanalını işler; `profile-fact`, profil takımının kendi `/profile-drain`'i (profile-team ile birlikte kurulur) tarafından ele alınır, burada değil.
+Öğrenme otomatik-drain'i yalnızca `learning` kanalını işler; `profile-fact`, profil takımının kendi `/profile-drain`'i (profile-team ile birlikte kurulur) tarafından ele alınır, burada değil.
 
 ## Neden satır içi işaretçi, araç çağrısı değil?
 
-Öğrenme başına bir araç çağrısı, jeton maliyetini ikiye katlar ve konuşmayı yavaşlatır. Satır içi işaretçiler, ajanın zaten üretecek olduğu metnin içine gömülüdür. [`atl tick`](/tr/cli/tick) içindeki grep düzeyinde bir geçiş onları sıfıra yakın maliyetle bulur; AI yoğun olan [`/drain`](/tr/skills/drain) işi yalnızca kuyrukta madde olduğunda çalışır — sıkıcı oturumlar bedava kalır.
+Öğrenme başına bir araç çağrısı, jeton maliyetini ikiye katlar ve konuşmayı yavaşlatır. Satır içi işaretçiler, ajanın zaten üretecek olduğu metnin içine gömülüdür. [`atl tick`](/tr/cli/tick) içindeki grep düzeyinde bir geçiş gizli işaretçileri sıfıra yakın maliyetle bulur; AI yoğun olan drain yalnızca kuyrukta madde olduğunda çalışır — sıkıcı oturumlar bedava kalır.
 
 ## İşaretçilemeyi ne zaman atla?
 
@@ -100,15 +107,16 @@ Kuyruk çok kanallıdır. İkinci bir kanal, `profile-fact`, kullanıcı ya da b
 
 ## Adım adım sahne arkası
 
-### 1. `atl tick` işaretçileri yakalar
+### 1. `atl tick` işaretçileri yakalar ve sinyal verir
 
-[`atl setup-hooks`](/tr/cli/setup-hooks), [`atl tick`](/tr/cli/tick) komutunu `UserPromptSubmit` hook'una bağlar (kısıtlanmış, ör. `--throttle=10m`) ve `atl session-start` oturum başında bir geçiş çalıştırır. Her çalıştırmada `tick`:
+[`atl setup-hooks`](/tr/cli/setup-hooks), [`atl tick`](/tr/cli/tick) komutunu `UserPromptSubmit` hook'una bağlar ve `atl session-start` oturum başında bir geçiş çalıştırır. Her çalıştırmada `tick`:
 
 - bu projenin son tick'ten beri değişen Claude Code transkriptlerini keşfeder,
-- assistant metnini çıkarır ve `<!-- learning: ... -->` (ve `<!-- profile-fact: ... -->`) işaretçilerini ayrıştırır,
-- **her birini kalıcı kuyruğa tam olarak bir kez sokar** — idempotenlik kuyruğun içerik-hash yineleme ayıklamasından gelir, dolayısıyla aynı metni yeniden drain etmek yeni hiçbir şey eklemez.
+- assistant metnini çıkarır ve `<!-- learning: ... -->` (ve `<!-- profile-fact: ... -->`) gizli işaretçilerini ayrıştırır,
+- **her birini kalıcı kuyruğa tam olarak bir kez sokar** — idempotenlik kuyruğun içerik-hash yineleme ayıklamasından gelir, dolayısıyla aynı metni yeniden drain etmek yeni hiçbir şey eklemez,
+- kuyruk sayısını okur ve boş olmadığında **otomatik-drain sinyalini** Claude'un bağlamına yazdırır (kısıtlamasız, dolayısıyla bekleyen iş olan her turda tetiklenir — `--throttle`'ın kapıladığı, daha ağır olan yakalama geçişidir).
 
-`tick` yalnızca **kuyruğa sokar**. Asla entegre etmez — bir öğrenmeyi bilgi tabanına katlamak LLM işidir, bu yüzden CLI/Beceri sınırının beceri tarafında kalır.
+`tick` yalnızca **kuyruğa sokar ve sinyal verir**. Asla entegre etmez — bir öğrenmeyi bilgi tabanına katlamak LLM işidir, bu yüzden CLI/Beceri sınırının beceri tarafında kalır.
 
 ### 2. Kalıcı kuyruk
 
@@ -117,70 +125,63 @@ Kuyruk, `~/.atl/queue.db` konumundaki tek bir gömülü [bbolt](https://github.c
 ```bash
 atl learnings status                    # kanal başına bekleyen sayıları (bu proje)
 atl learnings peek                      # bekleyen maddeleri listele (insan okunur)
-atl learnings peek --channel learning --json   # /drain'in tükettiği makine-okunur liste
+atl learnings peek --channel learning --json   # drain'in tükettiği makine-okunur liste
 atl learnings ack <id>                  # bir maddeyi işlenmiş olarak işaretle (sil)
 ```
 
-### 3. Oturum başlangıcı sayıyı yüzeye çıkarır
+### 3. Otomatik-drain sinyali
 
-Yeni bir oturum açtığında, `SessionStart` hook'u ([`atl session-start`](/tr/cli/setup-hooks)) bir `tick` geçişi çalıştırır ve bekleyen sayıyı — [`atl doctor`](/tr/cli/doctor) komutunun raporladığı sayının aynısını — Claude'un `additionalContext` alanında kısa bir sinyal olarak bildirir:
+Kuyruk boş olmadığı her an — oturum başında ve sonraki her promptta — hook, bekleyen sayıyı Claude'un `additionalContext` alanında kısa bir sinyal olarak bildirir:
 
 ```
-🧠 2 learning(s) pending → run /drain
+atl: 2 learning(s) pending — auto-drain them now in a background subagent (per the learning-capture rule)
 ```
 
 Kuyrukta hiçbir şey yokken çıktı boştur (sıfır jeton maliyeti).
 
-### 4. `/drain` kuyruğu işler
+### 4. Ajan arka planda otomatik drain eder
 
-Ajan (sen) sinyali okur ve şunu çağırır:
+Bu sinyali görünce ajan ([learning-capture kuralı](https://github.com/agentteamland/atl/blob/main/core/rules/learning-capture.md) uyarınca) **tek bir arka plan drain alt-ajanı başlatır** — kullanıcıdan `/drain` komutu yok, bekleme yok. Alt-ajan çalışan oturumun kimlik doğrulamasını devralır (dolayısıyla ayrı bir başsız (headless) `claude -p` yoktur ve kimlik doğrulama sorunu yaşanmaz) ve drain'i çalıştırır:
 
-```
-/drain
-```
-
-Beceri:
-
-1. Bekleyen maddeleri okumak için `atl learnings peek --channel learning --json` çalıştırır (`{id, channel, payload, enqueued_at}`).
+1. Bekleyen maddeleri `atl learnings peek --channel learning --json` ile okur (`{id, channel, payload, enqueued_at}`).
 2. Her maddeyi yükünün biçimine göre yönlendirir, içerikten kebab-case bir konu türeterek:
    - **Konu biçimli güncel doğru** → wiki sayfası (`<proj>/.atl/wiki/<topic>.md`, yerine yaz/birleştir) + journal
    - **Zaman damgalı anlatı** → yalnızca journal (`<proj>/.atl/journal/<YYYY-MM-DD>.md`, ekle)
    - **Kurulu bir ajan için alan bilgisi** → o ajanın `children/<topic>.md` dosyası + `## Knowledge Base` bölümünü yeniden inşa et + journal
-   - **Yapısal** (tekrarlayan bir iş akışı, kristalleşmiş bir sözleşme, sahibi ajan olmayan yeni bir alan, bir kimlik genişletmesi) → `AskUserQuestion` ile öner; asla otonom yazma
+   - **Yapısal** (tekrarlayan iş akışı, kristalleşmiş sözleşme, sahibi ajan olmayan yeni bir alan, bir kimlik genişletmesi) → `AskUserQuestion` ile öner; asla otonom yazma
 3. Her yapısal olmayan maddeyi sessizce yazar, ardından **yalnızca yazma başarılı olduktan sonra ack'ler**.
-4. Yapısal maddeler için onları toplar ve her birini tek bir `AskUserQuestion` üzerinden önerir (reaktif-oluşturma sınırı — yapısal büyümeyi bir insan onaylar).
-5. Neyin nereye indiğine dair kısa bir özet bildirir.
+4. Neyin nereye indiğine dair kısa bir özet bildirir.
+
+**Tek-uçuşta:** sinyal kuyruk boşalana dek belirmeyi sürdürür, dolayısıyla ajan aynı anda yalnızca bir drain alt-ajanı başlatır — çalışan biri kuyruğu temizler; ajan ikinciyi üst üste bindirmez. Bir drain başarısız olursa ya da bir tur atlanırsa, maddeler kuyrukta hayatta kalır ve bir sonraki turun sinyali onları yeniden dener, dolayısıyla **hiçbir şey asla kaybolmaz** — en kötü ihtimalle bir öğrenme bir tur sonra entegre edilir.
 
 ### 5. ack = sil; döngü yapısal olarak kapanır
 
 `atl learnings ack <id>` maddeyi kuyruktan **siler**. İlerletilecek bir durum dosyası ve sonradan karşılaştırılacak bir şey yoktur — işlenmiş bir işaretçi fiziksel olarak geri dönemez.
 
-v1'in uzun-oturum tekrar-raporlama hata sınıfını yapısal olarak öldüren şey budur: v1'de raporlar, sürekli büyüyen bir transkripti `~/.claude/state/learning-capture-state.json` dosyasına karşı süzerek yeniden taramaktan geliyordu ve süzgeç hatalı tetiklenebiliyordu. v2'de raporlar kuyruktan gelir ve işleme maddeyi kaldırır. Boş bir kuyrukta `/drain` komutunu yeniden çalıştırmak bir no-op'tur.
-
-`/drain` bir maddeyi entegre edemezse, onu ack'lenmemiş bırakır ve raporda not eder — başarısızlık biçimleri veri kaybettirmez.
+v1'in uzun-oturum tekrar-raporlama hata sınıfını yapısal olarak öldüren şey budur: v1'de raporlar, sürekli büyüyen bir transkripti bir JSON durum dosyasına karşı süzerek yeniden taramaktan geliyordu ve süzgeç hatalı tetiklenebiliyordu. v2'de raporlar kuyruktan gelir ve işleme maddeyi kaldırır. Boş bir kuyrukta drain'i yeniden çalıştırmak bir no-op'tur.
 
 ## Hook kurulu değilken
 
-İşaretçiler hook olmadan da zararsızdır — HTML yorumlarıdır, görüntülenmiş çıktıda görünmezler, metin olarak etkisizdirler. Yakalama alışkanlığı yine de değerlidir (işaretçiler transkripti okuyan bir insan için bile okunaklıdır).
+Gizli işaretçiler hook olmadan da zararsızdır — HTML yorumlarıdır, görüntülenmiş çıktıda görünmezler, metin olarak etkisizdirler (görünür `📝 Öğrenildi:` satırı yine de kullanıcıya ne öğrenildiğini gösterir). Yakalama alışkanlığı yine de değerlidir.
 
-Otomatik yakalama için [`atl setup-hooks`](/tr/cli/setup-hooks) çalıştır. Onsuz hiçbir şey kendiliğinden kuyruğa girmez; bir yakalama geçişini yine de kendin [`atl tick`](/tr/cli/tick) ile (`--throttle` olmadan) zorlayabilir, ardından [`/drain`](/tr/skills/drain) çalıştırabilirsin. İşaretçiler transkriptlerde birikir ve bir `tick` geçişi ne zaman çalışırsa kullanılabilir kalır.
+Otomatik yakalama + otomatik drain için [`atl setup-hooks`](/tr/cli/setup-hooks) çalıştır. Onsuz hiçbir şey kendiliğinden kuyruğa girmez ya da sinyal vermez; bir yakalama geçişini yine de kendin [`atl tick`](/tr/cli/tick) ile zorlayabilir, ardından [`/drain`](/tr/skills/drain) becerisini elle çalıştırabilirsin. İşaretçiler transkriptlerde birikir ve bir `tick` geçişi ne zaman çalışırsa kullanılabilir kalır.
 
 ## Tarihçe
 
-Bu akış üç biçimden geçti:
+Bu akış dört biçimden geçti:
 
 1. **Özgün hâl (`atl` öncesi):** "Claude her oturum sonunda öngörülü biçimde öğrenmeleri kaydetmeli." Claude'un bir düz metin yönergesini hatırlamasına bağlıydı. Güvenilmez.
-2. **v1 (transkript taraması + `/save-learnings`):** Satır içi işaretçiler yapılandırılmış YAML alanları taşıyordu; bir `SessionStart` hook'u önceki oturumun transkriptlerini yeniden tarıyor, bir JSON durum dosyasına karşı süzüyor ve işlenmemiş işaretçileri `/save-learnings` becerisinin işlemesi için raporluyordu. Durum dosyası başarıda ilerletiliyordu. Model çalışıyordu, ama sürekli büyüyen bir transkripti bir süzgece karşı yeniden taramak uzun-oturum tekrar-raporlama hata sınıfının kaynağıydı ve işaretçi şeması (`topic`/`kind`/`doc-impact`/`body`) yakalamayı bir docs-sync adımına bağlıyordu.
-3. **Mevcut hâl (v2 — işaretçi → bbolt kuyruğu → `/drain` → ack):** İşaretçi düz nesirdir. [`atl tick`](/tr/cli/tick) her birini kalıcı bir [bbolt](https://github.com/etcd-io/bbolt) kuyruğuna tam olarak bir kez sokar; [`/drain`](/tr/skills/drain) her birini bilgi tabanına katlar ve ack'ler (siler). Transkript yeniden-taraması yok, durum dosyası yok, docs-sync bağlaması yok — ve tekrar-raporlama hata sınıfı tasarım gereği yok oldu.
+2. **v1 (transkript taraması + `/save-learnings`):** Satır içi işaretçiler yapılandırılmış YAML alanları taşıyordu; bir `SessionStart` hook'u önceki oturumun transkriptlerini yeniden tarıyor, bir JSON durum dosyasına karşı süzüyor ve işlenmemiş işaretçileri raporluyordu. Süzgece-karşı-yeniden-tarama modeli uzun-oturum tekrar-raporlama hata sınıfının kaynağıydı ve işaretçi şeması yakalamayı bir docs-sync adımına bağlıyordu.
+3. **v2 (işaretçi → bbolt kuyruğu → elle `/drain` → ack):** İşaretçi düz nesir oldu; [`atl tick`](/tr/cli/tick) her birini kalıcı bir kuyruğa tam olarak bir kez sokar; tekrar-raporlama hata sınıfı tasarım gereği yok oldu. Ama entegrasyon hâlâ, oturum başı sinyalinden sonra bir insanın `/drain` çalıştırmasını gerektiriyordu.
+4. **Mevcut hâl (otomatik-drain + görünür işaretler):** İşaret artık görünür bir satır + gizli bir işaretçidir ve hook, kuyruk boş olmadığı her turda sinyal verir; böylece ajan onu **arka planda kendiliğinden** drain eder — elle `/drain` adımı ortadan kalktı. Kuyruğun kalıcılığı, atlanmış bir drain'i kendini iyileştirir kılar.
 
 ## İlgili
 
-- [`atl tick`](/tr/cli/tick) — işaretçileri ayrıştıran ve kuyruğa sokan oturum içi geçiş.
+- [`atl tick`](/tr/cli/tick) — işaretçileri ayrıştıran, kuyruğa sokan ve otomatik-drain sinyalini yayan oturum içi geçiş.
 - [`atl learnings`](/tr/cli/learnings) — kalıcı kuyruğu incele ve drain et (`status` / `peek` / `ack`).
 - [`/drain`](/tr/skills/drain) — LLM yarısı: her kuyruktaki öğrenmeyi bilgi tabanına yönlendirir, sonra ack'ler.
 - [`atl setup-hooks`](/tr/cli/setup-hooks) — `tick` çalıştıran `UserPromptSubmit` + `SessionStart` hook'larını bağlar.
 - [`atl doctor`](/tr/cli/doctor) — aynı bekleyen sayıyı talep üzerine yüzeye çıkarır.
 - [Bilgi sistemi](/tr/guide/knowledge-system) — journal ve wiki nerede yaşar.
 - [Children + learnings](/tr/guide/children-and-learnings) — ajan / beceri alan bilgisi nereye iner.
-- [Claude Code sözleşmeleri](/tr/guide/claude-code-conventions) — boyunca kullanılan işaretçi blok sözleşmeleri.
 - Kanonik kural: [`core/rules/learning-capture.md`](https://github.com/agentteamland/atl/blob/main/core/rules/learning-capture.md).
