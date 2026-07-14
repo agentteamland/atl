@@ -42,6 +42,15 @@ var upgradeCmd = &cobra.Command{
 			return nil
 		}
 
+		// Serialize with any concurrent upgrade (a racing auto-apply or another
+		// manual run) so only one process downloads + swaps at a time.
+		release, ok := selfupdate.TryLock()
+		if !ok {
+			fmt.Println("atl: an upgrade is already in progress")
+			return nil
+		}
+		defer release()
+
 		fmt.Printf("Upgrading atl %s → %s …\n", st.Current, st.Latest)
 		if err := selfupdate.Apply(ctx, st.Latest); err != nil {
 			if errors.Is(err, selfupdate.ErrWindowsManual) {

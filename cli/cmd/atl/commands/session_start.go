@@ -1,12 +1,15 @@
 package commands
 
 import (
+	"context"
 	"fmt"
 	"time"
 
+	"github.com/agentteamland/atl/cli/internal/buildinfo"
 	"github.com/agentteamland/atl/cli/internal/doctor"
 	"github.com/agentteamland/atl/cli/internal/gc"
 	"github.com/agentteamland/atl/cli/internal/queue"
+	"github.com/agentteamland/atl/cli/internal/selfupdate"
 	"github.com/spf13/cobra"
 )
 
@@ -96,6 +99,16 @@ var sessionStartCmd = &cobra.Command{
 
 		// Rules-distill "distill due" signal — monorepo-internal, same shape.
 		rulesSessionSignal()
+
+		// Binary self-update — once/24h, check for a newer stable release and, if
+		// there is one, spawn a detached `atl upgrade` so the download + swap runs
+		// independently and the next session runs the new binary. Bounded (short
+		// timeout) + throttled + never-fail.
+		sctx, scancel := context.WithTimeout(context.Background(), 3*time.Second)
+		if notice := selfupdate.AutoApply(sctx, buildinfo.Version); notice != "" {
+			fmt.Println(notice)
+		}
+		scancel()
 
 		return nil
 	},
