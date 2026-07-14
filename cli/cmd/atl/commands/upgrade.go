@@ -19,12 +19,7 @@ var upgradeCmd = &cobra.Command{
 		"Only ever upgrades (never downgrades); a dev build is left untouched; set\n" +
 		"ATL_NO_SELF_UPDATE to disable. On Windows it reports the new version instead\n" +
 		"(a running .exe can't self-replace — rerun the install script).",
-	// Hidden until the feature's docs land (the docs correction is sequenced last,
-	// per the atl-binary-self-update decision) — this keeps it out of the docs
-	// coverage gate. Unhide + add cli/upgrade.md in the docs PR. Invocation still
-	// works while hidden (the session-start auto-apply spawns it as a subprocess).
-	Hidden: true,
-	Args:   cobra.NoArgs,
+	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 		defer cancel()

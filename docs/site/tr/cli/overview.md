@@ -12,6 +12,7 @@ Komutlar üç gruba ayrılır: elle çalıştırdığın **takım komutları**, 
 | [`atl list`](/tr/cli/list) | Bu projede kurulu takımları gösterir. |
 | [`atl remove`](/tr/cli/remove) | Bir takımı kaldırır. |
 | [`atl update`](/tr/cli/update) | Bir ya da tüm kurulu takımlar için en günceli çeker. |
+| [`atl upgrade`](/tr/cli/upgrade) | `atl` binary'sinin kendisini en son sürüme günceller (checksum-doğrulamalı, yerinde atomik değiştirme). |
 | [`atl search`](/tr/cli/search) | Takım kataloğunda (GitHub destekli index) arama yapar. |
 | [`atl gc`](/tr/cli/gc) | Hiçbir manifestin sahiplenmediği sahipsiz varlıkları geri kazanır — kurulumun geri-alınabilir tersi (varsayılan kuru-çalışma; yumuşak-silme + geri-al). |
 
@@ -34,7 +35,7 @@ Bunlar [`atl setup-hooks`](/tr/cli/setup-hooks) tarafından Claude Code hook'lar
 | Komut | Ne yapar |
 |---|---|
 | [`atl setup-hooks`](/tr/cli/setup-hooks) | Aşağıdaki otomasyonu süren Claude Code hook'larının (`SessionStart`, `UserPromptSubmit`) tek seferlik kurulumu/kaldırılması. |
-| `atl session-start` | `SessionStart` hook'unun çalıştırdığı, açılış anındaki bakım işi (önbellek yenileme + otomatik güncelleme + önceki-transkript işaretçi taraması + öz-sürüm denetimi). |
+| `atl session-start` | `SessionStart` hook'unun çalıştırdığı, açılış anındaki bakım işi (çekirdek tazeleme + önceki-transkript işaretçi taraması + doctor öz-onarımı + günde bir [binary self-update](/tr/cli/upgrade) kontrolü). |
 | `atl tick` | Oturum içi bakım tıkı (prompt'a iliştirilerek her 5–10 dakikada bir): kısılmış (throttled) arka plan işlerini boşaltır. |
 | `atl doctor` | Kendi kendini onaran daemon — sapmayı (drift) teşhis eder ve kurulumu kendiliğinden onarır. |
 
