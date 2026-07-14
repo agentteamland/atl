@@ -21,6 +21,18 @@ jobs:
       - name: Build
         working-directory: cli
         run: go build ./...
+      - name: Cross-compile (goreleaser targets — catch platform-specific build breaks)
+        working-directory: cli
+        run: |
+          # The host build above is linux/amd64; goreleaser also ships darwin +
+          # windows (amd64/arm64). A Unix-only syscall (e.g. syscall.Kill) compiles
+          # here but breaks the windows target at release time — build every target
+          # so that class fails the PR, not the tag.
+          for target in darwin/amd64 darwin/arm64 windows/amd64 windows/arm64 linux/arm64; do
+            os="${target%/*}"; arch="${target#*/}"
+            echo "cross-compiling ${os}/${arch}"
+            GOOS="$os" GOARCH="$arch" go build ./...
+          done
       - name: Vet
         working-directory: cli
         run: go vet ./...

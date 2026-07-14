@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"syscall"
 )
 
 // lockPath is the single-instance lock for a project's dispatch run.
@@ -63,13 +62,7 @@ func lockOwnerAlive(path string) (int, bool) {
 	if err != nil || pid <= 0 {
 		return 0, false
 	}
-	// Signal 0 probes existence without delivering a signal: nil (or EPERM — the
-	// process exists but we can't signal it) means alive; ESRCH means gone.
-	err = syscall.Kill(pid, 0)
-	if err == nil || err == syscall.EPERM {
-		return pid, true
-	}
-	return pid, false
+	return pid, processAlive(pid)
 }
 
 // Release removes the lock file. Safe to call once; a missing file is not an error.
