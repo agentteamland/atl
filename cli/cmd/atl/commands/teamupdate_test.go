@@ -8,29 +8,6 @@ import (
 	"github.com/agentteamland/atl/cli/internal/fanout"
 )
 
-func TestVersionLess(t *testing.T) {
-	cases := []struct {
-		a, b string
-		want bool
-	}{
-		{"1.2.0", "1.2.1", true},
-		{"1.2.1", "1.2.1", false},
-		{"1.2.1", "1.2.0", false},
-		{"1.9.0", "1.10.0", true}, // numeric, not lexicographic
-		{"v1.0.0", "v2.0.0", true},
-		{"0.8.1", "0.8.1", false},
-		{"1.0.0-beta", "1.0.0", true},  // a pre-release is older than its final release → upgrades
-		{"1.0.0", "1.0.0-beta", false}, // and the final is never "older" than its own pre-release
-		{"2.0.0-alpha.1", "2.0.0", true},
-		{"1.0.0-beta", "1.0.1", true}, // numeric triple still wins first
-	}
-	for _, c := range cases {
-		if got := versionLess(c.a, c.b); got != c.want {
-			t.Errorf("versionLess(%q,%q) = %v, want %v", c.a, c.b, got, c.want)
-		}
-	}
-}
-
 func TestReflectWithFanout(t *testing.T) {
 	src := t.TempDir()
 	claude := t.TempDir()

@@ -3,14 +3,13 @@ package commands
 import (
 	"os"
 	"path/filepath"
-	"strconv"
-	"strings"
 
 	"github.com/agentteamland/atl/cli/internal/fanout"
 	"github.com/agentteamland/atl/cli/internal/generation"
 	"github.com/agentteamland/atl/cli/internal/index"
 	"github.com/agentteamland/atl/cli/internal/manifest"
 	"github.com/agentteamland/atl/cli/internal/scope"
+	"github.com/agentteamland/atl/cli/internal/semver"
 	"github.com/agentteamland/atl/cli/internal/source"
 	"github.com/agentteamland/atl/cli/internal/teampkg"
 )
@@ -45,7 +44,7 @@ func updateTeams(projectRoot string) (int, error) {
 			if lookErr != nil {
 				continue // not in the index (e.g. a local-only team) — nothing to pull
 			}
-			if !versionLess(m.Version, entry.Version) {
+			if !semver.Less(m.Version, entry.Version) {
 				continue // already current
 			}
 			if err := upgradeTeam(m, entry, layer, claude); err != nil {
@@ -140,41 +139,4 @@ func reflectWithFanout(srcDir, claudeDir string, baseline map[string]string) (ma
 	// Files in the old baseline but absent from the new version are dropped from
 	// the manifest (and left on disk — conservative; a future prune can remove).
 	return next, nil
-}
-
-// versionLess reports whether semver a is strictly older than b. The numeric
-// release triple is compared first; on a tie, a pre-release (e.g. 1.0.0-beta) is
-// strictly older than the same-numbered final release (1.0.0) — so a team
-// installed at a pre-release correctly upgrades to its final. Ordering between two
-// distinct pre-releases of the same triple is not resolved (they compare equal),
-// which is enough for the install→final path.
-func versionLess(a, b string) bool {
-	pa, pb := parseSemver(a), parseSemver(b)
-	for i := 0; i < 3; i++ {
-		if pa[i] != pb[i] {
-			return pa[i] < pb[i]
-		}
-	}
-	ra, rb := hasPrerelease(a), hasPrerelease(b)
-	return ra && !rb // a is a pre-release of the same triple as final b
-}
-
-// hasPrerelease reports whether a semver string carries a pre-release segment
-// (a "-" after the numeric triple, before any "+build" metadata).
-func hasPrerelease(v string) bool {
-	v = strings.TrimPrefix(strings.TrimSpace(v), "v")
-	v = strings.SplitN(v, "+", 2)[0]
-	return strings.Contains(v, "-")
-}
-
-func parseSemver(v string) [3]int {
-	v = strings.TrimPrefix(strings.TrimSpace(v), "v")
-	v = strings.SplitN(v, "-", 2)[0]
-	v = strings.SplitN(v, "+", 2)[0]
-	parts := strings.Split(v, ".")
-	var out [3]int
-	for i := 0; i < 3 && i < len(parts); i++ {
-		out[i], _ = strconv.Atoi(parts[i])
-	}
-	return out
 }
