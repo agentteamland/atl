@@ -6,7 +6,7 @@
 
 **Katalog / Dizin** — takımların keşfedilme biçimi. GitHub'da [`atl-team`](https://github.com/topics/atl-team) konusuyla etiketlenmiş herkese açık depolardan oluşturulan bir dizin. `atl search` bu dizini sorgular; `atl install` bir tanıtıcıyı buna göre çözümler. Önbelleğe alınmış kopya `~/.atl/index.json` konumunda yaşar. Bkz. [`atl search`](/tr/cli/search).
 
-**Children deseni** — karmaşık ajanlar için bir sözleşme: üst düzey `agent.md` kısa kalır (kimlik, kapsam, ilkeler, Knowledge Base); ayrıntılı bilgi `children/` altında konu başına bir dosya olarak yaşar. Her çocuk dosya, [`/drain`](/tr/skills/drain)'in üst `agent.md` dosyasının Knowledge Base bölümünü kendiliğinden yeniden inşa etmek için kullandığı `knowledge-base-summary` frontmatter alanını taşır. Becerilerde aynı desen `learnings/` olarak yansıtılır (`SKILL.md`'nin Accumulated Learnings bölümünü kendiliğinden yeniden inşa eder).
+**Children deseni** — karmaşık ajanlar için bir sözleşme: üst düzey `agent.md` kısa kalır (kimlik, kapsam, ilkeler, Knowledge Base); ayrıntılı bilgi `children/` altında konu başına bir dosya olarak yaşar. Her çocuk dosya, [`/drain`](/tr/skills/drain)'in üst `agent.md` dosyasının Knowledge Base bölümünü kendiliğinden yeniden inşa etmek için kullandığı `knowledge-base-summary` frontmatter alanını taşır.
 
 **Bağımlılıklar** — bir takımın gereksinim duyduğu ek takımlar; `team.json` içindeki `dependencies` alanıyla belirtilir (takım adı → sürüm kısıtı eşlemesi). Takımın kendisiyle birlikte çözülür ve kurulur.
 
@@ -32,13 +32,11 @@
 
 **Çalışma alanı (workspace)** — `agentteamland/workspace`, tüm eş depoların geliştirme için bir araya getirildiği bakımcı merkezi. AgentTeamLand'i kullanmak için gerekmez; yalnızca platforma katkı veriyorsan ilgilenir.
 
-**Journal** — `.atl/journal/{date}_{agent}.md` altındaki kronolojik, ajan başına öğrenme kaydı. [`/drain`](/tr/skills/drain) öğrenme kuyruğunu bilgi tabanına işlerken yazar; ajan açılışında Claude tarafından [knowledge-system kuralı](https://github.com/agentteamland/atl/blob/main/core/rules/knowledge-system.md) gereği okunur.
+**Journal** — `.atl/journal/{YYYY-MM-DD}.md` altındaki kronolojik tarihsel kayıt (günde bir tarihli dosya, tüm ajanlar tarafından paylaşılır — ajan başına değil). [`/drain`](/tr/skills/drain) öğrenme kuyruğunu bilgi tabanına işlerken yazar; ajan açılışında Claude tarafından [knowledge-system kuralı](https://github.com/agentteamland/atl/blob/main/core/rules/knowledge-system.md) gereği okunur.
 
-**knowledge-base-summary** — her `children/{topic}.md` (ve `learnings/{topic}.md`) dosyasında zorunlu olan YAML frontmatter alanı. [`/drain`](/tr/skills/drain)'in üst `agent.md`'nin Knowledge Base (ya da `SKILL.md`'nin Accumulated Learnings) bölümünü yeniden inşa ederken çıkardığı bir-üç satırlık özet. Kaynak doğruluktur — yeniden inşa edilmiş bölüme yapılan elle düzenlemeler bir sonraki `/drain` çalıştırmasında üzerine yazılır.
+**knowledge-base-summary** — her `children/{topic}.md` dosyasında zorunlu olan YAML frontmatter alanı. [`/drain`](/tr/skills/drain)'in üst `agent.md`'nin Knowledge Base bölümünü yeniden inşa ederken çıkardığı bir-üç satırlık özet. Kaynak doğruluktur — yeniden inşa edilmiş bölüme yapılan elle düzenlemeler bir sonraki `/drain` çalıştırmasında üzerine yazılır.
 
 **knowledge-system** — iki katmanlı bilgi modelini (`journal/` + `wiki/`) tanımlayan çekirdek kural. `agent-memory` katmanı journal'a katıldıktan sonra `memory-system` adından yeniden adlandırıldı.
-
-**learnings/** — ajanların `children/` dizinini yansıtan, beceri başına alt dizin. Her `learnings/{topic}.md` dosyası `knowledge-base-summary` frontmatter taşır; becerinin `## Accumulated Learnings` bölümü bu dosyalardan kendiliğinden yeniden inşa edilir.
 
 **Öğrenme işaretçisi** — bir öğrenme anı geçtiğinde Claude'un konuşma sırasında düşürdüğü satır içi HTML yorumu. Biçim: `<!-- learning: serbest metin -->`. `atl tick` tarafından dayanıklı kuyruğa (`~/.atl/queue.db`) alınır (içerik hash'iyle tekilleştirilerek, tam bir kez), ardından [`/drain`](/tr/skills/drain) tarafından işlenir ve silinir.
 

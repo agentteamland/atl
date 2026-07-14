@@ -24,4 +24,4 @@ Teams published under the `agentteamland/` handle (plus a maintainer allowlist) 
 
 ## Publish your own
 
-Anyone can publish a team — see [Creating a team](/authoring/creating-a-team). A public repo with a valid `team.json` and the `atl-team` topic appears in the catalog within the hour.
+Anyone can publish a team — see [Creating a team](/authoring/creating-a-team). Once a public repo has a valid `team.json` and the `atl-team` topic, an hourly CI job discovers it and proposes a catalog update via pull request; the team becomes installable once a maintainer reviews and merges that PR.

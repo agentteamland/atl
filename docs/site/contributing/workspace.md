@@ -14,14 +14,13 @@ cd workspace
 ./scripts/sync.sh
 ```
 
-`sync.sh` clones every peer repo under `agentteamland/` into `./repos/<name>/`. It's idempotent — re-running fast-forward-pulls existing clones and clones any new ones added to the org since last run.
+`sync.sh` clones every peer repo under `agentteamland/` into `./repos/<name>/`. It's idempotent — re-running fast-forward-pulls existing clones and clones any repos in its canonical list that aren't checked out yet. The repo list is hand-maintained inside `sync.sh`; a repo newly added to the org must be added there before sync will pick it up.
 
 After sync, `./repos/` contains the v2 active repos plus the archived v1 repos (kept read-only for history):
 
 ```
 repos/
 ├── atl/                       # v2 monorepo — cli + core + teams + docs
-├── docs/                      # VitePress docs site (EN + TR) — pending v2 redeploy
 └── .github/                   # organization profile
 
 # Archived v1 repos (read-only, kept for history):
@@ -34,7 +33,8 @@ repos/
 ├── design-system-team/        # 🗄 ARCHIVED 2026-06-21 — ported into atl monorepo
 ├── starter-extended/          # 🗄 ARCHIVED 2026-06-21 — inheritance dropped from v2
 ├── registry/                  # 🗄 ARCHIVED 2026-06-21 — replaced by GitHub topic catalog
-└── homebrew-tap/ scoop-bucket/ # 🗄 ARCHIVED 2026-06-21 — distribution via GitHub Releases only
+├── homebrew-tap/ scoop-bucket/ # 🗄 ARCHIVED 2026-06-21 — distribution via GitHub Releases only
+└── docs/                      # 🗄 ARCHIVED 2026-06-22 — docs site ported into the atl monorepo (docs/site/)
 ```
 
 ## Daily commands

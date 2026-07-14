@@ -6,22 +6,19 @@ Beyin fırtınası oturumlarını başlat ve tamamla. Beyin fırtınaları, kod 
 
 Global beceri olarak [ATL monoreposunda](https://github.com/agentteamland/atl) yayımlanır.
 
-## Üç kapsam
+## İki kapsam
 
-Bir beyin fırtınası üç düzeyden birinde yaşar — *kimin* karara önem vereceğine göre kapsamı seç:
+Bir beyin fırtınası iki düzeyden birinde yaşar — *kimin* karara önem vereceğine göre kapsamı seç:
 
 | Bayrak | Hedef dizin | Ne zaman |
 |---|---|---|
 | *(yok)* | `.atl/brain-storms/` | Projeye özgü konular (varsayılan). |
 | `--global` | `~/.atl/brain-storms/` | Projeler arası, kişisel konular. |
-| `--team` | `<proje>/.atl/brain-storms/` (takım kapsamlı alt dizin) | Kurulu bir takımla ilgili konular (ajan kuralları, takım stratejisi, katkıcı yönetişimi). |
-
-`--team` için etkin takım, kurulu `.claude/agents/` girişlerinden algılanır. Tek takım → kendiliğinden kullanılır; birden çok takım → beceri `AskUserQuestion` ile sorar; kurulu takım yok → `atl install` ipucuyla bir hata verir.
 
 ## `start` kipi
 
 ```
-/brainstorm start [--global|--team] <konuyu açıklayan ilk mesaj>
+/brainstorm start [--global] <konuyu açıklayan ilk mesaj>
 ```
 
 Akış:
@@ -29,13 +26,13 @@ Akış:
 1. **Konuyu çıkar** — kullanıcının mesajından kebab-case bir dosya adı türet. Kullanıcı dosya adını VERMEZ.
 2. **Kapsamı belirle** — bayraktan al (yoksa varsayılan olarak proje).
 3. **Dizini oluştur** — yoksa (`{scope-base}/brain-storms/`) dizinini aç.
-4. **Beyin fırtınası dosyasını oluştur** — frontmatter (`status: active`, `scope`, `team`, `date`, `participants`) + Context + Discussion + Open Items bölümleriyle.
-5. **Beyin fırtınasını kapsamın `CLAUDE.md` / `README.md` dosyasına sabitle** — bir `<!-- brainstorm:active -->` işaretçi bloğu üzerinden. Bu, etkin beyin fırtınasının bir sonraki oturumda kaçırılmasını olanaksız kılar — proje bağlamıyla birlikte kendiliğinden yüklenir.
+4. **Beyin fırtınası dosyasını oluştur** — frontmatter (`status: active`, `scope`, `date`, `participants`) + Context + Discussion + Open Items bölümleriyle.
+5. **Beyin fırtınasını kapsamın `CLAUDE.md` dosyasına sabitle** — bir `<!-- brainstorm:active -->` işaretçi bloğu üzerinden. Bu, etkin beyin fırtınasının bir sonraki oturumda kaçırılmasını olanaksız kılar — proje bağlamıyla birlikte kendiliğinden yüklenir.
 6. **Kullanıcıya bildir** — dosya adı, kapsam ve sabitlenen konum; ardından konunun içine dal.
 
 ### Etkin beyin fırtınası sabitleyicisi
 
-Her etkin beyin fırtınası kendisini, kapsamın `CLAUDE.md` (ya da takım `README.md`) dosyasında bir `<!-- brainstorm:active:start --> ... <!-- brainstorm:active:end -->` bloğu içine sabitler:
+Her etkin beyin fırtınası kendisini, kapsamın `CLAUDE.md` dosyasında bir `<!-- brainstorm:active:start --> ... <!-- brainstorm:active:end -->` bloğu içine sabitler:
 
 ```markdown
 <!-- brainstorm:active:start -->
@@ -66,17 +63,15 @@ Dosya, **yeterince ayrıntılı** olmalıdır; yeni bir bağlamda dosyayı okuya
 
 Akış:
 
-1. **Etkin beyin fırtınasını bul.** Üç kapsamı da tarar (`.atl/brain-storms/`, `~/.atl/brain-storms/` ve `.atl/brain-storms/` altındaki takım kapsamlı alt dizinler). Birden çoksa bunları kapsamlarıyla birlikte listeler ve hangisinin tamamlanacağını sorar.
+1. **Etkin beyin fırtınasını bul.** Her iki kapsamı da tarar (`.atl/brain-storms/` ve `~/.atl/brain-storms/`). Birden çoksa bunları kapsamlarıyla birlikte listeler ve hangisinin tamamlanacağını sorar.
 2. **Beyin fırtınası dosyasını tamamla.** `status: active` → `status: completed`. Son notları sona ekle. Open Items bölümünü güncelle (çözülmemişler kalır). Final Decisions bölümünü ekle.
 3. **Belge dosyasını oluştur ya da güncelle.** Yerleşmiş kararlar şu yerlere gider:
    - **Proje beyin fırtınası** → `.atl/docs/`.
    - **Global beyin fırtınası** → `~/.atl/docs/`.
-   - **Takım beyin fırtınası** → `<proje>/.atl/docs/` (takım kapsamlı alt dizin).
-4. **`CLAUDE.md` / `README` güncellenir.** En fazla üç şey olur:
+4. **`CLAUDE.md` güncellenir.** En fazla üç şey olur:
    - Tamamlanmış beyin fırtınası özeti uygun bölüme eklenir.
    - Bu beyin fırtınasının maddesi `<!-- brainstorm:active -->` işaretçi bloğundan kaldırılır. Madde listesi boşalırsa blok tümüyle kaldırılır (geride bayatlamış bir "Active brainstorms" başlığı kalmaz).
    - Karar implementasyonsuz iş bırakıyorsa, bir sonraki oturumun kuyruğu görmesi için `<!-- pending-implementation -->` bloğuna bir madde eklenir (saf-karar beyin fırtınalarında atlanır; implementasyon yayımlanınca kaldırılır).
-5. **Takım beyin fırtınalarını doğrudan push'la değil, PR ile yayımla.** Takım beyin fırtınaları takımın yerel klonunda yaşar ve takım depoları dal korumalıdır. `done` akışı dosyayı yerelde yazar ve kullanıcıya bir PR açmasını söyler (elle ya da [`/create-pr`](/tr/skills/create-pr) ile).
 
 ## Belge zinciri
 
@@ -108,14 +103,12 @@ Bir beyin fırtınası sırasında "şimdi yapmıyoruz, sonraya" diye işaretlen
 3. **Dosya adı kullanıcıdan istenmez.** Mesajdan çıkarılır ve uygun bir kebab-case ad atanır.
 4. **Beyin fırtınası dosyaları asla silinmez.** Tarihsel kayıttır.
 5. **Her beyin fırtınası tek konuya odaklanır.** Farklı konular → farklı dosyalar.
-6. **Etkin beyin fırtınası araması üç kapsamı da kapsar.** `done` kipinde proje, global ve takım kapsamlı alt dizinler taranır.
-7. **Kapsam frontmatter'da yer alır.** `scope: project|global|team`, `team: {ad}` — `done` kipinin hedeflerini belirler.
-8. **Takım beyin fırtınaları doğrudan push'la değil, PR ile yayımlanır.** Takım depoları dal korumalıdır; `done` akışı yerelde yazar ve PR oluşturmaya yönlendirir.
+6. **Etkin beyin fırtınası araması her iki kapsamı da kapsar.** `done` kipinde proje ve global taranır.
+7. **Kapsam frontmatter'da yer alır.** `scope: project|global` — `done` kipinin hedeflerini belirler.
 
 ## İlgili
 
 - [`/drain`](/tr/skills/drain) — düzenli öğrenme yakalama (beyin fırtınasına paralel; beyin fırtınaları kasıtlıdır, öğrenmeler kendiliğinden olur).
-- [`/create-pr`](/tr/skills/create-pr) — bir takım beyin fırtınası değişikliğini PR olarak paketler.
 - [Kavramlar: Beceri](/tr/guide/concepts#skill) — beyin fırtınalarının bilgi modelinde nereye oturduğu.
 
 ## Kaynak

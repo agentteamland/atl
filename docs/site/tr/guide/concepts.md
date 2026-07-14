@@ -26,7 +26,7 @@ Tüm yapı için bkz. [Children + learnings](/tr/guide/children-and-learnings).
 
 Bir beceri, kullanıcının çağırabileceği bir slash komutudur. `/drain`, `/create-pr`, `/docs-audit`. Beceriler, kök dizininde bir `SKILL.md` bulunan dizinler olarak gelir; o dosya, becerinin ne zaman kullanılacağını ve ne yapması gerektiğini anlatır.
 
-Beceriler ajan yapısını yansıtır: karmaşık beceriler, dosya başına bir konu olarak uç durumların ve birikmiş bilgeliğin tutulduğu bir `learnings/` alt dizini taşır; aynı `knowledge-base-summary` frontmatter sözleşmesiyle. `/drain`, `SKILL.md`'nin **Accumulated Learnings** bölümünü bu frontmatter satırlarından yeniden inşa eder — `learnings/`, becerilerde `children/`'ın ajanlarda olduğu şeydir.
+Beceriler **bilgi deposu değil, yordamdır** — bir beceri, çalıştırılacak adımlardır, dolayısıyla birikmiş-bilgi dizini taşımaz. Bilgi tabanı ajanın `children/` dizininde birleştirilmiştir (v1, bu şekli becerilere `learnings/` dizini olarak yansıtıyordu; v2 bunu kaldırdı, [`core/rules/agent-structure.md`](https://github.com/agentteamland/atl/blob/main/core/rules/agent-structure.md) uyarınca).
 
 Beceriler **global** (`atl`'nin kendisiyle birlikte gelen) ya da **takım kapsamlı** (belirli bir takımca getirilen ve yalnızca o takım kurulduktan sonra görünen) olabilir. Yaptığı iş yığına özgü olan beceriler — örneğin bir takımın proje iskeleti kuran becerisi — takım kapsamlıdır. `/drain`, `/create-pr`, `/create-code-diagram`, `/brainstorm`, `/rule` ve `/rule-wizard` ise globaldir çünkü her yere uygulanır.
 
@@ -79,7 +79,7 @@ Bu, v1'in `/save-learnings`'ini (artık `/drain`) değiştirir ve ayrı `memory`
 
 **Takım komutları** (elle çalıştırılır):
 
-- `atl install [team]` — bir takımı (katalog adıyla ya da Git URL'siyle) geçerli kapsama kurar.
+- `atl install [team]` — bir takımı (katalog adıyla) geçerli kapsama kurar.
 - `atl list` — burada neyin kurulu olduğunu gösterir.
 - `atl remove [team]` — kurulumu kaldırır.
 - `atl update [team]` — bir ya da tüm kurulu takımlar için en sonu çeker.

@@ -1,22 +1,22 @@
 # Children + learnings
 
-Karmaşık ajanların ve becerilerin birikmiş alan bilgisi için kullandığı şekil: kısa bir üst düzey dosya, üstüne konu başına bir dosya barındıran bir alt dizin; her dosya, üst dosyanın dizin bölümünü kendiliğinden yeniden inşa eden tek satırlık bir `knowledge-base-summary` frontmatter taşır.
+Karmaşık bir ajanın birikmiş alan bilgisi için kullandığı şekil: kısa bir üst düzey `agent.md`, üstüne konu başına bir dosya barındıran bir `children/` dizini; her dosya, üst dosyanın Knowledge Base bölümünü kendiliğinden yeniden inşa eden tek satırlık bir `knowledge-base-summary` frontmatter taşır.
 
-Aynı desen, iki ad — ajanlar için **`children/`**, beceriler için **`learnings/`**. İkisi arasında tek bir zihinsel model.
+Bu, **ajan bilgi tabanıdır** — bir ajanın `children/` dizini. (v1, aynı şekli becerilere de `learnings/` dizini olarak yansıtıyordu; **v2 bunu kaldırdı** — beceriler bilgi deposu değil, yordamdır. Bkz. [Tarihçe](#tarihce).)
 
 Kanonik kural [`core/rules/agent-structure.md`](https://github.com/agentteamland/atl/blob/main/core/rules/agent-structure.md) dosyasında yaşar. Bu sayfa kullanıcıya yönelik özettir.
 
 ## Bu desen neden var?
 
-Onsuz, karmaşık ajanlar ve beceriler iki kötü şekilden birinde son bulur:
+Onsuz, karmaşık bir ajan iki kötü şekilden birinde son bulur:
 
-1. **Tek parça dosyalar** — her şey tek bir `agent.md` ya da `SKILL.md` içine yığılmış. Bir parçayı diğerlerine dokunmadan güncellemek zor. Farklar gürültülü olur. Her yeniden okuma jeton yakar.
+1. **Tek parça dosyalar** — her şey tek bir `agent.md` içine yığılmış. Bir parçayı diğerlerine dokunmadan güncellemek zor. Farklar gürültülü olur. Her yeniden okuma jeton yakar.
 2. **Elle hazırlanmış dizin bölümleri** — bir insanın konu dosyalarına paralel bakım yaptığı ayrı bir `agent.md` içindekiler tablosu. Biri güncellemeyi unuttuğu an gerçeklikten kayar.
 
-Children + learnings deseni ikisini birden çözer:
+Children deseni ikisini birden çözer:
 
 - **Konu başına bir dosya** — bir parçayı diğerlerine dokunmadan güncellersin.
-- **Kendiliğinden yeniden inşa edilen dizin** — üst düzey dosyanın "Knowledge Base" / "Accumulated Learnings" bölümü her [`/drain`](/tr/skills/drain) çalıştırmasında frontmatter'dan yeniden oluşturulur. Elle yapılan düzenlemeler üzerine yazılır — kaynak doğruluk her çocuk dosyanın frontmatter'ıdır.
+- **Kendiliğinden yeniden inşa edilen dizin** — üst düzey dosyanın **Knowledge Base** bölümü her [`/drain`](/tr/skills/drain) çalıştırmasında frontmatter'dan yeniden oluşturulur. Elle yapılan düzenlemeler üzerine yazılır — kaynak doğruluk her çocuk dosyanın frontmatter'ıdır.
 
 Sonuç: bilgi sürtünmesizce birikir, üst düzey dosya sıkı kalır ve dizin asla bayatlamaz.
 
@@ -44,28 +44,15 @@ Her karmaşık ajan şu yapıyla düzenlenir:
 5. **Tek parça ajan dosyaları yasaktır.**
 6. **Bu desen tüm ajanlar için geçerlidir.** API, Socket, Worker, Flutter, React, Mail, Log, Infra — hepsi aynı yapıyı izler.
 
-## Learnings — beceriler için
+## Becerilerin `learnings/` yansıması yoktur
 
-Her karmaşık beceri ajan biçimini aynalar:
+v1'de bu aynı şekil becerilere de yansıtılıyordu: `SKILL.md` yanında bir `learnings/` dizini, "Accumulated Learnings" bölümüne kendiliğinden yeniden inşa edilirdi. **v2 bunu kaldırdı.** Bilgi tabanı ajanın `children/` dizininde birleştirildi — **beceriler bilgi deposu değil, yordamdır**, dolayısıyla bir beceri dizini `learnings/` yansıması taşımaz.
 
-```
-.claude/skills/{skill-name}/
-├── SKILL.md              ← Becerinin yordamı (adımlar, kimlik, akış). Kısa kalır.
-└── learnings/            ← Birikmiş sınır durumları, başarılı desenler, kötü desenler
-    ├── topic-1.md
-    ├── topic-2.md
-    └── ...
-```
-
-[`atl install`](/tr/cli/install), katalogu sorgulayarak takımı getirir ve becerileri (ajanlar ve kurallarla birlikte) projenin `.claude/` dizinine kopyalar. [`atl update`](/tr/cli/update), kurulu takımları katalogdan yeniler. `/drain` önce proje-yerel kopyaya yazar; ardından `atl promote` kazanımları global katmanına taşır ve `atl publish` bunları takımın deposuna üst kaynak olarak önerebilir.
-
-Aynı şekil, aynı kurallar, aynı `knowledge-base-summary` frontmatter sözleşmesi. Becerinin `SKILL.md` dosyası, `learnings/*.md` frontmatter'ından kendiliğinden derlenen bir "Accumulated Learnings" bölümüyle birlikte gelir — `agent.md` Knowledge Base mekanizmasının aynısı.
-
-**Beceriyi neden ajan üzerine aynalayalım?** "Kendini iyileştiren beceri" çerçevelemesi, ajanların (Claude) beceriyi çağırırken görebileceği birikmiş deneyim için yapılandırılmış bir yer kazandırır. `learnings/` olmadan her beceri kullanımı, daha önce karşılaşılmış sınır durumlarında sıfırdan başlar.
+Bu, kanonik kural [`core/rules/agent-structure.md`](https://github.com/agentteamland/atl/blob/main/core/rules/agent-structure.md) içindedir: v1, beceriler için ayrı bir `learnings/` yansıması tutuyordu; v2 bunları birleştirir — tek bir bilgi tabanı vardır, ajanın `children/` dizini. Beceriler bilgi deposu değil, yordamdır. Bu sayfanın geri kalanı o tek bilgi tabanı hakkındadır: ajanın `children/` dizini.
 
 ## Frontmatter sözleşmesi
 
-Her `children/*.md` ve `learnings/*.md` dosyası bir `knowledge-base-summary` frontmatter alanı taşımak ZORUNDADIR:
+Her `children/*.md` dosyası bir `knowledge-base-summary` frontmatter alanı taşımak ZORUNDADIR:
 
 ```markdown
 ---
@@ -77,18 +64,18 @@ knowledge-base-summary: "<kendiliğinden yeniden inşa edilen dizin bölümünde
 <asıl içerik — desenler, stratejiler, örnekler — gerektiği kadar uzun>
 ```
 
-Bu özet, üst dosyanın Knowledge Base / Accumulated Learnings bölümünü besler. Bu alan olmadan `/drain` ya konuyu yeniden inşada atlar YA DA (kendi oluşturduğu yeni dosyalar için) alanı türetilmiş bir özetle yazar; her iki durumda da dosyada bir adet bulunmalıdır.
+Bu özet, üst dosyanın Knowledge Base bölümünü besler. Bu alan olmadan `/drain` ya konuyu yeniden inşada atlar YA DA (kendi oluşturduğu yeni dosyalar için) alanı türetilmiş bir özetle yazar; her iki durumda da dosyada bir adet bulunmalıdır.
 
 ## Kendiliğinden yeniden inşa edilen dizin bölümleri
 
-`/drain` çalıştığında, üst dosyanın dizin bölümünü her `children/*.md` (ajanlar için) ya da `learnings/*.md` (beceriler için) frontmatter'ından yeniden inşa eder. Şekil her ikisi için aynıdır:
+`/drain` çalıştığında, `agent.md`'nin **Knowledge Base** bölümünü her `children/*.md` frontmatter'ından yeniden inşa eder:
 
 ```markdown
-## Knowledge Base                     ← (beceriler için "Accumulated Learnings")
+## Knowledge Base
 
 ### <Konu 1 (dosya adından başlık biçimine getirilmiş)>
 <knowledge-base-summary>
-→ [Details](children/topic-1.md)     ← (beceriler için learnings/topic-1.md)
+→ [Details](children/topic-1.md)
 
 ### <Konu 2>
 <knowledge-base-summary>
@@ -97,7 +84,7 @@ Bu özet, üst dosyanın Knowledge Base / Accumulated Learnings bölümünü bes
 ...
 ```
 
-Bu bölüme yapılan elle düzenlemeler bir sonraki `/drain` çalıştırmasında **üzerine yazılır** — kaynak doğruluk her çocuk dosyanın frontmatter'ıdır. `agent.md` / `SKILL.md` dosyasının geri kalanı (kimlik, sorumluluk, ilkeler, akış) yeniden inşa tarafından **değiştirilmez**.
+Bu bölüme yapılan elle düzenlemeler bir sonraki `/drain` çalıştırmasında **üzerine yazılır** — kaynak doğruluk her çocuk dosyanın frontmatter'ıdır. `agent.md` dosyasının geri kalanı (kimlik, sorumluluk, ilkeler) yeniden inşa tarafından **değiştirilmez**.
 
 ## Üç güncelleme katmanı
 
@@ -105,9 +92,9 @@ Bu bölünme, "bilgi birikir" davranışının kendiliğinden ve sürtünmesiz o
 
 | Katman | Ne değişir | Nasıl |
 |---|---|---|
-| **A — otomatik** | Bir `children/{topic}.md` ya da `learnings/{topic}.md` dosyası oluşturulur veya güncellenir. | `/drain` doğrudan yazar. Soru sormaz. |
-| **B — otomatik** | Üst dosyanın Knowledge Base / Accumulated Learnings bölümü yeni frontmatter kümesinden yeniden inşa edilir. | `/drain` yeniden inşa eder. Soru sormaz. |
-| **C — onay kapılı** | Üst dosyanın kimliği / sorumluluğu / ilkeleri / beceri akışı değişmek zorundadır. | `/drain` bir `AskUserQuestion` onay kapısı açar. Kullanıcı onaylar; dosya güncellenir. Kullanıcı reddeder; öneri journal'a "reddedildi" olarak yazılır. |
+| **A — otomatik** | Bir `children/{topic}.md` dosyası oluşturulur veya güncellenir. | `/drain` doğrudan yazar. Soru sormaz. |
+| **B — otomatik** | Üst dosyanın Knowledge Base bölümü yeni frontmatter kümesinden yeniden inşa edilir. | `/drain` yeniden inşa eder. Soru sormaz. |
+| **C — onay kapılı** | Üst dosyanın kimliği / sorumluluğu / ilkeleri değişmek zorundadır. | `/drain` bir `AskUserQuestion` onay kapısı açar. Kullanıcı onaylar; dosya güncellenir. Kullanıcı reddeder; öneri journal'a "reddedildi" olarak yazılır. |
 
 C katmanı, üst düzey kimliği kendiliğinden kaymaya karşı korur. Kullanıcı bir değişikliği onayladıktan sonra dosya güncellenir.
 
@@ -137,16 +124,16 @@ Blueprint olmadan ajan, yeni birimleri nasıl oluşturacağını tahmin eder. Bl
 - Yeni takım üyeleri (ya da yeni Claude oturumları) tutarlı çıktı üretir.
 - Kalite kazara değil, tekrarlanabilirdir.
 
-(Becerilerin bir blueprint deseni yoktur — bir beceri, şablon güdümlü bir birim değil, yordamın kendisidir. Accumulated Learnings bölümü, beceri için blueprint kontrol listesinin karşılığıdır: hatırlanacak şeyler, dikkat edilecek sınır durumları.)
+(Becerilerin bir blueprint deseni yoktur — bir beceri, şablon güdümlü bir birim değil, yordamın kendisidir.)
 
 ## İlgili
 
 - [Bilgi sistemi](/tr/guide/knowledge-system) — bu takım tarafı desenin proje tarafındaki yansıması (journal + wiki).
-- [`/drain`](/tr/skills/drain) — `children/` ve `learnings/` dosyalarını yazar; üst dizin bölümlerini yeniden inşa eder.
-- [Kavramlar: Beceri](/tr/guide/concepts#skill) — `learnings/` deseninin nereye oturduğu.
+- [`/drain`](/tr/skills/drain) — `children/` dosyalarını yazar; ajanın Knowledge Base bölümünü yeniden inşa eder.
 - Kanonik kural: [`core/rules/agent-structure.md`](https://github.com/agentteamland/atl/blob/main/core/rules/agent-structure.md).
 
-## Tarihçe
+## Tarihçe {#tarihce}
 
 - `core@1.0.0`: ajan children deseni tanıtıldı. Knowledge Base bölümü elle bakım görüyordu.
-- `core@1.8.0`: [self-updating-learning-loop](https://github.com/agentteamland/workspace/blob/main/.atl/docs/self-updating-learning-loop.md) Q3'ü, children desenini becerilere genişletti (`learnings/`, `children/` yansıması). Knowledge Base ve Accumulated Learnings bölümleri frontmatter'dan kendiliğinden yeniden inşa edilir oldu. Kimlik / çekirdek değişiklikleri için C-katmanı onay kapısı kuralın bir parçası olarak biçimlendi. "Agent Configuration Rules" adından "Agent + skill structure rules" adına geçilerek genişleyen kapsamı yansıtıldı.
+- `core@1.8.0`: [self-updating-learning-loop](https://github.com/agentteamland/workspace/blob/main/.atl/docs/self-updating-learning-loop.md) Q3'ü, children desenini becerilere genişletti (`children/`'ın `learnings/` yansıması); hem Knowledge Base hem de bir "Accumulated Learnings" bölümü frontmatter'dan kendiliğinden yeniden inşa edilir oldu. Kimlik / çekirdek değişiklikleri için C-katmanı onay kapısı kuralın bir parçası olarak biçimlendi. Kural, genişleyen kapsamı yansıtmak için "Agent Configuration Rules" adından "Agent + skill structure rules" adına geçirildi.
+- **atl v2**: beceri `learnings/` yansıması **kaldırıldı** — bilgi tabanı ajanın `children/` dizininde yeniden birleştirildi; beceriler bilgi deposu değil, yordamdır ([`core/rules/agent-structure.md`](https://github.com/agentteamland/atl/blob/main/core/rules/agent-structure.md) uyarınca).

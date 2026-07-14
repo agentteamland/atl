@@ -22,8 +22,10 @@ Everything lives under the global ATL layer at `~/.atl/profiles/`:
 ```
 ~/.atl/profiles/
 ├── _index.md                     # discovery: who exists, salience, role
-├── _interfaces/
-│   └── person.md                 # the self-describing schema (person, in v1)
+├── _interfaces/                  # the self-describing schemas — six types seeded
+│   ├── person.md                 #   (+ agent-authored interfaces for novel types)
+│   ├── org.md · animal.md · place.md · object.md · project.md
+│   └── migrations/               # breaking-change migration files, applied on touch
 └── people/
     └── <slug>/
         ├── profile.md            # frontmatter core + narrative body

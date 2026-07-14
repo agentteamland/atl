@@ -113,7 +113,7 @@ Flags:
 
 ### Channels
 
-The queue is multi-channel. `/drain` processes the **`learning`** channel only. The `profile-fact` channel is reserved for a future first-party profile team and is not handled here.
+The queue is multi-channel. `/drain` processes the **`learning`** channel only. The `profile-fact` channel is handled by the shipped profile-team's `/profile-drain` (installed with profile-team), not here.
 
 ## Agent KB rebuild
 
@@ -129,7 +129,7 @@ knowledge-base-summary: "<one-line summary used in agent.md's Knowledge Base sec
 <the actual knowledge — patterns, examples, the why>
 ```
 
-After writing or updating a child, **fully rebuild** `agent.md`'s `## Knowledge Base` section from the children's frontmatter (sorted by filename). That section is derived, not hand-edited — it's replaced wholesale each run. The same pattern applies to a skill's `learnings/` directory and its `## Accumulated Learnings` section, if a learning targets a skill.
+After writing or updating a child, **fully rebuild** `agent.md`'s `## Knowledge Base` section from the children's frontmatter (sorted by filename). That section is derived, not hand-edited — it's replaced wholesale each run. Skills have no equivalent: they are procedures, not knowledge stores, so `/drain` rebuilds only an agent's `## Knowledge Base` — there is no skill "Accumulated Learnings" section.
 
 ## Wiki index rebuild
 

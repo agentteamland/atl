@@ -26,7 +26,7 @@ See [Children + learnings](/guide/children-and-learnings) for the full shape.
 
 A skill is a user-invocable slash command. `/drain`, `/create-pr`, `/docs-audit`. Skills ship as directories with a `SKILL.md` at their root; the file describes when to use the skill and what it should do.
 
-Skills mirror the agent shape: complex skills carry a `learnings/` subdirectory of topic-per-file edge cases and accumulated wisdom, with the same `knowledge-base-summary` frontmatter contract. `/drain` rebuilds the **Accumulated Learnings** section of `SKILL.md` from those frontmatter lines — `learnings/` is to skills what `children/` is to agents.
+Skills are **procedures, not knowledge stores** — a skill is the steps to run, so it carries no accumulated-knowledge directory. The knowledge base is unified into the agent's `children/` (v1 mirrored that shape onto skills as a `learnings/` directory; v2 removed it, per [`core/rules/agent-structure.md`](https://github.com/agentteamland/atl/blob/main/core/rules/agent-structure.md)).
 
 Skills can be **global** (shipped with `atl` itself) or **team-scoped** (shipped by a specific team and only visible after the team is installed). Scaffolder skills like `/create-new-project` and `/verify-system` are team-scoped by convention, because the work they do is always stack-specific. `/drain`, `/create-pr`, `/create-code-diagram`, `/brainstorm`, `/rule`, and `/rule-wizard` are global because they apply universally.
 
@@ -79,7 +79,7 @@ This replaces v1's `/save-learnings` (now `/drain`) and removes the separate `me
 
 **Team commands** (run by hand):
 
-- `atl install [team]` — install a team (by catalog handle or Git URL) into the current scope.
+- `atl install [team]` — install a team (by catalog handle) into the current scope.
 - `atl list` — show what's installed here.
 - `atl remove [team]` — uninstall.
 - `atl update [team]` — pull latest for one or all installed teams.

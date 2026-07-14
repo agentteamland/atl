@@ -101,10 +101,9 @@ The same current-truth-vs-history split also exists on the team side, carried *w
 
 Concretely:
 
-- **Agent children files** (`children/{topic}.md` in the agent's directory) are the agent-side equivalent of wiki — topic-based, replace/update, cross-project domain knowledge for the agent.
-- **Skill learnings files** (`learnings/{topic}.md` in a skill's directory) are the per-skill equivalent — same shape, scoped to the skill.
+- **Agent children files** (`children/{topic}.md` in the agent's directory) are the agent-side equivalent of wiki — topic-based, replace/update, cross-project domain knowledge for the agent. (Skills are procedures, not knowledge stores — they have no such directory.)
 
-Both carry a `knowledge-base-summary:` frontmatter field that's auto-aggregated into `agent.md` (Knowledge Base section) or `SKILL.md` (Accumulated Learnings section). See [Children + learnings](/guide/children-and-learnings) for the full pattern.
+Each child carries a `knowledge-base-summary:` frontmatter field that's auto-aggregated into `agent.md`'s Knowledge Base section. See [Children + learnings](/guide/children-and-learnings) for the full pattern.
 
 ## Related
 

@@ -85,7 +85,7 @@ Kuyruk çok kanallıdır. İkinci bir kanal, `profile-fact`, kullanıcı ya da b
 <!-- profile-fact: Prefers TypeScript over JavaScript for all new services. -->
 ```
 
-[`/drain`](/tr/skills/drain) yalnızca `learning` kanalını işler; `profile-fact`, gelecekteki bir birinci-taraf profil takımının kendi drain'ine ayrılmıştır ve burada ele alınmaz.
+[`/drain`](/tr/skills/drain) yalnızca `learning` kanalını işler; `profile-fact`, profil takımının kendi `/profile-drain`'i (profile-team ile birlikte kurulur) tarafından ele alınır, burada değil.
 
 ## Neden satır içi işaretçi, araç çağrısı değil?
 

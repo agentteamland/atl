@@ -6,22 +6,19 @@ Two modes: `start` opens a new brainstorm; `done` completes the active brainstor
 
 Ships as a global skill in the [ATL monorepo](https://github.com/agentteamland/atl).
 
-## Three scopes
+## Two scopes
 
-A brainstorm lives at one of three levels — pick the scope that matches *who* will care about the decision:
+A brainstorm lives at one of two levels — pick the scope that matches *who* will care about the decision:
 
 | Flag | Target directory | When |
 |---|---|---|
 | *(none)* | `.atl/brain-storms/` | Project-specific topics (default) |
 | `--global` | `~/.atl/brain-storms/` | Cross-project, personal topics |
-| `--team` | `<project>/.atl/brain-storms/` (team-scoped subdirectory) | Topics related to an installed team (agent rules, team strategy, contributor governance) |
-
-For `--team`, the active team is detected from installed `.claude/agents/` entries. Single team → used automatically; multiple teams → the skill asks via `AskUserQuestion`; no team installed → error with an `atl install` hint.
 
 ## `start` mode
 
 ```
-/brainstorm start [--global|--team] <initial message describing the topic>
+/brainstorm start [--global] <initial message describing the topic>
 ```
 
 Flow:
@@ -29,13 +26,13 @@ Flow:
 1. **Infer the topic** from the user's message — derive a kebab-case filename. The user does NOT supply a filename.
 2. **Determine scope** from the flag (or default to project).
 3. **Create directory** if it doesn't exist (`{scope-base}/brain-storms/`).
-4. **Create the brainstorm file** with frontmatter (`status: active`, `scope`, `team`, `date`, `participants`) + Context + Discussion + Open Items sections.
-5. **Pin the brainstorm into the scope's `CLAUDE.md` / `README.md`** via a `<!-- brainstorm:active -->` marker block. This makes the active brainstorm impossible to miss in the next session — it auto-loads with project context.
+4. **Create the brainstorm file** with frontmatter (`status: active`, `scope`, `date`, `participants`) + Context + Discussion + Open Items sections.
+5. **Pin the brainstorm into the scope's `CLAUDE.md`** via a `<!-- brainstorm:active -->` marker block. This makes the active brainstorm impossible to miss in the next session — it auto-loads with project context.
 6. **Confirm** to the user: filename, scope, pinned location, then dive into the topic.
 
 ### The active-brainstorm pin
 
-Every active brainstorm pins itself into the scope's `CLAUDE.md` (or team `README.md`) inside an `<!-- brainstorm:active:start --> ... <!-- brainstorm:active:end -->` block:
+Every active brainstorm pins itself into the scope's `CLAUDE.md` inside an `<!-- brainstorm:active:start --> ... <!-- brainstorm:active:end -->` block:
 
 ```markdown
 <!-- brainstorm:active:start -->
@@ -66,17 +63,15 @@ The file must be **detailed enough** that a Claude reading it in a new context c
 
 Flow:
 
-1. **Find the active brainstorm.** Searches all three scopes (`.atl/brain-storms/`, `~/.atl/brain-storms/`, and team-scoped subdirectories under `.atl/brain-storms/`). If multiple, lists them with their scope and asks which to complete.
+1. **Find the active brainstorm.** Searches both scopes (`.atl/brain-storms/` and `~/.atl/brain-storms/`). If multiple, lists them with their scope and asks which to complete.
 2. **Complete the brainstorm file.** `status: active` → `status: completed`. Append final notes. Update Open Items (unresolved ones remain). Add a Final Decisions section.
 3. **Create or update the docs file.** Settled decisions go to:
    - **Project brainstorm** → `.atl/docs/`
    - **Global brainstorm** → `~/.atl/docs/`
-   - **Team brainstorm** → `<project>/.atl/docs/` (team-scoped subdirectory)
-4. **Update CLAUDE.md / README.** Up to three things happen:
+4. **Update CLAUDE.md.** Up to three things happen:
    - Append the completed-brainstorm summary to the appropriate section
    - Remove this brainstorm's bullet from the `<!-- brainstorm:active -->` marker block. If the bullet list becomes empty, remove the entire block (no stale "Active brainstorms" heading lingers).
    - If the decision leaves unshipped implementation, add a bullet to the `<!-- pending-implementation -->` block so the next session sees the queued work (omitted for a pure-decision brainstorm; removed when the implementation ships).
-5. **Persist team brainstorms via PR, not direct push.** Team brainstorms live under the team's local clone and team repos are branch-protected. The `done` flow writes the file locally and instructs the user to open a PR (manually or via [`/create-pr`](/skills/create-pr)).
 
 ## The document chain
 
@@ -108,14 +103,12 @@ Every item marked "not doing now, later" during a brainstorm is reflected in `.a
 3. **Filename is not requested from the user.** It's inferred from the message and assigned a kebab-case name.
 4. **Brainstorm files are never deleted.** Historical record.
 5. **Each brainstorm focuses on a single topic.** Different topics → different files.
-6. **Active brainstorm search covers all three scopes.** In `done` mode, project + global + team-scoped subdirectories are scanned.
-7. **Scope is in frontmatter.** `scope: project|global|team`, `team: {name}` — determines `done`-mode targets.
-8. **Team brainstorms ship via PR, not direct push.** Team repos are branch-protected; the `done` flow writes locally and points at PR creation.
+6. **Active brainstorm search covers both scopes.** In `done` mode, project + global are scanned.
+7. **Scope is in frontmatter.** `scope: project|global` — determines `done`-mode targets.
 
 ## Related
 
 - [`/drain`](/skills/drain) — periodic learning capture (parallel to brainstorm; brainstorms are deliberate, learnings are spontaneous)
-- [`/create-pr`](/skills/create-pr) — packages a team brainstorm change as a PR
 - [Concepts: Skill](/guide/concepts#skill) — where brainstorms fit in the knowledge model
 
 ## Source

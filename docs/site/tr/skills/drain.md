@@ -113,7 +113,7 @@ Bayraklar:
 
 ### Kanallar
 
-Kuyruk çok kanallıdır. `/drain` yalnızca **`learning`** kanalını işler. `profile-fact` kanalı, ileride gelecek bir birinci-taraf profil takımı için ayrılmıştır ve burada işlenmez.
+Kuyruk çok kanallıdır. `/drain` yalnızca **`learning`** kanalını işler. `profile-fact` kanalı, yayımlanmış profile-team takımının `/profile-drain` skill'i (profile-team ile birlikte kurulur) tarafından işlenir, burada değil.
 
 ## Ajan KB yeniden inşası
 
@@ -129,7 +129,7 @@ knowledge-base-summary: "<agent.md'nin Knowledge Base bölümünde kullanılan t
 <asıl bilgi — desenler, örnekler, gerekçe>
 ```
 
-Bir çocuğu yazdıktan ya da güncelledikten sonra, `agent.md`'nin `## Knowledge Base` bölümünü çocukların frontmatter alanlarından (dosya adına göre sıralı) **tümüyle yeniden inşa et**. O bölüm türetilmiştir, elle düzenlenmez — her çalıştırmada baştan sona değiştirilir. Aynı desen, bir öğrenme bir beceriyi hedef alıyorsa, becerinin `learnings/` dizini ve `## Accumulated Learnings` bölümü için de geçerlidir.
+Bir çocuğu yazdıktan ya da güncelledikten sonra, `agent.md`'nin `## Knowledge Base` bölümünü çocukların frontmatter alanlarından (dosya adına göre sıralı) **tümüyle yeniden inşa et**. O bölüm türetilmiştir, elle düzenlenmez — her çalıştırmada baştan sona değiştirilir. Becerilerin bir karşılığı yoktur: beceriler bilgi deposu değil, yordamdır; bu yüzden `/drain` yalnızca bir ajanın `## Knowledge Base` bölümünü yeniden inşa eder — beceri "Accumulated Learnings" bölümü diye bir şey yoktur.
 
 ## Wiki dizini yeniden inşası
 

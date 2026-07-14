@@ -22,8 +22,10 @@ Her şey global ATL katmanı altında `~/.atl/profiles/`'te yaşar:
 ```
 ~/.atl/profiles/
 ├── _index.md                     # keşif: kim var, önem (salience), rol
-├── _interfaces/
-│   └── person.md                 # kendini-tanımlayan şema (v1'de person)
+├── _interfaces/                  # kendini-tanımlayan şemalar — altı tür seed'lenir
+│   ├── person.md                 #   (+ yeni türler için ajan-yazımı arayüzler)
+│   ├── org.md · animal.md · place.md · object.md · project.md
+│   └── migrations/               # kırıcı-değişiklik migration dosyaları, dokununca uygulanır
 └── people/
     └── <slug>/
         ├── profile.md            # frontmatter çekirdek + anlatı gövdesi

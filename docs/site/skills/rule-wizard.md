@@ -22,9 +22,9 @@ Ships as a global skill in [rule](https://github.com/agentteamland/rule).
 - ✅ `/rule-wizard Controllers should not write try-catch; global handler takes over`
 - ❌ `/rule-wizard` — invoked without context, the wizard refuses and asks for one
 
-## Three scopes
+## Two scopes
 
-Same as [`/rule`](/skills/rule#three-scopes): project (default), `--global`, `--team`. When the flag is provided, the wizard skips the scope question.
+Same as [`/rule`](/skills/rule#three-scopes): project (default) and `--global`. When the flag is provided, the wizard skips the scope question.
 
 ## Phase 1 — understanding and preparation
 
@@ -32,7 +32,7 @@ Same as [`/rule`](/skills/rule#three-scopes): project (default), `--global`, `--
 
 **Before** asking anything, read:
 
-- `.claude/rules/coding-common.md`
+- `.atl/rules/coding-common.md`
 - All `.md` files under `.atl/docs/coding-standards/` (dynamically listed)
 
 Purpose:
@@ -79,11 +79,9 @@ For each rule, clarify (via Q&A):
 
 #### A) Scope — where to write?
 
-(Skipped if `--global` or `--team` is set.)
+(Skipped if `--global` is set.)
 
 Sub-question if project scope is selected: which application? (dynamically lists existing `.atl/docs/coding-standards/{app}.md` files + a "common" option).
-
-Sub-question if team scope is selected: which agent's knowledge base? (lists installed-team agents + "team-wide rule" option).
 
 #### B) Single-sentence rule statement
 

@@ -14,14 +14,13 @@ cd workspace
 ./scripts/sync.sh
 ```
 
-`sync.sh`, `agentteamland/` altındaki her eş depoyu `./repos/<name>/` dizinine klonlar. İdempotent çalışır — yeniden çalıştırmak var olan klonları ileri-sarmalı çekimle günceller ve son çalıştırmadan bu yana organizasyona eklenen yeni depoları klonlar.
+`sync.sh`, `agentteamland/` altındaki her eş depoyu `./repos/<name>/` dizinine klonlar. İdempotent çalışır — yeniden çalıştırmak var olan klonları ileri-sarmalı çekimle günceller ve kanonik listesinde olup henüz kontrol edilmemiş depoları klonlar. Depo listesi `sync.sh` içinde elle tutulur; organizasyona yeni eklenen bir depo, sync onu alabilmeden önce oraya eklenmelidir.
 
 Eşzamanlamadan sonra `./repos/`, v2 aktif depolarını ve arşivlenmiş v1 depolarını içerir (tarih için salt okunur olarak saklanmıştır):
 
 ```
 repos/
 ├── atl/                       # v2 monorepo — cli + core + takımlar + belgeler
-├── docs/                      # VitePress belgeler sitesi (EN + TR) — v2 yeniden yayımı bekleniyor
 └── .github/                   # organizasyon profili
 
 # Arşivlenmiş v1 depoları (salt okunur, tarih için saklanmış):
@@ -34,7 +33,8 @@ repos/
 ├── design-system-team/        # 🗄 ARCHIVED 2026-06-21 — atl monoreposuna aktarıldı
 ├── starter-extended/          # 🗄 ARCHIVED 2026-06-21 — kalıtım v2'de kaldırıldı
 ├── registry/                  # 🗄 ARCHIVED 2026-06-21 — GitHub konu kataloğuyla değiştirildi
-└── homebrew-tap/ scoop-bucket/ # 🗄 ARCHIVED 2026-06-21 — dağıtım artık yalnızca GitHub Releases üzerinden
+├── homebrew-tap/ scoop-bucket/ # 🗄 ARCHIVED 2026-06-21 — dağıtım artık yalnızca GitHub Releases üzerinden
+└── docs/                      # 🗄 ARCHIVED 2026-06-22 — belgeler sitesi atl monoreposuna aktarıldı (docs/site/)
 ```
 
 ## Günlük komutlar

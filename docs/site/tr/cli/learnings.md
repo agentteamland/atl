@@ -62,7 +62,7 @@ a1b2c3d4e5f6  learning      BSD sed requires escaped pipes for alternation …
 
 ### `atl learnings ack <id>`
 
-İşlenmiş bir öğeyi kuyruktan siler — işle-sonra-sil olduğundan asla yeniden ortaya çıkamaz. Tam olarak bir id alır (`peek --json` çıktısındaki tam id; 12 karakterlik görüntüleme biçimi değil). Etkisizdir (idempotent): orada olmayan bir id'yi onaylamak zararsız bir işlemsizliktir (no-op). [`/drain`](/tr/skills/drain) skill'i her öğeyi tümleştirdikten sonra bunu çağırır.
+İşlenmiş bir öğeyi kuyruktan siler — işle-sonra-sil olduğundan asla yeniden ortaya çıkamaz. Tam olarak bir id alır — tam id ya da onun belirsiz olmayan herhangi bir ön eki, `peek`'in yazdırdığı 12 karakterlik biçim dahil (git-short-SHA tarzında çözülür; bilinmeyen ya da belirsiz bir ön ek tahmin etmek yerine hata verir). Hiçbir bekleyen öğeyle eşleşmeyen bir id — bir yazım hatası ya da zaten onayladığın bir tanesi — sessizce başarılı olmak yerine bir hatayla reddedilir; böylece yanlış bir id, çalışıyormuş gibi yapmak yerine gürültülü biçimde başarısız olur. [`/drain`](/tr/skills/drain) skill'i her öğeyi tümleştirdikten sonra onu tam olarak bir kez onaylar (ack).
 
 ```
 acked a1b2c3d4e5f6...

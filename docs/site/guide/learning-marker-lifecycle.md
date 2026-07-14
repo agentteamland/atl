@@ -84,7 +84,7 @@ The queue is multi-channel. A second channel, `profile-fact`, captures durable f
 <!-- profile-fact: Prefers TypeScript over JavaScript for all new services. -->
 ```
 
-[`/drain`](/skills/drain) processes only the `learning` channel; `profile-fact` is reserved for a future first-party profile team's own drain and is not handled here.
+[`/drain`](/skills/drain) processes only the `learning` channel; `profile-fact` is handled by the profile team's own `/profile-drain` (installed with profile-team), not here.
 
 ## Why inline markers, not a tool call
 
