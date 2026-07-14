@@ -64,6 +64,38 @@ func TestScanOwnedVsUnowned(t *testing.T) {
 	}
 }
 
+// TestScanRespectsUserRules: a rule the user authored (present in .atl/rules) is
+// reflected into .claude/rules and must be treated as owned, while a .claude/rules
+// file with no .atl/rules source is a genuine orphan.
+func TestScanRespectsUserRules(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	proj := t.TempDir()
+
+	// A user rule authored at the project layer: source in .atl/rules, reflected
+	// copy in .claude/rules.
+	writeFile(t, filepath.Join(proj, ".atl", "rules", "house-style.md"), "source")
+	writeFile(t, filepath.Join(proj, ".claude", "rules", "house-style.md"), "reflected")
+	// A .claude/rules file with no source → a real orphan (source was deleted, or
+	// it was hand-dropped).
+	writeFile(t, filepath.Join(proj, ".claude", "rules", "stale.md"), "no source")
+
+	orphans, err := Scan(proj, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	byRel := map[string]Orphan{}
+	for _, o := range orphans {
+		byRel[o.Rel] = o
+	}
+	if _, ok := byRel["rules/house-style.md"]; ok {
+		t.Error("a reflected user rule with a live .atl/rules source must never be an orphan")
+	}
+	if _, ok := byRel["rules/stale.md"]; !ok {
+		t.Error("a .claude/rules file with no .atl/rules source must be reported as an orphan")
+	}
+}
+
 // TestScanRespectsPins: a project-pinned path is treated as owned and never
 // reported as an orphan, while an unpinned sibling gain still is.
 func TestScanRespectsPins(t *testing.T) {

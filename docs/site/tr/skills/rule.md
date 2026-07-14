@@ -13,6 +13,10 @@ Global beceri olarak [atl monorepo](https://github.com/agentteamland/atl) içind
 | *(yok)* | Proje `.atl/` dosyaları | Bu projeye özgü kurallar (varsayılan). |
 | `--global` | `~/.atl/rules/` | Her projeye uygulanan kişisel kurallar. |
 
+::: tip Kural gerçekte nasıl yüklenir
+`.atl/rules/` kalıcı kaynaktır. `atl session-start`, `.atl/rules/*.md` dosyalarını eşleşen `.claude/rules/` dizinine — Claude Code'un yüklediği yüzeye — yansıtır; böylece `.atl/rules/` içine yazılan bir kural bir sonraki oturumdan itibaren etkin olur. `.claude/rules/` kopyası türetilmiştir; `atl gc` onu ancak sen `.atl/rules/` kaynağını sildikten sonra geri kazanır. (`.atl/docs/coding-standards/` altındaki uygulamaya özgü dosyalar, her zaman yüklenen kurallar değil talep üzerine başvuru belgeleridir ve yansıtılmaz.)
+:::
+
 ## Akış
 
 ### 1. Kuralı çözümle

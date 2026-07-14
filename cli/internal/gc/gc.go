@@ -28,6 +28,7 @@ import (
 	"github.com/agentteamland/atl/cli/internal/pin"
 	"github.com/agentteamland/atl/cli/internal/scope"
 	"github.com/agentteamland/atl/cli/internal/teampkg"
+	"github.com/agentteamland/atl/cli/internal/userrules"
 )
 
 // HistoryMaxAge is how long a promote conflict-archive survives before gc treats
@@ -140,6 +141,20 @@ func scanLayer(scopeName, layerDir, claudeDir string, extraOwned map[string]bool
 			if u := unitOf(rel); u != "" {
 				ownedUnits[u] = true
 			}
+		}
+	}
+	// A rule the user authored via /rule lands in <layer>/.atl/rules and is
+	// reflected into <layer>/.claude/rules (see internal/userrules). Its source in
+	// .atl/rules is its owner, so gc must never reclaim the reflected copy while
+	// the source exists. Delete the source and the copy becomes a real orphan.
+	userOwned, err := userrules.Owned(layerDir)
+	if err != nil {
+		return nil, err
+	}
+	for rel := range userOwned {
+		owned[rel] = true
+		if u := unitOf(rel); u != "" {
+			ownedUnits[u] = true
 		}
 	}
 

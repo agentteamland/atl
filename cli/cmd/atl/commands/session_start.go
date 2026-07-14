@@ -9,6 +9,7 @@ import (
 	"github.com/agentteamland/atl/cli/internal/doctor"
 	"github.com/agentteamland/atl/cli/internal/gc"
 	"github.com/agentteamland/atl/cli/internal/queue"
+	"github.com/agentteamland/atl/cli/internal/scope"
 	"github.com/agentteamland/atl/cli/internal/selfupdate"
 	"github.com/spf13/cobra"
 )
@@ -29,10 +30,25 @@ var sessionStartCmd = &cobra.Command{
 		if n, _ := reflectCore(); n > 0 {
 			fmt.Printf("atl: refreshed %d core file(s)\n", n)
 		}
+		// Reflect the user's own global rules (authored via `/rule --global` into
+		// ~/.atl/rules) into ~/.claude/rules so Claude Code actually loads them.
+		// Kept above the queue gate — like reflectCore — so a locked/contended
+		// queue can never skip it. Non-blocking; a hook must never fail.
+		if n, _ := reflectUserRules(scope.Global, ""); n > 0 {
+			fmt.Printf("atl: reflected %d global user rule(s) into the Claude load surface\n", n)
+		}
 
 		st, project, err := openQueue()
 		if err != nil {
 			return nil // non-blocking: never fail a hook
+		}
+
+		// Same for project rules (authored via `/rule` into <project>/.atl/rules);
+		// this needs the project root that openQueue resolved.
+		if project != "" {
+			if n, _ := reflectUserRules(scope.Project, project); n > 0 {
+				fmt.Printf("atl: reflected %d project rule(s) into the Claude load surface\n", n)
+			}
 		}
 
 		// Drain the previous session's transcripts (no throttle at session start).
