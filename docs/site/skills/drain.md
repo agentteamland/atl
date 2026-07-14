@@ -2,7 +2,7 @@
 
 Fold the pending learning queue into the knowledge base — route each item to the wiki, the journal, or an agent's knowledge base, then ack it so it's deleted.
 
-`/drain` is the **consuming half** of the v2 learning loop. Capture is automatic and deterministic: Claude drops silent `<!-- learning -->` markers during a conversation, and [`atl tick`](/cli/tick) transfers each one into a durable bbolt queue exactly once. This skill is the LLM half the CLI can't do itself, and it does two judgment jobs:
+`/drain` is the **consuming half** of the v2 learning loop. Capture is automatic and deterministic: Claude marks learnings during a conversation (a visible `📝 Learned:` line plus a hidden `<!-- learning -->` marker), and [`atl tick`](/cli/tick) transfers each one into a durable bbolt queue exactly once. This skill is the LLM half the CLI can't do itself — and it now runs **automatically in the background**: when the queue is non-empty the hook signals the agent, which spawns a background drain subagent (per the [learning-capture rule](https://github.com/agentteamland/atl/blob/main/core/rules/learning-capture.md)) rather than waiting for a manual `/drain`. Run manually only to force a pass. It does two judgment jobs:
 
 1. **Mine** the conversation for learnings the agent *forgot* to mark — the user's corrections, reverts, repeated mistakes — and enqueue them like any marker. Marker capture only catches what the agent noticed, and the mistakes worth not-repeating are exactly the ones it didn't.
 2. **Quality-gate, then integrate** each queued item — decide whether it's worth keeping (Save / Improve / Absorb / Drop), then route the keepers to the wiki, the journal, or an agent's knowledge base, and ack each.

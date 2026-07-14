@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/agentteamland/atl/cli/internal/coreassets"
@@ -8,6 +9,18 @@ import (
 	"github.com/agentteamland/atl/cli/internal/scope"
 	"github.com/agentteamland/atl/cli/internal/userrules"
 )
+
+// autoDrainNotice is the per-turn signal that tells the agent to drain the
+// learning queue in the background — empty when the queue is empty. Both the
+// UserPromptSubmit tick and session-start emit it; the learning-capture rule is
+// what acts on it (spawn a background drain subagent). Kept in one place so the
+// wording can't drift between the two emitters.
+func autoDrainNotice(pending int) string {
+	if pending <= 0 {
+		return ""
+	}
+	return fmt.Sprintf("atl: %d learning(s) pending — auto-drain them now in a background subagent (per the learning-capture rule)", pending)
+}
 
 // reflectCore refreshes the embedded core rules + skills into the global Claude
 // dir. Core is the platform layer — it ships inside the binary and is reflected

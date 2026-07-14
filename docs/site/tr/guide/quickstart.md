@@ -81,7 +81,7 @@ Platformun kendi global becerileri de orada — `/drain`, `/create-pr`, `/create
 
 - Oturum içinde (ve `atl tick` ile) bir bakım **tick**'i çalışır ve kuyruktaki öğrenmeleri bilgi tabanına katar.
 - `atl doctor` kurulumu kendiliğinden onarır — hatırlaman gereken bir komut değil, daima açık çalışan sağlık daemon'udur.
-- Bir şey seni beklediğinde `atl`, `N learning(s) pending` (N öğrenme bekliyor) der; `/drain` becerisi (oturumunda onu çalıştır) her öğeyi doğru yere yönlendirir — bir wiki sayfasına, günlüğe ya da bir ajanın bilgi tabanına — ardından öğeyi kuyruktan siler.
+- Öğrenmeler kuyruğa girdiğinde `atl`, ajana **onları arka planda otomatik drain etmesi** için sinyal verir — her öğe doğru yerine yönlendirilir (bir wiki sayfası, günlük ya da bir ajanın bilgi tabanı) ve kuyruktan silinir; elle çalıştırılacak bir `/drain` komutu yoktur.
 
 Kuyruğa istediğin zaman göz at:
 
