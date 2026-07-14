@@ -58,7 +58,7 @@ Full field reference: [team.json](./team-json).
 
 - `name` is the team's short-name. Once set, don't change it — users refer to it. Must be kebab-case (lowercase letters, digits, hyphens).
 - `version` is SemVer (major.minor.patch). Bump it when you ship changes — `atl update` uses this to decide whether to pull.
-- `author` is an **object**, not a string. At minimum `{ "name": "Your Name" }`. A plain string like `"author": "You"` fails to parse.
+- `author` is an **object**, not a string. At minimum `{ "name": "Your Name" }`. A plain string like `"author": "You"` isn't a parse error — the install parser models no `author` field, so it's silently ignored — but use the object form for clarity and future compatibility.
 - `agents` is an array of **metadata**, not agent content. The actual agent Markdown lives under `agents/<name>/agent.md` (see Step 3).
 
 ### Step 3 — Add your agent
@@ -148,8 +148,8 @@ atl list
 # project:
 #   you/my-team@0.1.0
 
-ls -la .claude/agents/
-# → web-agent.md
+ls .claude/agents/web-agent/
+# → agent.md
 ```
 
 If the output matches, your team is installed. The agent is now available to Claude in `/tmp/demo-app/`.
@@ -263,7 +263,7 @@ my-team/
     └── file-naming.md
 ```
 
-Every file under `agents/`, `skills/`, and `rules/` that `team.json` lists becomes a copy in the consumer's `.claude/` when they install. Files not listed are ignored.
+`atl` copies every file under the team's asset directories (`agents/`, `skills/`, `rules/`, plus `knowledge/`, `scripts/`, `packs/`) into the consumer's `.claude/`. The `team.json` `agents[]`/`skills[]`/`rules[]` arrays are catalog metadata — they describe the team in `atl search`, they do not decide what gets copied. Only files outside those asset directories (`team.json`, `README`, `LICENSE`) stay behind.
 
 ---
 
@@ -273,7 +273,7 @@ When someone runs `atl install you/my-team`:
 
 1. **Resolve.** The handle is looked up in the GitHub-backed catalog (generated from public `atl-team`-tagged repos). A team published from a monorepo subpath resolves to that subpath; a standalone team resolves to its own repo root.
 2. **Fetch.** The team is downloaded as a ref-pinned HTTPS tarball into a temp directory — no `git` binary required. The temp directory is deleted after the install.
-3. **Validate.** `atl` parses `team.json`, checks that it has a name, and confirms every declared agent/skill/rule actually exists on disk. Anything missing fails here.
+3. **Validate.** `atl` parses `team.json` and confirms it has a `name`. It does not individually check declared agents/skills/rules against disk — the install only fails here if the team ships no asset files at all (`team ships no installable assets`).
 4. **Write.** Agents, skills, and rules are **copied** into the scope's `.claude/` — `~/.claude` for a global install, `<project>/.claude` for a project install.
 5. **Record.** A per-team manifest at `<layer>/.atl/installed/<handle>__<name>.json` records the source ref + per-file SHA-256 baselines that `atl update`'s auto-refresh and `atl doctor`'s integrity check rely on.
 
@@ -282,12 +282,6 @@ There is no persistent clone cache and no separate ATL asset store — team asse
 ---
 
 ## Common pitfalls
-
-**`Error: agent source missing: .../agents/foo/agent.md`**
-→ Your `team.json` lists `agents: [{"name": "foo"}]` but the filesystem has `agents/foo.md` (flat) where the children pattern expects `agents/foo/agent.md`. Match the declared assets to what's on disk.
-
-**`Error: parse team.json: json: cannot unmarshal string into Go struct field TeamManifest.author`**
-→ `author` must be an object, not a string. Change `"author": "You"` to `"author": { "name": "You" }`.
 
 **Edited the team and ran `atl update`, no effect**
 → Did you commit, bump the version, and push? `atl update` pulls the published version, so uncommitted (or unpushed) edits don't flow. Commit + bump + push, then `atl update`.

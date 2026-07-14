@@ -22,9 +22,9 @@ Global beceri olarak [rule](https://github.com/agentteamland/rule) içinde yayı
 - ✅ `/rule-wizard Controller'lar try-catch yazmamalı; global handler devralır`
 - ❌ `/rule-wizard` — bağlam olmadan çağrıldı, sihirbaz reddeder ve bağlam ister.
 
-## Üç kapsam
+## İki kapsam
 
-[`/rule`](/tr/skills/rule#three-scopes) ile aynıdır: proje (varsayılan), `--global`, `--team`. Bayrak verildiğinde sihirbaz kapsam sorusunu atlar.
+[`/rule`](/tr/skills/rule#three-scopes) ile aynıdır: proje (varsayılan) ve `--global`. Bayrak verildiğinde sihirbaz kapsam sorusunu atlar.
 
 ## Aşama 1 — anlama ve hazırlık
 
@@ -32,7 +32,7 @@ Global beceri olarak [rule](https://github.com/agentteamland/rule) içinde yayı
 
 Soru sormadan **önce** şunları oku:
 
-- `.claude/rules/coding-common.md`.
+- `.atl/rules/coding-common.md`.
 - `.atl/docs/coding-standards/` altındaki tüm `.md` dosyalar (devingen biçimde listelenir).
 
 Amaç:
@@ -79,11 +79,9 @@ Her kural için (soru-yanıt yoluyla) netleştir:
 
 #### A) Kapsam — nereye yazılacak?
 
-(`--global` ya da `--team` ayarlıysa atlanır.)
+(`--global` ayarlıysa atlanır.)
 
 Proje kapsamı seçilirse alt soru: hangi uygulama? (Mevcut `.atl/docs/coding-standards/{app}.md` dosyalarını devingen biçimde listeler artı bir "common" seçeneği.)
-
-Takım kapsamı seçilirse alt soru: hangi ajanın bilgi tabanı? (Kurulu takımın ajanlarını listeler artı "team-wide rule" seçeneği.)
 
 #### B) Tek cümlelik kural ifadesi
 

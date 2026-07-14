@@ -27,7 +27,7 @@ Bu kadarı kuruluma yeter. CLI manifest dosyasını çözümler, `agents/web-age
 | `name` | dize | ✅ | Takımın katalog adı. Küçük harf kebab-case. GitHub kullanıcı adınızla birleşerek `<handle>/<name>` kurulum referansını oluşturur. |
 | `version` | semver dizesi | ✅ | SemVer 2.0.0 (`1.2.3`, `1.2.3-beta.1`). `atl update` güncelleme gerekip gerekmediğine bunu karşılaştırarak karar verir. |
 | `description` | dize | ✅ | `atl search` çıktısında görünen tek cümlelik tanıtım. Kısa tut — katalog çıktısında tek satırdır. |
-| `author` | nesne | — | `{ "name": "...", "url": "...", "email": "..." }`. **Nesne olmalıdır, dize değil** — `"Your Name <you@example.com>"` gibi düz bir dize ayrıştırmada başarısız olur. `author` verildiğinde yalnızca `name` zorunludur. |
+| `author` | nesne | — | Kurulum ayrıştırıcısının şu an okumadığı isteğe bağlı üst veri. Verilirse `{ "name": "...", "url": "...", "email": "..." }` nesnesi geleneksel biçimdir; düz bir dize de kabul edilir (sessizce yoksayılır), reddedilmez. |
 | `license` | SPDX dizesi | — | `"MIT"`, `"Apache-2.0"` vb. Verilmezse `"MIT"` varsayılır. |
 | `keywords` | dize[] | — | `atl search` eşleşmesi için. `["nextjs", "tailwind", "blog"]`. |
 | `repository` | dize | — | Katalogda gösterilen takım kaynak URL'si. |
@@ -77,9 +77,9 @@ my-team/
     └── commit-style.md
 ```
 
-Yalnızca `agents/`, `skills/` ve `rules/` kurulabilir varlıklardır — Claude Code'un okuduğu dizinler bunlardır. Repodaki diğer her şey (`team.json`, `README`, `LICENSE`) geride kalır ve tüketicinin `.claude/` dizinine kopyalanmaz.
+Kurulabilir varlık dizinleri şunlardır: `agents/`, `skills/`, `rules/`, `knowledge/`, `scripts/` ve `packs/` (`teampkg.AssetDirs` kümesi). `agents/`/`skills/`/`rules/` Claude Code'un doğrudan okuduğu dizinlerdir; `knowledge/`/`scripts/`/`packs/` ise takımın çalışma zamanı referans belgelerini, yardımcı betiklerini ve alan paketlerini taşır. Diğer her şey (`team.json`, `README`, `LICENSE`) geride kalır.
 
-`team.json` içindeki her giriş (`agents[]`, `skills[]`, `rules[]` altında) diskte gerçek bir dosya ya da dizine karşılık gelmek zorundadır. Varlık bildiren ama hiçbirini göndermeyen bir takım kurulumda hata verir.
+Bir takımın bir varlık dizini altında en az bir dosya göndermesi gerekir, yoksa `atl install` başarısız olur (`team ships no installable assets`). Bildirilen tek tek `agents[]`/`skills[]`/`rules[]` girişleri katalog üst verisidir ve kurulum sırasında diske karşı doğrulanmaz — bu çapraz kontrolü, birinci taraf takımlar için `atl skills check` geliştirici komutu yapar.
 
 ## Doğrulama
 
@@ -87,7 +87,7 @@ v2'de ayrı bir JSON Şeması dosyası ve şema doğrulama CI adımı yoktur. Do
 
 - `team.json` geçerli JSON olarak ayrıştırılabilmelidir.
 - `name` alanı bulunmalıdır.
-- Bildirilen `agents/`, `skills/`, `rules/` girişleri diskte var olmalıdır — `atl install`, kurulabilir varlık olmayan bir takımda hata verir.
+- Takım, bir varlık dizini altında en az bir dosya göndermelidir — `atl install`, kurulabilir varlık olmayan bir takımda hata verir.
 
 Sözleşmenin tamamı budur. `atl install` takımını kabul ederse geçerlidir; yerel ya da CI'da çalıştırılacak başka bir şey yoktur.
 

@@ -27,7 +27,7 @@ That's enough to install. The CLI parses the manifest, copies `agents/web-agent.
 | `name` | string | ✅ | The team's catalog name. Lowercase kebab-case. Combined with your GitHub handle it forms the install ref `<handle>/<name>`. |
 | `version` | semver string | ✅ | SemVer 2.0.0 (`1.2.3`, `1.2.3-beta.1`). `atl update` compares this to decide whether to pull. |
 | `description` | string | ✅ | One-sentence pitch shown in `atl search`. Keep it tight — it's a single line in catalog output. |
-| `author` | object | — | `{ "name": "...", "url": "...", "email": "..." }`. **Must be an object, not a string** — a plain string like `"Your Name <you@example.com>"` will fail to parse. `name` is the only part required when `author` is present. |
+| `author` | object | — | Optional metadata the install parser does not currently read. If provided, an object `{ "name": "...", "url": "...", "email": "..." }` is the conventional shape; a plain string is accepted (silently ignored), not rejected. |
 | `license` | SPDX string | — | `"MIT"`, `"Apache-2.0"`, etc. Defaults to `"MIT"` if omitted. |
 | `keywords` | string[] | — | For `atl search` matching. `["nextjs", "tailwind", "blog"]`. |
 | `repository` | string | — | The team's source URL, surfaced in the catalog. |
@@ -77,9 +77,9 @@ my-team/
     └── commit-style.md
 ```
 
-Only `agents/`, `skills/`, and `rules/` are installable assets — they're the directories Claude Code reads. Everything else in the repo (`team.json`, `README`, `LICENSE`) stays behind and is never copied into the consumer's `.claude/`.
+The installable asset directories are `agents/`, `skills/`, `rules/`, `knowledge/`, `scripts/`, and `packs/` (the `teampkg.AssetDirs` set). `agents/`/`skills/`/`rules/` are what Claude Code reads directly; `knowledge/`/`scripts/`/`packs/` carry a team's runtime reference docs, helper scripts, and area packs. Everything else (`team.json`, `README`, `LICENSE`) stays behind.
 
-Every entry in `team.json` (under `agents[]`, `skills[]`, `rules[]`) must correspond to an actual file or directory on disk. A team that declares assets but ships none fails to install.
+A team must ship at least one file under an asset directory or `atl install` fails (`team ships no installable assets`). Individual declared `agents[]`/`skills[]`/`rules[]` entries are catalog metadata and are not validated against disk at install time — the `atl skills check` dev command performs that cross-check for first-party teams.
 
 ## Validation
 
@@ -87,7 +87,7 @@ There is no separate JSON Schema file and no schema-validation CI step in v2. Va
 
 - `team.json` must parse as JSON.
 - It must have a `name`.
-- The declared `agents/` `skills/` `rules/` must exist on disk — `atl install` errors if a team ships no installable assets.
+- The team must ship at least one file under an asset directory — `atl install` errors if a team ships no installable assets.
 
 That's the whole contract. If `atl install` accepts your team, it's valid; there's nothing else to run locally or in CI.
 

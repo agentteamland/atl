@@ -58,7 +58,7 @@ Tüm alanlar için: [team.json](./team-json).
 
 - `name`, takımın kısa adıdır. Bir kez belirlendiğinde değiştirme — kullanıcılar buna göre başvuracak. Kebab-case olmalıdır (küçük harfler, rakamlar, tireler).
 - `version`, SemVer biçimindedir (major.minor.patch). Değişiklik yayımladığında artır — `atl update` bu alana bakarak çekim yapıp yapmayacağına karar verir.
-- `author` bir **nesnedir**, dize değildir. En azından `{ "name": "Your Name" }`. `"author": "You"` gibi düz dize ayrıştırma hatasına neden olur.
+- `author` bir **nesnedir**, dize değildir. En azından `{ "name": "Your Name" }`. `"author": "You"` gibi düz bir dize ayrıştırma hatası değildir — kurulum ayrıştırıcısı `author` diye bir alan modellemez, dolayısıyla sessizce yok sayılır — yine de açıklık ve gelecekteki uyumluluk için nesne biçimini kullan.
 - `agents`, **üst bilgi** dizisidir, ajan içeriği değildir. Asıl ajan Markdown'ı `agents/<name>/agent.md` altında yaşar (bkz. Adım 3).
 
 ### Adım 3 — Ajanını ekle
@@ -148,8 +148,8 @@ atl list
 # project:
 #   you/my-team@0.1.0
 
-ls -la .claude/agents/
-# → web-agent.md
+ls .claude/agents/web-agent/
+# → agent.md
 ```
 
 Çıktı buna uyuyorsa takımın kurulmuştur. Ajan artık `/tmp/demo-app/` içinde Claude tarafından kullanılabilir.
@@ -263,7 +263,7 @@ my-team/
     └── file-naming.md
 ```
 
-`team.json` tarafından listelenen `agents/`, `skills/` ve `rules/` altındaki her dosya, kullanıcı kurulum yaptığında onun `.claude/` dizinine bir kopya olarak gelir. Listelenmeyen dosyalar yok sayılır.
+`atl`, takımın varlık dizinleri (`agents/`, `skills/`, `rules/` ve ayrıca `knowledge/`, `scripts/`, `packs/`) altındaki her dosyayı kullanıcının `.claude/` dizinine kopyalar. `team.json` içindeki `agents[]`/`skills[]`/`rules[]` dizileri katalog üst bilgisidir — takımı `atl search` çıktısında tanıtırlar, neyin kopyalanacağına karar vermezler. Yalnızca o varlık dizinlerinin dışındaki dosyalar (`team.json`, `README`, `LICENSE`) geride kalır.
 
 ---
 
@@ -273,7 +273,7 @@ my-team/
 
 1. **Çöz.** Handle, GitHub tabanlı katalogda aranır (herkese açık `atl-team` etiketli depolardan üretilen dizin). Monorepo alt yolundan yayımlanan bir takım o alt yola; bağımsız bir takım kendi deposunun köküne çözülür.
 2. **İndir.** Takım, geçici bir dizine ref-sabitli HTTPS tarball'ı olarak indirilir — `git` ikili dosyası gerekmez. Geçici dizin kurulumdan sonra silinir.
-3. **Doğrula.** `atl`, `team.json` dosyasını ayrıştırır, bir `name` alanı olduğunu kontrol eder ve bildirilen her ajan/beceri/kuralın diskte gerçekten var olduğunu doğrular. Eksik olan varsa burada hata verir.
+3. **Doğrula.** `atl`, `team.json` dosyasını ayrıştırır ve bir `name` alanı olduğunu doğrular. Bildirilen ajan/beceri/kuralları teker teker diske karşı kontrol etmez — kurulum yalnızca takım hiç varlık dosyası göndermiyorsa burada hata verir (`team ships no installable assets`).
 4. **Yaz.** Ajanlar, beceriler ve kurallar kapsamın `.claude/` dizinine **kopyalanır** — global kurulum için `~/.claude`, proje kurulumu için `<proje>/.claude`.
 5. **Kaydet.** `<katman>/.atl/installed/<handle>__<name>.json` konumundaki takıma özgü manifesto, kaynak ref ve dosya başına SHA-256 değerlerini kaydeder; `atl update`'in otomatik yenileme ve `atl doctor`'ın bütünlük denetimi bu verilere dayanır.
 
@@ -282,12 +282,6 @@ Kalıcı klonlama önbelleği yoktur, ayrı bir ATL varlık deposu da yoktur. Ta
 ---
 
 ## Sık karşılaşılan tuzaklar
-
-**`Error: agent source missing: .../agents/foo/agent.md`**
-→ `team.json` dosyan `agents: [{"name": "foo"}]` olarak listeliyor ama dosya sisteminde `agents/foo.md` (düz) var; çocuklar deseni `agents/foo/agent.md` bekler. Bildirilen varlıkları disktekiyle eşleştir.
-
-**`Error: parse team.json: json: cannot unmarshal string into Go struct field TeamManifest.author`**
-→ `author` bir nesne olmalı, dize değil. `"author": "You"` yerine `"author": { "name": "You" }` yaz.
 
 **Takımı düzenledim ve `atl update` çalıştırdım ama etki yok**
 → Commit attın mı, sürümü artırdın mı, push'ladın mı? `atl update`, yayımlanmış sürümü çeker; commit'lenmemiş veya push'lanmamış düzenlemeler akmaz. Commit at + sürümü artır + push'la, sonra `atl update`.

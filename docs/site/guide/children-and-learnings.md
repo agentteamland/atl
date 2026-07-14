@@ -1,22 +1,22 @@
 # Children + learnings
 
-The shape that complex agents and skills use for accumulated domain knowledge: a short top-level file plus a directory of topic-per-file detail pages, each carrying a one-line `knowledge-base-summary` frontmatter that auto-rebuilds the parent file's index section.
+The shape a complex agent uses for accumulated domain knowledge: a short top-level `agent.md` plus a `children/` directory of topic-per-file detail pages, each carrying a one-line `knowledge-base-summary` frontmatter that auto-rebuilds the parent file's Knowledge Base section.
 
-Same pattern, two names — **`children/`** for agents, **`learnings/`** for skills. Single mental model across both.
+This is the **agent knowledge base** — an agent's `children/` directory. (v1 mirrored the same shape onto skills as a `learnings/` directory; **v2 removed that** — skills are procedures, not knowledge stores. See [History](#history).)
 
 The canonical rule lives at [`core/rules/agent-structure.md`](https://github.com/agentteamland/atl/blob/main/core/rules/agent-structure.md). This page is the user-facing summary.
 
 ## Why this pattern exists
 
-Without it, complex agents and skills end up as one of two anti-shapes:
+Without it, a complex agent ends up as one of two anti-shapes:
 
-1. **Monolithic files** — everything piled into one `agent.md` or `SKILL.md`. Hard to update one piece without touching the rest. Diffs are noisy. Re-reads burn tokens.
+1. **Monolithic files** — everything piled into one `agent.md`. Hard to update one piece without touching the rest. Diffs are noisy. Re-reads burn tokens.
 2. **Hand-curated index sections** — a separate `agent.md` table of contents that a human maintains alongside the topic files. Drifts the moment someone forgets to update it.
 
-The children + learnings pattern resolves both:
+The children pattern resolves both:
 
 - **Topic-per-file** — update one piece without touching others
-- **Auto-rebuilt index** — the top-level file's "Knowledge Base" / "Accumulated Learnings" section is regenerated from frontmatter on every [`/drain`](/skills/drain) run. Hand edits are overwritten — the source of truth is each child's frontmatter.
+- **Auto-rebuilt index** — the top-level file's **Knowledge Base** section is regenerated from frontmatter on every [`/drain`](/skills/drain) run. Hand edits are overwritten — the source of truth is each child's frontmatter.
 
 Result: knowledge accumulates frictionlessly, the top-level file stays tight, and the index never goes stale.
 
@@ -44,28 +44,15 @@ Every complex agent is organized as:
 5. **Monolithic agent files are prohibited.**
 6. **This pattern applies to all agents.** API, Socket, Worker, Flutter, React, Mail, Log, Infra — all follow the same structure.
 
-## Learnings — for skills
+## Skills have no `learnings/` mirror
 
-Every complex skill mirrors the agent shape. Two locations matter:
+In v1 this same shape was mirrored onto skills: a `learnings/` directory beside `SKILL.md`, auto-rebuilt into an "Accumulated Learnings" section. **v2 removed that.** The knowledge base is unified into the agent's `children/` — **skills are procedures, not knowledge stores**, so a skill directory carries no `learnings/` mirror.
 
-```
-.claude/skills/{skill-name}/
-├── SKILL.md              ← The skill's procedure (steps, identity, flow). Stays short.
-└── learnings/            ← Accumulated edge cases, successful patterns, anti-patterns
-    ├── topic-1.md
-    ├── topic-2.md
-    └── ...
-```
-
-[`atl install`](/cli/install) fetches the team from the catalog and copies skills (along with agents and rules) into your project's `.claude/` directory. [`atl update`](/cli/update) refreshes installed teams from the catalog. `/drain` writes to the project-local copy first; `atl promote` then lifts gains to your global layer, and `atl publish` can propose them upstream to the team's repo.
-
-Same shape, same rules, same `knowledge-base-summary` frontmatter convention. The skill's `SKILL.md` ships with an "Accumulated Learnings" section auto-aggregated from `learnings/*.md` frontmatter — same mechanism as `agent.md`'s Knowledge Base.
-
-**Why mirror agents on skills?** The "self-improving skill" framing benefits from a structured place for accumulated wisdom that agents (Claude) can see when invoking the skill. Without `learnings/`, every skill use starts from zero on edge cases that came up in prior runs.
+This is the canonical rule in [`core/rules/agent-structure.md`](https://github.com/agentteamland/atl/blob/main/core/rules/agent-structure.md): "v1 kept a separate `learnings/` mirror for skills; v2 unifies — there is one knowledge base, the agent's `children/`. Skills are procedures, not knowledge stores." The rest of this page is about that one knowledge base: the agent `children/` directory.
 
 ## The frontmatter contract
 
-Every `children/*.md` and `learnings/*.md` file MUST carry a `knowledge-base-summary` frontmatter field:
+Every `children/*.md` file MUST carry a `knowledge-base-summary` frontmatter field:
 
 ```markdown
 ---
@@ -77,18 +64,18 @@ knowledge-base-summary: "<one-to-three-line summary used in the auto-rebuilt ind
 <the actual content — patterns, strategies, examples — as long as needed>
 ```
 
-This summary is what feeds the parent file's Knowledge Base / Accumulated Learnings section. Without it, `/drain` either skips the topic in the rebuild OR (for new files it created itself) writes the field with a generated summary; in both cases the file should have one.
+This summary is what feeds the parent file's Knowledge Base section. Without it, `/drain` either skips the topic in the rebuild OR (for new files it created itself) writes the field with a generated summary; in both cases the file should have one.
 
 ## Auto-rebuilt index sections
 
-When `/drain` runs, it rebuilds the parent file's index section from the frontmatter of every `children/*.md` (for agents) or `learnings/*.md` (for skills). The shape is identical for both:
+When `/drain` runs, it rebuilds the `agent.md` **Knowledge Base** section from the frontmatter of every `children/*.md`:
 
 ```markdown
-## Knowledge Base                     ← (or "Accumulated Learnings" for skills)
+## Knowledge Base
 
 ### <Topic 1 (heading-cased from filename)>
 <knowledge-base-summary>
-→ [Details](children/topic-1.md)     ← (or learnings/topic-1.md for skills)
+→ [Details](children/topic-1.md)
 
 ### <Topic 2>
 <knowledge-base-summary>
@@ -97,7 +84,7 @@ When `/drain` runs, it rebuilds the parent file's index section from the frontma
 ...
 ```
 
-Hand edits to this section are **overwritten** on the next `/drain` run — the source of truth is each child file's frontmatter. The rest of `agent.md` / `SKILL.md` (identity, responsibility, principles, flow) is **not touched** by the rebuild.
+Hand edits to this section are **overwritten** on the next `/drain` run — the source of truth is each child file's frontmatter. The rest of `agent.md` (identity, responsibility, principles) is **not touched** by the rebuild.
 
 ## Three layers of update
 
@@ -105,9 +92,9 @@ The split lets "knowledge accumulates" be automatic and frictionless, while prot
 
 | Layer | What changes | How |
 |---|---|---|
-| **A — auto** | A `children/{topic}.md` or `learnings/{topic}.md` file is created or updated. | `/drain` writes it directly. No prompt. |
-| **B — auto** | The parent's Knowledge Base / Accumulated Learnings section is rebuilt from the new frontmatter set. | `/drain` rebuilds it. No prompt. |
-| **C — gated** | The parent's identity / responsibility / principles / skill flow needs to change. | `/drain` raises an `AskUserQuestion` gate. The user approves; the file is updated. The user rejects; the proposal is logged to journal as "rejected." |
+| **A — auto** | A `children/{topic}.md` file is created or updated. | `/drain` writes it directly. No prompt. |
+| **B — auto** | The parent's Knowledge Base section is rebuilt from the new frontmatter set. | `/drain` rebuilds it. No prompt. |
+| **C — gated** | The parent's identity / responsibility / principles need to change. | `/drain` raises an `AskUserQuestion` gate. The user approves; the file is updated. The user rejects; the proposal is logged to journal as "rejected." |
 
 The C-layer protects the top-level identity from automatic drift. Once the user approves a change, the file is updated.
 
@@ -137,16 +124,16 @@ Without a blueprint, the agent guesses how to create new units. With a blueprint
 - New team members (or new Claude sessions) produce consistent output
 - Quality is repeatable, not accidental
 
-(Skills don't have a blueprint pattern — a skill IS the procedure, not a template-driven unit. The Accumulated Learnings section is the skill's equivalent of a blueprint's checklist: things to remember, edge cases to watch for.)
+(Skills don't have a blueprint pattern — a skill IS the procedure, not a template-driven unit.)
 
 ## Related
 
 - [Knowledge system](/guide/knowledge-system) — the project-side mirror (journal + wiki) of this team-side pattern
-- [`/drain`](/skills/drain) — writes children/ and learnings/ files; rebuilds parent index sections
-- [Concepts: Skill](/guide/concepts#skill) — where the learnings/ pattern fits
+- [`/drain`](/skills/drain) — writes `children/` files; rebuilds the agent Knowledge Base section
 - Canonical rule: [`core/rules/agent-structure.md`](https://github.com/agentteamland/atl/blob/main/core/rules/agent-structure.md)
 
 ## History
 
 - `core@1.0.0`: agent children pattern introduced. Knowledge Base section was hand-maintained.
-- `core@1.8.0`: Q3 of [self-updating-learning-loop](https://github.com/agentteamland/workspace/blob/main/.atl/docs/self-updating-learning-loop.md) extends children pattern to skills (`learnings/` mirror of `children/`). Knowledge Base + Accumulated Learnings sections become auto-rebuild from frontmatter. C-layer onay gate for identity / core changes formalized as part of the rule. Renamed from "Agent Configuration Rules" to "Agent + skill structure rules" to reflect the broader scope.
+- `core@1.8.0`: Q3 of [self-updating-learning-loop](https://github.com/agentteamland/workspace/blob/main/.atl/docs/self-updating-learning-loop.md) extended the children pattern to skills (a `learnings/` mirror of `children/`), with both the Knowledge Base and an "Accumulated Learnings" section auto-rebuilt from frontmatter. C-layer approval gate for identity / core changes formalized as part of the rule. The rule was renamed from "Agent Configuration Rules" to "Agent + skill structure rules" to reflect the broader scope.
+- **atl v2**: the skill `learnings/` mirror was **removed** — the knowledge base unified back to the agent's `children/`; skills are procedures, not knowledge stores (per [`core/rules/agent-structure.md`](https://github.com/agentteamland/atl/blob/main/core/rules/agent-structure.md)).

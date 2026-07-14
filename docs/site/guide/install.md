@@ -88,7 +88,7 @@ atl --version
 atl --help
 ```
 
-You should see the installed version and the command list: `install`, `update`, `promote`, `pin`, `unpin`, `publish`, `learnings`, `tick`, `session-start`, `setup-hooks`, `doctor`, `list`, `search`, `remove`.
+You should see the installed version and the top-level commands, including `install`, `update`, `upgrade`, `remove`, `list`, `search`, `promote`, `publish`, `pin`, `unpin`, `learnings`, `tick`, `session-start`, `setup-hooks`, `doctor`, `gc`, `skills`, `rules`, `docs`, and `init`.
 
 ## What got installed
 

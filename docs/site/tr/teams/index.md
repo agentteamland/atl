@@ -24,4 +24,4 @@ Takımlar `<handle>/<ad>` referansıyla kurulur. [`atl install`](/tr/cli/install
 
 ## Kendi takımını yayımla
 
-Herkes takım yayımlayabilir — [Takım oluşturma](/tr/authoring/creating-a-team) sayfasına bak. Geçerli bir `team.json` içeren ve `atl-team` topic'i taşıyan herkese açık bir depo bir saat içinde katalogda görünür.
+Herkes takım yayımlayabilir — [Takım oluşturma](/tr/authoring/creating-a-team) sayfasına bak. Herkese açık bir depo geçerli bir `team.json` içerip `atl-team` topic'ini taşıdığında, saatlik bir CI işi onu keşfeder ve bir pull request ile katalog güncellemesi önerir; takım, bir bakımcı o PR'ı inceleyip birleştirdiğinde kurulabilir hâle gelir.

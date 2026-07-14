@@ -88,7 +88,7 @@ atl --version
 atl --help
 ```
 
-Kurulu sürümü ve komut listesini görmelisin: `install`, `update`, `promote`, `pin`, `unpin`, `publish`, `learnings`, `tick`, `session-start`, `setup-hooks`, `doctor`, `list`, `search`, `remove`.
+Kurulu sürümü ve üst düzey komutları görmelisin; bunlara `install`, `update`, `upgrade`, `remove`, `list`, `search`, `promote`, `publish`, `pin`, `unpin`, `learnings`, `tick`, `session-start`, `setup-hooks`, `doctor`, `gc`, `skills`, `rules`, `docs` ve `init` dahildir.
 
 ## Ne kuruldu?
 

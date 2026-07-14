@@ -62,7 +62,7 @@ a1b2c3d4e5f6  learning      BSD sed requires escaped pipes for alternation …
 
 ### `atl learnings ack <id>`
 
-Deletes a processed item from the queue — processed-then-deleted, so it can never resurface. Takes exactly one id (the full id from `peek --json`, not the 12-char display form). Idempotent: acking an id that isn't there is a harmless no-op. The [`/drain`](/skills/drain) skill calls this after it integrates each item.
+Deletes a processed item from the queue — processed-then-deleted, so it can never resurface. Takes exactly one id — the full id, or any unambiguous prefix of it, including the 12-char form `peek` prints (it resolves git-short-SHA style; an unknown or ambiguous prefix errors instead of guessing). An id that matches no pending item — a typo, or one you already acked — is rejected with an error rather than silently succeeding, so a wrong id fails loudly instead of pretending to work. The [`/drain`](/skills/drain) skill acks each item exactly once after integrating it.
 
 ```
 acked a1b2c3d4e5f6...

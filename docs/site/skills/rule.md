@@ -6,15 +6,12 @@ For complex or ambiguous rules where multiple formulations are possible, use [`/
 
 Ships as a global skill in the [atl monorepo](https://github.com/agentteamland/atl).
 
-## Three scopes
+## Two scopes
 
 | Flag | Target | When |
 |---|---|---|
-| *(none)* | Project `.claude/` files | Rules specific to this project (default) |
-| `--global` | `~/.claude/rules/` | Personal rules that apply to every project |
-| `--team` | Team files under the active scope's `.claude/` directory | Agent or team-rule files for an installed team |
-
-For `--team`, the active team is detected from installed `.claude/agents/` files. Single team → used automatically; multiple teams → asks via `AskUserQuestion`.
+| *(none)* | Project `.atl/` files | Rules specific to this project (default) |
+| `--global` | `~/.atl/rules/` | Personal rules that apply to every project |
 
 ## Flow
 
@@ -32,21 +29,14 @@ From the user's natural-language statement, extract:
 
 | Applicability | File |
 |---|---|
-| Common to all applications | `.claude/rules/coding-common.md` |
+| Common to all applications | `.atl/rules/coding-common.md` |
 | A specific application | `.atl/docs/coding-standards/{app}.md` (selected from existing files) |
 
 **Global scope (`--global`):**
 
 | Applicability | File |
 |---|---|
-| General rule | `~/.claude/rules/{topic}.md` (append if exists, create if not) |
-
-**Team scope (`--team`):**
-
-| Related area | File |
-|---|---|
-| An agent's knowledge base | `.claude/agents/{agent}.md` (under the active scope) |
-| Team-wide rule | `.claude/rules/{topic}.md` (under the active scope) |
+| General rule | `~/.atl/rules/{topic}.md` (append if exists, create if not) |
 
 If the rule applies to more than one but not all, the skill asks.
 
@@ -93,12 +83,6 @@ what types of changes? Be specific.}
 
 Update the target file via `Edit`. Give the user a brief summary: which file and which ID.
 
-### 7. Persisting team-scope rules
-
-Team rules written with `--team` are saved into the team's installed asset files under `.claude/`. These are local copies — they are not automatically pushed back to the team's upstream repository.
-
-To contribute a rule back upstream, open a PR against the team's source repository directly. [`/create-pr`](/skills/create-pr) automates this if installed.
-
 ## Important rules
 
 1. **Language:** The user may invoke the skill in any language; the skill always **writes the rule in English**.
@@ -106,7 +90,6 @@ To contribute a rule back upstream, open a PR against the team's source reposito
 3. **No duplication.** Read existing rules first.
 4. **Validate file paths.** Wrong scope → wrong file.
 5. **No format deviations.** All required fields filled: Rule, Why, Apply when, Examples.
-6. **Team-scope rules ship via PR, not direct push.** Branch-protected; the skill writes locally and points at PR creation.
 
 ## Related
 

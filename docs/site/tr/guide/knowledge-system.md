@@ -101,10 +101,9 @@ Aynı güncel-doğru-vs-geçmiş bölünmesi takım tarafında da vardır; tek b
 
 Somut olarak:
 
-- **Ajan çocuk dosyaları** (ajanın dizinindeki `children/{topic}.md`) wiki'nin ajan tarafındaki karşılığıdır — konu tabanlı, yerine yazma / güncelleme, ajan için projeler arası alan bilgisi.
-- **Beceri öğrenim dosyaları** (bir becerinin dizinindeki `learnings/{topic}.md`) beceri başına karşılıktır — aynı şekil, kapsamı beceriye sıkıştırılmış.
+- **Ajan çocuk dosyaları** (ajanın dizinindeki `children/{topic}.md`) wiki'nin ajan tarafındaki karşılığıdır — konu tabanlı, yerine yazma / güncelleme, ajan için projeler arası alan bilgisi. (Beceriler bilgi deposu değil, yordamdır — böyle bir dizinleri yoktur.)
 
-Her ikisinde de bir `knowledge-base-summary:` frontmatter alanı bulunur ve bu alan `agent.md` (Knowledge Base bölümü) ya da `SKILL.md` (Accumulated Learnings bölümü) içine kendiliğinden derlenir. Tüm desen için bkz. [Children + learnings](/tr/guide/children-and-learnings).
+Her çocuk dosyada bir `knowledge-base-summary:` frontmatter alanı bulunur ve bu alan `agent.md`'nin Knowledge Base bölümüne kendiliğinden derlenir. Tüm desen için bkz. [Children + learnings](/tr/guide/children-and-learnings).
 
 ## İlgili
 
