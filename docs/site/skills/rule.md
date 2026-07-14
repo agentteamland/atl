@@ -13,6 +13,10 @@ Ships as a global skill in the [atl monorepo](https://github.com/agentteamland/a
 | *(none)* | Project `.atl/` files | Rules specific to this project (default) |
 | `--global` | `~/.atl/rules/` | Personal rules that apply to every project |
 
+::: tip How the rule actually loads
+`.atl/rules/` is the durable source. `atl session-start` reflects `.atl/rules/*.md` into the matching `.claude/rules/` — the surface Claude Code loads — so a rule written to `.atl/rules/` takes effect from the next session. The `.claude/rules/` copy is derived; `atl gc` reclaims it only once you delete the `.atl/rules/` source. (App-specific files under `.atl/docs/coding-standards/` are on-demand reference, not always-loaded rules, and are not reflected.)
+:::
+
 ## Flow
 
 ### 1. Analyze the rule
