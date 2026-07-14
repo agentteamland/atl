@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "name": "delivery-team",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Azure DevOps work-item-driven, sprint-based autonomous software delivery: role-agents + ceremony skills orchestrated by atl work dispatch over isolated claude -p workers in git worktrees.",
   "author": {
     "name": "AgentTeamLand",
