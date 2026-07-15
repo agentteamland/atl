@@ -71,7 +71,7 @@ atl list
 
 ## 6. Use it in Claude Code
 
-Open Claude Code in this directory. The team's skills are available as slash commands — by convention, stack teams ship `/create-new-project` (scaffold a full stack: gather → scaffold → build → verify → commit) and `/verify-system` (an end-to-end health check).
+Open Claude Code in this directory. The team's skills are available as slash commands — each skill the team ships is invocable by name.
 
 Every agent the team ships is available for Claude to delegate to.
 
