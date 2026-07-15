@@ -14,9 +14,9 @@ When you run `atl install`, the CLI does not run a JSON Schema validator. It che
 
 - `team.json` parses as valid JSON.
 - It has a `name`.
-- Every asset declared under `agents[]`, `skills[]`, and `rules[]` exists on disk at its expected path.
+- It ships at least one file under an asset directory (`agents/`, `skills/`, `rules/`, `knowledge/`, `scripts/`, `packs/`).
 
-If any of those fail, the install stops with an error. Anything else (extra fields, formatting) is ignored.
+If any of those fail, the install stops with an error. Individual declared `agents[]`/`skills[]`/`rules[]` entries are catalog metadata and are not validated against disk at install time — the `atl skills check` dev command performs that cross-check for first-party teams. Anything else (extra fields, formatting) is ignored.
 
 ## Related
 
