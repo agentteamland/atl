@@ -7,6 +7,7 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/agentteamland/atl/cli/internal/detach"
 	"github.com/agentteamland/atl/cli/internal/throttle"
 )
 
@@ -49,7 +50,7 @@ func AutoApply(ctx context.Context, current string) string {
 		return fmt.Sprintf("atl: %s is available — rerun the install script to upgrade (Windows)", st.Latest)
 	}
 
-	if err := spawnDetachedUpgrade(); err != nil {
+	if err := detach.Spawn("upgrade"); err != nil {
 		return ""
 	}
 	return fmt.Sprintf("atl: %s available — updating in the background (active next session)", st.Latest)

@@ -83,10 +83,18 @@ Her bildirim `schemaVersion`, `handle`, `name`, `version`, `scope`, çekildiği 
 
 `atl update`'i elle nadiren çalıştırsın çünkü ATL her şeyi otomatik güncel tutar. [`atl setup-hooks`](/tr/cli/setup-hooks) ([`atl install`](/tr/cli/install)'ın zorunlu bir parçası olarak çalıştırılır) iki Claude Code hook'u bağlar:
 
-- `SessionStart` → [`atl session-start`](/tr/cli/setup-hooks) — önceki oturumun öğrenmelerini boşaltır, doktor öz denetimini çalıştırır ve platform çekirdeğini global katmana yansıtır.
+- `SessionStart` → [`atl session-start`](/tr/cli/setup-hooks) — önceki oturumun öğrenmelerini boşaltır, doktor öz denetimini çalıştırır, platform çekirdeğini global katmana yansıtır ve (proje başına günde bir kez kısıtlanmış olarak) arka planda bir `atl update` başlatır; böylece daha yeni *yayınlanmış* takım sürümleri sen istemeden çekilir.
 - `UserPromptSubmit` → [`atl tick --throttle=10m`](/tr/cli/tick) — ucuz bir istem başına **yayma** (global→proje) işlemi; kısıtlamalı bir boşaltma + doktor + yükseltme geçişi içerir.
 
-İstem başına [`atl tick`](/tr/cli/tick), yerel yaymayı sürekli halleder; bu sayede global katmanına yükseltilen kazanımlar sen hiçbir şey yapmadan projelerine ulaşır. `atl update` ağ kısmını ekler — indeksi yeniden çözerek ve daha yeni *yayınlanmış* takım sürümlerini çekerek — bu daha ağır geçişi elle (ya da yeni sürümleri şimdi kontrol etmek istediğinde) çalıştırsın.
+İstem başına [`atl tick`](/tr/cli/tick), yerel yaymayı sürekli halleder; bu sayede global katmanına yükseltilen kazanımlar sen hiçbir şey yapmadan projelerine ulaşır. **Ağ** kısmı — indeksi yeniden çözmek ve daha yeni *yayınlanmış* takım sürümlerini çekmek — de otomatik çalışır: `atl session-start`, proje başına günde en çok bir kez ayrık (detached) bir `atl update` başlatır; böylece indirme arka planda yürür ve bir sonraki oturum daha yeni takımları görür. `atl update`'i elle çalıştırmak yalnızca o ağ geçişini, kısıtlamayı beklemeden şimdi zorlar.
+
+### Otomatik takım güncellemesini devre dışı bırakma
+
+Otomatik session-start takım güncellemesini kapatmak için `ATL_NO_TEAM_UPDATE` değişkenini (herhangi bir değere) ayarla; elle çalıştırılan `atl update` komutu yine çalışır. Bu, ikili için [`ATL_NO_SELF_UPDATE`](/tr/cli/upgrade) neyse takım varlıkları için onun karşılığıdır. Özellik aksi hâlde her zaman açıktır.
+
+```bash
+ATL_NO_TEAM_UPDATE=1   # session-start artık takımları otomatik güncellemez
+```
 
 ## Yayınlama önerileri {#yayınlama-önerileri}
 

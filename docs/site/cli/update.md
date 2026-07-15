@@ -83,10 +83,18 @@ Each manifest records `schemaVersion`, `handle`, `name`, `version`, `scope`, the
 
 You rarely run `atl update` by hand because ATL keeps things current automatically. [`atl setup-hooks`](/cli/setup-hooks) (run as a mandatory part of [`atl install`](/cli/install)) wires two Claude Code hooks:
 
-- `SessionStart` → [`atl session-start`](/cli/setup-hooks) — drains the previous session's learnings, runs the doctor self-check, and reflects platform core into the global layer.
+- `SessionStart` → [`atl session-start`](/cli/setup-hooks) — drains the previous session's learnings, runs the doctor self-check, reflects platform core into the global layer, and (throttled to once a day per project) spawns a background `atl update` so newer *published* team versions are pulled without you asking.
 - `UserPromptSubmit` → [`atl tick --throttle=10m`](/cli/tick) — a cheap per-prompt **fan-out** (global→project), plus a throttled drain + doctor + promote pass.
 
-The per-prompt [`atl tick`](/cli/tick) handles the local fan-out continuously, so gains promoted into your global layer reach your projects without you doing anything. `atl update` adds the **network** half — re-resolving the index and pulling newer *published* team versions — which is the heavier pass you run manually (or whenever you want to check for new releases now).
+The per-prompt [`atl tick`](/cli/tick) handles the local fan-out continuously, so gains promoted into your global layer reach your projects without you doing anything. The **network** half — re-resolving the index and pulling newer *published* team versions — also runs automatically: `atl session-start` spawns a detached `atl update` at most once a day per project, so the download runs in the background and the next session sees the newer teams. Running `atl update` by hand just forces that network pass now instead of waiting for the throttle.
+
+### Disabling the automatic team-update
+
+Set `ATL_NO_TEAM_UPDATE` (to any value) to turn off the automatic session-start team-update; the manual `atl update` command still works. It's the team-asset counterpart to [`ATL_NO_SELF_UPDATE`](/cli/upgrade#disabling-it) for the binary. The feature is otherwise always on.
+
+```bash
+ATL_NO_TEAM_UPDATE=1   # session-start no longer auto-updates teams
+```
 
 ## Publish suggestions
 

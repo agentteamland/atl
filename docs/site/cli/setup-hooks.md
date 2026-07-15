@@ -51,6 +51,7 @@ Runs once when you open a new Claude Code session. `atl session-start` performs 
 2. **Drain the previous session** — discovers this project's transcripts modified since the last drain, extracts the assistant text, and transfers any inline `<!-- learning: ... -->` markers into the durable queue at `~/.atl/queue.db` (exactly once).
 3. **Doctor self-check** — runs the queue-health + asset-integrity checks and surfaces (or auto-heals) anything not OK.
 4. **Signal pending learnings** — if the queue holds unprocessed learnings, prints a one-line `atl: N learning(s) pending — run /drain to fold them into the knowledge base` so Claude folds them in.
+5. **Auto-update, throttled (background)** — at most once a day, checks for a newer `atl` release and, if there is one, spawns a detached [`atl upgrade`](/cli/upgrade); and, once a day per project, spawns a detached [`atl update`](/cli/update) to pull newer *published* team versions. Both run in the background so they never block boot, and the next session runs on the fresh binary / teams. Set `ATL_NO_SELF_UPDATE` or `ATL_NO_TEAM_UPDATE` to opt out.
 
 `SessionStart` is the one Claude Code event that delivers hook stdout to Claude's context, so whatever `session-start` prints reaches Claude. It stays quiet when there's nothing worth surfacing, so a boring boot costs nothing.
 
@@ -120,7 +121,7 @@ The merge preserves any other hooks you have. Re-running `atl setup-hooks` (or `
 
 ## Offline behavior
 
-The hooks read and write local files only — draining transcripts, the bbolt queue, and the doctor checks need no network. A hook must never block your work, so `session-start` and `tick` never fail the session; if something goes wrong they surface a line (or stay quiet) and the prompt proceeds normally.
+The core cadence needs no network — draining transcripts, the bbolt queue, the doctor checks, and the per-prompt fan-out all work fully offline. The only network passes are `session-start`'s throttled, detached auto-updates (the binary self-update and the team update), which are best-effort: they fail quietly offline and, being detached, never block boot. A hook must never block your work, so `session-start` and `tick` never fail the session; if something goes wrong they surface a line (or stay quiet) and the prompt proceeds normally.
 
 ## Related
 
