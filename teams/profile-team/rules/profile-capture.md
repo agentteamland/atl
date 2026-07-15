@@ -6,8 +6,13 @@
 fire-and-forget reflex as learning capture, on a separate channel. A marker is a silent
 HTML comment: invisible in rendered output, preserved in the transcript. ATL's automation
 does the rest — `atl tick` transfers your markers into the durable queue exactly once, and
-the `/profile-drain` skill (profile-team's `profile-curator`) folds each into the right
-profile at `~/.atl/profiles/`. You never track state or write profile files inline.
+when the queue is non-empty it signals you to **drain it in the background automatically**
+(the same auto-drain loop as learning capture, on the `profile-fact` channel). The
+`/profile-drain` skill (profile-team's `profile-curator`) folds each marker into the right
+profile at `~/.atl/profiles/`. You never run `/profile-drain` by hand and you never track
+state — capture and integration are both automatic. You do exactly two things: drop a
+`profile-fact` marker when a durable fact comes up, and spawn a background `/profile-drain`
+subagent when the queue signals.
 
 Profiles are **global** — the same entity is one profile across every project. Capture is
 cheap (~30 tokens); free to skip when nothing durable about an entity came up.
@@ -82,3 +87,25 @@ The curator gates writes by tier, and your `source` flag decides what lands:
 
 Be honest about `source`: a wrong inference self-corrects next conversation, but a
 mislabeled `user-confirmed` hardens a guess into fact.
+
+## Auto-drain — what you do when the queue signals
+
+When a hook prints `atl: N profile-fact(s) pending — auto-drain …` into your context:
+
+- **Spawn ONE background `/profile-drain` subagent** (the Agent tool, run in the background)
+  that runs the `/profile-drain` procedure. It inherits this session's auth, so there is no
+  separate `claude -p` and no auth problem.
+- **Single-in-flight:** if a `/profile-drain` subagent you already spawned is still running,
+  do **not** spawn another — the signal keeps appearing until the queue drains, and the
+  running one will clear it. Wait for its completion, then it's done.
+- **Don't ask, don't wait for the user, don't run `/profile-drain` inline** in your own
+  context — keep your main turn for the user's request; the background subagent folds the
+  facts into `~/.atl/profiles/` alongside it.
+- **Nothing is lost:** the durable queue is the safety net — if a background drain fails or
+  you miss a turn, the markers survive and the next turn's signal retries them; the worst
+  case is a profile-fact integrated a turn later.
+- **Fallback:** if this harness has no background-subagent capability, run the
+  `/profile-drain` procedure yourself, concisely, at the end of your turn.
+
+This is the profile-fact sibling of the `learning-capture` auto-drain — the same signal
+shape and the same single-in-flight discipline, on a separate channel with its own skill.

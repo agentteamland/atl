@@ -63,8 +63,11 @@ channel, the sibling of the [learning loop](/guide/learning-marker-lifecycle):
    `profile-fact` channel exactly once — deterministic, no LLM. `atl learnings status`
    counts them; `atl learnings peek --channel profile-fact` inspects them.
 
-3. **Signal.** At session start, `atl` surfaces `N profile-fact(s) pending — run
-   /profile-drain` (the sibling of the learning signal).
+3. **Signal.** Whenever the `profile-fact` channel is non-empty, `atl tick` (every turn)
+   and session start emit an auto-drain signal — `N profile-fact(s) pending — auto-drain …`,
+   the sibling of the learning signal. The `profile-capture` rule acts on it: the agent
+   spawns **one** background `/profile-drain` subagent (single-in-flight), so integration is
+   automatic and you never run it by hand.
 
 4. **Drain.** `/profile-drain` hands the pending facts to the `profile-curator` agent,
    which resolves each to the right person, applies it (privacy-gated, source-flagged),

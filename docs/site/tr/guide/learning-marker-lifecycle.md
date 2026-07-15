@@ -92,7 +92,7 @@ Kuyruk çok kanallıdır. İkinci bir kanal, `profile-fact`, kullanıcı ya da b
 <!-- profile-fact: Prefers TypeScript over JavaScript for all new services. -->
 ```
 
-Öğrenme otomatik-drain'i yalnızca `learning` kanalını işler; `profile-fact`, profil takımının kendi `/profile-drain`'i (profile-team ile birlikte kurulur) tarafından ele alınır, burada değil.
+Her iki kanal da aynı şekilde auto-drain olur — `atl tick` her biri için sinyali basar ve ajan arka planda bir drain subagent'ı başlatır. `learning` kanalı `/drain` ile (`learning-capture` kuralına göre) drain edilir; `profile-fact` ise profile-team'in `/profile-drain`'i ile (kendi `profile-capture` kuralına göre, takımla birlikte kurulur) drain edilir — yani profile-team kurulu olmayan bir oturum `profile-fact` sinyaline hiç davranmaz.
 
 ## Neden satır içi işaretçi, araç çağrısı değil?
 

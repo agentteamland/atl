@@ -42,7 +42,7 @@ Fix: one shared pool. Symptom was intermittent timeouts at ~200 rps.
 
 ### The `profile-fact` channel
 
-A second channel, `profile-fact`, captures durable facts about the entities in the user's world (people, orgs, and more), for the profile layer — a shipped first-party team (`profile-team`). Same hidden-comment shape, `profile-fact:` prefix; the exact marker format is owned by profile-team's own `profile-capture` rule, which installs with the team. The auto-drain here processes only the `learning` channel; `profile-fact` is folded in by profile-team's `/profile-drain` when installed.
+A second channel, `profile-fact`, captures durable facts about the entities in the user's world (people, orgs, and more), for the profile layer — a shipped first-party team (`profile-team`). Same hidden-comment shape, `profile-fact:` prefix; the exact marker format is owned by profile-team's own `profile-capture` rule, which installs with the team. That channel auto-drains the same way this one does — a background `/profile-drain` subagent — but the action instruction lives in the `profile-capture` rule: `atl tick` emits the auto-drain signal for both channels, while the rule that acts on each ships with its owner, so a session without profile-team simply never acts on the `profile-fact` signal.
 
 ## What happens after — the automatic loop
 

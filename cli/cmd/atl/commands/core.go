@@ -13,13 +13,31 @@ import (
 // autoDrainNotice is the per-turn signal that tells the agent to drain the
 // learning queue in the background — empty when the queue is empty. Both the
 // UserPromptSubmit tick and session-start emit it; the learning-capture rule is
-// what acts on it (spawn a background drain subagent). Kept in one place so the
-// wording can't drift between the two emitters.
+// what acts on it (spawn a background drain subagent).
 func autoDrainNotice(pending int) string {
+	return drainSignal(pending, "learning", "learning-capture")
+}
+
+// autoProfileDrainNotice is the profile-fact sibling of autoDrainNotice: the
+// per-turn signal telling the agent to fold pending profile-fact markers into
+// the global profiles in the background via /profile-drain. The action
+// instruction lives in profile-team's profile-capture rule (core stays
+// team-agnostic), so when profile-team isn't installed no rule acts on this and
+// it is a harmless notice.
+func autoProfileDrainNotice(pending int) string {
+	return drainSignal(pending, "profile-fact", "profile-capture")
+}
+
+// drainSignal builds the shared auto-drain signal for one queue channel — a
+// single wording template for every channel, so the two emitters (tick +
+// session-start) and the two channels can't drift. noun is the singular item
+// name ("learning", "profile-fact"); rule is the capture rule that carries the
+// action instruction. Empty when the channel is empty (no false-fire).
+func drainSignal(pending int, noun, rule string) string {
 	if pending <= 0 {
 		return ""
 	}
-	return fmt.Sprintf("atl: %d learning(s) pending — auto-drain them now in a background subagent (per the learning-capture rule)", pending)
+	return fmt.Sprintf("atl: %d %s(s) pending — auto-drain them now in a background subagent (per the %s rule)", pending, noun, rule)
 }
 
 // reflectCore refreshes the embedded core rules + skills into the global Claude

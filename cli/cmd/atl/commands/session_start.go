@@ -98,11 +98,12 @@ var sessionStartCmd = &cobra.Command{
 		if msg := autoDrainNotice(learningPending); msg != "" {
 			fmt.Println(msg)
 		}
-		// profile-team's channel: only fires when profile-team is installed and a
-		// session dropped profile-fact markers. /profile-drain is a team skill; core
-		// /drain stays learning-only (its documented boundary).
-		if profilePending > 0 {
-			fmt.Printf("atl: %d profile-fact(s) pending — run /profile-drain to fold them into the profiles\n", profilePending)
+		// profile-team's channel: the profile-fact sibling of the learning auto-drain
+		// above. The action instruction lives in profile-team's profile-capture rule
+		// (core stays team-agnostic), so this is a harmless notice when profile-team
+		// isn't installed.
+		if msg := autoProfileDrainNotice(profilePending); msg != "" {
+			fmt.Println(msg)
 		}
 
 		// Docs-correctness signal — fires only in a repo that has a docs site

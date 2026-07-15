@@ -30,6 +30,30 @@ func TestAutoDrainNotice(t *testing.T) {
 	}
 }
 
+// autoProfileDrainNotice is the profile-fact sibling: same background auto-drain
+// shape, but its own channel noun and its own action-owning capture rule.
+func TestAutoProfileDrainNotice(t *testing.T) {
+	if autoProfileDrainNotice(0) != "" {
+		t.Error("an empty profile-fact queue must produce no signal (no false-fire)")
+	}
+	if autoProfileDrainNotice(-1) != "" {
+		t.Error("a negative count must produce no signal")
+	}
+	msg := autoProfileDrainNotice(2)
+	if !strings.Contains(msg, "2 profile-fact") {
+		t.Errorf("the signal must carry the count and channel: %q", msg)
+	}
+	if !strings.Contains(msg, "auto-drain") || !strings.Contains(msg, "background") {
+		t.Errorf("the signal must instruct a background auto-drain: %q", msg)
+	}
+	if !strings.Contains(msg, "profile-capture") {
+		t.Errorf("the signal must point at the profile-capture rule (its action owner): %q", msg)
+	}
+	if strings.Contains(msg, "run /profile-drain") {
+		t.Errorf("the signal must not be the old passive 'run /profile-drain' wording: %q", msg)
+	}
+}
+
 // ownedRuleNames must protect both the platform's core rules (global only) and
 // any team-installed rule — a user rule that collides with either name must not
 // be reflected over installed content.

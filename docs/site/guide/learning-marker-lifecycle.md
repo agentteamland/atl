@@ -91,7 +91,7 @@ The queue is multi-channel. A second channel, `profile-fact`, captures durable f
 <!-- profile-fact: Prefers TypeScript over JavaScript for all new services. -->
 ```
 
-The learning auto-drain processes only the `learning` channel; `profile-fact` is handled by the profile team's own `/profile-drain` (installed with profile-team), not here.
+Both channels auto-drain the same way — `atl tick` emits the signal for each, and the agent spawns a background drain subagent. The `learning` channel is drained by `/drain` (per the `learning-capture` rule); `profile-fact` is drained by profile-team's `/profile-drain` (per its `profile-capture` rule, installed with the team), so a session without profile-team simply never acts on the `profile-fact` signal.
 
 ## Why inline marks, not a tool call
 

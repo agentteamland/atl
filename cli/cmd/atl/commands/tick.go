@@ -76,6 +76,9 @@ var tickCmd = &cobra.Command{
 			if msg := autoDrainNotice(counts[queue.ChannelLearning]); msg != "" {
 				fmt.Println(msg)
 			}
+			if msg := autoProfileDrainNotice(counts[queue.ChannelProfileFact]); msg != "" {
+				fmt.Println(msg)
+			}
 		}
 
 		// Throttle gate (auto mode): skip the heavier drain+doctor pass if we ran
