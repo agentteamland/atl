@@ -63,8 +63,11 @@ yeniden kullanır — [öğrenme döngüsünün](/tr/guide/learning-marker-lifec
    olarak bir kez aktarır — deterministik, LLM yok. `atl learnings status` onları sayar;
    `atl learnings peek --channel profile-fact` inceler.
 
-3. **Sinyal.** Oturum başlangıcında `atl`, `N profile-fact(s) pending — run /profile-drain`
-   satırını yüzeye çıkarır (öğrenme sinyalinin kardeşi).
+3. **Sinyal.** `profile-fact` kanalı boş olmadığında, `atl tick` (her turda) ve oturum
+   başlangıcı bir auto-drain sinyali basar — `N profile-fact(s) pending — auto-drain …`,
+   öğrenme sinyalinin kardeşi. `profile-capture` kuralı buna göre davranır: ajan arka planda
+   **tek** bir `/profile-drain` subagent'ı başlatır (single-in-flight), böylece entegrasyon
+   otomatiktir ve onu asla elle çalıştırmazsınız.
 
 4. **Drain.** `/profile-drain`, bekleyen bilgileri `profile-curator` ajanına devreder; ajan her
    birini doğru kişiye çözer, uygular (gizlilik-kapılı, kaynak-etiketli), şemayı evrimleştirir,
