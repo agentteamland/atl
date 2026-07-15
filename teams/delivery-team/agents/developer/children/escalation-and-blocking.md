@@ -76,6 +76,14 @@ The order matters: `status.json` first (the deterministic supervisor signal that
 then the Azure milestone (the durable, human-legible record on the board). Both, so neither the
 engine nor a human is left guessing.
 
+**When I *can't* mark it — a crash or a silent stall.** The contract above is my *clean* path: I
+decide, I mark the board, I exit. If I instead crash or hang without ever writing a `blocker`, I mark
+nothing — but the supervisor's recovery ladder still ends by writing a durable `BlockedReport` to
+`.delivery/blocked/<id>.json`. That report is drained at `/sprint-review` (its step 2), which
+reflects the same `blocked` tag + diagnostic comment onto the work-item and clears the report — so a
+unit that dies mid-flight still reaches the board, just at sprint close instead of the instant I'd
+have marked it myself.
+
 ## The cardinal rule: NEVER fake a green
 
 This is the line that must never move. When I hit a wall, the tempting shortcut is to *look* done —

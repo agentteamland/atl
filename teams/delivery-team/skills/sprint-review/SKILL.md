@@ -21,6 +21,8 @@ the `azureDevOps` MCP.
 | Sprint Review Report | write (idempotent upsert) | project wiki `Sprints/Sprint-<n>-Review` |
 | dev→release PR (on PO Approve only) | write | `repo_create_pull_request` (+ `repo_update_pull_request`) |
 | Rejected PBI (on PO Reject only) | write (idempotent field update + comment) | clear its `IterationPath`, set the runtime-resolved rework state, comment the reason (the #9 resolution — reuse, don't file a parallel item) |
+| Blocked-unit reports (dispatch engine) | read + clear | `<projectRoot>/.delivery/blocked/*.json` |
+| Blocked reflection on each report's work-item | write (idempotent tag + field + comment) | `wit_get_work_item_type` → `wit_update_work_item` (`blocked` tag + `CMMI.Blocked` where exposed, `System.State`/`IterationPath` untouched) + `wit_add_work_item_comment` (§6) |
 
 Field semantics for the config live in
 [`config-and-methodology.md`](../../knowledge/config-and-methodology.md); the Azure operation→tool
@@ -62,7 +64,45 @@ Resolve the concrete sprint and its states at runtime — **never hardcode a sta
 - Resolve the type's state→category map with `wit_get_work_item_type` so "Completed" means the
   **runtime-resolved Completed-category** state, not the literal `"Done"`.
 
-### 2. Compile the Sprint Review Report — acting as the `project-manager`
+### 2. Reflect blocked units to Azure and clear their reports
+
+Before compiling the report, drain the dispatch engine's **blocked reports**. When the recovery
+ladder gives up on a work-unit, `atl work dispatch` writes a durable `BlockedReport` to
+`<projectRoot>/.delivery/blocked/<id>.json` — the engine has **no Azure surface** (the CLI/Skill
+boundary), so reflecting a blocked unit onto its work-item is this ceremony's job. Draining these
+reports here is what turns a silently-stalled unit into a board-visible one; skip it and a crashed
+or stalled unit accumulates on disk, invisible to the PO.
+
+- List `<projectRoot>/.delivery/blocked/*.json`. **None → skip this step** (note "no blocked
+  reports") — the common case.
+- Read and parse each `BlockedReport` (fields: `id`, `branch`, `worktreePath`, `reason`, `phase`,
+  `lastSummary`, `stderrTail`, `preserved`, `blockedAt`).
+- Per report `id`, **reflect the block onto the work-item** — the settled "mark blocked" contract
+  ([azure-adapter.md](../../knowledge/azure-adapter.md) §6), which is **NOT** a state transition:
+  resolve the type with `wit_get_work_item_type`, then `wit_update_work_item` to **merge** `blocked`
+  into `System.Tags` (never clobber existing tags) and, **only where the type exposes it**, set
+  `Microsoft.VSTS.CMMI.Blocked = Yes`. Leave `System.State` **and** `IterationPath` **unchanged**
+  here — the item must stay in the closed iteration so the report (step 3) still reads it as
+  carryover; its return to the backlog is the standard carryover handling
+  ([reject-and-carryover.md](../../agents/project-manager/children/reject-and-carryover.md)), not
+  this step's job.
+- **Record the diagnostic as a comment** (`wit_add_work_item_comment`) whose first line is the
+  supervisor sentinel `**[Blocked — supervisor report]**` — deliberately **distinct** from a worker
+  self-block comment so the two never collide. The body carries `reason` / `phase` / `branch` /
+  `worktreePath` / `lastSummary` / `stderrTail` / `blockedAt`, so whoever picks the unit up next has
+  the full stall/crash context. Idempotency is the §7 sentinel pattern: before adding,
+  `wit_list_work_item_comments` filtered to that sentinel — found → update in place, not-found → add;
+  a re-run never duplicates.
+- **Only after the Azure reflection succeeds, clear the local report** — delete
+  `<projectRoot>/.delivery/blocked/<id>.json`. The durable record is now the work-item comment (plus
+  the preserved git branch); the local file was only the cross-boundary carrier. A failed reflection
+  leaves the report in place, so the next `/sprint-review` retries it (the sentinel makes a retry a
+  safe no-op where it already landed).
+- Hand the reflected ids + their reasons to the compile step (step 3) so each appears in the report's
+  `## Carryover` section flagged **blocked** with its diagnostic — the visible audit trail the PO
+  reads.
+
+### 3. Compile the Sprint Review Report — acting as the `project-manager`
 
 Acting as the `project-manager` (read
 [`../../agents/project-manager/agent.md`](../../agents/project-manager/agent.md) + its `children/`,
@@ -90,10 +130,10 @@ cap as a truncation error, never a complete read). The six sections:
    defines one. The PO reviews the integrated **running result**, not a diff list.
 5. **Actual velocity** — the story points completed this sprint (the Completed sum from §1); this
    is read-only arithmetic and feeds the next `/sprint-plan`'s velocity window.
-6. **Integration findings** — the cross-unit open findings from the tech-lead's checkpoint (step 3)
+6. **Integration findings** — the cross-unit open findings from the tech-lead's checkpoint (step 4)
    plus the forward-fix tasks filed there.
 
-### 3. Run the cross-unit integration checkpoint — acting as the `tech-lead`
+### 4. Run the cross-unit integration checkpoint — acting as the `tech-lead`
 
 Then, **as the `tech-lead`** (read
 [`../../agents/tech-lead/agent.md`](../../agents/tech-lead/agent.md) + its `children/`, especially
@@ -115,9 +155,9 @@ Acceptance Criteria collectively delivered?
   `Architecture/` / `Architecture/ADR/ADR-<n>-<slug>` / `Conventions/` — by idempotent upsert
   (`wiki_create_or_update_page`, §8). Workers never write the wiki; the tech-lead promotes.
 - Feed the checkpoint's open findings + the filed forward-fix task ids back into the report's
-  **Integration findings** section (step 2, §6).
+  **Integration findings** section (step 3, §6).
 
-### 4. Write the report to the wiki and surface it in-session
+### 5. Write the report to the wiki and surface it in-session
 
 Write the assembled report to exactly `Sprints/Sprint-<n>-Review` (`<n>` from step 1) with
 `wiki_create_or_update_page` — an **idempotent upsert** into the `project-manager`'s `Sprints/`
@@ -125,7 +165,7 @@ namespace (§8, one owner). Confirm the `Sprints/` namespace exists on the first
 with `wiki_list_pages`; read `wikiId` from `config.json` (never re-resolved). Also surface the full
 report **in-session** so the PO reads it here before the gate.
 
-### 5. Run the PO Approve/Reject gate — the `product-owner` (human) decides
+### 6. Run the PO Approve/Reject gate — the `product-owner` (human) decides
 
 Ask the **product-owner** (the user) an explicit Approve/Reject question on this sprint's integrated
 `dev` state. This is the **only** trigger for the dev→release merge — the scoped carve-out of the
@@ -148,7 +188,7 @@ inference; wait for the explicit decision.
   merges outside the PO-approved PR.
 - Then mark the iteration reviewed (a runtime-resolved state update via `wit_update_work_item`, §6
   — never a hardcoded literal), and record the approval on the review page (idempotent upsert,
-  step 4).
+  step 5).
 
 **On REJECT — the release STAYS PUT (forward-fix, never a revert):**
 
@@ -166,18 +206,22 @@ carried-over, and rejected work identically):
   next developer who picks it up knows the acceptance gap that brought it back.
 - The next `/sprint-plan` re-picks the no-`IterationPath` item as an ordinary backlog candidate —
   **no special "rejected" queue**.
-- Also record the rejection reason on the review page (idempotent upsert, step 4).
+- Also record the rejection reason on the review page (idempotent upsert, step 5).
 - Do **not** open or complete any dev→release PR — `release` is untouched.
 
 ## Idempotent re-run
 
 A re-run converges, never duplicates (§5 — Azure tags are the source of truth, no local ledger):
 
+- **The blocked-report drain (step 2) is idempotent** — the Azure reflection merges the `blocked`
+  tag (never replaces) and dedups its comment on the `**[Blocked — supervisor report]**` sentinel,
+  and the local `<id>.json` is deleted only after the reflection lands; a re-run either re-reflects a
+  still-present report harmlessly or finds nothing left to drain.
 - **Report generation is read-only** — re-reading the sprint's items, PR links, evidence, and `dev`
   state has no side effect.
 - **The review page is an idempotent upsert** — `wiki_create_or_update_page` overwrites
   `Sprints/Sprint-<n>-Review` in place rather than appending a duplicate.
-- **Any created item** — an integration forward-fix task (step 3) or a reject follow-up (step 5) —
+- **Any created item** — an integration forward-fix task (step 4) or a reject follow-up (step 6) —
   carries `System.Tags` of `atl-run:sprint-review:<sprint-id>` (provenance) + `atl-key:<hash>` where
   `hash = hash(parent-id + plan-ordinal)` (a **stable plan-ordinal**, never a per-run GUID, never
   `hash(title)`). Before any create, a **check-first WIQL** (`wit_query_by_wiql`) for that `atl-key`

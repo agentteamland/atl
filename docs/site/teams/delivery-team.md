@@ -62,8 +62,9 @@ developer  →  tester  →  tech-lead
 
 The engine advances a stage on a worker's clean exit, verifies the tech-lead's merge landed on `dev`
 by a pure git read (never trusting a worker's exit code), reclaims the worktree, and refills the DAG.
-A stalled or crashed worker is reclaimed and retried once, then mark-blocked — a durable report a
-ceremony reflects back to Azure. Each worker reaches Azure only through the project-scoped `azureDevOps`
+A stalled or crashed worker is reclaimed and retried once, then mark-blocked — a durable report that
+`/sprint-review` reflects back to Azure (the `blocked` tag + a diagnostic comment) and clears. Each
+worker reaches Azure only through the project-scoped `azureDevOps`
 MCP the engine wires it, so a worker can never touch anything but the configured test/target project.
 
 ## Azure is the single source of truth

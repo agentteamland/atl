@@ -56,6 +56,13 @@ reasons, all handled the same way — return to backlog, record the reason:
   (the `tech-lead`'s review found blocking issues). The item stays open; next sprint it's a
   candidate again, with the review thread as context.
 
+> **Blocked by a crash/stall, not just a dependency.** A worker that *cleanly* blocks marks the board
+> itself; but one that crashes or silently stalls marks nothing, and the dispatch engine (which has
+> no Azure surface) instead writes a durable `BlockedReport` to `.delivery/blocked/<id>.json`. That
+> report is drained at `/sprint-review` (its step 2): the ceremony reflects the `blocked` tag +
+> diagnostic comment onto the work-item and clears the report, so the unit lands in `## Carryover`
+> like any other — never silently dropped.
+
 Carryover handling:
 
 1. **Clear or leave the IterationPath** — for a clean re-plan, I clear the incomplete item's

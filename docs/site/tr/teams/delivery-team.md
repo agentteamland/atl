@@ -62,8 +62,9 @@ developer  →  tester  →  tech-lead
 
 Motor, bir worker'ın temiz çıkışında stage'i ilerletir, tech-lead'in merge'inin `dev`'e indiğini saf bir
 git okumasıyla doğrular (worker'ın exit code'una asla güvenmez), worktree'yi geri alır ve DAG'ı doldurur.
-Stall eden ya da çöken bir worker geri alınıp bir kez retry edilir, sonra mark-blocked olur — bir
-seremoninin Azure'a yansıttığı kalıcı bir rapor. Her worker Azure'a yalnız motorun ona bağladığı
+Stall eden ya da çöken bir worker geri alınıp bir kez retry edilir, sonra mark-blocked olur — bunu
+`/sprint-review`'ın Azure'a yansıttığı (`blocked` tag'i + tanı yorumu) ve temizlediği kalıcı bir
+rapor. Her worker Azure'a yalnız motorun ona bağladığı
 proje-kapsamlı `azureDevOps` MCP üzerinden erişir; böylece bir worker yapılandırılmış test/hedef proje
 dışında hiçbir şeye dokunamaz.
 
