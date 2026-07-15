@@ -111,4 +111,5 @@ Her çocuk dosyada bir `knowledge-base-summary:` frontmatter alanı bulunur ve b
 - [`atl learnings`](/tr/cli/learnings) — `/drain`'in sürdüğü deterministik kuyruk tesisatı (`status` / `peek` / `ack`).
 - [`atl tick`](/tr/cli/tick) — yakalanan işaretçileri kuyruğa aktarır (döngünün yakalama yarısı).
 - [Children + learnings](/tr/guide/children-and-learnings) — journal + wiki'nin ajan tarafındaki yansıması.
+- [Backlog & tasks](./backlog-and-tasks.md) — ertelenen işler (`backlog.md`) + etkin niyet (`tasks.md`). Bunlar karar **durumudur** — journal + wiki'nin bir kardeşi, üçüncü bir bilgi katmanı değil.
 - Kanonik kural: [`core/rules/knowledge-system.md`](https://github.com/agentteamland/atl/blob/main/core/rules/knowledge-system.md).

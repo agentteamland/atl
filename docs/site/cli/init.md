@@ -33,7 +33,9 @@ The tiers, their budgets, and the managed-vs-owned ownership model are explained
 2. **If a `CLAUDE.md` already exists there, it does nothing** — your file is user-owned and never overwritten.
 3. Otherwise it writes the tier's starter skeleton (filling the project / repo name) and prints the path it created.
 
-`atl install` runs the same project-tier scaffold as a best-effort step: when you install a team into a project that has no `CLAUDE.md`, ATL drops the project starter so the `/brainstorm` and `/drain` blocks have a home. It is only-if-absent and never fails the install.
+For the **project** and **monorepo** tiers, `atl init` also drops empty `.atl/backlog.md` + `.atl/tasks.md` skeletons alongside the `CLAUDE.md` — the two decision-state files the `/brainstorm` skill keeps current (see [Backlog & tasks](../guide/backlog-and-tasks.md)). Each is written **only if absent**, so your own `backlog.md` / `tasks.md` is never overwritten. The **global** tier is skipped — it has no project `.atl/`.
+
+`atl install` runs the same project-tier scaffold as a best-effort step: when you install a team into a project that has no `CLAUDE.md`, ATL drops the project starter (and the `.atl/backlog.md` + `.atl/tasks.md` skeletons) so the `/brainstorm` and `/drain` blocks have a home. It is only-if-absent and never fails the install.
 
 ## Idempotency — safe to re-run
 
@@ -42,6 +44,7 @@ Re-running `atl init` (or `atl install`) when a `CLAUDE.md` is already present i
 ## Related
 
 - [Claude Code conventions](/guide/claude-code-conventions) — the three tiers, token budgets, ownership model, and the marker blocks the project file carries
+- [Backlog & tasks](../guide/backlog-and-tasks.md) — the `.atl/backlog.md` + `.atl/tasks.md` decision-state files this scaffold drops for the project / monorepo tiers
 - [`atl install`](/cli/install) — installs a team and drops the project starter if absent
 - [`/brainstorm`](/skills/brainstorm) — maintains the `<!-- brainstorm:active -->` block in the project `CLAUDE.md`
 - [`/drain`](/skills/drain) — maintains the `<!-- wiki:index -->` knowledge map block

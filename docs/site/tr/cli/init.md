@@ -33,7 +33,9 @@ Tier'ler, bütçeleri ve yönetilen-vs-sahip-olunan ownership modeli [Claude Cod
 2. **Orada zaten bir `CLAUDE.md` varsa hiçbir şey yapmaz** — dosyan kullanıcıya aittir ve asla üzerine yazılmaz.
 3. Aksi hâlde tier'in başlangıç iskeletini yazar (proje / repo adını doldurarak) ve oluşturduğu yolu yazdırır.
 
-`atl install` aynı project-tier scaffold'ı en-iyi-çaba adımı olarak çalıştırır: `CLAUDE.md`'si olmayan bir projeye takım kurduğunda ATL project başlangıcını düşürür ki `/brainstorm` ve `/drain` bloklarının bir evi olsun. Yalnızca-yoksa çalışır ve kurulumu asla başarısız kılmaz.
+**project** ve **monorepo** tier'lerinde `atl init`, `CLAUDE.md`'nin yanına boş `.atl/backlog.md` + `.atl/tasks.md` iskeletlerini de düşürür — `/brainstorm` becerisinin güncel tuttuğu iki karar-durumu dosyası (bkz. [Backlog & tasks](../guide/backlog-and-tasks.md)). Her biri **yalnızca yoksa** yazılır; böylece kendi `backlog.md` / `tasks.md` dosyanın asla üzerine yazılmaz. **global** tier atlanır — proje `.atl/`'si yoktur.
+
+`atl install` aynı project-tier scaffold'ı en-iyi-çaba adımı olarak çalıştırır: `CLAUDE.md`'si olmayan bir projeye takım kurduğunda ATL project başlangıcını (ve `.atl/backlog.md` + `.atl/tasks.md` iskeletlerini) düşürür ki `/brainstorm` ve `/drain` bloklarının bir evi olsun. Yalnızca-yoksa çalışır ve kurulumu asla başarısız kılmaz.
 
 ## İdempotenlik — yeniden çalıştırması güvenlidir
 
@@ -42,6 +44,7 @@ Tier'ler, bütçeleri ve yönetilen-vs-sahip-olunan ownership modeli [Claude Cod
 ## İlgili
 
 - [Claude Code kuralları](/tr/guide/claude-code-conventions) — üç tier, token bütçeleri, ownership modeli ve proje dosyasının taşıdığı marker bloklar
+- [Backlog & tasks](../guide/backlog-and-tasks.md) — bu scaffold'ın project / monorepo tier'lerinde düşürdüğü `.atl/backlog.md` + `.atl/tasks.md` karar-durumu dosyaları
 - [`atl install`](/tr/cli/install) — bir takım kurar ve yoksa project başlangıcını düşürür
 - [`/brainstorm`](/tr/skills/brainstorm) — proje `CLAUDE.md`'sindeki `<!-- brainstorm:active -->` bloğunu yönetir
 - [`/drain`](/tr/skills/drain) — `<!-- wiki:index -->` bilgi haritası bloğunu yönetir

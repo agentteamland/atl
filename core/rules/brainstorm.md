@@ -72,7 +72,7 @@ Every discussion and decision flows through a three-layer chain:
 ```
 brain-storms/ (process) -> docs/ (outcome) -> CLAUDE.md (summary)
                      \
-                       backlog.md (deferred items)
+                       backlog.md (deferred superset) -> tasks.md (active-intent subset)
 ```
 
 - No decision is made without a brainstorm.
@@ -80,14 +80,21 @@ brain-storms/ (process) -> docs/ (outcome) -> CLAUDE.md (summary)
 - If decisions change, a new brainstorm is opened and a "superseded by X" note is
   added to the old one.
 
-Both layers of the chain live in the scope's `.atl/` (project) or `~/.atl/`
+Every layer of the chain lives in the scope's `.atl/` (project) or `~/.atl/`
 (global) — the same scope axis the brainstorm itself lives in.
 
-## Backlog discipline
+## Backlog + tasks discipline
 
-Every item marked "not doing now, later" during a brainstorm must be reflected in
-the scope's **`.atl/backlog.md`**. This prevents scope creep — we record what
-we're not doing now so we remember when the need resurfaces.
+Deferred decisions live in a two-tier surface under the scope's `.atl/`:
+
+- **`.atl/backlog.md`** — the passive, **trigger-gated superset** of everything
+  deferred, punted, or left uncertain. It prevents scope creep: we record what
+  we're *not* doing now so the need isn't lost when it resurfaces. Most entries
+  are gated on a trigger (a condition under which they come back) — the backlog
+  is a scannable index of deferred work, not a to-do list.
+- **`.atl/tasks.md`** — the **active-intent subset**: the short, prioritized list
+  of what we actually mean to do next. An item moves **backlog → tasks** when we
+  decide to pull it forward (a trigger fired, or we simply chose to prioritize it).
 
 ### When to add to the backlog
 
@@ -97,22 +104,36 @@ we're not doing now so we remember when the need resurfaces.
 - Anything noted as "we'll do this later" during development that needs a
   permanent record.
 
-### Format
+### Backlog format (lean, grouped by area)
 
-- **Prepend** (newest on top) — added to the beginning of `.atl/backlog.md`;
-  older items stay below.
-- Per item: date + category heading + context link + detailed description + a
-  "when does this come up" note + related resources.
-- Follow the template at the top of the file.
+- Group items under `## Area` headings by theme, not by date — a scannable index.
+- One line per item: `- **Title** — one sentence. _Trigger:_ when it resurfaces. ↳ [source](...)`.
+- The rich "why deferred / full context" lives in the linked brainstorm — don't
+  duplicate it here. The backlog is the index; the brainstorm is the detail.
+
+### Tasks format (active intent)
+
+- `- [ ] **Title** — one sentence. ↳ [source](...)`, grouped under `## Now` / `## Next`.
+- Keep it short and honest: if nothing is actively planned, `tasks.md` is nearly
+  empty — that is the correct state, not a gap to fill. Don't manufacture tasks;
+  unplanned deferred work belongs in `backlog.md`.
 
 ### Mandatory check during `brainstorm done`
 
-When `/brainstorm done` runs, scan every "deferred" note in the brainstorm file
-and **ensure each has a corresponding backlog entry**. If any are missing, ask
-the user and add them. This is a checklist step before closing the brainstorm.
+When `/brainstorm done` runs, before the docs file is written:
+1. **Backlog:** scan the brainstorm for every deferred / "later" / "not now" /
+   left-uncertain item and ensure each has a `backlog.md` entry under the right
+   area group. If any is missing, add it — or ask the user when it's ambiguous.
+2. **Tasks:** if the brainstorm decided to actively pursue something *now* (rather
+   than defer it), promote that intent into `tasks.md`; and remove from `tasks.md`
+   anything this brainstorm actually shipped.
 
-### Removing from the backlog
+Closing a brainstorm without the backlog check is how deferred scope silently
+disappears.
 
-When an item is implemented, it is **deleted** from the backlog (not marked done
-and left). It's now part of the active infrastructure, so the relevant
-docs/CLAUDE.md is updated instead.
+### Removing from either file
+
+An item **leaves `backlog.md`** when it ships (the `docs/` + CLAUDE.md become the
+source of truth) or when it's promoted into `tasks.md`. A task **leaves `tasks.md`**
+when it ships — deleted, never left behind as a checked-off ✅. Don't leave
+completed items lingering in either file.

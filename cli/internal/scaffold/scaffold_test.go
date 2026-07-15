@@ -115,6 +115,52 @@ func TestWriteIfAbsentGlobal(t *testing.T) {
 	}
 }
 
+func TestWriteStateFilesIfAbsent(t *testing.T) {
+	root := t.TempDir()
+	backlog := filepath.Join(root, ".atl", "backlog.md")
+	tasks := filepath.Join(root, ".atl", "tasks.md")
+
+	// First call creates both under .atl/.
+	created, err := WriteStateFilesIfAbsent(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(created) != 2 {
+		t.Fatalf("first call should create 2 files, got %d: %v", len(created), created)
+	}
+	for _, p := range []string{backlog, tasks} {
+		if _, serr := os.Stat(p); serr != nil {
+			t.Fatalf("expected %s to exist: %v", p, serr)
+		}
+	}
+	b, _ := os.ReadFile(backlog)
+	if !strings.Contains(string(b), "# Backlog") || !strings.Contains(string(b), "Trigger:") {
+		t.Errorf("backlog skeleton missing expected content: %q", firstLine(string(b)))
+	}
+	tb, _ := os.ReadFile(tasks)
+	if !strings.Contains(string(tb), "# Tasks") {
+		t.Errorf("tasks skeleton missing expected content: %q", firstLine(string(tb)))
+	}
+
+	// Second call must NOT overwrite a user-edited file.
+	if err := os.WriteFile(backlog, []byte("USER EDITED"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	created, err = WriteStateFilesIfAbsent(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range created {
+		if p == backlog {
+			t.Errorf("second call must not recreate an existing backlog.md")
+		}
+	}
+	b, _ = os.ReadFile(backlog)
+	if string(b) != "USER EDITED" {
+		t.Errorf("existing backlog.md was clobbered: %q", string(b))
+	}
+}
+
 func firstLine(s string) string {
 	if i := strings.IndexByte(s, '\n'); i >= 0 {
 		return s[:i]

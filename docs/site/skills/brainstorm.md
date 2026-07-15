@@ -75,26 +75,30 @@ Flow:
 
 ## The document chain
 
-Every discussion and decision flows through three layers:
+Every discussion and decision flows through three layers, with two decision-state files hanging off the process:
 
 ```
 brain-storms/ (process) → docs/ (outcome) → CLAUDE.md (summary)
                      \
-                       backlog.md (deferred items)
+                       backlog.md (deferred superset) → tasks.md (active-intent subset)
 ```
 
 - No decision is made without a brainstorm.
 - Brainstorm files are **never deleted** — they're the historical record.
 - If decisions change, a NEW brainstorm is opened and a `superseded by X` note is added to the old one.
 
-## Backlog discipline
+## Backlog & tasks
 
-Every item marked "not doing now, later" during a brainstorm is reflected in `.atl/backlog.md`:
+Two files under a project's `.atl/` hold **decision state** — a sibling to the knowledge-system journal + wiki, not a third knowledge layer. The `/brainstorm` skill writes them and keeps them current. See the [Backlog & tasks](../guide/backlog-and-tasks.md) guide for the full convention.
 
-- **Prepend** (newest on top)
-- For each item: date + category heading + context link + detailed topic description + "when does this come up" note + related resources
-- During `/brainstorm done`, every "deferred" note in the brainstorm is checked against the backlog — missing ones are added before the brainstorm is closed
-- When a deferred item is later implemented, it's **deleted** from the backlog (not marked done)
+- **`backlog.md`** — the passive, **trigger-gated superset** of everything deferred, punted, or left uncertain. A scannable index, not a to-do list. Grouped by `## Area` headings (by theme, not by date). One line per item: `- **Title** — one sentence. _Trigger:_ when it resurfaces. ↳ [source](...)`. The rich why/context stays in the linked brainstorm (backlog is the index, brainstorm is the detail — no duplication).
+- **`tasks.md`** — the **active-intent subset**: the short, prioritized list of what we actually mean to do next. `- [ ] **Title** — one sentence. ↳ [source](...)`, grouped under `## Now` / `## Next`. Kept short and honest: if nothing is planned it is nearly empty (the correct state, not a gap) — don't manufacture tasks.
+
+**Promotion.** An item moves `backlog.md` → `tasks.md` when we decide to pull it forward (a trigger fired, or we chose to prioritize it). An item **leaves** `backlog.md` when it ships **or** when it's promoted to `tasks.md`; a task **leaves** `tasks.md` when it ships (docs + CLAUDE.md become the source of truth) — deleted, never left as a checked-off item.
+
+**`/brainstorm done` checks.** Closing a brainstorm runs a mandatory **backlog check** (every deferred item gets an entry under its `## Area` group) plus a **tasks check** (promote anything decided to act on now; remove anything this brainstorm shipped).
+
+**Scaffolding.** `atl init` (and `atl install`) drop empty `backlog.md` + `tasks.md` skeletons under `.atl/`, only if absent (a user's existing file is never overwritten). The global tier has no project `.atl/`, so it is skipped.
 
 ## Important rules
 

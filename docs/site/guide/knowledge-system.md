@@ -111,4 +111,5 @@ Each child carries a `knowledge-base-summary:` frontmatter field that's auto-agg
 - [`atl learnings`](/cli/learnings) — the deterministic queue plumbing (`status` / `peek` / `ack`) `/drain` drives
 - [`atl tick`](/cli/tick) — transfers captured markers into the queue (the capture half of the loop)
 - [Children + learnings](/guide/children-and-learnings) — the agent-side mirror of journal + wiki
+- [Backlog & tasks](./backlog-and-tasks.md) — deferred work (`backlog.md`) + active intent (`tasks.md`). These are decision **state** — a sibling to journal + wiki, not a third knowledge layer.
 - Canonical rule: [`core/rules/knowledge-system.md`](https://github.com/agentteamland/atl/blob/main/core/rules/knowledge-system.md)

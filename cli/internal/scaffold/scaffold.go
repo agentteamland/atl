@@ -12,7 +12,7 @@ import (
 	"strings"
 )
 
-//go:embed templates/global.md templates/project.md templates/monorepo.md
+//go:embed templates/global.md templates/project.md templates/monorepo.md templates/backlog.md templates/tasks.md
 var templates embed.FS
 
 // Tier is which CLAUDE.md skeleton to drop.
@@ -59,20 +59,56 @@ func WriteIfAbsent(tier Tier, root, name string) (path string, created bool, err
 	if err != nil {
 		return "", false, err
 	}
-	if _, serr := os.Stat(path); serr == nil {
-		return path, false, nil // exists — never clobber user-owned content
-	} else if !os.IsNotExist(serr) {
-		return path, false, serr
-	}
 	body, err := Skeleton(tier, name)
 	if err != nil {
 		return path, false, err
 	}
+	created, err = writeIfAbsent(path, body)
+	return path, created, err
+}
+
+// stateFiles are the per-project decision-state files scaffolded under .atl/:
+// backlog.md (the deferred, trigger-gated superset) + tasks.md (the active-intent
+// subset). See the brainstorm rule's "Backlog + tasks discipline".
+var stateFiles = []string{"backlog.md", "tasks.md"}
+
+// WriteStateFilesIfAbsent drops the .atl/backlog.md + .atl/tasks.md skeletons under
+// root, each only if absent (a user's own file is never overwritten). It returns the
+// paths it actually created. These are project-scoped decision state — callers must
+// NOT invoke this for the global tier (which has no project .atl/).
+func WriteStateFilesIfAbsent(root string) (created []string, err error) {
+	atlDir := filepath.Join(root, ".atl")
+	for _, name := range stateFiles {
+		b, rerr := templates.ReadFile("templates/" + name)
+		if rerr != nil {
+			return created, rerr
+		}
+		path := filepath.Join(atlDir, name)
+		did, werr := writeIfAbsent(path, string(b))
+		if werr != nil {
+			return created, werr
+		}
+		if did {
+			created = append(created, path)
+		}
+	}
+	return created, nil
+}
+
+// writeIfAbsent writes body to path only if nothing exists there yet, creating
+// parent directories as needed. It returns whether it wrote (false = a file already
+// existed and was left untouched — never clobber user-owned content).
+func writeIfAbsent(path, body string) (created bool, err error) {
+	if _, serr := os.Stat(path); serr == nil {
+		return false, nil
+	} else if !os.IsNotExist(serr) {
+		return false, serr
+	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return path, false, err
+		return false, err
 	}
 	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
-		return path, false, err
+		return false, err
 	}
-	return path, true, nil
+	return true, nil
 }

@@ -91,6 +91,13 @@ var installCmd = &cobra.Command{
 		if path, created, serr := scaffold.WriteIfAbsent(scaffold.Project, projectRoot, filepath.Base(projectRoot)); serr == nil && created {
 			fmt.Printf("atl: created %s — a project CLAUDE.md starter; fill in the sections marked for you.\n", path)
 		}
+		// Also drop the .atl/ decision-state starters (backlog + tasks), only-if-absent.
+		// Best-effort — a write failure must never fail the install.
+		if statePaths, serr := scaffold.WriteStateFilesIfAbsent(projectRoot); serr == nil {
+			for _, p := range statePaths {
+				fmt.Printf("atl: created %s — project decision state (backlog + tasks).\n", p)
+			}
+		}
 
 		for _, it := range installed {
 			suffix := ""
