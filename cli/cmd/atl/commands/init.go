@@ -54,6 +54,18 @@ var initCmd = &cobra.Command{
 		} else {
 			fmt.Printf("atl: %s already exists — left untouched.\n", path)
 		}
+
+		// Project/monorepo also get the .atl/ decision-state files (backlog + tasks),
+		// only-if-absent. Global has no project .atl/, so it's skipped.
+		if tier != scaffold.Global {
+			statePaths, serr := scaffold.WriteStateFilesIfAbsent(root)
+			if serr != nil {
+				return serr
+			}
+			for _, p := range statePaths {
+				fmt.Printf("atl: created %s — project decision state (the backlog + tasks convention).\n", p)
+			}
+		}
 		return nil
 	},
 }

@@ -152,11 +152,20 @@ multiple, list them (showing each one's scope) and ask which to complete.
   the whole discussion
 
 ### 2.5. Backlog check (mandatory — the brainstorm rule requires it here)
-Scan the brainstorm for every item marked deferred / "later" / "not now" and
-ensure each has a corresponding entry in the scope's `.atl/backlog.md` (prepend,
-newest on top). If any deferred item has no backlog entry, add it — or ask the
-user when it's ambiguous. Closing a brainstorm without this is how deferred scope
-silently disappears; it is a checklist step before the docs file is written.
+Scan the brainstorm for every item marked deferred / "later" / "not now" /
+left-uncertain and ensure each has a corresponding entry in the scope's
+`.atl/backlog.md`, under the matching `## Area` group, in the lean one-line format
+the brainstorm rule defines (`- **Title** — one sentence. _Trigger:_ … ↳ [source](...)`).
+If any deferred item has no backlog entry, add it — or ask the user when it's
+ambiguous. Closing a brainstorm without this is how deferred scope silently
+disappears; it is a checklist step before the docs file is written.
+
+### 2.6. Tasks check
+If the brainstorm decided to actively pursue something *now* (rather than defer
+it), promote that intent into the scope's `.atl/tasks.md` under `## Now` / `## Next`
+as `- [ ] **Title** — one sentence. ↳ [source](...)`. Conversely, remove from `tasks.md`
+anything this brainstorm actually shipped. Keep `tasks.md` honest — only
+genuinely-intended work; unplanned deferrals stay in `backlog.md`.
 
 ### 3. Create / update the docs file
 Determine the docs location from the brainstorm's scope:
@@ -202,7 +211,8 @@ Up to three updates happen:
      the implementation ships — by hand, or by the PR that ships the change.
 
 ### 5. Respond
-Tell the user the brainstorm is complete and list the created/updated files.
+Tell the user the brainstorm is complete and list the created/updated files
+(docs, CLAUDE.md, and any `backlog.md` / `tasks.md` changes).
 
 ---
 

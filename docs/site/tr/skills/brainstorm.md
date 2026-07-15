@@ -75,26 +75,30 @@ Akış:
 
 ## Belge zinciri
 
-Her tartışma ve karar üç katmandan akar:
+Her tartışma ve karar üç katmandan akar; sürece iki karar-durumu dosyası da bağlanır:
 
 ```
 brain-storms/ (süreç) → docs/ (sonuç) → CLAUDE.md (özet)
                      \
-                       backlog.md (ertelenmiş öğeler)
+                       backlog.md (ertelenmiş üst-küme) → tasks.md (etkin-niyet alt-kümesi)
 ```
 
 - Beyin fırtınası olmadan karar verilmez.
 - Beyin fırtınası dosyaları **asla silinmez** — tarihsel kayıttır.
 - Kararlar değişirse YENİ bir beyin fırtınası açılır ve eskisine `superseded by X` notu eklenir.
 
-## Backlog disiplini
+## Backlog ve tasks
 
-Bir beyin fırtınası sırasında "şimdi yapmıyoruz, sonraya" diye işaretlenen her öğe `.atl/backlog.md` dosyasına yansır:
+Bir projenin `.atl/` dizini altındaki iki dosya **karar durumunu** tutar — bilgi sisteminin journal + wiki katmanının bir kardeşidir, üçüncü bir bilgi katmanı değil. Bu dosyaları `/brainstorm` becerisi yazar ve güncel tutar. Tam sözleşme için [Backlog ve tasks](../guide/backlog-and-tasks.md) rehberine bakın.
 
-- **Başa eklenir** (en yenisi en üstte).
-- Her öğe için: tarih + kategori başlığı + bağlam bağı + ayrıntılı konu açıklaması + "ne zaman gündeme gelir" notu + ilgili kaynaklar.
-- `/brainstorm done` sırasında beyin fırtınasındaki her "ertelenmiş" not backlog'a karşı denetlenir — eksik olanlar beyin fırtınası kapanmadan önce eklenir.
-- Bir ertelenmiş öğe daha sonra hayata geçirildiğinde backlog'dan **silinir** (tamamlandı işareti konulup bırakılmaz).
+- **`backlog.md`** — ertelenen, bir kenara bırakılan ya da belirsiz kalan her şeyin edilgen, **tetik-kapılı üst-kümesi**. Yapılacaklar listesi değil, taranabilir bir dizin. `## Area` başlıklarına göre gruplanır (temaya göre, tarihe göre değil). Öğe başına tek satır: `- **Başlık** — tek cümle. _Trigger:_ ne zaman yeniden gündeme gelir. ↳ [kaynak](...)`. Zengin gerekçe/bağlam, bağlanan beyin fırtınasında kalır (backlog dizindir, beyin fırtınası ayrıntıdır — tekrar yok).
+- **`tasks.md`** — **etkin-niyet alt-kümesi**: gerçekten sıradaki adım olarak yapmayı düşündüğümüz kısa, önceliklendirilmiş liste. `- [ ] **Başlık** — tek cümle. ↳ [kaynak](...)`, `## Now` / `## Next` altında gruplanır. Kısa ve dürüst tutulur: planlanan bir şey yoksa neredeyse boştur (doğru durum budur, bir eksiklik değil) — görev uydurmayın.
+
+**Terfi.** Bir öğe, onu öne çektiğimize karar verdiğimizde (bir tetik ateşlendi ya da önceliklendirmeyi seçtik) `backlog.md` → `tasks.md` yönünde taşınır. Bir öğe `backlog.md`'den, yayımlandığında **ya da** `tasks.md`'ye terfi edildiğinde **çıkar**; bir görev `tasks.md`'den yayımlandığında **çıkar** (kaynak-doğru artık docs + CLAUDE.md olur) — silinir, işaretlenip bırakılmaz.
+
+**`/brainstorm done` denetimleri.** Bir beyin fırtınasını kapatmak zorunlu bir **backlog denetimi** (her ertelenmiş öğe kendi `## Area` grubunun altına bir kayıt alır) ve bir **tasks denetimi** (şimdi yapmaya karar verilen her şeyi terfi ettir; bu beyin fırtınasının yayımladığı her şeyi kaldır) çalıştırır.
+
+**İskele.** `atl init` (ve `atl install`), yalnızca yoksa `.atl/` altına boş `backlog.md` + `tasks.md` iskeletleri bırakır (kullanıcının mevcut dosyası asla üzerine yazılmaz). Global katmanın proje `.atl/` dizini olmadığından, orada atlanır.
 
 ## Önemli kurallar
 

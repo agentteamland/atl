@@ -64,6 +64,7 @@ export default defineConfig({
               text: 'Knowledge model',
               items: [
                 { text: 'Knowledge system', link: '/guide/knowledge-system' },
+                { text: 'Backlog & tasks', link: '/guide/backlog-and-tasks' },
                 { text: 'Children + learnings', link: '/guide/children-and-learnings' },
                 { text: 'Learning marker lifecycle', link: '/guide/learning-marker-lifecycle' },
                 { text: 'Claude Code conventions', link: '/guide/claude-code-conventions' }
@@ -202,6 +203,7 @@ export default defineConfig({
               text: 'Bilgi modeli',
               items: [
                 { text: 'Bilgi sistemi', link: '/tr/guide/knowledge-system' },
+                { text: 'Backlog ve görevler', link: '/tr/guide/backlog-and-tasks' },
                 { text: 'Children + learnings', link: '/tr/guide/children-and-learnings' },
                 { text: 'Öğrenme işaretçisi yaşam döngüsü', link: '/tr/guide/learning-marker-lifecycle' },
                 { text: 'Claude Code sözleşmeleri', link: '/tr/guide/claude-code-conventions' }
