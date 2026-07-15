@@ -79,7 +79,7 @@ my-team/
 
 Kurulabilir varlık dizinleri şunlardır: `agents/`, `skills/`, `rules/`, `knowledge/`, `scripts/` ve `packs/` (`teampkg.AssetDirs` kümesi). `agents/`/`skills/`/`rules/` Claude Code'un doğrudan okuduğu dizinlerdir; `knowledge/`/`scripts/`/`packs/` ise takımın çalışma zamanı referans belgelerini, yardımcı betiklerini ve alan paketlerini taşır. Diğer her şey (`team.json`, `README`, `LICENSE`) geride kalır.
 
-Bir takımın bir varlık dizini altında en az bir dosya göndermesi gerekir, yoksa `atl install` başarısız olur (`team ships no installable assets`). Bildirilen tek tek `agents[]`/`skills[]`/`rules[]` girişleri katalog üst verisidir ve kurulum sırasında diske karşı doğrulanmaz — bu çapraz kontrolü, birinci taraf takımlar için `atl skills check` geliştirici komutu yapar.
+Bir takımın bir varlık dizini altında en az bir dosya göndermesi gerekir, yoksa `atl install` başarısız olur (`team ships no installable assets`). Bildirilen tek tek `agents[]`/`skills[]`/`rules[]` girişleri katalog üst verisidir ve kurulum sırasında diske karşı doğrulanmaz — bildirilen `agents[]` ve `skills[]` girişlerini, birinci taraf takımlar için `atl skills check` geliştirici komutu çapraz kontrol eder.
 
 ## Doğrulama
 
