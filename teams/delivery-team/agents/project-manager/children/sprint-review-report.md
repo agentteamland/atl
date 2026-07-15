@@ -45,7 +45,10 @@ id, title, StoryPoints. This is the honest "what shipped" list.
 Every admitted item that did **not** complete, with the reason (blocked on a dependency, ran out
 of sprint, review not passed). These return to the backlog for the next `/sprint-plan` — I never
 silently drop them (see [reject-and-carryover.md](reject-and-carryover.md)). Listing carryover
-explicitly is what keeps the backlog honest and the next velocity mean correct.
+explicitly is what keeps the backlog honest and the next velocity mean correct. A `blocked` entry
+may be one the dispatch engine surfaced: `/sprint-review`'s step 2 drains any
+`.delivery/blocked/<id>.json` report, reflects it onto the work-item, and feeds it here with its
+diagnostic — so a crashed/stalled unit is listed too, not just a dependency-blocked one.
 
 ### `## Per-item evidence`
 For each completed PBI (or task, per the sprint's granularity): the **PR link** and the **test
