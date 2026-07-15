@@ -41,6 +41,11 @@ jobs:
         run: go test ./...
       - name: English-only (no non-English text outside /tr/ mirrors)
         run: bash scripts/scan-non-english.sh
+      - name: No personal paths (OS home-path leaks — builtin patterns only)
+        # --all scans the whole tree, catching historical leaks too. Only the
+        # universal OS-path patterns run here; the maintainer's personal-string
+        # config is home-only (it must never be committed to a public repo).
+        run: bash scripts/scan-personal-paths.sh --all
 
   docs:
     runs-on: ubuntu-latest
