@@ -51,6 +51,7 @@ Yeni bir Claude Code oturumu açtığında bir kez çalışır. `atl session-sta
 2. **Önceki oturumu drenaj et** — bu projenin son drenajdan bu yana değişen transkriptlerini bulur, asistan metnini çıkarır ve satır içi `<!-- learning: ... -->` işaretçilerini `~/.atl/queue.db` adresindeki kalıcı kuyruğa tam olarak bir kez aktarır.
 3. **Doctor öz-denetimi** — kuyruk sağlığı ile varlık bütünlüğü denetimlerini çalıştırır; sorunları yüzeye çıkarır ya da otomatik olarak iyileştirir.
 4. **Bekleyen öğrenmeleri sinyal et** — kuyrukta işlenmemiş öğrenmeler varsa `atl: N learning(s) pending — run /drain to fold them into the knowledge base` tek satırını yazdırır; Claude bunu bilgi tabanına katlaması için bir ipucu olarak görür.
+5. **Otomatik güncelleme, kısıtlamalı (arka plan)** — günde en çok bir kez, daha yeni bir `atl` sürümü olup olmadığını denetler ve varsa ayrık (detached) bir [`atl upgrade`](/tr/cli/upgrade) başlatır; ayrıca proje başına günde bir kez, daha yeni *yayınlanmış* takım sürümlerini çekmek için ayrık bir [`atl update`](/tr/cli/update) başlatır. İkisi de arka planda çalışır, böylece açılışı asla engellemez ve bir sonraki oturum taze ikili / takımlarla çalışır. Devre dışı bırakmak için `ATL_NO_SELF_UPDATE` ya da `ATL_NO_TEAM_UPDATE` ayarla.
 
 `SessionStart`, hook stdout çıktısını Claude'un bağlamına ileten tek Claude Code olayıdır; dolayısıyla `session-start` komutunun yazdığı her şey Claude'a ulaşır. Yüzeye çıkarılacak bir şey yoksa sessiz kalır; sıradan bir açılış hiçbir ek maliyete yol açmaz.
 
@@ -120,7 +121,7 @@ Birleştirme, sahip olduğun diğer hook'ları korur. `atl setup-hooks` yeniden 
 
 ## Çevrimdışı davranış
 
-Hook'lar yalnızca yerel dosyaları okur ve yazar — transkriptleri drenaj etmek, bbolt kuyruğu ve doctor denetimleri ağ bağlantısı gerektirmez. Bir hook çalışmanı asla engellememelidir; bu yüzden `session-start` ve `tick` oturumu başarısız kılmaz; bir şeyler ters giderse bir satır çıkarır (ya da sessiz kalır) ve komut istemi normal biçimde sürer.
+Çekirdek kadans ağ gerektirmez — transkriptleri drenaj etmek, bbolt kuyruğu, doctor denetimleri ve istem başına yayma tümüyle çevrimdışı çalışır. Tek ağ geçişleri, `session-start`'ın kısıtlamalı, ayrık (detached) otomatik güncellemeleridir (ikili öz-güncellemesi ve takım güncellemesi); bunlar en iyi çaba iledir: çevrimdışıyken sessizce başarısız olur ve ayrık oldukları için açılışı asla engellemez. Bir hook çalışmanı asla engellememelidir; bu yüzden `session-start` ve `tick` oturumu başarısız kılmaz; bir şeyler ters giderse bir satır çıkarır (ya da sessiz kalır) ve komut istemi normal biçimde sürer.
 
 ## İlgili
 

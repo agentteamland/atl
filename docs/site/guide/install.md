@@ -114,7 +114,7 @@ atl setup-hooks
 
 This wires Claude Code's hooks so the platform runs itself in the background:
 
-- **`SessionStart` → `atl session-start`** — drains the previous session's learnings, runs `doctor` to self-heal, and keeps the `atl` binary itself current (a daily [self-update](/cli/upgrade) check).
+- **`SessionStart` → `atl session-start`** — drains the previous session's learnings, runs `doctor` to self-heal, and keeps the `atl` binary and your installed teams current (a daily [self-update](/cli/upgrade) + [team-update](/cli/update) check).
 - **`UserPromptSubmit` → `atl tick --throttle=10m`** — an in-session maintenance tick (throttled), so updates, fan-out, and learning capture happen without you lifting a finger.
 
 In v2 this is meant to be on, not opt-in — automation is the point. You don't run `atl update` by hand; your teams and `atl` itself stay current automatically. See [`atl setup-hooks`](/cli/setup-hooks) for details.

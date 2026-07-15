@@ -127,6 +127,13 @@ var sessionStartCmd = &cobra.Command{
 		}
 		scancel()
 
+		// Automatic network team-update — the team-asset sibling of the binary
+		// self-update above. Once/24h per project, spawn a detached `atl update` so
+		// installed teams pull any newer published version out of band (the next
+		// session sees them). Throttled + silent + never-fail; ATL_NO_TEAM_UPDATE
+		// opts out. This is the "manual atl update becomes unnecessary" v2 promise.
+		autoUpdateTeams(project)
+
 		return nil
 	},
 }
