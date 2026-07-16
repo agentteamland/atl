@@ -46,7 +46,7 @@ role-craft lives in each role-agent's `children/`, cited per step.
 ## Procedure
 
 Confirm `.delivery/config.json` and `.delivery/methodology.json` exist (written by
-`/delivery-init`). Read `config.json` — `org`/`project`/`repo`, `branchPair` (the **authoritative**
+`/delivery-init`). Read `config.json` — the backend's coordinates (Azure `org`/`project`/`repo`; GitHub `owner`/`repo`/`projectNumber` — see [`config-and-methodology.md`](../../knowledge/config-and-methodology.md) §2), `branchPair` (the **authoritative**
 dev/release names; config wins over `methodology.branches`), the selected `backend` (default
 `azure`, which selects the active adapter), and the cached durable-knowledge-store handle the
 active adapter needs (on the Azure backend, `wikiId`). Config is read-only to this ceremony. Resolve
@@ -54,9 +54,10 @@ the scope (which Features/PBIs to refine) with the user, then work the steps bel
 touch names a real operation from the active backend's adapter operation map
 (`backends/<backend>/adapter.md`); never invent a tool name.
 
-> **Backend-schema follow-up (flag, not this pass):** `wikiId` is Azure-specific config — the
-> GitHub backend's in-repo durable-knowledge store needs no such handle. Generalizing this field is
-> a tracked schema follow-up, kept out of this naming-neutralization pass.
+> **Durable-knowledge locator is backend-specific:** `wikiId` is Azure-only — the GitHub backend's
+> in-repo `/docs` store needs no such handle (see [`config-and-methodology.md`](../../knowledge/config-and-methodology.md)
+> §2). The coordinate fields are now read per-backend; unifying the two config shapes into one
+> neutral schema remains a tracked follow-up.
 
 ### 1. Read the analysis back — by location, never by guessing
 

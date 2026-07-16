@@ -55,9 +55,12 @@ only at the Approve/Reject gate. No `developer`/`tester` worker is spawned here 
 ### 1. Load config and resolve the closed sprint's runtime facts
 
 Read `.delivery/config.json` and `.delivery/methodology.json` (read-only — only `/delivery-init`
-writes them). Take `org`/`project`/`repo`, the durable-knowledge store's locator (`wikiId`, already
-resolved + cached at init — never re-resolve it), and **`config.branchPair`** as the authoritative
-dev/release branch names (config wins over `methodology.branches`).
+writes them). Take the backend's coordinates (Azure `org`/`project`/`repo`; GitHub
+`owner`/`repo`/`projectNumber` — see [`config-and-methodology.md`](../../knowledge/config-and-methodology.md)
+§2), the durable-knowledge store locator the active adapter needs (Azure: `wikiId`, resolved +
+cached at init — never re-resolve it; GitHub: none — the store is the in-repo `/docs` tree), and
+**`config.branchPair`** as the authoritative dev/release branch names (config wins over
+`methodology.branches`).
 
 Resolve the concrete sprint and its states at runtime — **never hardcode a state literal**
 (concept #7):
@@ -163,8 +166,8 @@ delivered?
 Write the assembled report to exactly `Sprints/Sprint-<n>-Review` (`<n>` from step 1) as an
 **idempotent upsert** into the durable-knowledge store (concept #9) — the `project-manager`'s
 `Sprints/` namespace (one owner). Confirm the `Sprints/` namespace exists on the first write of the
-project (a durable-knowledge store listing, concept #9); read the store's locator (`wikiId`) from
-`config.json` (never re-resolved). Also surface the full report **in-session** so the PO reads it
+project (a durable-knowledge store listing, concept #9); read the store's locator from `config.json`
+(Azure: `wikiId`, never re-resolved; GitHub: the in-repo `/docs` path — no locator). Also surface the full report **in-session** so the PO reads it
 here before the gate.
 
 ### 6. Run the PO Approve/Reject gate — the `product-owner` (human) decides
@@ -232,4 +235,4 @@ local ledger):
   second promotion PR.
 
 All backend access is through the active backend's adapter; the credential is referenced by name
-(`config.pat.ref`) and never read or written as a literal.
+(`config.pat.ref` on Azure, `config.credential.ref` on GitHub) and never read or written as a literal.

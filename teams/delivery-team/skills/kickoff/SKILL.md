@@ -19,7 +19,7 @@ than duplicating it. What it reads and writes:
 
 | Reads | Writes |
 |---|---|
-| `.delivery/config.json` (`org`/`project`/`repo`/`branchPair`/`wikiId`/`pat.ref`) | the first **Epic** + **Feature(s)** (create work-items, concept #1) |
+| `.delivery/config.json` (the active backend's coordinates + `branchPair` + durable-knowledge locator + credential ref — see [`config-and-methodology.md`](../../knowledge/config-and-methodology.md) §2) | the first **Epic** + **Feature(s)** (create work-items, concept #1) |
 | `.delivery/methodology.json` (`roles`, `cadence`, `artifactHierarchy`, `capacityModel`) | business framing into each item's spec field (fixed H2s, concept #2) |
 | the live PO conversation (intake) | technical analysis as one `**[Technical Analysis]**` comment (add a comment, concept #3) |
 | existing backlog on a re-run (check-first query by `atl-key`, concept #10) | the first `Domain/` + `Architecture/` durable-knowledge pages (upsert the durable-knowledge store, concept #9) |
@@ -30,7 +30,7 @@ the operation → tool map, idempotency, runtime type resolution, content placem
 durable-knowledge namespaces live in the active backend's adapter (`backends/<backend>/adapter.md`),
 which binds the provider-neutral concepts defined in [the backend interface](../../knowledge/backend-interface.md).
 All backend access is through the active backend's adapter; the credential is referenced by name
-(`config.pat.ref`), never read or written as a literal.
+(`config.pat.ref` on Azure, `config.credential.ref` on GitHub), never read or written as a literal.
 
 ## When to run
 
@@ -54,11 +54,15 @@ files exist at the project root **before** touching the backend or the PO:
 - Read `.delivery/config.json` and `.delivery/methodology.json`. **If either is absent, STOP** and
   tell the user to run [`/delivery-init`](../delivery-init/SKILL.md) first — do **not** create,
   guess, or re-write either file here.
-- From `config.json`, load `org`/`project`/`repo`, the authoritative `branchPair` (the actual
-  dev/release branch names — `config.branchPair` wins over `methodology.branches`), `wikiId`, and
-  `pat.ref` (the env-var **name**, never the credential). If `wikiId` is `null`, tell the user the
-  durable-knowledge store isn't provisioned yet and that step 2's knowledge-seeding needs it — they
-  should provision it per the active backend's adapter and re-run `/delivery-init` before proceeding.
+- From `config.json`, load the backend's connection coordinates (Azure `org`/`project`/`repo`;
+  GitHub `owner`/`repo`/`projectNumber` — see [`config-and-methodology.md`](../../knowledge/config-and-methodology.md)
+  §2), the authoritative `branchPair` (the actual dev/release branch names — `config.branchPair`
+  wins over `methodology.branches`), the durable-knowledge store locator the active adapter needs
+  (Azure: `wikiId`; GitHub: none — the store is the in-repo `/docs` tree, always present), and the
+  credential ref (`pat.ref` on Azure, `credential.ref` on GitHub — the env-var **name**, never the
+  credential). **Azure only:** if `wikiId` is `null`, tell the user the wiki isn't provisioned yet
+  and that step 2's knowledge-seeding needs it — they should create it and re-run `/delivery-init`
+  before proceeding. (GitHub's in-repo `/docs` store needs no provisioning.)
 - From `methodology.json`, load `roles` (with each `dispatch`), `artifactHierarchy`
   (`["Epic","Feature","Pbi","Task"]`), `cadence`, and `capacityModel`.
 - **Live backend probe** — run the active backend's connectivity check (resolve project / identity,
