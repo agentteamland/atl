@@ -17,8 +17,10 @@ Under a project's committed `.delivery/`:
 - **`methodology.json`** — the descriptor: `roles[]` (binding + dispatch), `artifactHierarchy`,
   `cadence`, `capacityModel`, `branches`. Written by `/delivery-init`.
 - **`config.json`** — connection identity: `backend` (which adapter — `backends/<backend>/adapter.md`,
-  default `azure`), `org`/`project`/`repo`, `branchPair`, `methodology`, the durable-knowledge
-  store's locator (where the backend needs one), and the credential pointer. Written by `/delivery-init`.
+  default `azure`), the backend's coordinates (Azure `org`/`project`/`repo`; GitHub
+  `owner`/`repo`/`projectNumber` — see [`config-and-methodology.md`](../../../knowledge/config-and-methodology.md)
+  §2), `branchPair`, `methodology`, the durable-knowledge store's locator (where the backend needs
+  one), and the credential pointer. Written by `/delivery-init`.
 
 **Both are read-only to me.** Only `/delivery-init` writes them. I consume the durable-knowledge
 store's locator (where the active backend needs one) and the branch names; I never re-derive them,

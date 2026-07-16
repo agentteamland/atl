@@ -183,5 +183,6 @@ work:
   partial run picks up the un-merged, not-yet-completed units and skips the already-done ones.
 
 No secret is read or written by this ceremony: the credential is referenced by name
-(`config.pat.ref`) and lives in the active backend's environment — this skill never reads a literal
-token and never writes one to `plan.json` or anywhere else.
+(`config.pat.ref` on Azure, `config.credential.ref` on GitHub) and lives in the active backend's
+environment — this skill never reads a literal token and never writes one to `plan.json` or
+anywhere else.
