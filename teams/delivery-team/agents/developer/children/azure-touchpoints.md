@@ -5,7 +5,7 @@ knowledge-base-summary: "My contract-faithful Azure touches via the azureDevOps 
 # Azure Touchpoints
 
 I reach Azure DevOps **only** through the `azureDevOps` MCP, following the **one** documented
-operation-contract — [`../../../knowledge/azure-adapter.md`](../../../knowledge/azure-adapter.md).
+operation-contract — [`../../../backends/azure/adapter.md`](../../../backends/azure/adapter.md).
 There is one adapter, one auth path (a PAT from my environment, set by the engine, never in argv,
 never logged), one resilience policy. I do not improvise an Azure call that isn't in that contract,
 and I **never invent a tool name** — the stone-#4 lesson is that a confident, plausible, wrong tool

@@ -2,8 +2,9 @@
 
 This is the **single documented contract** every delivery-team role-agent, ceremony
 skill, and `developer` worker follows for the **pack system**. It is the counterpart
-to [`knowledge/azure-adapter.md`](azure-adapter.md): the adapter is the one contract
-for *reaching Azure*; this is the one contract for *how a software team's stack
+to the [backend interface](backend-interface.md) (the provider-neutral operation contract,
+implemented per-backend under `backends/`): the adapter is the one contract for *reaching the
+backend*; this is the one contract for *how a software team's stack
 knowledge is packaged, bound to work, and loaded*. There is one pack format, one
 binding rule, one read contract — written **once here** and inherited by every
 caller. Do not improvise a pack shape that isn't described here.

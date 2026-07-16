@@ -19,7 +19,7 @@ the committed sprint to `atl work dispatch`.
 
 Field semantics live in [`config-and-methodology.md`](../../knowledge/config-and-methodology.md);
 the Azure tool map, idempotency, pagination, and runtime type/state resolution live in
-[`azure-adapter.md`](../../knowledge/azure-adapter.md). Every Azure touch goes through the
+[`azure-adapter.md`](../../backends/azure/adapter.md). Every Azure touch goes through the
 `azureDevOps` MCP; no ceremony reads or writes a literal PAT (the config carries only `pat.ref`
 by name).
 
@@ -64,7 +64,7 @@ completed StoryPoints over the last `velocityWindowN` (=3) CLOSED sprints** (rea
 - For each closed sprint, read its items with `wit_get_work_items_for_iteration` (batch read;
   adapter §3), then **keep only the items whose state resolves to the RUNTIME-RESOLVED
   Completed-category** — resolve the type's state→category map via `wit_get_work_item_type`, per
-  [`azure-adapter.md` §6 "Runtime type & state resolution — never hardcode"](../../knowledge/azure-adapter.md#6-runtime-type--state-resolution--never-hardcode).
+  [`azure-adapter.md` §6 "Runtime type & state resolution — never hardcode"](../../backends/azure/adapter.md#6-runtime-type--state-resolution--never-hardcode).
   **Never** compare against the literal `"Done"`; a template may spell completion `Closed`,
   `Completed`, or a custom value.
 - Sum `Microsoft.VSTS.Scheduling.StoryPoints` over those completed items to get the sprint's
@@ -72,7 +72,7 @@ completed StoryPoints over the last `velocityWindowN` (=3) CLOSED sprints** (rea
 - **Read the whole list.** If a sprint could exceed the iteration read's set, close the gap with a
   high-`top` `wit_query_by_wiql` filtered to that IterationPath **and** the Completed category, and
   **treat a result AT the WIQL cap as a truncation error to surface**, never as a complete read
-  ([`azure-adapter.md` §4 "Pagination — 'list means all'"](../../knowledge/azure-adapter.md#4-pagination--list-means-all-per-tool-mechanism)).
+  ([`azure-adapter.md` §4 "Pagination — 'list means all'"](../../backends/azure/adapter.md#4-pagination--list-means-all-per-tool-mechanism)).
   A half-read Done set silently understates velocity and shrinks every future sprint.
 
 Velocity is **read-only** — pure client-side arithmetic over `wit_*` queries; no write, inherently
@@ -141,7 +141,7 @@ feasibility against the `Architecture/` wiki before the assignment is committed.
 - **Assign the IterationPath** — set each selected unit's `System.IterationPath` to this sprint's
   resolved path via `wit_update_work_item` / `wit_update_work_items_batch` (batch the admitted set
   into one call; wrap in the adapter's backoff, §3). This is an **idempotent field update**
-  ([`azure-adapter.md` §5 "Idempotency — the load-bearing part"](../../knowledge/azure-adapter.md#5-idempotency--the-load-bearing-part-protects-resumability)),
+  ([`azure-adapter.md` §5 "Idempotency — the load-bearing part"](../../backends/azure/adapter.md#5-idempotency--the-load-bearing-part-protects-resumability)),
   **not** a create-membership — a re-run sets the same path to the same value, a safe no-op.
 
 Nothing is silently dropped: units that don't fit this sprint's capacity, or are held back for

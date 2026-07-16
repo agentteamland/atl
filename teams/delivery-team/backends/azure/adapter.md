@@ -227,7 +227,7 @@ removed; velocity is client-side arithmetic over `wit_*` queries, not a transpor
 gap.)
 
 - It is wrapped behind a single uniform interface — the
-  [`scripts/az-attach.sh`](../scripts/az-attach.sh) helper — so callers see
+  [`scripts/az-attach.sh`](../../scripts/az-attach.sh) helper — so callers see
   `attach(work-item, file)` and the transport split (REST here, MCP everywhere else)
   stays hidden inside the adapter. Two steps: `POST _apis/wit/attachments` (upload →
   returns a URL) then `wit_update_work_item` / a relation add to link the returned URL

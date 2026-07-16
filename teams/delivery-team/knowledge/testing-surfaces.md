@@ -1,7 +1,7 @@
 # Testing surfaces — the delivery-team's verification-runtime contract
 
 The single documented contract for **how** a work-unit is verified at runtime — the
-counterpart to [`azure-adapter.md`](azure-adapter.md) (the Azure operation-contract) and
+counterpart to the [backend interface](backend-interface.md) (the operation contract) and
 [`pack-format.md`](pack-format.md) (the stack-knowledge seam). The role-agents describe the
 *discipline* of testing — the developer's Level-1 self-test
 ([`../agents/developer/children/self-test-craft.md`](../agents/developer/children/self-test-craft.md))

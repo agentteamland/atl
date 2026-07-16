@@ -1,8 +1,8 @@
 # PR & review — the delivery-native pull-request lifecycle contract
 
 The single documented contract for the **back half of the per-work-unit micro-loop** — open the
-PR, review it, merge it, transition the work-item — the peer of [`azure-adapter.md`](azure-adapter.md)
-(the Azure operation-contract), [`testing-surfaces.md`](testing-surfaces.md) (verification), and
+PR, review it, merge it, transition the work-item — the peer of the [backend interface](backend-interface.md)
+(the operation contract, implemented per-backend under `backends/`), [`testing-surfaces.md`](testing-surfaces.md) (verification), and
 [`config-and-methodology.md`](config-and-methodology.md). It pins the one thing the role-agent prose
 had drifted on: **which actor performs each step**, given the hard invariant that the Go orchestrator
 is **zero-Azure** (no MCP surface).

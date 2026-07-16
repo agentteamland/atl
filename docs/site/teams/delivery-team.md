@@ -71,7 +71,7 @@ MCP the engine wires it, so a worker can never touch anything but the configured
 
 There is no local database. **Work-items are the transient execution state** and the **project wiki is
 the durable knowledge** (the ATL wiki/journal split, living in Azure). Every role reaches Azure through
-one documented **MCP-first operation-contract** (`knowledge/azure-adapter.md`) — `wit_*` for work-items,
+one documented **MCP-first operation-contract** (`backends/azure/adapter.md`) — `wit_*` for work-items,
 `repo_*` for PRs, `wiki_*` for knowledge — with a thin REST carve-out for the one operation the MCP
 lacks (evidence attachment). Content is placed by **machine-locatable sentinels**: the business analysis
 in the Description, the `**[Technical Analysis]**` and `**[Canonical Brief]**` comments each matched by

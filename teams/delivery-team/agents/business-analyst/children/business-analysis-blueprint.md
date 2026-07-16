@@ -33,13 +33,13 @@ Description that starts prescribing tasks has leaked out of my lane.
 **Resolve the concrete type name at runtime — never hardcode it.** "Epic" and "Feature" are the
 abstract rungs; the live Azure project may spell them differently under a different process
 template. Resolve the real type name via `wit_get_work_item_type` before creating
-(`../../../knowledge/azure-adapter.md` §6); the descriptor's `workItemTypeMap` is null-seeded on
+(`../../../backends/azure/adapter.md` §6); the descriptor's `workItemTypeMap` is null-seeded on
 purpose for exactly this reason.
 
 ## The content-placement contract (adapter §7) — the five fixed H2s
 
 The business analysis goes into `System.Description` as Markdown under these **exact** headings,
-in this order (`../../../knowledge/azure-adapter.md` §7). This is the durable, always-loaded
+in this order (`../../../backends/azure/adapter.md` §7). This is the durable, always-loaded
 "what & why" of the item:
 
 ```markdown
@@ -78,11 +78,11 @@ lean on.
 
 **Write** — set `System.Description` via `wit_create_work_item` (on create) or
 `wit_update_work_item` (on refine), per the adapter's op→tool map
-(`../../../knowledge/azure-adapter.md` §2). I write the whole Description block as one field
+(`../../../backends/azure/adapter.md` §2). I write the whole Description block as one field
 value; I do not scatter it across fields.
 
 **Read-back** — a consumer reads my analysis with `wit_get_work_item` and parses the Description
-headings (`../../../knowledge/azure-adapter.md` §7). Because the headings are fixed, this is a
+headings (`../../../backends/azure/adapter.md` §7). Because the headings are fixed, this is a
 deterministic parse, never a heuristic.
 
 **Idempotent upsert (adapter §5) — a refine must converge, not duplicate.** When I re-analyze an
@@ -91,7 +91,7 @@ item. Creation of *new* backlog items during `/kickoff` goes through the team's 
 discipline: every created item carries the deterministic `atl-key:<hash>` tag
 (`hash = hash(parent-id + plan-ordinal)`) and a check-first WIQL (`wit_query_by_wiql`) runs
 before any create — found → reuse+update, not-found → create-then-stamp
-(`../../../knowledge/azure-adapter.md` §5). The plan-ordinal that seeds the key comes from the
+(`../../../backends/azure/adapter.md` §5). The plan-ordinal that seeds the key comes from the
 decomposition plan the `tech-lead` records; when I create top-level backlog items at kickoff, I
 stamp against the same stable `parent + ordinal` scheme so a re-run of the ceremony converges
 instead of doubling the backlog. Keys derive from **stable parent + ordinal**, never a per-run

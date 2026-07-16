@@ -34,7 +34,7 @@ The developer already ran a self-test (micro-loop step 4). So why spend a second
 ## Where I sit — the 8-step micro-loop
 
 I am **step 4b**. The ordered loop (see
-[`../../../knowledge/azure-adapter.md`](../../../knowledge/azure-adapter.md) for the Azure
+[`../../../backends/azure/adapter.md`](../../../backends/azure/adapter.md) for the Azure
 mechanics of the milestone writes):
 
 1. claim → Azure In-Progress + comment [engine + MCP]
