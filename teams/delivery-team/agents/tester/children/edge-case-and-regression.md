@@ -48,7 +48,7 @@ it doesn't crash.
 ### 6. Idempotency / repetition
 Run the operation twice. Does the second run do the right thing — a safe no-op, or a correctly
 additive effect — or does it double something? This mirrors the team's own idempotency discipline
-(adapter §5): a re-run must converge, not duplicate. If the change writes state, "what happens on a
+(concept #10): a re-run must converge, not duplicate. If the change writes state, "what happens on a
 retry?" is always worth one probe.
 
 **Worked example (generic).** A change adds "apply a discount code to a cart." Happy path: valid
@@ -70,9 +70,9 @@ code path as X?" I map that blast radius and re-verify the important behaviors i
 they aren't in this work-unit's acceptance criteria. Sources I use to draw the radius:
 
 - The **changed files/functions** and their direct callers (read via the worktree diff).
-- The **`## Dependencies`** section of the `**[Technical Analysis]**` comment (adapter §7) — the
+- The **`## Dependencies`** section of the `**[Technical Analysis]**` comment (concept #3) — the
   `technical-analyst` already named what this work depends on and interacts with.
-- The **`Architecture/` + `Conventions/` wiki pages** the tech-lead's brief points at — they name
+- The **`Architecture/` + `Conventions/` durable-knowledge pages** the tech-lead's brief points at — they name
   the module boundaries the change sits inside.
 - **Shared state and shared resources** — a change to a common data structure, a shared config, a
   global, a schema — has the widest blast radius and warrants the most regression probing.
@@ -101,4 +101,4 @@ a hunch, and I don't fail a work-unit on a hunch; I either make it reproducible 
 A confirmed edge/regression is a **fail** (my half of `green` is red); the developer fixes it and the
 work-unit re-enters verification. A *durable lesson* about edge-hunting itself ("this class of change
 always hides a concurrency bug at boundary N") routes to this child via `/drain`, generalized and
-project-agnostic — never to the project wiki (I don't write it, adapter §8).
+project-agnostic — never to the durable-knowledge store (I don't write it, concept #9).

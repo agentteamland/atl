@@ -1,5 +1,5 @@
 ---
-knowledge-base-summary: "The capacityModel as data: velocity = mean StoryPoints over the last velocityWindowN (=3) closed sprints; the cold-start po-seed + seed-decay blend for the first N sprints; the availabilityFactor 0-1 dial for short-staffed sprints. Velocity is read-only, idempotent, client-side arithmetic over wit_* Done queries (resolve the Completed state-category at runtime). Reading work_get_team_capacity as a secondary signal."
+knowledge-base-summary: "The capacityModel as data: velocity = mean story points over the last velocityWindowN (=3) closed sprints; the cold-start po-seed + seed-decay blend for the first N sprints; the availabilityFactor 0-1 dial for short-staffed sprints. Velocity is read-only, idempotent, client-side arithmetic over the active backend's completed-work-item queries (resolve the Completed state at runtime, concept #7). Reading the backend's own team-capacity model as a secondary signal (concept #6)."
 ---
 
 # Capacity & Velocity
@@ -8,7 +8,7 @@ Capacity is the ceiling my sprint-planning blueprint admits against. It is a *nu
 not a policy I hold — every parameter comes from `capacityModel` in `.delivery/methodology.json`
 (read as data, see [methodology-as-data.md](methodology-as-data.md)), and every input comes from a
 read-only query against the live project. This is craft that travels to any project: the *formula*
-lives here, the *numbers* live in Azure and the descriptor.
+lives here, the *numbers* live in the active backend and the descriptor.
 
 ## The capacityModel — the parameters I read (never hardcode)
 
@@ -25,7 +25,7 @@ lives here, the *numbers* live in Azure and the descriptor.
 | Field | What I do with it |
 |---|---|
 | `velocityWindowN` | how many closed sprints the velocity mean averages over (default 3). |
-| `unit` | the estimation unit (`storyPoints`) — the field I sum is `StoryPoints`. |
+| `unit` | the estimation unit (`storyPoints`) — the field I sum is the story-points field. |
 | `coldStart` | the strategy when fewer than `velocityWindowN` closed sprints exist (`po-seed`). |
 | `seedVelocity` | the PO-set starting velocity, set at `/kickoff`; `null` until seeded. |
 | `availabilityFactorDefault` | the default 0–1 availability dial (1.0 = fully staffed). |
@@ -35,33 +35,33 @@ descriptor with `velocityWindowN: 5` gets a 5-sprint mean with zero change to my
 
 ## Velocity — read-only, client-side, idempotent
 
-**Velocity = the mean of completed StoryPoints over the last `velocityWindowN` closed sprints.**
+**Velocity = the mean of completed story points over the last `velocityWindowN` closed sprints.**
 It is pure arithmetic over Done-item queries — no write, no state, no analytics API.
 
-> **WHY client-side arithmetic and not an analytics call.** The adapter has exactly one REST
-> carve-out — attachment upload (adapter §9) — and it is deliberately *not* an analytics hatch:
-> Resolution #3 removed the analytics transport gap precisely because velocity is expressible as
-> `wit_*` queries. Computing it client-side keeps the team on the MCP-first contract and keeps
-> velocity **idempotent by nature** (adapter §5): re-running the query sums the same Done items to
-> the same number, so a re-plan never corrupts the ceiling.
+> **WHY client-side arithmetic and not an analytics call.** Velocity is fully expressible as
+> completed-work-item queries (concept #10), so it needs no backend analytics hatch — the active
+> backend's adapter deliberately exposes no analytics transport, only the work-item read surface.
+> Computing it client-side keeps the team on the adapter's documented contract and keeps velocity
+> **idempotent by nature** (concept #10): re-running the query sums the same Done items to the same
+> number, so a re-plan never corrupts the ceiling.
 
 ### How I compute it
 
 For each of the last `velocityWindowN` closed sprints:
 
-1. Read that sprint's completed items. Prefer `wit_get_work_items_for_iteration` for the sprint's
-   IterationPath, or a high-`top` `wit_query_by_wiql` filtered to that IterationPath **and** the
-   Completed state-category — resolved at runtime via `wit_get_work_item_type`, **never** the
-   literal `"Done"` (adapter §6). Different process templates spell completion differently (Scrum
-   `Done` vs Agile `Closed`); resolving keeps the math correct on any template.
-2. Sum `Microsoft.VSTS.Scheduling.StoryPoints` over those completed items. Only items that
-   actually reached the Completed category count — a carried-over or rejected item contributes
-   zero to the sprint it *didn't* complete in (see [reject-and-carryover.md](reject-and-carryover.md)).
+1. Read that sprint's completed items — read the sprint's items (concept #6) for the sprint's
+   iteration, or the ready-to-pull / idempotency query (concept #10) filtered to that iteration
+   **and** the Completed state — resolved at runtime (concept #7), **never** the literal `"Done"`.
+   Different backends and process templates spell completion differently; resolving keeps the math
+   correct on any of them.
+2. Sum the story-points field over those completed items. Only items that actually reached the
+   Completed category count — a carried-over or rejected item contributes zero to the sprint it
+   *didn't* complete in (see [reject-and-carryover.md](reject-and-carryover.md)).
 3. Average the per-sprint sums: `velocity = mean(sprint_points[])`.
 
-**"List means all" is load-bearing here** (adapter §4): a half-read Done set silently *understates*
-velocity and would shrink every future sprint. So I read to exhaustion, and I treat a result AT
-the WIQL cap as a truncation error to surface — never as a complete read.
+**"List means all" is load-bearing here** (concept #10): a half-read Done set silently *understates*
+velocity and would shrink every future sprint. So I read to exhaustion, and I treat a result at
+the query cap as a truncation error to surface — never as a complete read.
 
 ### Worked example (generic)
 
@@ -118,22 +118,22 @@ capacity = velocity × availabilityFactor
 > condition. Keeping them separate means a low-availability sprint doesn't poison the velocity
 > history: next sprint's mean still reflects true capability, and only the factor changes.
 
-## `work_get_team_capacity` — the secondary signal
+## The backend's own capacity model — the secondary signal
 
-Azure's own capacity model (`work_get_team_capacity`) records
-per-member daily capacity and days-off for an iteration. I read it as a **secondary, corroborating
-signal**, not as my primary ceiling:
+Some backends expose their own capacity model (on the active backend, via its team-capacity read —
+concept #6) recording per-member daily capacity and days-off for an iteration. Where the active
+backend offers it, I read it as a **secondary, corroborating signal**, not as my primary ceiling:
 
-- If the PO (or a `/delivery-init` setup) has populated team capacity in Azure, it can inform the
-  `availabilityFactor` — e.g. a member with days-off logged is a real availability reduction I can
-  reflect rather than ask about.
-- But my ceiling stays **velocity-derived** (empirical throughput), because Azure's capacity is an
-  *hours* model and this team estimates in *story points*; the two don't convert cleanly. Azure
-  capacity refines the availability dial; it does not replace the velocity mean.
-- `work_update_team_capacity` is a write; I use it sparingly and idempotently if a ceremony needs
-  to record the sprint's availability back to Azure — the same durable-milestone discipline as any
-  other write (adapter §3). Reading is the default; writing team capacity is not part of routine
-  planning.
+- If the PO (or a `/delivery-init` setup) has populated team capacity in the active backend, it can
+  inform the `availabilityFactor` — e.g. a member with days-off logged is a real availability
+  reduction I can reflect rather than ask about.
+- But my ceiling stays **velocity-derived** (empirical throughput), because the backend's capacity is
+  an *hours* model and this team estimates in *story points*; the two don't convert cleanly. The
+  backend's capacity refines the availability dial; it does not replace the velocity mean.
+- Writing team capacity back (concept #6, where the backend supports it) is a write I use sparingly
+  and idempotently if a ceremony needs to record the sprint's availability back to the active
+  backend — the same durable-milestone discipline as any other write (the resilience policy).
+  Reading is the default; writing team capacity is not part of routine planning.
 
 ## What velocity is NOT
 

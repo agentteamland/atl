@@ -1,5 +1,5 @@
 ---
-knowledge-base-summary: "Methodology is data, not hardcoded logic: I read roles/dispatch, cadence, capacityModel, artifactHierarchy, and branches from .delivery/methodology.json and act. config.json is read-only (only /delivery-init writes it). Resolve concrete type/state/iteration names at runtime (wit_get_work_item_type), never a literal Done ('blocked' is a tag/field, not a state). The branchPair-vs-methodology.branches reconciliation (config wins)."
+knowledge-base-summary: "Methodology is data, not hardcoded logic: I read roles/dispatch, cadence, capacityModel, artifactHierarchy, and branches from .delivery/methodology.json and act. config.json is read-only (only /delivery-init writes it). Resolve concrete type/state/iteration names at runtime (concept #7 completion/state, concept #6 iteration), never a literal Done ('blocked' is a tag/field, not a state). The branchPair-vs-methodology.branches reconciliation (config wins)."
 ---
 
 # Methodology as Data
@@ -16,14 +16,16 @@ Under a project's committed `.delivery/`:
 
 - **`methodology.json`** — the descriptor: `roles[]` (binding + dispatch), `artifactHierarchy`,
   `cadence`, `capacityModel`, `branches`. Written by `/delivery-init`.
-- **`config.json`** — connection identity: `org`/`project`/`repo`, `branchPair`, `methodology`,
-  `wikiId`, `pat.ref`. Written by `/delivery-init`.
+- **`config.json`** — connection identity: `backend` (which adapter — `backends/<backend>/adapter.md`,
+  default `azure`), `org`/`project`/`repo`, `branchPair`, `methodology`, the durable-knowledge
+  store's locator (where the backend needs one), and the credential pointer. Written by `/delivery-init`.
 
-**Both are read-only to me.** Only `/delivery-init` writes them. I consume `wikiId` and the
-branch names; I never re-derive them, and I never write a token — `pat.ref` is a *pointer* to where
-the secret lives (an env-var name), never the secret itself
-(`config-and-methodology.md` §2). A ceremony/role that wrote a literal token into config would
-create exactly the exfiltration surface `atl guard` + the `untrusted-input` rule exist to stop.
+**Both are read-only to me.** Only `/delivery-init` writes them. I consume the durable-knowledge
+store's locator (where the active backend needs one) and the branch names; I never re-derive them,
+and I never write a token — the credential config is a *pointer* to where the secret lives (an env-var name),
+never the secret itself (`config-and-methodology.md` §2). A ceremony/role that wrote a literal token
+into config would create exactly the exfiltration surface `atl guard` + the `untrusted-input` rule
+exist to stop.
 
 ## What I read from the descriptor, and why as data
 
@@ -46,26 +48,24 @@ create exactly the exfiltration surface `atl guard` + the `untrusted-input` rule
 
 ## Resolve concrete names at runtime — never hardcode
 
-The descriptor holds *intent*; the live Azure project holds concrete *names*. `workItemTypeMap` is
-**null-seeded on purpose** (`{ "Pbi": null, "Task": null, "Bug": null }`) — the real Azure type and
-state names are process-template-dependent (Scrum `Product Backlog Item`/`Done` vs Agile
-`User Story`/`Closed`). So, before I touch a type or a state:
+The descriptor holds *intent*; the live backend project holds concrete *names*. `workItemTypeMap` is
+**null-seeded on purpose** (`{ "Pbi": null, "Task": null, "Bug": null }`) — the real type and
+state names are backend- and process-template-dependent. So, before I touch a type or a state:
 
-- **Types/states** → resolve via `wit_get_work_item_type` (adapter §6). "Done" for velocity is the
-  resolved **Completed** state-category, not the literal string `"Done"`. "Mark blocked" is **not**
-  a state — Azure has no blocked state-category; it is a `blocked` tag (plus the
-  `Microsoft.VSTS.CMMI.Blocked` field where the type exposes it), leaving `System.State` unchanged.
-  I never write a literal state into my reasoning, and I never invent a `Blocked` state.
-- **Iteration names/paths** → resolve at runtime via `work_list_iterations`
-  ([iteration-management.md](iteration-management.md)) — the concrete
-  `Sprint <n>` path is a live fact, never a constructed string.
+- **Types/states** → resolve the completion/state model at runtime (concept #7). "Done" for velocity
+  is the resolved **Completed** state, not the literal string `"Done"`. "Mark blocked" is **not** a
+  state — no backend models blocking as a completion state; it is a `blocked` tag/label (plus a
+  backend-specific blocked field where the type exposes one), leaving the item's state unchanged. I
+  never write a literal state into my reasoning, and I never invent a `Blocked` state.
+- **Iteration names** → resolve at runtime by listing the backend's iterations (concept #6)
+  ([iteration-management.md](iteration-management.md)) — the concrete `Sprint <n>` identifier is a
+  live fact, never a constructed string.
 
 > **WHY runtime resolution is non-negotiable.** Hardcoding `"Done"` (or assuming a `"Blocked"`
 > state that no standard template even has) silently breaks the moment a project uses a different
 > process template — the query matches nothing, velocity reads zero, the plan admits garbage.
 > Resolving real states at runtime (and treating "blocked" as a tag/field, not a state) is what
-> makes the team work on *any*
-> process template (Scrum/Agile/CMMI/custom) with zero org-admin setup.
+> makes the team work on *any* backend and process template with zero org-admin setup.
 
 ## The branchPair ↔ methodology.branches reconciliation
 
@@ -91,6 +91,7 @@ project. **When they differ, `config.branchPair` wins.** So whenever I need a br
 
 1. Load `methodology.json` + `config.json` at the start of my ceremony participation.
 2. Take *parameters* from the descriptor (`capacityModel`, `cadence`, `artifactHierarchy`).
-3. Take *identity/connection* from config (`wikiId`, `branchPair` — authoritative branches).
-4. Resolve every *concrete Azure name* (type, state, iteration) at runtime — never a literal.
+3. Take *identity/connection* from config (the durable-knowledge store's locator where the backend
+   needs one, `branchPair` — authoritative branches).
+4. Resolve every *concrete backend name* (type, state, iteration) at runtime — never a literal.
 5. Write nothing back to either file — they are `/delivery-init`'s to own; I am a reader.

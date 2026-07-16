@@ -1,15 +1,15 @@
 ---
-knowledge-base-summary: "How I use the project wiki's `Analysis/` namespace (adapter §8), co-owned with the technical-analyst — the deep per-Epic/Feature analysis that is too long for the work-item Description. Covers the split between the terse business-owned Description and the deep wiki page, the co-ownership discipline that keeps my business layer and the TA's technical layer from colliding, and a generic page shape."
+knowledge-base-summary: "How I use the durable-knowledge store's `Analysis/` namespace (concept #9), co-owned with the technical-analyst — the deep per-Epic/Feature analysis that is too long for the work-item spec field. Covers the split between the terse business-owned spec field and the deep durable-knowledge page, the co-ownership discipline that keeps my business layer and the TA's technical layer from colliding, and a generic page shape."
 ---
 
-# Analysis-Wiki Craft — the `Analysis/` namespace
+# Analysis-Store Craft — the `Analysis/` durable-knowledge namespace
 
-The Epic/Feature `System.Description` is deliberately **terse** — it is the always-loaded "what &
-why" summary, five fixed headings, scannable (`business-analysis-blueprint.md`, adapter §7). But
+The Epic/Feature **spec field** is deliberately **terse** — it is the always-loaded "what &
+why" summary, five fixed headings, scannable (`business-analysis-blueprint.md`, concept #2). But
 some Epics and Features need real depth: personas and their contexts, the scenarios and edge
 conditions behind the acceptance criteria, the business reasoning that led to the scope
 decisions, the open questions and their resolutions. That depth does not belong in the
-Description — it goes in the project wiki's **`Analysis/`** namespace (adapter §8).
+spec field — it goes in the durable-knowledge store's **`Analysis/`** namespace (concept #9).
 
 `Analysis/` is **co-owned** with the `technical-analyst`. Domain reasoning is mine; technical
 depth (the approach, feasibility, risks, NFR rationale) is theirs. The discipline below is how we
@@ -19,24 +19,24 @@ share the namespace without a write race.
 `Analysis/` page on any project; the actual page is project-specific and written when I run inside
 a ceremony. The example is generic.
 
-## The split: terse Description vs. deep wiki page
+## The split: terse spec field vs. deep durable-knowledge page
 
-| | Work-item `System.Description` | `Analysis/` wiki page |
+| | Work-item spec field | `Analysis/` durable-knowledge page |
 |---|---|---|
 | **Purpose** | The always-loaded summary — value + testable conditions | The deep reasoning behind that summary |
 | **Length** | Terse, five fixed H2s | As long as the analysis needs |
 | **Audience** | Every consumer, every read of the item | Whoever needs the depth (refine, hard estimates, disputes) |
 | **Owner** | Business-owned (mine) | Co-owned: my business layer + the TA's technical layer |
-| **Read via** | `wit_get_work_item` (parse headings) | `wiki_get_page_content` / `search_wiki` |
+| **Read via** | read the work-item (parse headings) | read/search the durable-knowledge store |
 
 **The rule of thumb:** if it is a *conclusion* the whole team must always see, it goes in the
-Description. If it is the *reasoning* that produced the conclusion — needed sometimes, by some
-readers — it goes in `Analysis/`. The Description says "these are the acceptance criteria"; the
+spec field. If it is the *reasoning* that produced the conclusion — needed sometimes, by some
+readers — it goes in `Analysis/`. The spec field says "these are the acceptance criteria"; the
 `Analysis/` page says "here is why these criteria and not others, here are the scenarios they
 cover, here is the edge case we deliberately excluded and why."
 
-**Why keep them separate rather than one big Description:** the Description is loaded on *every*
-read of the work-item by *every* consumer — bloating it taxes everyone. The wiki page is pulled
+**Why keep them separate rather than one big spec field:** the spec field is loaded on *every*
+read of the work-item by *every* consumer — bloating it taxes everyone. The durable-knowledge page is pulled
 only when the depth is wanted. Keeping the summary terse and the depth linked is what keeps the
 board fast to reason about while the reasoning stays recoverable.
 
@@ -50,15 +50,15 @@ page:
   business questions.
 - **The TA's layer (technical analysis):** approach depth, feasibility and risk reasoning, NFR
   rationale, dependency analysis. This mirrors the TA's work-item comment (the
-  `**[Technical Analysis]**` sentinel, adapter §7) but at wiki depth.
+  `**[Technical Analysis]**` sentinel, concept #3) but at durable-knowledge depth.
 
 The mechanics that prevent a collision:
 - **Distinct sections, one page.** A per-Epic/Feature `Analysis/` page carries a **Business
   Analysis** section (mine) and a **Technical Analysis** section (the TA's). We each own our
   section; neither rewrites the other's.
-- **Read before write.** Before I update the page I read it (`wiki_get_page_content`) so I revise
-  my section in place and leave the TA's intact. `wiki_create_or_update_page` is an idempotent
-  upsert (adapter §8), so writing the whole page back with only my section changed is safe.
+- **Read before write.** Before I update the page I read it (read the durable-knowledge store) so I revise
+  my section in place and leave the TA's intact. A write to the durable-knowledge store is an idempotent
+  upsert (concept #9), so writing the whole page back with only my section changed is safe.
 - **Cross-link, don't duplicate.** My section links to `Domain/` for definitions and to the
   work-item for the terse criteria; the TA's section links to `Architecture/`/ADRs. We reference
   each other's layer instead of restating it.
@@ -83,7 +83,7 @@ actual context that shapes the requirement.>
 
 ### Scenarios
 <The concrete flows behind the acceptance criteria — happy path, the meaningful variations,
-the failure and edge conditions. Each ties to an AC in the work-item Description.>
+the failure and edge conditions. Each ties to an AC in the work-item spec field.>
 
 ### Scope reasoning
 <Why this boundary. What's deliberately Out of Scope and the business reason. Rejected
@@ -103,10 +103,10 @@ with their resolution and date, so the reasoning trail survives.>
 
 ## When to bother with an `Analysis/` page at all
 
-Not every Feature needs one. A small, well-understood Feature is fully served by its Description.
+Not every Feature needs one. A small, well-understood Feature is fully served by its spec field.
 I open an `Analysis/` page when: the Feature has non-obvious scenarios or edge conditions; the
 scope boundary needed real reasoning to draw; there are open business questions worth recording;
 or the PO/team will plausibly revisit "why did we decide it this way?" later. The heuristic is
 **would a future refine or dispute be resolved faster with the reasoning written down?** — if
-yes, write the page; if no, the terse Description is enough. Over-documenting a trivial item is as
+yes, write the page; if no, the terse spec field is enough. Over-documenting a trivial item is as
 much a smell as under-documenting a complex one.

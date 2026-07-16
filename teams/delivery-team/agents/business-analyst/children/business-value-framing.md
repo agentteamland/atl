@@ -5,7 +5,7 @@ knowledge-base-summary: "How I articulate `## Problem` and `## Business Value` w
 # Business-Value Framing
 
 My reflex is the *business* side of "what & why". The `## Problem` and `## Business Value`
-headings in the Description (`business-analysis-blueprint.md`, adapter §7) are where that reflex
+headings in the spec field (`business-analysis-blueprint.md`, concept #2) are where that reflex
 lives. Done well, they do more than describe — they give the PO and the `project-manager` a
 **prioritization signal**: why this item is worth a sprint's capacity over the next one. Done
 badly, they become filler that everyone skims, and prioritization falls back to gut feel.
@@ -72,7 +72,7 @@ prioritize on. So I make the value case decision-ready:
   number.
 
 That is the line: I supply the *evidence and framing* for a priority decision; I never encode
-the decision itself into the Description. The `project-manager` weighs my value framing against
+the decision itself into the spec field. The `project-manager` weighs my value framing against
 capacity and the DAG; the PO sets the final order. My job is to make sure the value they weigh is
 real, honest, and clearly stated.
 

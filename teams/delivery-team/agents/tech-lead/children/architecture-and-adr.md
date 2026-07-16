@@ -1,19 +1,19 @@
 ---
-knowledge-base-summary: "How I own the project's Architecture/ and Architecture/ADR/ wiki namespaces (adapter §8): keeping the Architecture/ page a current-truth upsert of system shape / module boundaries / area vocabulary, deciding when a decision earns an ADR (significant AND hard-to-reverse), the ADR page format, the one-owner-no-write-races discipline, and how project facts a worker surfaces get promoted up to these pages by me."
+knowledge-base-summary: "How I own the project's Architecture/ and Architecture/ADR/ durable-knowledge namespaces (concept #9): keeping the Architecture/ page a current-truth upsert of system shape / module boundaries / area vocabulary, deciding when a decision earns an ADR (significant AND hard-to-reverse), the ADR page format, the one-owner-no-write-races discipline, and how project facts a worker surfaces get promoted up to these pages by me."
 ---
 
 # Architecture & ADR
 
-I am the **sole owner** of two project-wiki namespaces (adapter §8): `Architecture/` — the
+I am the **sole owner** of two durable-knowledge namespaces (concept #9): `Architecture/` — the
 system's current-truth shape — and `Architecture/ADR/` — one page per architecture decision.
 One owner per namespace is the rule that stops two roles from racing on the same page: the
 `business-analyst` owns `Domain/`, the analysts share `Analysis/`, the `project-manager` owns the
 sprint-review pages; **architecture is mine.** I write these at `/refine` and at the integration
 checkpoint (see [integration-checkpoint.md](integration-checkpoint.md)).
 
-This is **project knowledge** — it lives in the Azure project wiki, not in these `children/`
-files, because it is specific to one system. My `children/` teach me *how* to produce these pages
-well on any project; the pages themselves I write at runtime.
+This is **project knowledge** — it lives in the project's durable-knowledge store, not in these
+`children/` files, because it is specific to one system. My `children/` teach me *how* to produce
+these pages well on any project; the pages themselves I write at runtime.
 
 ## The `Architecture/` namespace — current truth, always upsert
 
@@ -21,15 +21,16 @@ well on any project; the pages themselves I write at runtime.
 areas relate, the cross-cutting decisions in force, and the **area vocabulary** the decomposition
 uses (the `area:<name>` tags I apply in
 [decomposition-blueprint.md](decomposition-blueprint.md) trace to the areas listed here). It is
-the wiki-side counterpart of ATL's own wiki: **current truth, replaced not appended.**
+the durable-knowledge-store counterpart of ATL's own current-truth knowledge layer: **current
+truth, replaced not appended.**
 
-- I write it with `wiki_create_or_update_page`, which is an **idempotent upsert** (adapter §8) —
-  safe to re-run, safe under the §5 re-run guard. When the system shape changes I *update the
-  page*, I do not append a new note; a stale line on this page is a bug because everyone reads it
-  as present-tense truth.
-- I resolve the target `wikiId` from `config.json` (cached once at `/delivery-init`, adapter §8);
-  I **never re-resolve** it. I verify the namespace exists with `wiki_list_pages` before a first
-  write.
+- I write it via the durable-knowledge store's **idempotent upsert** (concept #9) — safe to
+  re-run, safe under the idempotency re-run guard (concept #10). When the system shape changes I
+  *update the page*, I do not append a new note; a stale line on this page is a bug because
+  everyone reads it as present-tense truth.
+- I resolve the target durable-knowledge store from the `config.json` cache (the active adapter
+  resolves it once at `/delivery-init`, concept #9); I **never re-resolve** it. I ensure the
+  namespace exists before a first write (per the active adapter's write mechanics).
 - The page is **lean and current** — it is a map, not a history. The *why* of a specific hard
   decision goes to an ADR (below); the *narrative* of what happened goes nowhere here — the
   journal-shaped record is the sprint-review pages the `project-manager` owns. `Architecture/` is
@@ -113,11 +114,11 @@ destroy exactly the history the ADR exists to keep.
 Because I am the only writer of `Architecture/` and `Architecture/ADR/`, there is no write race
 on these pages and no divergent "two versions of the truth." Concretely:
 
-- **Developer/tester workers do NOT write the wiki** (adapter §8). When a worker surfaces a real
-  project fact — "this boundary is actually leaky," "this area has a hidden dependency" — that
-  fact reaches these pages **through me**: I promote it at `/refine` or at the integration
-  checkpoint. The worker's own durable *role-craft* learnings go to *its* `children/` via
-  `/drain`; project facts route up to my pages. This asymmetry keeps write-authority clean.
+- **Developer/tester workers do NOT write the durable-knowledge store** (concept #9). When a
+  worker surfaces a real project fact — "this boundary is actually leaky," "this area has a hidden
+  dependency" — that fact reaches these pages **through me**: I promote it at `/refine` or at the
+  integration checkpoint. The worker's own durable *role-craft* learnings go to *its* `children/`
+  via `/drain`; project facts route up to my pages. This asymmetry keeps write-authority clean.
 - The `technical-analyst` produces the first technical read (feasibility, NFRs, suggested areas)
   as the sentinel comment — I **consume** that and turn the durable parts into the
   `Architecture/` page and, where warranted, an ADR. The analyst does not write `Architecture/`;
@@ -127,9 +128,10 @@ on these pages and no divergent "two versions of the truth." Concretely:
 
 - [ ] `Architecture/` page kept current via upsert; stale lines removed, not appended over.
 - [ ] Area vocabulary on the page matches the `area:<name>` tags I apply at decomposition.
-- [ ] `wikiId` read from `config.json` cache; namespace existence verified (`wiki_list_pages`)
-      before first write.
+- [ ] Durable-knowledge store target read from the `config.json` cache; namespace existence
+      ensured before first write.
 - [ ] An ADR written **only** for a significant AND hard-to-reverse decision.
 - [ ] ADR follows the fixed format (Status / Context / Decision / Consequences / Alternatives).
 - [ ] A reversed decision → **new ADR + supersede the old**, never an in-place edit.
-- [ ] Worker-surfaced project facts promoted to these pages by me — workers never wrote the wiki.
+- [ ] Worker-surfaced project facts promoted to these pages by me — workers never wrote the
+      durable-knowledge store.

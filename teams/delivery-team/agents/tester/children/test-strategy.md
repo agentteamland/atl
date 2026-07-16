@@ -13,7 +13,7 @@ happy path only (that's the developer's self-test again, adding nothing).
 ## The spec is the acceptance criteria — start there
 
 My spec is not the code; it is the `## Acceptance Criteria` list in the work-item's
-`System.Description` (adapter §7), plus the constraints the `technical-analyst` recorded under the
+**spec field** (concept #2), plus the constraints the `technical-analyst` recorded under the
 `## NFRs` heading of the `**[Technical Analysis]**` comment. I read these *before* I look at how the
 developer implemented anything, so my expectations are derived from intent, not from the code (code
 I read to find seams to attack — not to learn what "correct" means).
@@ -119,5 +119,5 @@ The strategy lives in my verdict comment on the work-item, in one or two lines: 
 what I covered at each pyramid level, and what I deliberately trusted rather than tested. This is
 project-agnostic *craft* — but the *instance* of it (the actual criteria, the actual risks) is
 project-specific, so it goes in the work-item comment, **not** in this file and **not** in the
-project wiki (I don't write the wiki — adapter §8). A durable *lesson* about strategy itself ("for
+durable-knowledge store (I don't write it — concept #9). A durable *lesson* about strategy itself ("for
 this class of change, concurrency is always rank 1") routes to this child via `/drain`, generalized.

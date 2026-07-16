@@ -66,8 +66,8 @@ Over-eliciting is as much a failure as under-eliciting.
 one could ever look at later and honestly call *false*. If a signal can't fail, it can't
 confirm.
 
-**Cost:** the `business-analyst` can't seed real acceptance criteria (adapter §7,
-`## Acceptance Criteria`), and the PO has no basis to judge, months later, whether the build
+**Cost:** the `business-analyst` can't seed real acceptance criteria (the spec field's
+`## Acceptance Criteria`, concept #2), and the PO has no basis to judge, months later, whether the build
 was worth it. A project with unfalsifiable success is a project that can never be shown to
 have succeeded *or* failed — so it drifts.
 

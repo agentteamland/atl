@@ -1,5 +1,5 @@
 ---
-knowledge-base-summary: "How I map technical dependencies as real Azure Dependency links (wit_work_items_link) — not just prose — so the project-manager's scheduling DAG is machine-readable, and how I identify and frame risks with a mitigation for each. The distinction between a dependency (a hard ordering constraint) and a risk (a probability of trouble), and how both feed downstream scheduling and review."
+knowledge-base-summary: "How I map technical dependencies as real dependency links (concept #8) — not just prose — so the project-manager's scheduling DAG is machine-readable, and how I identify and frame risks with a mitigation for each. The distinction between a dependency (a hard ordering constraint) and a risk (a probability of trouble), and how both feed downstream scheduling and review."
 ---
 
 # Dependency & Risk
@@ -13,27 +13,28 @@ concrete.
 ## Dependencies must be links, not just prose
 
 A dependency I only mention in the comment text is invisible to the `project-manager`'s
-scheduling DAG. The PM builds its ordering from the work-items' **Azure Dependency links**, not
-from parsing English. So for every real technical dependency I record it **twice**:
+scheduling DAG. The PM builds its ordering from the work-items' **dependency links** (concept
+#8), not from parsing my prose. So for every real technical dependency I record it **twice**:
 
 1. **In prose** under `## Dependencies` — human-readable, with the *why* ("B needs A's paging
    capability before B can be estimated").
-2. **As an Azure link** via `wit_work_items_link` — the machine-readable edge the PM's DAG
+2. **As a dependency link** (concept #8) — the machine-readable edge the PM's DAG
    consumes.
 
 Prose without the link is a dependency the scheduler doesn't know about. The link without prose
 is an edge with no rationale — a future reader can't tell why it exists. Both, always.
 
-### The link mechanics (adapter §2)
+### The link mechanics (concept #8)
 
-- I create the dependency edge with `wit_work_items_link` (the adapter's tool for
-  Dependency/Parent links). I use the **Dependency** relation, not the Parent/Child hierarchy —
-  Parent/Child is the artifact ladder (`artifactHierarchy`, config §1), Dependency is the
-  ordering constraint. Conflating them corrupts both the tree and the DAG.
-- To remove a stale edge (a dependency that turned out not to hold), I use `wit_work_item_unlink`
-  — never leave a false edge that would over-constrain the schedule.
+- I create the dependency edge through the active backend's dependency-link operation (concept
+  #8). I use the **dependency** relation, not the parent/child hierarchy — parent/child is the
+  artifact ladder (`artifactHierarchy`, config §1, concept #1), the dependency link is the
+  ordering constraint (concept #8). Conflating them corrupts both the tree and the DAG.
+- To remove a stale edge (a dependency that turned out not to hold), I remove the dependency link
+  through the active backend (concept #8) — never leave a false edge that would over-constrain
+  the schedule.
 - Linking is idempotent-friendly: re-asserting an existing link is a safe no-op, consistent with
-  the team's re-run convergence discipline (adapter §5). I don't need an `atl-key` here — the
+  the team's re-run convergence discipline (concept #10). I don't need an `atl-key` here — the
   link's endpoints *are* its identity.
 - If a dependency is on an item that doesn't exist yet (a spike the tech-lead hasn't created),
   I state it in prose and flag the sequencing; I create the link once both endpoints exist. I
@@ -44,7 +45,7 @@ is an edge with no rationale — a future reader can't tell why it exists. Both,
 | | **Dependency** | **Risk** |
 |---|---|---|
 | What it is | A *certain* ordering constraint: B cannot proceed until A. | A *probability* of trouble: this might go wrong. |
-| Where it goes | `## Dependencies` + an Azure Dependency link | `## Feasibility & Risks` with a mitigation |
+| Where it goes | `## Dependencies` + a dependency link (concept #8) | `## Feasibility & Risks` with a mitigation |
 | Who consumes it | the `project-manager` (scheduling DAG) | the `tech-lead` (decomposition), the `developer` (build), the PO (expectations) |
 | The test | "Is A *required before* B?" → yes = dependency | "Could X *cause* B to fail/slip?" → yes = risk |
 
@@ -98,10 +99,10 @@ false-precision score; the two-axis tag is enough to sort.
   means an item gets scheduled before its blocker, and the sprint stalls. My discipline of
   link-plus-prose is what keeps the PM's plan sound.
 - **tech-lead** — reads my risks to shape the decomposition (a high-impact risk may become its
-  own de-risking work-item with a stable plan-ordinal, adapter §5) and to weigh the approach at
+  own de-risking work-item with a stable plan-ordinal, concept #10) and to weigh the approach at
   `/refine`.
 - **developer** — reads the risks and mitigations in the sentinel-located analysis comment
-  (adapter §7) as build guidance ("stream, don't buffer") before touching code.
+  (concept #3) as build guidance ("stream, don't buffer") before touching code.
 - **product-owner** — sees the honest risk catalogue so sprint commitments are made with eyes
   open, not on a rosy read.
 

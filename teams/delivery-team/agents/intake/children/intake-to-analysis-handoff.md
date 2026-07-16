@@ -6,7 +6,7 @@ knowledge-base-summary: "BLUEPRINT — the structured framing I hand to the busi
 
 This is my **primary production unit**: the structured framing I produce at the end of a
 discovery conversation and hand to the `business-analyst` (who then, with the
-`technical-analyst`, turns it into durable Azure artifacts). Everything in
+`technical-analyst`, turns it into durable backend artifacts). Everything in
 `elicitation-craft.md` exists to *produce* this framing well; this file defines *what it
 is* and how to assemble it completely.
 
@@ -15,24 +15,24 @@ is* and how to assemble it completely.
 The delivery org runs as an analysis assembly line: **PO ⇄ me → `business-analyst` →
 `technical-analyst`**. My output is the first link. The contract is:
 
-- I hand off a **framing**, not a work-item. I do **not** call `wit_create_work_item` or
-  any `wit_*`/`wiki_*` tool — creating Azure state is the analysts' and tech-lead's job
+- I hand off a **framing**, not a work-item. I do **not** create a work-item or write to the
+  durable-knowledge store — creating backend state is the analysts' and tech-lead's job
   during the ceremony (see `kickoff-participation.md`). My deliverable is an in-conversation
   structured document that the `business-analyst` reads.
 - The framing must be **hand-off-complete**: the BA should be able to write the Epic/Feature
-  `System.Description` (under the fixed H2s `## Problem`, `## Business Value`, `## Scope`,
-  `## Acceptance Criteria`, `## Out of Scope` — the content-placement contract, adapter §7)
+  spec field (under the fixed H2s `## Problem`, `## Business Value`, `## Scope`,
+  `## Acceptance Criteria`, `## Out of Scope` — the content-placement contract, concept #2)
   and the `technical-analyst` should be able to start a feasibility read **without coming
   back to ask me a question I could have asked the PO.** A framing that forces the BA to
   guess a requirement has failed.
 - The framing is **project knowledge**, but I do not persist it. I produce it live; the BA
-  persists the parts that become durable — into the Epic/Feature Description and, for depth,
-  the project wiki `Domain/` + `Analysis/` namespaces (adapter §8). My role is bounded by
+  persists the parts that become durable — into the Epic/Feature spec field and, for depth,
+  the durable-knowledge store's `Domain/` + `Analysis/` namespaces (concept #9). My role is bounded by
   the conversation and discarded after (my `in-session` dispatch nature); the framing lives
   on only through what the analysts write.
 
 Why a framing and not work-items: keeping creation on the analysts' side of the seam means
-the durable Azure artifacts are written by the roles that own their namespaces and idempotency
+the durable backend artifacts are written by the roles that own their namespaces and idempotency
 keys, with one consistent content-placement discipline — no half-formed items created during
 a live chat that a later ceremony has to reconcile.
 
@@ -110,7 +110,7 @@ Notes on filling it:
   justifies it.
 - **I do not size, prioritize, or decompose.** No story points, no Epic/Feature split, no
   area tags — those belong to the `project-manager` (sizing/selection) and `tech-lead`
-  (decomposition + `area:<name>` tags, adapter §7). I frame; they structure.
+  (decomposition + `area:<name>` tags, concept #4). I frame; they structure.
 
 ## Worked example (generic)
 
@@ -182,7 +182,7 @@ Before I hand the framing to the `business-analyst`, every box must be checked:
 - [ ] **Out-of-scope hints** captured (what we're deliberately not doing now).
 - [ ] **Open questions** routed to `business-analyst` / `technical-analyst` — nothing I could
       have asked the PO is left for them to guess.
-- [ ] **No Azure state created by me** — no work-items, no wiki pages, no tags; the analysts
+- [ ] **No backend state created by me** — no work-items, no durable-knowledge pages, no tags; the analysts
       own creation.
 - [ ] I did **not** size, prioritize, decompose, or choose an architecture/stack.
 - [ ] I confirmed the whole framing back to the PO and they endorsed it.
