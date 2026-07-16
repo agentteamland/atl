@@ -38,12 +38,16 @@ note() { echo "  note - $1"; }
 gh auth setup-git >/dev/null 2>&1 || true
 LOGIN=$(gh_login)
 [ -n "$LOGIN" ] || { bad "gh not authenticated"; finish; exit 1; }
-REPO="$LOGIN/atl-e2e-delivery"
+# The fixture repo + Project live in the agentteamland org (ATL's own infra), NOT the
+# runner's personal namespace — overridable for a fork via ATL_E2E_DELIVERY_OWNER. The
+# runner's token still authenticates; it just needs repo+project rights on the owner.
+OWNER="${ATL_E2E_DELIVERY_OWNER:-agentteamland}"
+REPO="$OWNER/atl-e2e-delivery"
 
-reset_delivery_repo "$LOGIN" \
+reset_delivery_repo "$OWNER" \
   && ok "reset delivery fixture repo to baseline (main/dev/release)" \
-  || bad "could not reset $REPO (does it exist? token 'repo' scope?)"
-PROJNUM=$(reset_delivery_project "$LOGIN")
+  || bad "could not reset $REPO (does it exist? token 'repo' rights on $OWNER?)"
+PROJNUM=$(reset_delivery_project "$OWNER")
 [ -n "$PROJNUM" ] && ok "created a fresh GitHub Project #$PROJNUM" || bad "could not create the Project (token 'project' scope?)"
 
 fresh
@@ -65,7 +69,7 @@ atl install agentteamland/delivery-team >/dev/null 2>&1 || bad "install errored"
 mkdir -p "$PROJ/.delivery"
 cat > "$PROJ/.delivery/config.json" <<EOF
 {
-  "owner": "$LOGIN",
+  "owner": "$OWNER",
   "repo": "atl-e2e-delivery",
   "projectNumber": $PROJNUM,
   "branchPair": { "dev": "dev", "release": "release" },
@@ -130,7 +134,7 @@ ge "$pbi" && ok "refine produced area:web work-units (PBIs)" || note "no area:we
 # ---- 3. /sprint-plan — velocity (cold-start), admit units onto the board ----------
 gturn "/sprint-plan. This is a cold-start project (no closed sprints), so use the po-seed velocity path. The candidate backlog is the open PBI issues (label area:web) not yet on the board. Select the top units and admit them to the current sprint by setting their Projects v2 Iteration field (add the issue to Project #$PROJNUM and set Iteration). Report the seed velocity used." || bad "sprint-plan turn errored"
 
-items=$(gh project item-list "$PROJNUM" --owner "$LOGIN" --format json -q '.items | length' 2>/dev/null || echo 0)
+items=$(gh project item-list "$PROJNUM" --owner "$OWNER" --format json -q '.items | length' 2>/dev/null || echo 0)
 ge "$items" && ok "sprint-plan added units to the Project board" || note "no board items this run (LLM-variable; sprint-start still derives the plan below)"
 
 # ---- 4. /sprint-start — build the DAG + materialize plan.json (NO dispatch) --------
@@ -165,7 +169,7 @@ clc=$(ic --state closed)
 ge "$clc" && ok "the worked issue was closed on merge-verify (§10)" || bad "no closed issue after the micro-loop"
 # NOTE: Project Status=Done (the built-in automation only sets Done on close/merge; the
 # ceremony may or may not have set it explicitly -> ceremony-fidelity)
-done_ct=$(gh project item-list "$PROJNUM" --owner "$LOGIN" --format json -q '[.items[] | select((.status // "") == "Done")] | length' 2>/dev/null || echo 0)
+done_ct=$(gh project item-list "$PROJNUM" --owner "$OWNER" --format json -q '[.items[] | select((.status // "") == "Done")] | length' 2>/dev/null || echo 0)
 ge "$done_ct" && ok "a board item reached Status=Done" || note "no board item at Status=Done this run (LLM-variable; the close still happened)"
 
 # ---- 6. /sprint-review — report to docs/sprints + PO approve -> dev->release PR ----
@@ -188,7 +192,7 @@ if [ "$FAIL" -gt 0 ]; then
   echo "--- turns.log (tail) ---"; tail -100 "$HOME/turns.log" 2>/dev/null
   echo "--- issues ---";           gh issue list --repo "$REPO" --state all --json number,title,state,labels 2>/dev/null
   echo "--- PRs ---";              gh pr list --repo "$REPO" --state all --json number,baseRefName,state 2>/dev/null
-  echo "--- board items ---";      gh project item-list "$PROJNUM" --owner "$LOGIN" --format json 2>/dev/null | jq '[.items[] | {title, status}]' 2>/dev/null
+  echo "--- board items ---";      gh project item-list "$PROJNUM" --owner "$OWNER" --format json 2>/dev/null | jq '[.items[] | {title, status}]' 2>/dev/null
   echo "--- plan.json ---";        cat "$PROJ/.delivery/plan.json" 2>/dev/null
   echo "==============================================="
 fi

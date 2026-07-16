@@ -53,12 +53,13 @@ publish blueprints exercise actual GitHub:
 - `agentteamland/atl-e2e-team` — propose-upstream upstream (not owned by the tester)
 - `<your-login>/atl-e2e-owned` — own-team re-publish target (the `publish-own`
   blueprint force-resets it to the fixture baseline each run, so it's repeatable)
-- `<your-login>/atl-e2e-delivery` — the GitHub-backend delivery fixture (create it
-  once). The `github-delivery-loop` blueprint force-resets it to the
-  `fixtures/delivery-repo/` baseline (main/dev/release, no stale issues/PRs) and
-  creates a fresh `atl-e2e-delivery` Project each run, so the T-point loop is
-  repeatable. Needs `repo` + `project` token scope; the container ships a modern `gh`
-  for Projects v2 (`field-create`/`item-edit`).
+- `agentteamland/atl-e2e-delivery` — the GitHub-backend delivery fixture, in the org
+  (ATL's own infra, alongside `atl-e2e-team`; override for a fork with
+  `ATL_E2E_DELIVERY_OWNER`). Create it once. The `github-delivery-loop` blueprint
+  force-resets it to the `fixtures/delivery-repo/` baseline (main/dev/release, no stale
+  issues/PRs) and creates a fresh `atl-e2e-delivery` Project each run, so the T-point
+  loop is repeatable. The runner's token needs `repo` + `project` rights on the owner;
+  the container ships a modern `gh` for Projects v2 (`field-create`/`item-edit`).
 
 The blueprints inject a test-only `~/.atl/index.json` (via `write_test_index` in
 `lib.sh`) so `atl install` resolves the fixtures offline — the production index is
