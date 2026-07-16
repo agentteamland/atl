@@ -59,6 +59,13 @@ overrides these fields without touching any ceremony.
 
 ## 2. `config.json` — connection identity (no secret)
 
+The shape is **backend-specific** — it carries the selected `backend`, that backend's
+coordinates, the branch pair, the methodology id, and a **by-name** credential reference (never
+a token). Written once by [`/delivery-init`](../skills/delivery-init/SKILL.md) (§4 of its
+procedure).
+
+### Azure shape (`backend: "azure"`)
+
 ```json
 {
   "org": "<org>",
@@ -85,18 +92,60 @@ overrides these fields without touching any ceremony.
 | `wikiId` | the Azure backend's durable-knowledge store id, resolved **once** at init and cached so ceremonies never re-resolve it (durable-knowledge store, concept #9; see `backends/azure/adapter.md`). `null` when none is provisioned yet — the store must exist before `/kickoff` seeds knowledge. |
 | `pat` | **`{ "ref": "<env-var-name>" }` — a pointer, never the token.** There is no token field in the schema. |
 
-**The backend credential is referenced by name, never stored.** `pat.ref` names *where* the secret lives;
-it is resolved at run time in priority: (1) the active backend's own configured auth,
-(2) an env var named by `pat.ref` (default `AZURE_DEVOPS_PAT`), (3) the OS keychain. A committed
-token is exactly the exfiltration surface `atl guard` + the `untrusted-input` rule exist to
-protect — `/delivery-init` **refuses to write a literal token**, and no ceremony ever writes
-one back.
+### GitHub shape (`backend: "github"`)
 
-> **Backend-specific schema — flagged for a follow-up (not this pass).** `pat.ref` (the "PAT"
-> naming), `wikiId` (an Azure durable-knowledge-store id — the GitHub backend's store is in-repo
-> `/docs`, which has none), and `transport` / `restFallbackEnabled` (the MCP-first transport
-> policy) are still Azure-shaped fields. This pass neutralizes the *prose* and framing only;
-> making the *schema* itself backend-neutral is a separate follow-up.
+```json
+{
+  "owner": "<owner>",
+  "repo": "<repo>",
+  "projectNumber": <n>,
+  "branchPair": { "dev": "dev", "release": "release" },
+  "backend": "github",
+  "methodology": "scrum",
+  "credential": { "ref": "GH_TOKEN" }
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `owner` / `repo` | the GitHub coordinates the `gh` CLI needs (`--repo <owner>/<repo>`). `owner` is the repo's org or user login; it also owns the board unless overridden. |
+| `projectNumber` | the **owner-scoped GitHub Projects v2 board number** (`gh project … --owner <owner> <projectNumber>`). Distinct from `repo` — a board is owner-level, not nested under the repo. Resolved (or created) once at init. |
+| `branchPair` | the project's actual `dev` / `release` branch names — same two-branch delivery flow as Azure. |
+| `backend` | `"github"`. |
+| `methodology` | the `id` of the active `methodology.json` (v1: `"scrum"`) — backend-independent. |
+| `credential` | **`{ "ref": "GH_TOKEN" }` — an informational record of where the token lives, never the token.** For GitHub the token env var is **fixed to `GH_TOKEN`** (both `gh` itself and the engine read only `GH_TOKEN`/`GITHUB_TOKEN`): the engine hardcodes `os.Getenv("GH_TOKEN")` and injects it into workers (`workerenv.go`), and does **not** parse this field. So — unlike Azure's `pat.ref` (§ Azure), which the engine genuinely reads to locate the PAT — `credential.ref` documents rather than configures; changing it does not change which env var is read. There is no token field. |
+
+GitHub carries **no** `wikiId` (its durable-knowledge store is in-repo `/docs`, which has no id —
+see `backends/github/adapter.md` §9) and **no** `transport` / `restFallbackEnabled` (those are
+the Azure MCP-first transport policy; GitHub is `gh`-native, no MCP, no REST carve-out).
+
+**The backend credential is referenced by name, never stored.** The credential field names
+*where* the secret lives, and is resolved at run time:
+
+- **Azure** — `pat.ref` in priority: (1) the Azure MCP's own configured auth, (2) an env var
+  named by `pat.ref` (default `AZURE_DEVOPS_PAT`), (3) the OS keychain.
+- **GitHub** — the token env var is **fixed to `GH_TOKEN`**: the engine reads `GH_TOKEN` from its
+  own environment and injects it into workers (`workerenv.go`), so `gh` finds it. `credential.ref`
+  records this for the reader but is **not** engine-read — it is not a configurable indirection
+  like Azure's `pat.ref`.
+
+A committed token is exactly the exfiltration surface `atl guard` + the `untrusted-input` rule
+exist to protect — `/delivery-init` **refuses to write a literal token**, and no ceremony ever
+writes one back.
+
+> **Backend-specific schema — each backend has its own concrete shape; unifying them is a
+> deferred follow-up.** The two shapes above diverge on purpose: Azure carries `org`/`project`/
+> `wikiId`/`transport`/`pat.ref`; GitHub carries `owner`/`projectNumber`/`credential.ref` and
+> omits the Azure-only fields. Each is documented and consumed as-is. Collapsing them into one
+> *neutral* schema (e.g. a shared core + a nested per-backend `backendConfig` block, so
+> ceremonies read one common shape) is a separate refactor follow-up — the two documented shapes
+> are the current contract.
+>
+> **Ceremony consumers still name Azure fields.** The ceremonies (`/kickoff`, `/refine`,
+> `/sprint-review`) currently read `org`/`project`/`repo`/`wikiId` by name; teaching them to read
+> the GitHub coordinates (`owner`/`projectNumber`) is the consumer-side companion to this writer,
+> tracked with the GitHub-backend e2e (#212). `/delivery-init` is the **writer** and defines the
+> shape here; the consumer neutralization lands before the loop is proven end-to-end.
 
 > **Reconciled — `config.branchPair` vs `methodology.branches`.** Both name the dev/release
 > branches; the split is deliberate. `methodology.branches` is the descriptor **default**
