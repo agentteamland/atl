@@ -96,13 +96,13 @@ reset_owned_repo() {
   rm -rf "$tmp"
 }
 
-# reset_delivery_repo force-restores <login>/atl-e2e-delivery to the fixture
-# baseline and rebuilds the two-branch flow, so the github-delivery-loop blueprint
-# starts from a clean repo even after a prior run left issues, PRs, feature
-# branches, or tags behind. The twin of reset_owned_repo, for the delivery fixture.
+# reset_delivery_repo force-restores <owner>/atl-e2e-delivery to the fixture baseline
+# and rebuilds the two-branch flow, so the github-delivery-loop blueprint starts from a
+# clean repo even after a prior run left issues, PRs, feature branches, or tags behind.
+# The owner is the org (agentteamland by default). The twin of reset_owned_repo.
 reset_delivery_repo() {
-  local login="$1"
-  local repo="$login/atl-e2e-delivery"
+  local owner="$1"
+  local repo="$owner/atl-e2e-delivery"
   # Delete every prior issue — idempotency labels would otherwise converge onto them,
   # and (unlike PRs) issues CAN be removed, so a truly empty baseline is achievable.
   for n in $(gh issue list --repo "$repo" --state all --limit 200 --json number -q '.[].number' 2>/dev/null); do
@@ -145,14 +145,14 @@ reset_delivery_repo() {
 # default (Todo/In Progress/Done); Iteration is UI-only (gh cannot create it), so the
 # blueprint tolerates its absence. Requires the `project` token scope.
 reset_delivery_project() {
-  local login="$1"
+  local owner="$1"
   local existing
-  existing=$(gh project list --owner "$login" --format json --limit 100 -q '.projects[] | select(.title=="atl-e2e-delivery") | .number' 2>/dev/null | head -1)
-  [ -n "$existing" ] && gh project delete "$existing" --owner "$login" >/dev/null 2>&1 || true
+  existing=$(gh project list --owner "$owner" --format json --limit 100 -q '.projects[] | select(.title=="atl-e2e-delivery") | .number' 2>/dev/null | head -1)
+  [ -n "$existing" ] && gh project delete "$existing" --owner "$owner" >/dev/null 2>&1 || true
   local num
-  num=$(gh project create --owner "$login" --title "atl-e2e-delivery" --format json -q '.number' 2>/dev/null)
+  num=$(gh project create --owner "$owner" --title "atl-e2e-delivery" --format json -q '.number' 2>/dev/null)
   [ -z "$num" ] && return 1
-  gh project field-create "$num" --owner "$login" --name "Story Points" --data-type NUMBER >/dev/null 2>&1 || true
-  gh project field-create "$num" --owner "$login" --name "Priority" --data-type SINGLE_SELECT --single-select-options "P0,P1,P2,P3" >/dev/null 2>&1 || true
+  gh project field-create "$num" --owner "$owner" --name "Story Points" --data-type NUMBER >/dev/null 2>&1 || true
+  gh project field-create "$num" --owner "$owner" --name "Priority" --data-type SINGLE_SELECT --single-select-options "P0,P1,P2,P3" >/dev/null 2>&1 || true
   echo "$num"
 }
