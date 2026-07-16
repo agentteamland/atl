@@ -23,9 +23,10 @@ RUN apt-get update \
  && apt-get install -y --no-install-recommends git ca-certificates jq curl \
  && rm -rf /var/lib/apt/lists/* \
  && npm install -g @anthropic-ai/claude-code
-# gh CLI (arch-aware) — the publish blueprints drive real fork/PR/commit/tag
+# gh CLI (arch-aware) — the publish + github-delivery blueprints drive real
+# fork/PR/commit/tag + Projects v2 (field-create/item-edit need a modern gh).
 RUN ARCH=$(dpkg --print-architecture) \
- && curl -fsSL "https://github.com/cli/cli/releases/download/v2.62.0/gh_2.62.0_linux_${ARCH}.tar.gz" | tar xz -C /tmp \
+ && curl -fsSL "https://github.com/cli/cli/releases/download/v2.86.0/gh_2.86.0_linux_${ARCH}.tar.gz" | tar xz -C /tmp \
  && mv /tmp/gh_*/bin/gh /usr/local/bin/gh \
  && rm -rf /tmp/gh_*
 COPY --from=build /out/atl /usr/local/bin/atl

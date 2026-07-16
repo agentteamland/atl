@@ -10,8 +10,10 @@
 # Auth is passed into the container only when present on the host:
 #   - gh:     GH_TOKEN (from your `gh auth token`)            — publish blueprints
 #   - Claude: CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY    — the learning-loop blueprint
-# Each blueprint declares its need on a `# needs: none|gh|token` line; a blueprint
-# whose auth is absent is skipped (so this same script is CI-safe and local-full).
+# Each blueprint declares its need on a `# needs: none|gh|token|gh+token` line; a
+# blueprint whose auth is absent is skipped (so this same script is CI-safe and
+# local-full). `gh+token` (github-delivery-loop) needs BOTH a GH_TOKEN and a Claude
+# token — the real GitHub-backend Layer-B loop.
 
 set -euo pipefail
 cd "$(dirname "$0")/../.."   # atl repo root (build context)
@@ -43,12 +45,13 @@ for name in $names; do
   needs="$(sed -n 's/^# needs: //p' "$bp" | head -1)"
   needs="${needs:-none}"
 
-  if [ "$needs" = "gh" ] && [ -z "$GH_TOKEN_VAL" ]; then
-    echo ">> skip $name (needs gh — run 'gh auth login')"; skip=$((skip + 1)); continue
-  fi
-  if [ "$needs" = "token" ] && [ -z "$CLAUDE_TOK" ] && [ -z "$API_KEY" ]; then
-    echo ">> skip $name (needs a Claude token — CLAUDE_CODE_OAUTH_TOKEN)"; skip=$((skip + 1)); continue
-  fi
+  # A blueprint may need gh, a Claude token, or (github-delivery-loop) BOTH.
+  case "$needs" in gh|gh+token)
+    [ -z "$GH_TOKEN_VAL" ] && { echo ">> skip $name (needs gh — run 'gh auth login')"; skip=$((skip + 1)); continue; } ;;
+  esac
+  case "$needs" in token|gh+token)
+    { [ -z "$CLAUDE_TOK" ] && [ -z "$API_KEY" ]; } && { echo ">> skip $name (needs a Claude token — CLAUDE_CODE_OAUTH_TOKEN)"; skip=$((skip + 1)); continue; } ;;
+  esac
 
   echo ""
   echo "========= blueprint: $name (needs: $needs) ========="
@@ -57,11 +60,8 @@ for name in $names; do
   # gh blueprint never receives the Claude token). Nothing is exported into a
   # blueprint that declared `needs: none`.
   secret_env=()
-  if [ "$needs" = "gh" ]; then
-    secret_env+=(-e "GH_TOKEN=$GH_TOKEN_VAL")
-  elif [ "$needs" = "token" ]; then
-    secret_env+=(-e "CLAUDE_CODE_OAUTH_TOKEN=$CLAUDE_TOK" -e "ANTHROPIC_API_KEY=$API_KEY")
-  fi
+  case "$needs" in gh|gh+token)    secret_env+=(-e "GH_TOKEN=$GH_TOKEN_VAL") ;; esac
+  case "$needs" in token|gh+token) secret_env+=(-e "CLAUDE_CODE_OAUTH_TOKEN=$CLAUDE_TOK" -e "ANTHROPIC_API_KEY=$API_KEY") ;; esac
   if docker run --rm \
       -e BLUEPRINT="$name" \
       ${secret_env[@]+"${secret_env[@]}"} \
