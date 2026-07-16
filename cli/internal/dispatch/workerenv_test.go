@@ -136,6 +136,46 @@ func TestDeliveryWorkerEnv(t *testing.T) {
 			t.Error("nil cfg should yield nil env")
 		}
 	})
+
+	t.Run("github backend → GH_TOKEN, no Azure vars", func(t *testing.T) {
+		gh := &DeliveryConfig{Backend: "github", Org: "ignored"}
+		t.Setenv("GH_TOKEN", "ghtok999")
+		m := envMap(deliveryWorkerEnv(gh))
+		if m["GH_TOKEN"] != "ghtok999" {
+			t.Errorf("GH_TOKEN = %q, want the token", m["GH_TOKEN"])
+		}
+		for _, k := range []string{"AZURE_DEVOPS_ORG", "AZURE_DEVOPS_PAT", "PERSONAL_ACCESS_TOKEN"} {
+			if _, ok := m[k]; ok {
+				t.Errorf("github worker env must not carry %s", k)
+			}
+		}
+	})
+
+	t.Run("github backend, no GH_TOKEN → empty (worker blocks honestly)", func(t *testing.T) {
+		gh := &DeliveryConfig{Backend: "github"}
+		t.Setenv("GH_TOKEN", "")
+		if env := deliveryWorkerEnv(gh); len(env) != 0 {
+			t.Errorf("no GH_TOKEN should yield no env vars, got %v", env)
+		}
+	})
+}
+
+func TestActiveBackend(t *testing.T) {
+	// nil + empty → the "azure" default (backward-compat for pre-field configs).
+	if got := (*DeliveryConfig)(nil).activeBackend(); got != "azure" {
+		t.Errorf("nil config activeBackend = %q, want azure", got)
+	}
+	if got := (&DeliveryConfig{}).activeBackend(); got != "azure" {
+		t.Errorf("empty config activeBackend = %q, want azure", got)
+	}
+	// an explicit backend is honored (parsed from JSON).
+	var c DeliveryConfig
+	if err := json.Unmarshal([]byte(`{"org":"o","backend":"github"}`), &c); err != nil {
+		t.Fatal(err)
+	}
+	if got := c.activeBackend(); got != "github" {
+		t.Errorf("explicit activeBackend = %q, want github", got)
+	}
 }
 
 func TestWriteMCPConfig(t *testing.T) {

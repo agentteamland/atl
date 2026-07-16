@@ -106,6 +106,7 @@ Create `.delivery/` if absent, then write both files.
   "project": "<project>",
   "repo": "<repo>",
   "branchPair": { "dev": "dev", "release": "release" },
+  "backend": "azure",
   "methodology": "scrum",
   "transport": "mcp",
   "restFallbackEnabled": true,
