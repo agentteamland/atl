@@ -35,7 +35,7 @@ described here.
 | Create child / nest under a parent (#1) | REST `sub_issues` endpoint: `gh api --method POST repos/{o}/{r}/issues/{parent}/sub_issues -F sub_issue_id=<child REST id>` (note: `gh issue create --parent` is NOT available in current `gh`) |
 | Read one / a batch of work-items (#1) | `gh issue view <n> --json …` / `gh api graphql` for a batch |
 | Read a sprint's items (#6) | `gh project item-list <n> --owner <o> --format json` filtered by the Iteration field client-side |
-| Update fields (state, iteration, labels…) (#4/#5/#6/#7) | `gh issue edit` (labels/body/state) + `gh api graphql updateProjectV2ItemFieldValue` (project fields: Status/Iteration/Priority/StoryPoints) |
+| Update fields (state, iteration, labels…) (#4/#5/#6/#7) | `gh issue edit` (labels/body/state) + `gh api graphql updateProjectV2ItemFieldValue` (project fields: Status/Iteration/Priority/`Story Points`) |
 | The ready-to-pull / idempotency / velocity query (#10) | `gh search issues` / `gh api graphql search(type:ISSUE, query:…)` — **server-side** filtering by label/state/type/assignee |
 | Add / read the analysis / brief comment (#3) | `gh issue comment <n> --body …` / `gh api …/issues/{n}/comments` (sentinel-matched) |
 | Link a work-item ↔ a PR (#11) | native: `Fixes #N` in the PR body + `PullRequest.closingIssuesReferences` (GraphQL) |
@@ -95,7 +95,7 @@ has **one model**, so "resolution" collapses to it:
 
 - **"Done" = the issue is CLOSED** (+ the Projects v2 **Status** field set to its **Done**
   category). The tech-lead closes the issue on merge-verify (§10). Velocity sums the
-  Story-Points field over closed issues in the last N sprints.
+  `Story Points` field over closed issues in the last N sprints.
 - **Claim = set Status to In Progress** (+ optionally self-assign).
 - **"Blocked" is a FLAG, never a state:** add a `blocked` **label** + a diagnostic comment,
   leaving the issue open. Same discipline as the Azure `blocked` tag — never invent a blocked

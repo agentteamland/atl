@@ -55,7 +55,7 @@
   "skills": [
     {
       "name": "delivery-init",
-      "description": "/delivery-init — connect a project to Azure DevOps: discover org/project/repo, probe the MCP, resolve the wiki, and write .delivery/config.json (secret-by-reference) + methodology.json."
+      "description": "/delivery-init — connect a project to its backend (azure | github): select it, discover coordinates, probe connectivity, then write .delivery/config.json (secret-by-reference) + methodology.json."
     },
     {
       "name": "kickoff",

@@ -1,44 +1,66 @@
 ---
 name: delivery-init
-description: /delivery-init — connect a project to Azure DevOps for the delivery-team. LLM-driven Q&A that discovers org/project/repo, probes the live MCP surface, resolves the project wiki, and writes .delivery/config.json (secret-by-reference, never a literal PAT) + .delivery/methodology.json (the Scrum descriptor every ceremony reads). Run once per project before /kickoff.
+description: /delivery-init — connect a project to the delivery-team's tracker. LLM-driven Q&A that first selects the backend (azure | github), then discovers the coordinates, probes live connectivity, resolves the board + durable-knowledge store, and writes .delivery/config.json (secret-by-reference, never a literal token) + .delivery/methodology.json (the Scrum descriptor every ceremony reads). Run once per project before /kickoff.
 ---
 
-# /delivery-init — connect a project to Azure DevOps
+# /delivery-init — connect a project to its delivery backend
 
-This is the delivery-team's **onboarding** step: the one-time, per-project setup that
-records *where* the work lives (the Azure DevOps org/project/repo, the branch pair, the
-project wiki) and *which methodology* the team runs — so every later ceremony (`/kickoff`,
-`/refine`, `/sprint-plan`, `/sprint-start`, `/sprint-review`) reads a settled config instead
-of re-asking. It writes two files into a committed `.delivery/` directory:
+This is the delivery-team's **onboarding** step: the one-time, per-project setup that records
+*which backend* the project runs on, *where* the work lives (the tracker coordinates, the
+branch pair, the board, the durable-knowledge store), and *which methodology* the team runs —
+so every later ceremony (`/kickoff`, `/refine`, `/sprint-plan`, `/sprint-start`,
+`/sprint-review`) reads a settled config instead of re-asking. It writes two files into a
+committed `.delivery/` directory:
 
 | File | What it holds |
 |---|---|
-| `.delivery/config.json` | non-secret connection **identity** — org/project/repo, branch pair, transport, the resolved `wikiId`, and a **by-name reference** to where the PAT lives (never the token itself) |
-| `.delivery/methodology.json` | the flat **methodology descriptor** every ceremony reads — roles + dispatch, the artifact hierarchy, cadence, the velocity/capacity model, and branch names (v1 = one Scrum instance) |
+| `.delivery/config.json` | non-secret connection **identity** — the `backend`, the backend's coordinates, the branch pair, and a **by-name reference** to where the credential lives (never the token itself). The exact fields are **backend-specific** (see step 4). |
+| `.delivery/methodology.json` | the flat **methodology descriptor** every ceremony reads — roles + dispatch, the artifact hierarchy, cadence, the velocity/capacity model, and branch names. Backend-independent (v1 = one Scrum instance). |
 
 Field semantics for both files live in the team's contract doc,
-[`knowledge/config-and-methodology.md`](../../knowledge/config-and-methodology.md); the Azure
-tool map + auth path live in [`backends/azure/adapter.md`](../../backends/azure/adapter.md).
-This skill is the **conversational writer** of that config — discovery and connectivity are
-judgment-heavy (which project? which repo? is the PAT reachable?), which is Skill territory
-under the CLI/Skill boundary. All Azure reads here go through the `azureDevOps` MCP.
+[`knowledge/config-and-methodology.md`](../../knowledge/config-and-methodology.md); the
+per-backend tool map + auth path live in the active backend's adapter —
+[`backends/azure/adapter.md`](../../backends/azure/adapter.md) or
+[`backends/github/adapter.md`](../../backends/github/adapter.md). This skill is the
+**conversational writer** of that config — backend selection, discovery, and connectivity are
+judgment-heavy (which project? which repo? is the credential reachable?), which is Skill
+territory under the CLI/Skill boundary.
 
 ## When to run
 
 - **Once per project**, before `/kickoff` — a greenfield project's cold-start ceremony
   requires `config.json` present and a live connectivity probe.
-- **Re-run** to update the connection (a new repo, a corrected wiki, a rotated PAT
-  reference). Re-running is idempotent — see [Idempotent re-run](#idempotent-re-run).
+- **Re-run** to update the connection (a new repo, a corrected board, a rotated credential
+  reference). Re-running is idempotent — see [Idempotent re-run](#idempotent-re-run). Switching
+  the *backend* on a re-run is an explicit re-scope, not a silent field edit — see that section.
 
 ## Procedure
 
 ### 1. Confirm you are at the project root
 
-`.delivery/` is a **committed** directory (like `.atl/`), so it belongs at the repository
-root. If the working directory isn't a repo root, ask the user to run the skill from there.
-Read any existing `.delivery/config.json` first (idempotent re-run — see the last section).
+`.delivery/` is a **committed** directory (like `.atl/`), so it belongs at the repository root.
+If the working directory isn't a repo root, ask the user to run the skill from there. Read any
+existing `.delivery/config.json` first (idempotent re-run — see the last section); if one
+exists, its `backend` is the current selection.
 
-### 2. Probe the Azure DevOps MCP — fail fast, explain the PAT
+### 2. Select the backend
+
+Ask which backend this project runs on — **`azure`** (Azure DevOps: Boards + Repos + Wiki via
+the `azureDevOps` MCP) or **`github`** (GitHub Issues + Projects v2 + Pull Requests via the `gh`
+CLI). **Default `azure`** for backward-compatibility. On a re-run, present the existing
+`config.backend` as the default and confirm.
+
+The choice selects which `backends/<backend>/adapter.md` every ceremony and worker loads, and
+which discovery path this skill follows next: **§3A (Azure)** or **§3B (GitHub)**. Do only the
+selected backend's discovery.
+
+---
+
+### 3A. Azure backend — discover, probe, resolve the wiki
+
+*(Follow this branch only when `backend = azure`.)*
+
+#### 3A.1 Probe the Azure DevOps MCP — fail fast, explain the PAT
 
 Confirm the `azureDevOps` MCP is reachable **before** asking anything, by calling
 `core_list_projects`. Interpret the result:
@@ -51,10 +73,10 @@ Confirm the `azureDevOps` MCP is reachable **before** asking anything, by callin
   PAT from the environment / OS keychain), and re-run once it's connected. **Never** ask the
   user to paste a PAT into the chat, and never write one anywhere.
 
-### 3. Discover and confirm org / project / repo (Q&A)
+#### 3A.2 Discover and confirm org / project / repo (Q&A)
 
-Drive this as a short conversation, offering discovered options rather than asking the user
-to type identifiers blind:
+Drive this as a short conversation, offering discovered options rather than asking the user to
+type identifiers blind:
 
 - **Project** — from `core_list_projects` (present the names; let the user pick). The **org**
   is derived from the chosen project's `url` authority (`https://dev.azure.com/<org>/…`) — do
@@ -66,7 +88,7 @@ to type identifiers blind:
 - **Methodology** — ask, even though **Scrum is the only v1 instance** (the seam is real).
   Confirm Scrum.
 
-### 4. Resolve the project wiki (`wikiId`)
+#### 3A.3 Resolve the project wiki (`wikiId`)
 
 Call `wiki_list_wikis` for the chosen project and cache the wiki id:
 
@@ -78,27 +100,113 @@ Call `wiki_list_wikis` for the chosen project and cache the wiki id:
 The `wikiId` is resolved **once here** and cached so ceremonies never re-resolve it (per the
 adapter contract §8).
 
-### 5. Record the transport policy
+#### 3A.4 Record the transport policy + the PAT reference — never the token
 
-Set `transport` to `"mcp"` and `restFallbackEnabled` to `true` — the team is MCP-first, with
-exactly one REST carve-out (attachment upload, adapter §9). No probe beyond step 2 is needed;
-these are fixed for v1.
+- Set `transport` to `"mcp"` and `restFallbackEnabled` to `true` — the team is MCP-first, with
+  exactly one REST carve-out (attachment upload, `backends/azure/adapter.md` §9). These are
+  fixed for v1; no probe beyond §3A.1 is needed.
+- The config carries **only a pointer** to where the secret lives, in a `pat.ref` field naming
+  an environment variable (default `AZURE_DEVOPS_PAT`). The schema has **no token field at
+  all**. At run time the PAT is resolved in priority order: (1) the Azure DevOps MCP's own
+  configured auth, (2) an env var named by `pat.ref`, (3) the OS keychain. Confirm the env-var
+  name with the user; **refuse to write a literal token** even if the user offers one.
 
-### 6. Record the PAT reference — never the token
+Then go to **step 4** (write the files) with the Azure config shape.
 
-The config carries **only a pointer** to where the secret lives, in a `pat.ref` field naming
-an environment variable (default `AZURE_DEVOPS_PAT`). The schema has **no token field at
-all**. At run time the PAT is resolved in priority order: (1) the Azure DevOps MCP's own
-configured auth, (2) an env var named by `pat.ref`, (3) the OS keychain. Confirm the env-var
-name with the user; **refuse to write a literal token** even if the user offers one — a
-committed secret is exactly the exfiltration surface `atl guard` + the `untrusted-input` rule
-exist to prevent.
+---
 
-### 7. Write the two files
+### 3B. GitHub backend — discover, probe, resolve the board
 
-Create `.delivery/` if absent, then write both files.
+*(Follow this branch only when `backend = github`.)*
 
-**`.delivery/config.json`** — substitute the confirmed values; keep the shape exactly:
+The GitHub backend is reached through the **`gh` CLI**, not an MCP. All reads here go through
+`gh` (`gh auth status`, `gh repo view`, `gh project …`), per
+[`backends/github/adapter.md`](../../backends/github/adapter.md) §1. There is **no wiki** — the
+durable-knowledge store is in-repo `/docs` (§9), so nothing to resolve.
+
+#### 3B.1 Probe `gh` connectivity — fail fast, explain the token scopes
+
+Confirm `gh` is installed and authenticated **before** asking anything, by calling
+`gh auth status`. Interpret the result:
+
+- **Authenticated, with `repo` + `project` scopes** → live. Continue.
+- **Not installed / not logged in** → **stop and explain**: this skill drives GitHub through
+  `gh`, which needs an authenticated session (`gh auth login`) or a `GH_TOKEN` in the
+  environment. Point the user there and re-run once connected.
+- **Authenticated but missing `project` scope** → `gh project …` calls will fail. Tell the user
+  to refresh the token with `gh auth refresh -s project` (Projects v2 read/write) and re-run.
+  The board setup below needs `project`; issue/PR work needs `repo`.
+
+> **Interactive init vs. the autonomous worker.** This skill runs interactively under the
+> user's own `gh` auth. At run time the autonomous worker gets its token as `GH_TOKEN` injected
+> by the engine (`workerenv.go`, per `backends/github/adapter.md` §1) — **never** from this
+> config. Both need `repo` + `project` scope. The token env var is **fixed to `GH_TOKEN`** (both
+> `gh` and the engine read only `GH_TOKEN`); the config's `credential.ref` (step 4) merely
+> *records* that fact for the reader — it is not engine-read and never stores the token.
+
+#### 3B.2 Discover and confirm the repo (`owner/repo`)
+
+Offer discovered values rather than asking the user to type identifiers blind:
+
+- **Repo** — from `gh repo view --json nameWithOwner,defaultBranchRef` in the current directory
+  (the repo is checked out at init). Present `owner/repo`; let the user confirm or override
+  (e.g. if the delivery target is a different repo). If the directory has no default GitHub
+  remote, ask for `owner/repo` explicitly.
+- **Branch pair** — the `dev` / `release` names (defaults `dev` / `release`; confirm, allow
+  override). Same two-branch delivery flow as Azure.
+- **Methodology** — confirm Scrum (the only v1 instance; the seam is real).
+
+#### 3B.3 Board (GitHub Project) — connect an existing one or create a new one
+
+A GitHub Projects v2 board is **owner-scoped** (org or user), identified by an owner + a
+**number**, not nested under the repo. Default the **owner** to the repo's owner; allow an
+override (e.g. a personal repo tracked on an org-level board). Ask **existing or new**:
+
+**Existing board** → prompt for its **name / URL / number**:
+
+- Accept a number directly, or extract it from a URL
+  (`https://github.com/orgs/<owner>/projects/<n>` or
+  `https://github.com/users/<owner>/projects/<n>`).
+- Validate with `gh project view <n> --owner <owner>` — a not-found / access error means the
+  number or owner is wrong, or the token lacks `project` scope; surface it and re-ask.
+- Then run the **field check** below (create only what's missing — an existing board may already
+  have the fields).
+
+**New board** → create it and set up the fields:
+
+- `gh project create --owner <owner> --title "<repo> delivery"` — capture the returned project
+  **number** (`--format json` → `.number`).
+- Then run the **field check** below (a fresh board has only the default fields).
+
+**Field check (both paths — this is the field-setup half of #213).** List the board's fields
+with `gh project field-list <n> --owner <owner> --format json` and reconcile against the four
+the autonomous loop needs. **Create only what is missing** (idempotent):
+
+| Field | Type | How to ensure it |
+|---|---|---|
+| **Status** | single-select | **Already exists by default** (`Todo` / `In Progress` / `Done`). Do **not** try to recreate it — the built-in Status field's *options* are not cleanly API-settable (see wiki `gh-projects-wip-manual`). Verify it carries `In Progress` + `Done` (a new board does); the loop's three states are exactly these. Note for the team: Projects v2's built-in automation only sets **Done** (on close/merge) — the *start* → `In Progress` transition is the ceremony's job, not the platform's. |
+| **Iteration** | iteration | **`gh` / GraphQL cannot create an iteration field** (`field-create --data-type` supports only TEXT / SINGLE_SELECT / DATE / NUMBER). If it is missing, **tell the user to add an "Iteration" field via the Project's settings UI** (Projects v2 → ⚙ → new field → Iteration) and re-run — do not fake it as a text/number field. |
+| **Story Points** | number | `gh project field-create <n> --owner <owner> --name "Story Points" --data-type NUMBER` |
+| **Priority** | single-select | `gh project field-create <n> --owner <owner> --name "Priority" --data-type SINGLE_SELECT --single-select-options "P0,P1,P2,P3"` |
+
+> **Scope boundary — native Issue Types stay in #213.** This field setup does **not** adopt
+> native org **Issue Types** (Epic / Feature / PBI / Task / Bug) — that needs an `admin:org`
+> scope refresh and is the other half of #213. The artifact ladder is carried by `type:<t>`
+> **labels** for now (the Layer-1 approach); the ceremonies stamp them, and the native-type
+> upgrade is tracked separately.
+
+Then go to **step 4** with the GitHub config shape.
+
+---
+
+### 4. Write `.delivery/config.json` — the backend-specific shape
+
+Create `.delivery/` if absent, then write `config.json`. **The shape is backend-specific**;
+write the one matching the selected backend, substituting the confirmed values and keeping the
+shape exactly. Both carry `backend`, `branchPair`, `methodology`, and a **by-name** credential
+pointer (never a token). Field semantics: [`knowledge/config-and-methodology.md`](../../knowledge/config-and-methodology.md) §2.
+
+**Azure** (`backend: "azure"`):
 
 ```json
 {
@@ -110,14 +218,37 @@ Create `.delivery/` if absent, then write both files.
   "methodology": "scrum",
   "transport": "mcp",
   "restFallbackEnabled": true,
-  "wikiId": "<resolved-wiki-id-or-null>",
+  "wikiId": "<resolved-at-init-or-null>",
   "pat": { "ref": "AZURE_DEVOPS_PAT" }
 }
 ```
 
-**`.delivery/methodology.json`** — the canonical Scrum descriptor, written **verbatim** (do
-not resolve the `workItemTypeMap` here — it stays `null`-seeded; ceremonies resolve the real
-Azure type/state names at connect time via `wit_get_work_item_type`, never hardcoded):
+**GitHub** (`backend: "github"`) — note there is **no** `wikiId` (durable knowledge is in-repo
+`/docs`), no `transport` / `restFallbackEnabled` (MCP-only policy), and the coordinates are
+GitHub-native (`owner` / `repo` / `projectNumber`, not `org` / `project`):
+
+```json
+{
+  "owner": "<owner>",
+  "repo": "<repo>",
+  "projectNumber": <n>,
+  "branchPair": { "dev": "dev", "release": "release" },
+  "backend": "github",
+  "methodology": "scrum",
+  "credential": { "ref": "GH_TOKEN" }
+}
+```
+
+For GitHub the token env var is **fixed to `GH_TOKEN`** — the engine hardcodes `os.Getenv("GH_TOKEN")`
+and `gh` itself reads only `GH_TOKEN` / `GITHUB_TOKEN`. So `credential.ref` is an *informational
+record* (it documents where the token lives), **not** the configurable indirection Azure's
+`pat.ref` is (which the engine genuinely reads); keep it `"GH_TOKEN"`.
+
+### 5. Write `.delivery/methodology.json` — the shared Scrum descriptor
+
+Backend-independent — write it **verbatim** for both backends (do not resolve the
+`workItemTypeMap` here — it stays `null`-seeded; ceremonies resolve the real per-backend
+type/state names at connect time via the active adapter, never hardcoded):
 
 ```json
 {
@@ -141,45 +272,37 @@ Azure type/state names at connect time via `wit_get_work_item_type`, never hardc
 }
 ```
 
-If the user chose non-default `dev` / `release` names in step 3, mirror them into **both**
+If the user chose non-default `dev` / `release` names, mirror them into **both**
 `config.branchPair` and `methodology.branches` so the two agree.
 
-### 8. Confirm connectivity (never on a guessed type name)
+### 6. Report
 
-Steps 2–4 already made live, **authenticated** MCP calls (`core_list_projects`,
-`repo_list_repos_by_project`, `wiki_list_wikis`) — reaching this step means auth + Azure
-reachability are already proven. Do **not** add a gate that guesses a concrete work-item type
-name (`wit_get_work_item_type` *requires* a type name, and the real PBI type is
-process-template-dependent — `Product Backlog Item`, `User Story`, or a custom/renamed value).
-Guessing `Product Backlog Item` would make init spuriously "fail" on any project whose type is
-named differently, even when connectivity is perfect. Concrete type + state names are resolved
-by **ceremonies at run time** via `wit_get_work_item_type` (adapter §6), never at init — that
-is what makes the team work on any process template.
+Summarize what was written — the backend, its coordinates (Azure: org/project/repo + the
+`wikiId` or the "provision a wiki" note; GitHub: `owner/repo` + the resolved `projectNumber` +
+any field the user must still add in the UI), the branch pair, and the credential **reference
+name** (never a value). Point the user to the next step: `/kickoff` for a brand-new project, or
+`/refine` / `/sprint-plan` for a project that already has a backlog.
 
-If you still want a best-effort process-template sanity check, a `wit_get_work_item_type` call
-that returns **not-found** means "reachable, type is named differently" — a **success** for
-connectivity, not an init failure; only an auth/transport error is a real failure. Either way,
-do not write resolved names into `methodology.json` (the type map stays `null`).
+## Security: the credential is never stored
 
-### 9. Report
-
-Summarize what was written — the org/project/repo, the branch pair, the `wikiId` (or the
-"provision a wiki" note), and the `pat.ref` **name** (never a value). Point the user to the
-next step: `/kickoff` for a brand-new project, or `/refine` / `/sprint-plan` for a project
-that already has a backlog.
-
-## Security: the PAT is never stored
-
-- `config.json` has **no token field** — only `pat.ref`, a name.
+- `config.json` has **no token field** — only a by-name reference (`pat.ref` for Azure,
+  `credential.ref` for GitHub, e.g. `GH_TOKEN`).
 - This skill **refuses to write a literal token** into any file, and never asks the user to
   paste one into the chat.
-- The MCP server, not this skill, holds the PAT; `atl work dispatch` passes it to workers via
-  the environment (adapter §1). A committed secret would be caught by `atl guard`, but the
-  discipline is upstream of the guard: don't create the secret-in-a-file in the first place.
+- The backend, not this skill, holds the credential: the Azure MCP holds the PAT; the GitHub
+  worker gets `GH_TOKEN` from the engine's env (`workerenv.go`). `atl work dispatch` passes it to
+  workers via the environment (adapter §1). A committed secret would be caught by `atl guard`,
+  but the discipline is upstream of the guard: don't create the secret-in-a-file in the first
+  place.
 
 ## Idempotent re-run
 
-If `.delivery/config.json` already exists, **do not blind-overwrite**. Read it, show the
-current values, and ask what to change — then rewrite only the confirmed fields. Same for
-`methodology.json`: if the user has edited it, offer to update rather than clobbering. A
+If `.delivery/config.json` already exists, **do not blind-overwrite**. Read it, show the current
+values, and ask what to change — then rewrite only the confirmed fields. Same for
+`methodology.json`: if the user has edited it, offer to update rather than clobbering.
+
+**Switching the backend** on a re-run is an explicit re-scope, not a field edit: the coordinate
+fields differ between backends (Azure `org`/`project`/`wikiId` vs GitHub `owner`/`projectNumber`),
+so a backend switch re-runs the whole selected branch (§3A or §3B) from scratch and writes the
+new shape — confirm the switch with the user before discarding the old backend's coordinates. A
 re-run must converge on the intended config, never silently discard a prior edit.
