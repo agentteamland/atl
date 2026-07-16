@@ -5,26 +5,26 @@ PR, review it, merge it, transition the work-item — the peer of the [backend i
 (the operation contract, implemented per-backend under `backends/`), [`testing-surfaces.md`](testing-surfaces.md) (verification), and
 [`config-and-methodology.md`](config-and-methodology.md). It pins the one thing the role-agent prose
 had drifted on: **which actor performs each step**, given the hard invariant that the Go orchestrator
-is **zero-Azure** (no MCP surface).
+is **zero-backend** (no backend surface).
 
-**Delivery-native, not `/create-pr` (resolution #10).** The platform `/create-pr` skill is
-GitHub/`gh`-shaped and does not work against Azure Repos. The delivery-team **owns its PR lifecycle**:
-it *reuses the review pattern* (baseline + tech-lead specialist + refute-to-keep) but runs it
-**delivery-native** against the Azure PR via `repo_*` thread/vote tools. The delivery-team never
-invokes `/create-pr`.
+**Delivery-native, not `/create-pr` (resolution #10).** The platform `/create-pr` skill carries its
+own review-chain + branch logic that collides with the delivery loop. The delivery-team **owns its PR
+lifecycle**: it *reuses the review pattern* (baseline + tech-lead specialist + refute-to-keep) but runs
+it **delivery-native** against the PR on the active backend via the active adapter's review/thread/vote
+surface (concept #11). The delivery-team never invokes `/create-pr`.
 
 ## §1 — The per-work-unit sequence (the back half of the 8-step loop)
 
 Ordered so test-gates resolve before review (resolution #1), and the merge is verified before the
 Done that triggers DAG refill (resolution #8):
 
-| Step | Actor | What | Azure |
+| Step | Actor | What | Backend concept (the active adapter binds the tool) |
 |---|---|---|---|
-| 6. open PR | **developer** worker | opens the PR to `dev` + links it to the work-item; then exits | `repo_create_pull_request`, `wit_link_work_item_to_pull_request` |
-| 4b. Level-2 | **tester** worker | independent strategy/edge/regression verification (§`testing-surfaces`) | test-surface tools + `az-attach.sh` |
-| 7. review | **tech-lead** (the `capabilities.review` provider) | the delivery-native review pattern (§3) + the evidence gate; votes | `repo_vote_pull_request`, `repo_create_pull_request_thread`, `repo_reply_to_comment`, `repo_list_pull_request_threads`, `wit_get_work_item_attachment` |
-| 8a. merge | **tech-lead**, on green | **completes the Azure PR = the merge to `dev`** (non-squash, §4) + sets the runtime-resolved Done | `repo_update_pull_request`, `wit_get_work_item_type` → `wit_update_work_item` |
-| 8b. verify | **engine** (zero-Azure) | verifies the merge landed on `dev`; reclaims the worktree; refills the DAG | git only (`MergedToBase`) — no Azure |
+| 6. open PR | **developer** worker | opens the PR to `dev` + links it to the work-item; then exits | open the PR + link it to the work-item (concept #11) |
+| 4b. Level-2 | **tester** worker | independent strategy/edge/regression verification (§`testing-surfaces`) | test-surface tools + attach evidence (concept #12) |
+| 7. review | **tech-lead** (the `capabilities.review` provider) | the delivery-native review pattern (§3) + the evidence gate; votes | review/vote + raise findings as PR threads (concept #11) + read evidence back (concept #12) |
+| 8a. merge | **tech-lead**, on green | **merges the PR to `dev`** (non-squash, §4) + sets the runtime-resolved Done | merge the PR (concept #11) + resolve the completion state then set Done (concept #7) |
+| 8b. verify | **engine** (zero-backend) | verifies the merge landed on `dev`; reclaims the worktree; refills the DAG | git only (`MergedToBase`) — no backend |
 
 `green = (all test-gates passed) ∧ (review passed)` — the ordered conjunction (resolution #1). The
 test-gates (developer self-test + tester Level-2) resolve first; the PR + review runs after; the
@@ -32,8 +32,8 @@ merge happens only on green.
 
 ## §2 — Open the PR (developer, step 6)
 
-The developer worker opens the PR delivery-native — `repo_create_pull_request` targeting the
-`config.branchPair.dev` branch — and links it to the work-item (`wit_link_work_item_to_pull_request`).
+The developer worker opens the PR delivery-native — open the PR (concept #11) targeting the
+`config.branchPair.dev` branch — and links it to the work-item (concept #11).
 **Its job ends here** (the six developer phases end at `pr`). It never reviews, merges, or sets Done.
 
 ## §3 — The review (tech-lead, step 7) — delivery-native, one gate
@@ -42,34 +42,36 @@ The **tech-lead is the review provider** and the single review gate — there is
 pass (resolution #8: two review surfaces = two meanings of green + duplicated diff-reading). It reuses
 the ATL adversarial-review **pattern** — a generic baseline read, the tech-lead specialist read, and a
 refute-to-keep pass that drops any finding lacking file:line / grep / test evidence — but runs it
-**delivery-native on the Azure PR**, raising findings as PR threads
-(`repo_create_pull_request_thread` / `repo_reply_to_comment` / `repo_list_pull_request_threads`) and
-recording the verdict with `repo_vote_pull_request`. It is **not** the `/create-pr` skill (§ intro).
+**delivery-native on the PR on the active backend**, raising findings as PR threads and recording the
+verdict — the review/thread/vote surface (concept #11), per the active adapter. It is **not** the
+`/create-pr` skill (§ intro).
 
 The review embeds the **delivery-specific evidence gate** (`testing-surfaces.md`): for `area:mobile`/web
-units the tech-lead confirms the test-evidence artifact (screenshots/results, read via
-`wit_get_work_item_attachment`) is attached to the work-item **before** it votes green — an un-run
+units the tech-lead confirms the test-evidence artifact (screenshots/results, read back per the active
+adapter — concept #12) is attached to the work-item **before** it votes green — an un-run
 surface is never a silent pass. "review passed" = the tech-lead's green vote through this chain.
 
 ## §4 — The merge + Done (tech-lead, step 8a, on green) — NOT the engine
 
-This is the actor split the prose had drifted on. **The Go orchestrator is zero-Azure — it has no MCP
-and cannot complete an Azure PR.** So the **tech-lead** (an MCP-capable worker), on a green review:
+This is the actor split the prose had drifted on. **The Go orchestrator is zero-backend — it has no
+backend surface and cannot merge a PR on the backend.** So the **tech-lead** (a backend-capable
+worker), on a green review:
 
-1. **Completes the Azure PR** — `repo_update_pull_request` with **`autoComplete: true`** + a
-   **history-reachable `mergeStrategy`** (`NoFastForward` / `Rebase` — **never `Squash`**, so the
-   merged branch's commits become ancestors of `dev`, exactly what the engine's verify (§5) checks)
-   + **`transitionWorkItems: false`**. The tool has **no synchronous "completed" status** (only
-   `autoComplete` + `Active`/`Abandoned`), and its default **`transitionWorkItems: true` would
-   implicitly move the work-item on completion** — colliding with the explicit Done in step 2; the
-   tech-lead owns the single Done transition, so it must be off. With no blocking branch policies
-   auto-complete merges within ~2 min; completing the PR *is* the merge, there is no separate git-push.
-2. **Sets the work-item to the runtime-resolved Done** (`wit_get_work_item_type` → `wit_update_work_item`,
-   never a literal `"Done"` — adapter §6). Merge first, then Done (so a Done never fronts an unlanded
+1. **Merges the PR to `dev`** (concept #11, per the active backend's adapter — Azure completes the PR,
+   GitHub uses `gh pr merge --merge`) with a **history-reachable, non-squash merge**: the merged
+   branch's commits become ancestors of `dev`, exactly what the engine's verify (§5) checks — **never
+   a squash that rewrites the SHA**. The merge must **not implicitly transition the work-item** — the
+   tech-lead owns the single Done transition (step 2), which an implicit move on merge would collide
+   with, so any adapter option that would transition the work-item is turned off. The concrete
+   per-backend mechanics (Azure's `autoComplete` + history-reachable merge-strategy + transition-off;
+   GitHub's `--merge`-only + explicit issue-close) live in the active adapter (concept #11). Merging
+   the PR *is* the merge — there is no separate git-push.
+2. **Sets the work-item to the runtime-resolved Done** (resolve the completion state, then set it —
+   never a literal `"Done"`; concept #7). Merge first, then Done (so a Done never fronts an unlanded
    merge).
 
-The engine does **not** merge (it has no Azure). Every "the engine merges to `dev`" phrasing that
-predates this contract means **the engine *verifies* the merge** (§5) — the tech-lead performs it.
+The engine does **not** merge (it has no backend surface). Every "the engine merges to `dev`" phrasing
+that predates this contract means **the engine *verifies* the merge** (§5) — the tech-lead performs it.
 
 ## §5 — The engine's verify (the durable-state backstop) — already built
 
@@ -81,10 +83,10 @@ origin/dev..branch == 0`) — to confirm the branch's commits are contained in `
 - **Merged** → the engine marks the unit done, reclaims the worktree (`git worktree remove` +
   `git branch -d` + delete the remote branch), and refills the DAG frontier.
 - **Not merged** (the tech-lead exited without a landed merge) → **mark-blocked**, never counted done
-  — a `.delivery/blocked/<id>.json` a ceremony reflects to Azure. This is the data-loss guard: the
+  — a `.delivery/blocked/<id>.json` a ceremony reflects to the active backend. This is the data-loss guard: the
   durable git state is the source of truth, not the worker's claim.
 
-Because the engine gates its own `Done`/refill on `MergedToBase`, a mis-set Azure Done (set but the
+Because the engine gates its own `Done`/refill on `MergedToBase`, a mis-set Done (set but the
 merge didn't land) can never let refill race unlanded work — the engine catches it and blocks.
 
 ## §6 — `capabilities.review` — the declaration (honest scope)
@@ -107,15 +109,16 @@ worker in the **same** worktree on each clean exit-0 (the tester + tech-lead nee
 commits in place); and `complete()` — the `MergedToBase` verify of §5 — runs **only after the final
 (tech-lead) stage**, so a developer or tester exit-0 (neither merges) is never mistaken for a completed
 unit. Each stage's prompt points at its role-agent (`DeliveryWorkerSpec` → `deliveryStagePrompt`), and
-every stage's worker is wired with the project-scoped `azureDevOps` MCP + PAT env (D3 / §4), so the
-tester can attach evidence and the tech-lead can complete the PR + set Done over Azure.
+every stage's worker is wired with the project-scoped backend surface + credential env (D3 / §4), so the
+tester can attach evidence and the tech-lead can merge the PR + set Done on the active backend.
 
 Two settled decisions shape it:
 
 - **No success-signal file (D4).** An earlier draft imagined a success artifact symmetric to
-  `BlockedReport`, to drive Azure→Done from a skill. That is superseded by §1: the **tech-lead** sets
-  the runtime-resolved Done directly over MCP (it has the context and the PR), and the engine only
-  **verifies** the merge (§5). The only durable engine artifact is still the `BlockedReport`.
+  `BlockedReport`, to drive the backend→Done transition from a skill. That is superseded by §1: the
+  **tech-lead** sets the runtime-resolved Done directly on the active backend (it has the context and
+  the PR), and the engine only **verifies** the merge (§5). The only durable engine artifact is still
+  the `BlockedReport`.
 - **Fail-at-any-stage → mark-blocked (D5).** A worker-reported blocker or a crash at any stage marks
   the unit blocked; the #12 crash-retry budget is **unit-level** — a crash re-drives the whole pipeline
   from the developer on a **fresh** worktree off dev (the crashed attempt's work is quarantined aside,
@@ -129,6 +132,6 @@ Two settled decisions shape it:
 
 **Layer-A-proven, one live-validation remaining.** The pipeline is deterministically exercised by the
 auth-free `work-dispatch` e2e blueprint (a fake worker keys off each stage's role token; only the
-tech-lead stage merges). The remaining proof is the **real-Azure #17 run**: a genuinely spawned
-`claude -p` worker inheriting the test-org MCP + PAT and doing its Azure ops end-to-end — the semantic
-validation a mock/fake cannot give ([mock-validates-shape-not-semantics]).
+tech-lead stage merges). The remaining proof is the **real-backend #17 live run**: a genuinely spawned
+`claude -p` worker inheriting the active backend's surface + credential and doing its backend ops
+end-to-end — the semantic validation a mock/fake cannot give ([mock-validates-shape-not-semantics]).

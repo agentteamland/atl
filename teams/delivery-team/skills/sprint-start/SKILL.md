@@ -1,18 +1,18 @@
 ---
 name: sprint-start
-description: /sprint-start — build the sprint's dependency DAG from Azure, fail-fast on a cycle or a missing prerequisite, run the mobile-emulator preflight, then materialize .delivery/plan.json and hand off to the deterministic `atl work dispatch` engine. Reads the sprint's admitted work-units (their Dependency links, area tags, and StackRank) over the azureDevOps MCP; writes exactly one derived artifact (plan.json); recurring, the second planning ceremony after /sprint-plan.
+description: /sprint-start — build the sprint's dependency DAG from the active backend, fail-fast on a cycle or a missing prerequisite, run the mobile-emulator preflight, then materialize .delivery/plan.json and hand off to the deterministic `atl work dispatch` engine. Reads the sprint's admitted work-units (their dependency links, area tags, and priority) over the active backend; writes exactly one derived artifact (plan.json); recurring, the second planning ceremony after /sprint-plan.
 ---
 
 # /sprint-start — DAG build, emulator preflight, dispatch launch
 
 This is the delivery-team's **bridge ceremony**: it sits after `/sprint-plan` has admitted a
-sprint's work-units (assigned their `IterationPath`, tagged their areas, linked their
-dependencies) and turns that settled Azure state into the one file the deterministic Go engine
+sprint's work-units (assigned their iteration, tagged their areas, linked their
+dependencies) and turns that settled backend state into the one file the deterministic Go engine
 reads, then launches the engine. It is the single point where an LLM ceremony hands off to
 `atl work dispatch` — no other ceremony spawns a `developer`/`tester` worker; the engine does.
 
-The ceremony itself neither codes nor schedules workers. It **reads** the sprint from Azure over
-the `azureDevOps` MCP, **validates** the plan is startable (acyclic + every mobile unit's emulator
+The ceremony itself neither codes nor schedules workers. It **reads** the sprint from the active
+backend, **validates** the plan is startable (acyclic + every mobile unit's emulator
 is bootable), **materializes** the plan, and **launches** the engine. It writes exactly one
 artifact:
 
@@ -22,8 +22,10 @@ artifact:
 
 Everything the ceremony reads about *how this project works* is data:
 [`config-and-methodology.md`](../../knowledge/config-and-methodology.md) (the `.delivery/`
-config + methodology descriptor); every Azure operation follows the one contract in
-[`azure-adapter.md`](../../backends/azure/adapter.md). Building and validating the DAG is
+config + methodology descriptor); the concepts every backend operation depends on are defined
+provider-neutrally in [the backend interface](../../knowledge/backend-interface.md), and each
+operation follows the one contract in the active backend's adapter
+(`backends/<backend>/adapter.md`). Building and validating the DAG is
 judgment-heavy — which links are real predecessors, is the graph acyclic, is the emulator
 actually up — which is Skill territory under the CLI/Skill boundary; the **deterministic**
 scheduling that follows (admit up to a cap, refill on completion, run the recovery ladder) is the
@@ -36,7 +38,7 @@ Go engine's, and this ceremony deliberately does not re-implement it.
   [`methodology.json`](../../knowledge/config-and-methodology.md)). `/sprint-plan` decides *which
   items and how much*; `/sprint-start` turns that into the runnable DAG and starts the engine.
 - **Re-run** to resume a sprint after a crash, a partial dispatch, or a re-plan. The DAG build and
-  the preflight are read-only/environmental, and `plan.json` is **derived from Azure** — so a
+  the preflight are read-only/environmental, and `plan.json` is **derived from the active backend** — so a
   re-run converges (see [Idempotent re-run](#idempotent-re-run)).
 
 ## Procedure
@@ -55,22 +57,20 @@ Acting as the `tech-lead` (read [`../../agents/tech-lead/agent.md`](../../agents
 [`../../agents/project-manager/agent.md`](../../agents/project-manager/agent.md) + its `children/`,
 chiefly `sprint-planning-blueprint.md`), assemble the DAG from the sprint's committed work-units:
 
-- Read the sprint's admitted units with `wit_get_work_items_for_iteration` for this sprint's
-  `IterationPath`. **"List means all"** (adapter §4, *Pagination — "list means all"*): if the set
-  could exceed the tool's return, close the gap with a high-`top` `wit_query_by_wiql` and treat a
-  result **at** the WIQL cap as a truncation error to surface, never as a complete read — a
+- Read the sprint's admitted units — read the sprint's items (concept #6) for this sprint's
+  iteration. **"List means all"** (concept #10, the query/idempotency substrate): if the set
+  could exceed the tool's return, close the gap with a high-limit query and treat a
+  result **at** the query's cap as a truncation error to surface, never as a complete read — a
   half-read sprint yields a broken DAG.
-- Batch-read each unit's fields + relations with `wit_get_work_items_batch_by_ids` (a single
-  `wit_get_work_item` per unit only when a relation detail is missing from the batch). From each
-  unit collect: its **Dependency links** — a `System.LinkTypes.Dependency-Forward` /
-  `System.LinkTypes.Dependency-Reverse` relation names its successor / predecessor — its
-  `area:*` `System.Tags`, and its `Microsoft.VSTS.Common.StackRank`.
+- Batch-read each unit's fields + relations — read the work-items (concept #1) in a batch (a single
+  work-item read per unit only when a relation detail is missing from the batch). From each
+  unit collect: its **dependency links** (concept #8) — a forward edge names its successor, a
+  reverse edge its predecessor — its `area:*` tags (concept #4), and its priority (concept #5).
 - The DAG edge set is the **predecessor → dependent** direction, restricted to edges *among this
-  sprint's admitted units*: an edge to a unit already in the runtime-resolved **Completed**-category
-  state (resolve the state name via `wit_get_work_item_type` — adapter §6, *Runtime type & state
-  resolution*; **never** a literal `"Done"`) is satisfied and dropped; an edge to an out-of-sprint,
-  not-yet-completed unit makes the dependent un-startable and is surfaced (a `/sprint-plan` gap),
-  not silently included.
+  sprint's admitted units*: an edge to a unit already in the runtime-resolved completed state
+  (resolve the completion/state model at runtime — concept #7; **never** a literal `"Done"`) is
+  satisfied and dropped; an edge to an out-of-sprint, not-yet-completed unit makes the dependent
+  un-startable and is surfaced (a `/sprint-plan` gap), not silently included.
 
 As `project-manager`, this reuses the DAG your `sprint-planning-blueprint.md` already built at
 `/sprint-plan`; as `tech-lead`, **confirm each admitted unit has its canonical brief** (the
@@ -94,7 +94,7 @@ no unsatisfied predecessor; if nodes remain when none can be removed, the remain
 
 ### 3. Emulator preflight — fail-fast on a missing mobile prerequisite
 
-If **any** admitted unit carries `area:mobile` / `area:ios` / `area:android` in its `System.Tags`,
+If **any** admitted unit carries `area:mobile` / `area:ios` / `area:android` in its tags (concept #4),
 run the mobile-emulator preflight before dispatch (the discipline is the tester's
 [`../../agents/tester/agent.md`](../../agents/tester/agent.md) `children/mobile-and-web-surfaces.md`
 — single-slot lease, preflight bootability, block-never-silent-pass; the runtime wiring is
@@ -140,46 +140,48 @@ verbatim):
   `delivery/{slug}/{id}` branch + worktree naming, so every branch traces to one unit and one PR.
 - `granularity` — `"pbi"` or `"task"`, matching the single level `/sprint-plan` admitted at (the
   all-PBI-or-all-task rule; the DAG never spans levels). Do not mix.
-- `units[]` — one entry per admitted unit: `id` (the Azure work-item id — the stable identity, so
-  there is no separate slug field), `title` (for logging + PR/branch context), `predecessors` (the
-  work-item ids that must complete first — the Dependency-Reverse edges from step 1, **among this
-  sprint's units only**), and `stackRank` (`Microsoft.VSTS.Common.StackRank`, the admission
-  tie-break: lower value = higher priority).
+- `units[]` — one entry per admitted unit: `id` (the backend work-item id, concept #1 — the stable
+  identity, so there is no separate slug field), `title` (for logging + PR/branch context),
+  `predecessors` (the work-item ids that must complete first — the predecessor edges from step 1,
+  concept #8, **among this sprint's units only**), and `stackRank` (the priority, concept #5 — the
+  admission tie-break: lower value = higher priority).
 
 Then launch the engine: run **`atl work dispatch`** (optionally `--cap N`; the default cap is `4`,
 matching the ~4–6 concurrency budget). The deterministic Go scheduler reads `plan.json`,
-re-validates the DAG, admits ready units up to the cap (StackRank ascending as the tie-break),
+re-validates the DAG, admits ready units up to the cap (`stackRank` ascending as the tie-break),
 spawns one isolated `claude -p` worker per unit in a git worktree off `config.branchPair.dev`,
 refills as units complete, and runs the recovery ladder. **The ceremony does not itself spawn any
 `developer`/`tester` worker** — that is the engine's job (the `worker`-dispatch roles; the ceremony
 only ever adopts the `subagent` roles above).
 
-**Strict milestone ordering (adapter §5 idempotency + the engine's durable-state discipline):** on a
-green unit the **tech-lead completes the Azure PR (= the merge to `dev`, non-squash) BEFORE** setting
-the runtime-resolved **Completed**-category transition; the **engine** (zero-Azure) then *verifies*
-the merge landed and gates refill on it — it never merges itself. The Done transition never precedes
-the merge, so a crash between the two never loses a merge and never refills against an un-merged unit.
-This ordering is the contract ([pr-and-review.md](../../knowledge/pr-and-review.md) §4–§5); the
-ceremony's only obligation is to hand the engine a well-formed, acyclic plan.
+**Strict milestone ordering (the idempotency policy, concept #10, + the engine's durable-state
+discipline):** on a green unit the **tech-lead completes the PR (= the merge to `dev`, non-squash,
+concept #11) BEFORE** setting the runtime-resolved completed transition (concept #7); the **engine**
+(zero-backend) then *verifies* the merge landed and gates refill on it — it never merges itself. The
+Done transition never precedes the merge, so a crash between the two never loses a merge and never
+refills against an un-merged unit. This ordering is the contract
+([pr-and-review.md](../../knowledge/pr-and-review.md) §4–§5); the ceremony's only obligation is to
+hand the engine a well-formed, acyclic plan.
 
 ## Idempotent re-run
 
 A re-run — after a crash, a partial dispatch, or a re-plan — **converges**; it never duplicates
 work:
 
-- **The DAG build (step 1) is read-only** — reading the sprint's units, their Dependency links, and
-  their StackRank over the MCP mutates nothing in Azure.
+- **The DAG build (step 1) is read-only** — reading the sprint's units, their dependency links
+  (concept #8), and their priority (concept #5) over the active backend mutates nothing in the backend.
 - **The emulator preflight (step 3) is environmental** — probing bootability and warming the shared
   device is a runtime check, not a persisted change.
-- **`plan.json` is DERIVED from Azure, not authored** — re-running against the same admitted sprint
-  (same units, same Dependency links, same StackRank) re-materializes the **same** plan. Overwriting
-  it with an equal plan is a safe no-op; a re-plan that changed the sprint in Azure re-derives the
-  new plan from that new state, staying convergent with the source of truth. There is no local
-  ledger to drift (adapter §5, *Idempotency — the load-bearing part*).
-- **`atl work dispatch` is itself resumable** — it observes durable state (the git merge, the Azure
-  Completed transition) rather than trusting a worker's exit code, so re-launching it after a
+- **`plan.json` is DERIVED from the active backend, not authored** — re-running against the same
+  admitted sprint (same units, same dependency links, same priority) re-materializes the **same**
+  plan. Overwriting it with an equal plan is a safe no-op; a re-plan that changed the sprint in the
+  backend re-derives the new plan from that new state, staying convergent with the source of truth.
+  There is no local ledger to drift (concept #10, the idempotency policy).
+- **`atl work dispatch` is itself resumable** — it observes durable state (the git merge, the
+  runtime-resolved completed transition, concept #7) rather than trusting a worker's exit code, so
+  re-launching it after a
   partial run picks up the un-merged, not-yet-completed units and skips the already-done ones.
 
-No secret is read or written by this ceremony: the PAT is referenced by name (`config.pat.ref`) and
-lives in the `azureDevOps` MCP's environment (adapter §1) — this skill never reads a literal token
-and never writes one to `plan.json` or anywhere else.
+No secret is read or written by this ceremony: the credential is referenced by name
+(`config.pat.ref`) and lives in the active backend's environment — this skill never reads a literal
+token and never writes one to `plan.json` or anywhere else.
