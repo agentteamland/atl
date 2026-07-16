@@ -29,7 +29,7 @@
     },
     {
       "name": "business-analyst",
-      "description": "Turns intake discovery into Epics and Features with fixed-heading business analysis, and owns the Domain and business-side Analysis wiki knowledge for the delivery org."
+      "description": "Turns intake discovery into Epics and Features with fixed-heading business analysis, and owns the Domain and business-side Analysis durable-knowledge for the delivery org."
     },
     {
       "name": "technical-analyst",
@@ -41,7 +41,7 @@
     },
     {
       "name": "tech-lead",
-      "description": "The delivery-team's highest-context technical role: decomposes Features into keyed work-units, owns the architecture + conventions wiki, briefs workers, and gates review pre-merge."
+      "description": "The delivery-team's highest-context technical role: decomposes Features into keyed work-units, owns the architecture + conventions durable-knowledge, briefs workers, and gates review pre-merge."
     },
     {
       "name": "developer",
@@ -59,7 +59,7 @@
     },
     {
       "name": "kickoff",
-      "description": "/kickoff — greenfield cold-start: live PO intake, then the business-analyst + technical-analyst create the first Epics/Features and seed the Domain/Architecture wiki. Run once after /delivery-init."
+      "description": "/kickoff — greenfield cold-start: live PO intake, then the business-analyst + technical-analyst create the first Epics/Features and seed the Domain/Architecture durable-knowledge. Run once after /delivery-init."
     },
     {
       "name": "refine",
@@ -67,7 +67,7 @@
     },
     {
       "name": "sprint-plan",
-      "description": "/sprint-plan — velocity-driven sprint selection: capacity from the last N=3 closed sprints, then the project-manager admits backlog units by stack-rank at one granularity and assigns IterationPath."
+      "description": "/sprint-plan — velocity-driven sprint selection: capacity from the last N=3 closed sprints, then the project-manager admits backlog units by priority at one granularity and assigns each the sprint's iteration."
     },
     {
       "name": "sprint-start",
