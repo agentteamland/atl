@@ -39,6 +39,10 @@ brainstorm defers  →  backlog.md  →(pull forward)→  tasks.md  →(ship)→
 - **Backlog → tasks:** bir öğe üzerinde harekete geçmeye karar verdiğinde onu terfi ettir.
 - **Çıkış:** bir öğe, gönderildiği anda her iki dosyadan da çıkar — dokümanlar doğru hâline gelir ve hiçbir şey "yapıldı" olarak öylece kalmaz.
 
+## Board backend'li projeler
+
+Bir delivery **board backend**'i kullanan bir proje — [`/delivery-init`](../teams/delivery-team.md) tarafından yazılan, `backend` alanı taşıyan bir `.delivery/config.json` içeren proje — bu iki dosyayı **kullanmaz**. Onun **proje board'u, erteleme için tek yetkili yüzeydir** (tek yüzey, böylece board ile `.md` dosyaları birbirinden sapamaz). [`/brainstorm done`](../skills/brainstorm.md) bu config'i algılar ve her ertelenmiş ve etkin-niyetli öğeyi board'a bir iş öğesi olarak senkronlar — idempotent biçimde, oluşturmadan önce kontrolü brainstorm'un adı + öğe başlığı üzerinden anahtarlayarak, böylece yeniden çalıştırma çoğaltmak yerine yakınsar — ve `.atl/` dosyalarına yazmayı bırakır. Bu dosyaların zaten tuttuğu içeriği emekliye ayırmak (board'a bir işaretçi + tek seferlik bir migration) ayrı, per-project bir adımdır. Bu bölümün üstündeki her şey, board backend'i **olmayan** her proje için **varsayılandır**.
+
 ## İskele
 
 [`atl init`](../cli/init.md) (ve `atl install`), `.atl/` altına boş `backlog.md` ve `tasks.md` iskeletlerini yalnızca henüz yoklarsa bırakır — kendi dosyaların asla üzerine yazılmaz. Global katmanda proje `.atl/`'si olmadığından atlanır.

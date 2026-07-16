@@ -98,6 +98,8 @@ Two files under a project's `.atl/` hold **decision state** — a sibling to the
 
 **`/brainstorm done` checks.** Closing a brainstorm runs a mandatory **backlog check** (every deferred item gets an entry under its `## Area` group) plus a **tasks check** (promote anything decided to act on now; remove anything this brainstorm shipped).
 
+**Board-backend projects route to the board instead.** When a project runs a delivery board backend — a `.delivery/config.json` with a `backend` field, written by [`/delivery-init`](/teams/delivery-team) — the **project board is the authoritative deferral surface**, not `backlog.md` / `tasks.md` (one surface only, so the two never drift). `/brainstorm done` then detects the config and syncs each deferred / actively-intended item to the board as a work-item (idempotent: it keys the check-first on the brainstorm's name + item title before creating, so re-running converges rather than duplicates) and stops writing the `.atl/` files — retiring any content they already hold is a separate one-time migration. The board write goes through the installed delivery-team's backend adapter, so `/brainstorm` never hardcodes provider commands or tag/label syntax. Projects **without** a board backend use the two-tier `.atl/` surface as before (the default).
+
 **Scaffolding.** `atl init` (and `atl install`) drop empty `backlog.md` + `tasks.md` skeletons under `.atl/`, only if absent (a user's existing file is never overwritten). The global tier has no project `.atl/`, so it is skipped.
 
 ## Important rules

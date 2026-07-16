@@ -39,6 +39,10 @@ brainstorm defers  →  backlog.md  →(pull forward)→  tasks.md  →(ship)→
 - **Backlog → tasks:** promote an item when you decide to act on it.
 - **Out:** an item leaves either file the moment it ships — the docs become the truth, and nothing lingers as done.
 
+## Board-backend projects
+
+A project that runs a delivery **board backend** — one with a `.delivery/config.json` carrying a `backend` field, written by [`/delivery-init`](../teams/delivery-team.md) — does **not** use these two files. Its **project board is the single authoritative deferral surface** (one surface, so the board and the `.md` files can't drift apart). [`/brainstorm done`](../skills/brainstorm.md) detects the config and syncs every deferred and actively-intended item to the board as a work-item — idempotently, keyed on the brainstorm's name + item title before creating so a re-run converges rather than duplicates — and stops writing the `.atl/` files. Retiring any content those files already hold (a pointer to the board + a one-time migration) is a separate, per-project step. Everything above this section is the **default** for every project *without* a board backend.
+
 ## Scaffolding
 
 [`atl init`](../cli/init.md) (and `atl install`) drop empty `backlog.md` and `tasks.md` skeletons under `.atl/`, only if they don't already exist — your own files are never overwritten. The global tier has no project `.atl/`, so it is skipped.

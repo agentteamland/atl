@@ -151,21 +151,87 @@ multiple, list them (showing each one's scope) and ask which to complete.
 - Add a "Final Decisions" section — a summary of every definitive decision from
   the whole discussion
 
+### 2.4. Determine the deferral surface — `.atl/` files vs a board backend
+The backlog check (2.5) and tasks check (2.6) write to one of two surfaces.
+Decide which **once**, here, before running either:
+
+- Read `<project-root>/.delivery/config.json` (a delivery board project writes it
+  at `/delivery-init`). Parse its JSON.
+- **No file, or no `backend` field** → the surface is **`.atl/backlog.md` +
+  `.atl/tasks.md`** (the default — every project without a delivery board
+  backend). Run 2.5 / 2.6 as written against those files; skip the rest of 2.4.
+- **`backend` is set** (e.g. `"github"` | `"azure"`) → the surface is the
+  **project board**, the authoritative deferral surface for this project (single
+  source of truth — deferrals live on the board, not in the `.atl/` files, so the
+  two can't drift). Then:
+  - On this path, **do not write `.atl/backlog.md` / `.atl/tasks.md`** — the board
+    holds the deferrals. (Anything those files still hold from before the project
+    adopted a board backend is stale; retiring it — a superseding pointer + a
+    one-time migration of the existing entries onto the board — is a separate,
+    per-project step, **not** something `/brainstorm done` does on its own. This
+    skill's job here is simply to stop adding to them.)
+  - Sync each deferred / actively-intended item to the board via the **board
+    surface** variants of 2.5 / 2.6 below.
+  - The board write goes through the installed **delivery-team's backend adapter
+    for the active backend** — the same adapter its ceremonies use; it owns the
+    concrete work-item / metadata / query commands for the provider. This skill
+    owns *what* to sync and the brainstorm-provenance dedup; the adapter owns
+    *how*. Do **not** spell provider-specific commands or tag/label syntax here
+    (`gh …`, MCP calls, `type:` / `area:` strings) — that duplicates the adapter
+    and drifts, the whole reason the backend interface exists. Auth is the
+    session's ambient `gh` / MCP (an interactive session under the user's own
+    login, not a dispatch worker); never read or pass a literal token.
+  - **Guard:** if `.delivery/config.json` names a `backend` but the matching
+    delivery-team adapter isn't installed (unexpected — the config is written by a
+    delivery-team skill), don't silently drop the deferrals: record them to the
+    `.atl/` surface as the default would, and tell the user the board sync was
+    skipped for lack of an adapter and those entries need moving onto the board
+    once it's present.
+
 ### 2.5. Backlog check (mandatory — the brainstorm rule requires it here)
 Scan the brainstorm for every item marked deferred / "later" / "not now" /
-left-uncertain and ensure each has a corresponding entry in the scope's
-`.atl/backlog.md`, under the matching `## Area` group, in the lean one-line format
-the brainstorm rule defines (`- **Title** — one sentence. _Trigger:_ … ↳ [source](...)`).
-If any deferred item has no backlog entry, add it — or ask the user when it's
-ambiguous. Closing a brainstorm without this is how deferred scope silently
-disappears; it is a checklist step before the docs file is written.
+left-uncertain. Record each on the surface chosen in 2.4:
+
+- **`.atl/` surface (default):** ensure each item has an entry in the scope's
+  `.atl/backlog.md`, under the matching `## Area` group, in the lean one-line
+  format the brainstorm rule defines
+  (`- **Title** — one sentence. _Trigger:_ … ↳ [source](...)`). If any deferred
+  item has no backlog entry, add it — or ask the user when it's ambiguous.
+- **Board surface:** ensure a board work-item exists for each deferred item,
+  created through the delivery-team adapter (2.4). Per item:
+  - **Idempotent — check first:** before creating, search the board for an item
+    already synced from this brainstorm — keyed on the brainstorm's name + the
+    item's title. Found → update it; not found → create. Re-running `/brainstorm
+    done` on the same brainstorm must converge, never duplicate. (This
+    brainstorm-provenance key is this skill's own — it is *not* the delivery
+    loop's plan-derived idempotency key, because a brainstorm item has no sprint /
+    plan ordinal; the adapter's typed metadata is where it's stored.)
+  - **Content:** title = the item's one-line title; body = the one-sentence
+    description + its trigger + a `Source: <relative-path-to-brainstorm>` line.
+    Through the adapter's typed metadata, mark the item's kind, its area when the
+    brainstorm maps to one, and its brainstorm provenance (the brainstorm name) —
+    let the adapter bind the concrete tag/label syntax.
+  - **Deferred = not in a sprint:** leave the item unassigned to any sprint /
+    iteration — a backlog item is admitted later by the sprint ceremony;
+    brainstorm-done only creates it.
+
+Closing a brainstorm without this check — on either surface — is how deferred
+scope silently disappears; it is a checklist step before the docs file is written.
 
 ### 2.6. Tasks check
 If the brainstorm decided to actively pursue something *now* (rather than defer
-it), promote that intent into the scope's `.atl/tasks.md` under `## Now` / `## Next`
-as `- [ ] **Title** — one sentence. ↳ [source](...)`. Conversely, remove from `tasks.md`
-anything this brainstorm actually shipped. Keep `tasks.md` honest — only
-genuinely-intended work; unplanned deferrals stay in `backlog.md`.
+it), record that intent on the surface from 2.4:
+- **`.atl/` surface (default):** promote it into the scope's `.atl/tasks.md`
+  under `## Now` / `## Next` as `- [ ] **Title** — one sentence. ↳ [source](...)`.
+  Conversely, remove from `tasks.md` anything this brainstorm actually shipped.
+- **Board surface:** create the work-item exactly as in 2.5 (same idempotent
+  check-first + provenance metadata), and additionally mark it active intent
+  through the adapter's typed metadata, so the next sprint-plan sees it as ready
+  to pull. Sprint admission itself stays the sprint ceremony's job — brainstorm-
+  done only creates the item; there is no `tasks.md` to prune (completion is the
+  board's own done state).
+Keep the intent honest — only genuinely-intended work is flagged active;
+unplanned deferrals stay on the backlog side.
 
 ### 3. Create / update the docs file
 Determine the docs location from the brainstorm's scope:
