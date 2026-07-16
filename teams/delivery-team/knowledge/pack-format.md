@@ -87,16 +87,16 @@ stack: "React + TypeScript + Vite"
   routing header.
 - **`## Dependency baseline`** — the library versions a team **pins**, framed as a
   baseline the project may move, not gospel — because a stale hardcoded version rots,
-  and the project wiki (not the pack) owns the project's actual lockfile truth.
+  and the durable-knowledge store (not the pack) owns the project's actual lockfile truth.
 
 ## 3. Area → pack binding
 
 Binding is a **tech-lead** responsibility, exercised at decomposition. The chain:
 
 1. The `technical-analyst` only *suggests* areas (under `## Suggested Areas` in its
-   sentinel comment — adapter §7). It does not decide them.
-2. The **tech-lead** decides and applies each work-unit's area, writing
-   `area:<name>` to `System.Tags` (adapter §7) — see the tech-lead's
+   sentinel comment — concept #3). It does not decide them.
+2. The **tech-lead** decides and applies each work-unit's area, writing the
+   `area:<name>` tag (concept #4) — see the tech-lead's
    [`decomposition-blueprint.md`](../agents/tech-lead/children/decomposition-blueprint.md).
    The tech-lead owns this because the area tag *is* the pack binding.
 3. The **`developer`** worker, spawned for that unit, loads **only** the tagged area's
@@ -123,17 +123,17 @@ truth:
 | Layer | What it is | Owner / source | Scope |
 |---|---|---|---|
 | **pack** (`packs/<area>/`) | generic **stack** craft — how to build/test *this stack*, anywhere | the software team (ships with it) | travels with the team, project-agnostic |
-| **project wiki** (`Architecture/`, `Conventions/`) | **project-specific** current-truth — this project's shape + its conventions layered ATOP the pack's generics (adapter §8) | tech-lead | this project only |
-| **canonical brief** (tech-lead) | the **bridge** — names the area (→ which pack) and embeds the exact wiki page paths for the unit | tech-lead, per work-unit | this work-unit only |
+| **durable-knowledge store** (`Architecture/`, `Conventions/`) | **project-specific** current-truth — this project's shape + its conventions layered ATOP the pack's generics (concept #9) | tech-lead | this project only |
+| **canonical brief** (tech-lead) | the **bridge** — names the area (→ which pack) and embeds the exact durable-knowledge page paths for the unit | tech-lead, per work-unit | this work-unit only |
 
-A **developer's context** = **pack (tagged area) + project-wiki (brief-named pages) +
-task + brief**. The brief is what makes a fresh, isolated worker load the *right*
-project knowledge: it names the area so the pack loads, and it embeds the
-`Architecture/`/`Conventions/` page paths so the worker pulls them via
-`wiki_get_page_content` (`search_wiki` for discovery when a path isn't pre-named —
-adapter §8). The pack does **not** restate project specifics, and the project wiki
-does **not** restate the stack's generic idioms — the split avoids duplication and its
-inevitable drift. See the tech-lead's
+A **developer's context** = **pack (tagged area) + durable-knowledge store (brief-named
+pages) + task + brief**. The brief is what makes a fresh, isolated worker load the
+*right* project knowledge: it names the area so the pack loads, and it embeds the
+`Architecture/`/`Conventions/` page paths so the worker pulls them from the
+durable-knowledge store (searching it for discovery when a path isn't pre-named —
+concept #9). The pack does **not** restate project specifics, and the durable-knowledge
+store does **not** restate the stack's generic idioms — the split avoids duplication and
+its inevitable drift. See the tech-lead's
 [`canonical-brief.md`](../agents/tech-lead/children/canonical-brief.md) for how the
 bridge is written.
 
@@ -171,8 +171,9 @@ stack — chosen so the pack exercises all three test surfaces (see the tester's
 Each is `pack.md` + topic files, release-grade and real (not stubs) but minimal and
 focused. The `mobile` pack carries the *knowledge* of how to boot and drive an
 emulator for its `integration_test` runs (single-slot lease, preflight bootability,
-block-never-silent-pass, screenshot evidence via `scripts/az-attach.sh`) — the emulator
-runtime/lease wiring itself lives in [`testing-surfaces.md`](testing-surfaces.md) §3 + the
+block-never-silent-pass, screenshot evidence attached per the active adapter
+(concept #12)) — the emulator runtime/lease wiring itself lives in
+[`testing-surfaces.md`](testing-surfaces.md) §3 + the
 `scripts/emulator-lease.sh` / `emulator-preflight.sh` helpers; the pack describes how to *use*
 that surface, driving those.
 
@@ -201,7 +202,7 @@ The pack is not just build knowledge — it is the source of the `developer`'s
 **Level-1 self-test** (the tester's `mobile-and-web-surfaces.md` establishes the two
 levels; do not contradict it). At the `self-test` phase of the worker micro-loop, the
 developer runs the pack's `## Test commands` on the surface(s) its area exercises,
-attaches evidence to the Azure work-item via `scripts/az-attach.sh` (adapter §9), and
+attaches evidence to the work-item per the active adapter (concept #12), and
 treats an un-run surface (an emulator that won't boot, a lease timeout) as
 **unverified — never a silent pass**. Level-1 is fast and self-gating; the thorough
 **Level-2** pass is a separate `tester` worker's job, and the `green` that authorizes
@@ -212,7 +213,7 @@ authority to declare done.
 ## 8. Worker phase vocabulary
 
 A `developer` worker reports progress to its supervisor through the four
-`status.json` fields (adapter §3 / the dispatch contract), one of which is `phase` —
+`status.json` fields (the dispatch contract), one of which is `phase` —
 the current micro-loop stage. The **canonical phase values** a developer writes, in
 order, are:
 
@@ -221,23 +222,25 @@ claim → plan → implement → self-test → comment → pr
 ```
 
 - `claim` — read the work-item + the `**[Technical Analysis]**` comment, transition
-  the item to the runtime-resolved in-progress state (`wit_get_work_item_type`, never
-  a literal — adapter §6), post a claim comment.
-- `plan` — decide the approach against the loaded pack + the brief-named wiki pages.
+  the item to the runtime-resolved in-progress state (never a literal — concept #7),
+  post a claim comment.
+- `plan` — decide the approach against the loaded pack + the brief-named
+  durable-knowledge pages.
 - `implement` — write the change in the worktree.
 - `self-test` — run the pack's `## Test commands` + attach evidence (§7).
 - `comment` — post the progress/PR comment (a plain comment; the developer never
-  writes the `**[Technical Analysis]**` sentinel or the wiki — adapter §7/§8).
-- `pr` — open the PR and link it to the work-item
-  (`wit_link_work_item_to_pull_request`). **This is where the worker's job ends.**
+  writes the `**[Technical Analysis]**` sentinel or the durable-knowledge store —
+  concepts #3/#9).
+- `pr` — open the PR and link it to the work-item (concept #11). **This is where the
+  worker's job ends.**
 
 `review` and `merge` are **not** developer phases: the tech-lead reviews, and — on green
-— the **tech-lead completes the Azure PR (= the merge to `dev`, non-squash) and sets the
-runtime-resolved Done**; the **deterministic engine** (zero-Azure) then *verifies* the
+— the **tech-lead completes the PR (= the merge to `dev`, non-squash) and sets the
+runtime-resolved Done**; the **deterministic engine** (zero-backend) then *verifies* the
 merge landed on the durable git state and never merges itself (strict ordering — merge
 precedes the Done that triggers refill; the engine gates refill on the verified merge).
 A worker that self-merged would violate both NEVER-merge and the engine's
-durable-state verification (the dispatch worker contract; adapter §6 keeps the Done
+durable-state verification (the dispatch worker contract; concept #7 keeps the Done
 transition runtime-resolved; [pr-and-review.md](pr-and-review.md) §4–§5 owns the
 actor split). The developer's contract ends at handoff
 to review — that boundary is what keeps the merge gate deterministic and the loop
