@@ -18,6 +18,7 @@ type DeliveryConfig struct {
 	Org        string `json:"org"`
 	Project    string `json:"project"`
 	Repo       string `json:"repo"`
+	Backend    string `json:"backend"` // "azure" (default) | "github" — the backend adapter the team runs on (D1/D4)
 	BranchPair struct {
 		Dev     string `json:"dev"`
 		Release string `json:"release"`
@@ -36,6 +37,15 @@ func (c *DeliveryConfig) DevBranch() string {
 		return c.BranchPair.Dev
 	}
 	return "dev"
+}
+
+// activeBackend is which provider backend the team runs on — config.backend,
+// defaulting to "azure" so a config that predates the field keeps Azure behavior (D8 BC).
+func (c *DeliveryConfig) activeBackend() string {
+	if c != nil && c.Backend != "" {
+		return c.Backend
+	}
+	return "azure"
 }
 
 // DeliveryConfigPath is <root>/.delivery/config.json (the file /delivery-init writes).
@@ -109,6 +119,16 @@ func mcpConfigJSON(org string) ([]byte, error) {
 // Azure #17 Layer-B run validates; this wiring follows the observed launcher contract.)
 func deliveryWorkerEnv(cfg *DeliveryConfig) []string {
 	if cfg == nil {
+		return nil
+	}
+	if cfg.activeBackend() == "github" {
+		// GitHub backend (D3): the worker drives `gh`, which reads GH_TOKEN from its
+		// env — no Azure org/PAT and no azureDevOps MCP (the scheduler skips
+		// writeMCPConfig for github). If GH_TOKEN is unset the worker blocks honestly
+		// at its first gh call — never a silent green, the same discipline as Azure.
+		if tok := os.Getenv("GH_TOKEN"); tok != "" {
+			return []string{"GH_TOKEN=" + tok}
+		}
 		return nil
 	}
 	env := []string{
