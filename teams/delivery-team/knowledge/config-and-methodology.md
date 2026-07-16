@@ -113,5 +113,6 @@ one back.
   `/delivery-init` writes it. The `wikiId` cache and the `pat.ref` name are consumed, never
   re-derived, per ceremony run.
 
-For the full Azure operation → MCP tool map, resilience, idempotency, and content-placement
-rules, see [`azure-adapter.md`](azure-adapter.md).
+For the full operation contract — the operation map, resilience, idempotency, and
+content-placement rules — see the [backend interface](backend-interface.md) and the active
+backend's adapter under `backends/`.

@@ -18,7 +18,7 @@ carry them in this file (see [`pack-loading.md`](pack-loading.md),
 ## The 8-step micro-loop
 
 The ordered loop (the Azure mechanics of each milestone write live in
-[`../../../knowledge/azure-adapter.md`](../../../knowledge/azure-adapter.md); my touchpoints are in
+[`../../../backends/azure/adapter.md`](../../../backends/azure/adapter.md); my touchpoints are in
 [`azure-touchpoints.md`](azure-touchpoints.md)):
 
 1. **claim** — transition the work-item to the runtime-resolved in-progress state + write a claim

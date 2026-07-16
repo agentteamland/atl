@@ -79,7 +79,7 @@ plan-ordinal)`. This choice is deliberate and I must protect its premise:
 ## Creating the units — check-first, then stamp (adapter §5)
 
 For every planned unit, in ordinal order, I follow the stamp + check-before-create protocol from
-the [Azure adapter](../../../knowledge/azure-adapter.md) (§5) so a re-run never duplicates:
+the [Azure adapter](../../../backends/azure/adapter.md) (§5) so a re-run never duplicates:
 
 1. Compute `atl-key = hash(parent-id + plan-ordinal)`.
 2. **Check-first WIQL** — `wit_query_by_wiql` filtered to that `atl-key` tag.

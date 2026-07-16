@@ -23,7 +23,7 @@ artifact:
 Everything the ceremony reads about *how this project works* is data:
 [`config-and-methodology.md`](../../knowledge/config-and-methodology.md) (the `.delivery/`
 config + methodology descriptor); every Azure operation follows the one contract in
-[`azure-adapter.md`](../../knowledge/azure-adapter.md). Building and validating the DAG is
+[`azure-adapter.md`](../../backends/azure/adapter.md). Building and validating the DAG is
 judgment-heavy — which links are real predecessors, is the graph acyclic, is the emulator
 actually up — which is Skill territory under the CLI/Skill boundary; the **deterministic**
 scheduling that follows (admit up to a cap, refill on completion, run the recovery ladder) is the

@@ -25,7 +25,7 @@ it spawns no `developer`/`tester` workers; only `/sprint-start` hands work to `a
 Field semantics for the config the ceremony reads live in
 [`config-and-methodology.md`](../../knowledge/config-and-methodology.md); the Azure tool map,
 content-placement, and idempotency rules live in
-[`azure-adapter.md`](../../knowledge/azure-adapter.md); the pack contract the area tags bind to
+[`azure-adapter.md`](../../backends/azure/adapter.md); the pack contract the area tags bind to
 lives in [`pack-format.md`](../../knowledge/pack-format.md). This skill orchestrates the roles; the
 role-craft lives in each role-agent's `children/`, cited per step.
 

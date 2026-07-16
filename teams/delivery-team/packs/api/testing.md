@@ -115,7 +115,7 @@ npm test             # the unit + supertest integration suites (e.g. jest --ci /
   is not green. This is the developer's half of `green = test-gates ∧ review` — the developer makes
   this pass, the tester's Level-2 pass and the tech-lead's review complete the green, and only then
   does the deterministic engine merge (the developer never merges or self-sets Done —
-  [azure-adapter.md](../../knowledge/azure-adapter.md) §6 keeps the Done transition runtime-resolved).
+  [azure-adapter.md](../../backends/azure/adapter.md) §6 keeps the Done transition runtime-resolved).
 
 ## Evidence — attach the proof to the work-item
 

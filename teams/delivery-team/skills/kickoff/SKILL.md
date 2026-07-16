@@ -27,7 +27,7 @@ than duplicating it. What it reads and writes:
 
 Field semantics for the config live in [`config-and-methodology.md`](../../knowledge/config-and-methodology.md);
 the Azure operation → MCP-tool map, idempotency, runtime type resolution, content placement, and
-wiki namespaces live in [`azure-adapter.md`](../../knowledge/azure-adapter.md). All Azure access is
+wiki namespaces live in [`azure-adapter.md`](../../backends/azure/adapter.md). All Azure access is
 through the `azureDevOps` MCP; the PAT is referenced by name (`config.pat.ref`), never read or
 written as a literal.
 

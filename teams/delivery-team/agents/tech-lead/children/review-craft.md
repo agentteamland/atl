@@ -93,7 +93,7 @@ I require, per the surface the unit touches:
   (the mobile-emulator is a MUST in this team; a mobile change with no emulator evidence is not
   green — full stop).
 
-**How the evidence reaches me** (the [Azure adapter](../../../knowledge/azure-adapter.md) §9):
+**How the evidence reaches me** (the [Azure adapter](../../../backends/azure/adapter.md) §9):
 evidence files (screenshots / result files) are uploaded to the work-item via the one REST
 carve-out — the [`scripts/az-attach.sh`](../../../scripts/az-attach.sh) helper (upload has no MCP
 tool). I **read the evidence back through the MCP** with `wit_get_work_item_attachment` — reading

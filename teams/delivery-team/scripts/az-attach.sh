@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# az-attach.sh — the delivery-team's ONE Azure REST carve-out (azure-adapter §9).
+# az-attach.sh — the delivery-team's ONE Azure REST carve-out (backends/azure/adapter.md §9).
 #
 # Uploads a local file as a work-item attachment and links it — the single Azure
 # operation the azureDevOps MCP can't do. Every other Azure call goes through the

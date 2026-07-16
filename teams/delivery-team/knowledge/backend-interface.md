@@ -84,9 +84,8 @@ adapter pack states it). Agent role-craft states the principle; the pack states 
 ## Status
 
 - **Interface: v1 (this file).** The concepts + cross-cutting policies both backends implement.
-- **Azure adapter:** the existing `knowledge/azure-adapter.md` is the Azure implementation; it
-  moves into `backends/azure/adapter.md` (a mechanical relocation that must keep the Azure e2e
-  blueprint green — its regression guard). *Tracked separately.*
+- **Azure adapter:** `backends/azure/adapter.md` — the Azure implementation (relocated here from
+  `knowledge/azure-adapter.md`; content unchanged, so the Azure e2e blueprint stays green).
 - **GitHub adapter:** `backends/github/adapter.md` — the GitHub implementation (the bindings in
   the right-hand column, plus the `## Depends On` dependency convention and the evidence-attach
   mechanism). *Tracked separately.*

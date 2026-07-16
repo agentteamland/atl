@@ -27,7 +27,7 @@ the `azureDevOps` MCP.
 Field semantics for the config live in
 [`config-and-methodology.md`](../../knowledge/config-and-methodology.md); the Azure operation→tool
 map, idempotency, content-placement, and the one REST carve-out live in
-[`azure-adapter.md`](../../knowledge/azure-adapter.md). The roles this ceremony adopts are the
+[`azure-adapter.md`](../../backends/azure/adapter.md). The roles this ceremony adopts are the
 [`tech-lead`](../../agents/tech-lead/agent.md) and the
 [`project-manager`](../../agents/project-manager/agent.md).
 
@@ -78,7 +78,7 @@ or stalled unit accumulates on disk, invisible to the PO.
 - Read and parse each `BlockedReport` (fields: `id`, `branch`, `worktreePath`, `reason`, `phase`,
   `lastSummary`, `stderrTail`, `preserved`, `blockedAt`).
 - Per report `id`, **reflect the block onto the work-item** — the settled "mark blocked" contract
-  ([azure-adapter.md](../../knowledge/azure-adapter.md) §6), which is **NOT** a state transition:
+  ([azure-adapter.md](../../backends/azure/adapter.md) §6), which is **NOT** a state transition:
   resolve the type with `wit_get_work_item_type`, then `wit_update_work_item` to **merge** `blocked`
   into `System.Tags` (never clobber existing tags) and, **only where the type exposes it**, set
   `Microsoft.VSTS.CMMI.Blocked = Yes`. Leave `System.State` **and** `IterationPath` **unchanged**
@@ -178,7 +178,7 @@ inference; wait for the explicit decision.
   `repo_create_pull_request` (the actual branch names come from config, §2 — config wins over
   `methodology.branches`).
 - **Completing/merging a PR is NOT in the MCP surface.** Per the adapter's *Operation → MCP tool
-  map* ([azure-adapter.md](../../knowledge/azure-adapter.md) §2), the PR row exposes only
+  map* ([azure-adapter.md](../../backends/azure/adapter.md) §2), the PR row exposes only
   `repo_create_pull_request` / `repo_update_pull_request` / `repo_vote_pull_request` /
   `repo_create_pull_request_thread` / `repo_list_pull_request_threads` / `repo_reply_to_comment` —
   there is no `complete`/`merge` tool. The honest mechanism: set the PR to auto-complete via

@@ -18,7 +18,7 @@ of re-asking. It writes two files into a committed `.delivery/` directory:
 
 Field semantics for both files live in the team's contract doc,
 [`knowledge/config-and-methodology.md`](../../knowledge/config-and-methodology.md); the Azure
-tool map + auth path live in [`knowledge/azure-adapter.md`](../../knowledge/azure-adapter.md).
+tool map + auth path live in [`backends/azure/adapter.md`](../../backends/azure/adapter.md).
 This skill is the **conversational writer** of that config — discovery and connectivity are
 judgment-heavy (which project? which repo? is the PAT reachable?), which is Skill territory
 under the CLI/Skill boundary. All Azure reads here go through the `azureDevOps` MCP.

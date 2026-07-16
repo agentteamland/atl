@@ -72,7 +72,7 @@ dışında hiçbir şeye dokunamaz.
 
 Yerel bir veritabanı yoktur. **İş-öğeleri geçici yürütme durumudur** ve **proje wiki'si kalıcı bilgidir**
 (ATL wiki/journal ayrımının Azure'da yaşayan hali). Her rol, Azure'a tek bir belgelenmiş **MCP-öncelikli
-operasyon-sözleşmesi** (`knowledge/azure-adapter.md`) üzerinden erişir — iş-öğeleri için `wit_*`, PR'lar
+operasyon-sözleşmesi** (`backends/azure/adapter.md`) üzerinden erişir — iş-öğeleri için `wit_*`, PR'lar
 için `repo_*`, bilgi için `wiki_*` — MCP'nin eksik olduğu tek operasyon (kanıt ekleme) için ince bir REST
 carve-out ile. İçerik **makine-bulunabilir sentinel'lerle** yerleştirilir: iş analizi Description'da,
 `**[Technical Analysis]**` ve `**[Canonical Brief]**` yorumları her biri tam ilk satırıyla eşleşerek

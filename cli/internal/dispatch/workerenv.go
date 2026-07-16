@@ -63,7 +63,7 @@ func LoadDeliveryConfig(root string) (*DeliveryConfig, error) {
 }
 
 // patRef is the env-var name the raw PAT is read from — config.pat.ref, defaulting to
-// AZURE_DEVOPS_PAT (matching /delivery-init + azure-adapter §1).
+// AZURE_DEVOPS_PAT (matching /delivery-init + backends/azure/adapter.md §1).
 func (c *DeliveryConfig) patRef() string {
 	if c != nil && c.PAT.Ref != "" {
 		return c.PAT.Ref

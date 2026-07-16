@@ -10,10 +10,10 @@ isolated `claude -p` workers in git worktrees.
 - **Source of truth:** the Azure DevOps project — work-items (transient execution
   state) + the project wiki (durable knowledge). The team stays thin and resumable
   because state lives in Azure, not in a long-lived context.
-- **Transport:** MCP-first — every role + worker reaches Azure through the
-  `azureDevOps` MCP (`wit_*`/`repo_*`/`work_*`/`wiki_*`); the one operation the MCP
-  can't do (attachment upload) is a thin REST carve-out. Contract:
-  [`knowledge/azure-adapter.md`](knowledge/azure-adapter.md).
+- **Backend:** the work-item store, git host, and durable-knowledge store are a pluggable
+  **backend**, behind a provider-neutral contract
+  ([`knowledge/backend-interface.md`](knowledge/backend-interface.md)) with per-provider
+  implementations under `backends/` — Azure (via the `azureDevOps` MCP) and GitHub (via `gh`).
 
 > **Status:** under construction. Stone #1 (`atl work dispatch`) shipped; this stone
 > adds the Azure operation-contract. Not yet in the install catalog.

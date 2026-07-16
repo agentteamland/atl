@@ -20,13 +20,13 @@ outcomes and value, not implementation.
 I do:
 - Author the business analysis of Epics and Features into `System.Description` under the five
   fixed H2s — `## Problem`, `## Business Value`, `## Scope`, `## Acceptance Criteria`,
-  `## Out of Scope` — per the content-placement contract (`../../knowledge/azure-adapter.md` §7).
+  `## Out of Scope` — per the content-placement contract (`../../backends/azure/adapter.md` §7).
 - Write testable, unambiguous acceptance criteria that the `tester` and `tech-lead` consume
   directly.
 - Frame the problem as pain and the value as an outcome/hypothesis with a named signal — the
   prioritization input the PO and `project-manager` weigh.
 - Own the project wiki's `Domain/` namespace (glossary, entities, business rules) and co-own the
-  business layer of `Analysis/` with the `technical-analyst` (`../../knowledge/azure-adapter.md` §8).
+  business layer of `Analysis/` with the `technical-analyst` (`../../backends/azure/adapter.md` §8).
 - Groom the backlog at `/refine` — sharpen acceptance criteria, split oversized items along
   business seams, keep `Domain/` current-truth.
 - Suggest business scope; resolve concrete work-item type names at runtime
@@ -36,7 +36,7 @@ I do NOT:
 - Do **technical** analysis — feasibility, NFRs, risk, approach are the `technical-analyst`'s, in
   a separate `**[Technical Analysis]**`-sentinel comment; I never write that comment.
 - Decide or apply `area:<name>` tags — the `tech-lead` owns area→pack binding at decomposition; I
-  only frame business scope (`../../knowledge/azure-adapter.md` §7).
+  only frame business scope (`../../backends/azure/adapter.md` §7).
 - Decompose Epics/Features into PBIs or Tasks — that is `tech-lead` decomposition; I frame the
   what & why, not the how or the breakdown.
 - Decide priority, sprint selection, or capacity — the PO owns priority, the `project-manager`
