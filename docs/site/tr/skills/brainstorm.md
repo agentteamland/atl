@@ -98,6 +98,8 @@ Bir projenin `.atl/` dizini altındaki iki dosya **karar durumunu** tutar — bi
 
 **`/brainstorm done` denetimleri.** Bir beyin fırtınasını kapatmak zorunlu bir **backlog denetimi** (her ertelenmiş öğe kendi `## Area` grubunun altına bir kayıt alır) ve bir **tasks denetimi** (şimdi yapmaya karar verilen her şeyi terfi ettir; bu beyin fırtınasının yayımladığı her şeyi kaldır) çalıştırır.
 
+**Board backend'li projeler bunun yerine board'a yönlendirir.** Bir proje bir delivery board backend'i kullandığında — [`/delivery-init`](/tr/teams/delivery-team) tarafından yazılan, `backend` alanı olan bir `.delivery/config.json` — **erteleme için yetkili yüzey artık proje board'udur**, `backlog.md` / `tasks.md` değil (tek yüzey, böylece ikisi birbirinden sapmaz). `/brainstorm done` o zaman bu config'i algılar ve her ertelenmiş / etkin-niyetli öğeyi board'a bir iş öğesi olarak senkronlar (idempotent: oluşturmadan önce kontrolü brainstorm'un adı + öğe başlığı üzerinden anahtarlar, böylece yeniden çalıştırma çoğaltmak yerine yakınsar) ve `.atl/` dosyalarına yazmayı bırakır — bu dosyaların zaten tuttuğu içeriği emekliye ayırmak ayrı, tek seferlik bir migration'dır. Board yazımı, kurulu delivery-team'in backend adaptörü üzerinden gider; böylece `/brainstorm` hiçbir zaman sağlayıcı komutlarını ya da etiket sözdizimini gömmez. Board backend'i **olmayan** projeler, eskisi gibi iki katmanlı `.atl/` yüzeyini kullanır (varsayılan).
+
 **İskele.** `atl init` (ve `atl install`), yalnızca yoksa `.atl/` altına boş `backlog.md` + `tasks.md` iskeletleri bırakır (kullanıcının mevcut dosyası asla üzerine yazılmaz). Global katmanın proje `.atl/` dizini olmadığından, orada atlanır.
 
 ## Önemli kurallar

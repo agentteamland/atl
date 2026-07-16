@@ -96,6 +96,17 @@ Deferred decisions live in a two-tier surface under the scope's `.atl/`:
   of what we actually mean to do next. An item moves **backlog → tasks** when we
   decide to pull it forward (a trigger fired, or we simply chose to prioritize it).
 
+**Board-backend projects — the board holds the deferrals.** When a project runs a
+delivery board backend (a `.delivery/config.json` with a `backend` field), the
+**project board is the authoritative deferral surface**, not these two files —
+one surface only, so the two can't drift. `/brainstorm done` then syncs deferrals
+and active intent to the board (via the delivery-team's backend adapter) and
+stops writing `.atl/backlog.md` / `tasks.md`; retiring any content those files
+already hold (a superseding pointer + a one-time migration onto the board) is a
+separate, per-project step, not something `/brainstorm done` does on its own. The
+two-tier `.atl/` surface described here is the default for every project *without*
+a board backend.
+
 ### When to add to the backlog
 
 - A sub-topic deemed "premature, let's defer" during a brainstorm → write to the
@@ -120,7 +131,9 @@ Deferred decisions live in a two-tier surface under the scope's `.atl/`:
 
 ### Mandatory check during `brainstorm done`
 
-When `/brainstorm done` runs, before the docs file is written:
+When `/brainstorm done` runs, before the docs file is written (for a board-backend
+project this check runs against the board instead of the two files — see the
+board-backend note above):
 1. **Backlog:** scan the brainstorm for every deferred / "later" / "not now" /
    left-uncertain item and ensure each has a `backlog.md` entry under the right
    area group. If any is missing, add it — or ask the user when it's ambiguous.
