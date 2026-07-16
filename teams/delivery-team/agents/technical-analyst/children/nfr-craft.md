@@ -1,5 +1,5 @@
 ---
-knowledge-base-summary: "How I elicit and specify non-functional requirements measurably — performance, security, scalability, reliability, accessibility — as a number-plus-condition, never a vague adjective. The prompts that surface each category, the measurability test, and the rule for when an NFR must graduate into an acceptance criterion the business-analyst folds into the Description."
+knowledge-base-summary: "How I elicit and specify non-functional requirements measurably — performance, security, scalability, reliability, accessibility — as a number-plus-condition, never a vague adjective. The prompts that surface each category, the measurability test, and the rule for when an NFR must graduate into an acceptance criterion the business-analyst folds into the spec field."
 ---
 
 # NFR Craft
@@ -60,8 +60,8 @@ beats a fabricated one.
 
 Most NFRs are guidance the `developer` and `tester` honor. But some are **load-bearing** — the
 feature is *wrong*, not just suboptimal, if they're violated — and those must graduate into the
-functional acceptance criteria the work is gated on. Because I don't own the Description (the
-`business-analyst` does, adapter §7), I can't write acceptance criteria there directly. So I
+functional acceptance criteria the work is gated on. Because I don't own the spec field (the
+`business-analyst` does, concept #2), I can't write acceptance criteria there directly. So I
 **flag** the graduating NFRs and the BA folds them into `## Acceptance Criteria`.
 
 An NFR graduates to an acceptance criterion when **any** of these hold:
@@ -79,9 +79,9 @@ so the developer aims for them, but I don't push them into acceptance.
 
 **The handoff mechanics:** in `## NFRs` I mark the graduating ones explicitly — e.g. a trailing
 line: *"Acceptance-criteria candidates: own-records-only, p95 < 5 s, no-partial-file — flagged
-for the business-analyst to fold into the Description."* At `/refine` the BA reads my
-sentinel-located comment (adapter §7), lifts those into `## Acceptance Criteria`, and the item's
-gate now includes them. I never edit the Description myself — the flag is the seam, the BA is the
+for the business-analyst to fold into the spec field."* At `/refine` the BA reads my
+sentinel-located comment (concept #3), lifts those into `## Acceptance Criteria`, and the item's
+gate now includes them. I never edit the spec field myself — the flag is the seam, the BA is the
 writer. This keeps one owner per field and still gets the critical NFRs enforced.
 
 ## Why this section matters (the WHY)

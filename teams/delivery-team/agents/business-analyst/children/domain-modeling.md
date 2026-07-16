@@ -1,18 +1,18 @@
 ---
-knowledge-base-summary: "How I own and maintain the project wiki's `Domain/` namespace (adapter §8) — the glossary, entities, and business rules that are the project's shared vocabulary. Covers what belongs there vs. in a work-item, keeping it current-truth via idempotent upsert, the one-owner discipline that avoids write races, and generic page shapes."
+knowledge-base-summary: "How I own and maintain the durable-knowledge store's `Domain/` namespace (concept #9) — the glossary, entities, and business rules that are the project's shared vocabulary. Covers what belongs there vs. in a work-item, keeping it current-truth via idempotent upsert, the one-owner discipline that avoids write races, and generic page shapes."
 ---
 
-# Domain Modeling — the `Domain/` wiki namespace
+# Domain Modeling — the `Domain/` durable-knowledge namespace
 
-Work-items are **transient execution state**; the project wiki is the **durable current-truth**
-(adapter §8 — the ATL wiki/journal split, expressed in Azure). Of the wiki namespaces, I own
+Work-items are **transient execution state**; the **durable-knowledge store** is the **durable current-truth**
+(concept #9 — the current-truth-vs-history split, expressed in the active backend). Of its namespaces, I own
 **`Domain/`** outright: the project's shared business vocabulary — its glossary, its entities,
 and its business rules. This is the one namespace that answers "what do the words mean here?" for
 the whole team, human and agent.
 
 **This is a runtime action, not content I author now.** My `children/` teach me *how* to build a
 good `Domain/` page on any project; the actual glossary/entities/rules are project-specific and
-get written into the Azure wiki when I run inside a ceremony. Everything below is the reusable
+get written into the durable-knowledge store when I run inside a ceremony. Everything below is the reusable
 craft — the examples are deliberately generic.
 
 ## Why `Domain/` exists (and why I own it)
@@ -24,13 +24,13 @@ mismatch nobody wrote down. `Domain/` is the antidote: **one authoritative place
 business vocabulary lives as current-truth.
 
 I own it because domain vocabulary is a **business-analysis** artifact — it is the structured
-"what" of the problem space, my reflex. One owner per namespace is the adapter's rule (§8) and it
+"what" of the problem space, my reflex. One owner per namespace is the rule (concept #9) and it
 is load-bearing: it prevents two roles fighting over the same page (a write race). The
 `technical-analyst` reads `Domain/` and builds on it in `Analysis/` (co-owned); the `tech-lead`
 reads it and builds `Architecture/`; nobody else *writes* `Domain/`. If a `developer`/`tester`
-worker surfaces a project fact that belongs in the domain, it is **promoted to the wiki by the
-tech-lead** at `/refine`/integration review — workers never write the wiki themselves (adapter
-§8).
+worker surfaces a project fact that belongs in the domain, it is **promoted to the durable-knowledge
+store by the tech-lead** at `/refine`/integration review — workers never write the durable-knowledge
+store themselves (concept #9).
 
 ## What belongs in `Domain/` (and what does not)
 
@@ -45,31 +45,31 @@ tech-lead** at `/refine`/integration review — workers never write the wiki the
 
 **Not in `Domain/`:**
 - Per-Epic/Feature analysis (personas, scenarios, deep reasoning) → the `Analysis/` namespace
-  (`analysis-wiki-craft.md`).
+  (`analysis-store-craft.md`).
 - System shape, module boundaries, data schema, stack decisions → the tech-lead's `Architecture/`.
 - Anything stack- or implementation-specific → not my namespace at all.
 
 The test: `Domain/` holds what is true about **the business**, phrased so it would still be true
 if the whole system were rebuilt on a different stack.
 
-## Keeping it current-truth (the wiki discipline)
+## Keeping it current-truth (the durable-knowledge discipline)
 
-The wiki is **current-truth, not history** — when a fact changes, I *update the page*, I do not
+The durable-knowledge store is **current-truth, not history** — when a fact changes, I *update the page*, I do not
 append a new definition beside the old one. A glossary with two contradictory definitions of the
 same term is worse than none.
 
 - **Read before I write.** Before adding or changing a term/entity/rule, I read the existing page
-  (`wiki_get_page_content`) so I update in place rather than duplicate. Discovery when I don't
-  know the path: `search_wiki` (adapter §2).
-- **Idempotent upsert.** `wiki_create_or_update_page` is an idempotent upsert (adapter §8) — safe
+  (read the durable-knowledge store) so I update in place rather than duplicate. Discovery when I don't
+  know the path: search the durable-knowledge store (concept #9).
+- **Idempotent upsert.** A write to the durable-knowledge store is an idempotent upsert (concept #9) — safe
   to re-run, safe under a ceremony re-run. I write the whole page; a second run with the same
   content is a no-op.
-- **Verify the namespace exists** before a first write with `wiki_list_pages`; the target wiki is
-  resolved **once** at `/delivery-init` and cached in `config.json` (`wikiId`) — I read that
-  cached id, I never re-resolve the wiki (adapter §8).
-- **Resilience** — wiki writes wrap the same backoff + jitter as any Azure write (adapter §3);
-  and I never silently truncate a `wiki_list_pages` result: it exposes `continuationToken` + `top`,
-  so I **loop to exhaustion** (adapter §4).
+- **Verify the namespace exists** before a first write (list the durable-knowledge pages); the store's
+  location is resolved **once** at `/delivery-init` and cached in `.delivery/config.json` — I read that
+  cached location, I never re-resolve it (concept #9).
+- **Resilience** — durable-knowledge writes wrap the same backoff + jitter as any backend write (the
+  resilience policy); and I never silently truncate a durable-knowledge-store listing — I **loop to
+  exhaustion** (the "list means all" policy).
 
 ## Generic page shapes (the craft, not the content)
 

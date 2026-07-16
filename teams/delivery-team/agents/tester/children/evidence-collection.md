@@ -1,5 +1,5 @@
 ---
-knowledge-base-summary: "How I capture and attach verification evidence: the scripts/az-attach.sh REST helper (adapter §9 — the ONE non-MCP op, upload-then-link with the worker's env PAT), what evidence a reviewer and the PO actually need (reproducible, self-describing, tied to a criterion), reading it back with wit_get_work_item_attachment, and why the proof — not my word — is what makes my green trustworthy downstream."
+knowledge-base-summary: "How I capture and attach verification evidence: attaching it to the work-item per the active backend's adapter (concept #12 — with the worker's env credential, never in argv), what evidence a reviewer and the PO actually need (reproducible, self-describing, tied to a criterion), reading it back per the active adapter, and why the proof — not my word — is what makes my green trustworthy downstream."
 ---
 
 # Evidence Collection
@@ -10,37 +10,29 @@ showing every gate green, is *evidence*. The `tech-lead` review (micro-loop step
 PO (at sprint-review) both make decisions on my green — so the green has to be *inspectable*, not
 taken on faith. This child is how I collect it and attach it correctly.
 
-## The ONE REST carve-out — `scripts/az-attach.sh`
+## Attaching evidence — per the active backend's adapter (concept #12)
 
-Uploading an attachment (a screenshot, a test-result file) is the **single** Azure operation with no
-MCP tool (adapter §9 — the DRAFT once said "two"; Resolution #3 narrowed it to one). Every other
-Azure call I make goes through the `azureDevOps` MCP; this one goes through a thin, uniform helper so
-I never touch REST directly and the transport split stays hidden:
+Attaching an artifact (a screenshot, a test-result file) to the work-item is concept #12 in the
+backend interface; the active backend's adapter (`backends/<backend>/adapter.md`, chosen once at
+`/delivery-init` and cached in `.delivery/config.json`'s `backend` field, default `azure`) binds it
+to a concrete mechanism, so I attach through that **one** documented path and never improvise a
+transport. What I rely on, whichever backend is active:
 
-```
-../../../scripts/az-attach.sh <work-item-id> <file> [comment]
-```
+- **I see `attach(work-item, file)`; the transport stays hidden in the adapter.** Whatever the
+  backend actually does to record the bytes and tie them to the unit, I call the neutral operation
+  and read the concept — I never hand-roll the raw mechanism.
+- **The credential comes from my env, never the argv.** The attach path reads the same backend
+  credential `atl work dispatch` already put in my environment for every other backend call. It
+  rides an auth header, is never on the command line, and is never logged. I **never** write, echo,
+  or pass a literal token — the same secret-hygiene the whole interface enforces (the credential is
+  referenced by name, never stored).
+- **It's worker-runnable and safe by construction.** I already have the credential and the network,
+  so I can run it directly. It validates its inputs (the work-item id, that the file exists, the
+  credential/target present), builds and parses request payloads safely (so a filename or comment
+  with quotes/newlines/reserved chars can't corrupt the request), and retries transient errors with
+  bounded backoff — the same resilience posture as every other backend call (concept: resilience).
 
-From my worker context that relative path is
-[`../../../scripts/az-attach.sh`](../../../scripts/az-attach.sh). What it does, and the contract I
-rely on:
-
-- **Two legs, hidden behind one call.** It `POST`s the bytes to `_apis/wit/attachments` (which
-  returns an attachment URL), then links that URL onto the work-item as an `AttachedFile` relation
-  (a JSON-Patch `add`). I see `attach(work-item, file)`; the two-step REST dance is inside the
-  helper.
-- **The PAT comes from my env, never the argv.** The helper reads the same `AZURE_DEVOPS_PAT` (and
-  `AZURE_DEVOPS_ORG` / `AZURE_DEVOPS_PROJECT`) that `atl work dispatch` already put in my
-  environment for the MCP. It rides Basic auth as a header, is never on the command line, and is
-  never logged. I **never** write, echo, or pass a literal token — the same secret-hygiene the whole
-  adapter enforces (config-and-methodology §2: the PAT is referenced by name, never stored).
-- **It's worker-runnable and safe by construction.** I already have the PAT and the network, so I
-  can run it directly. It validates its inputs (numeric work-item id, file exists, org/project/PAT
-  present), builds and parses all JSON with `jq` (so a filename or comment with quotes/newlines/
-  reserved chars can't corrupt the request), and retries 429/5xx with bounded backoff — the same
-  resilience posture as the MCP callers (adapter §3).
-
-The Go orchestrator stays zero-Azure through all of this — the carve-out lives in the *team*, run by
+The Go orchestrator stays zero-backend through all of this — the attach lives in the *team*, run by
 me, not in `atl`.
 
 ## What evidence a reviewer and the PO actually need
@@ -54,10 +46,10 @@ my work:
 - **Self-describing filenames + comments** — I name the file for what it proves and pass a `comment`
   that ties it to a criterion: e.g. `attach 4217 over-balance-rejected.png "AC-2: transfer over
   source balance is rejected"`. Six months later, or at sprint-review, the attachment is legible on
-  its own. (The helper percent-encodes the filename and safely embeds the comment, so descriptive
+  its own. (The attach path safely encodes the filename and comment, so descriptive
   names with spaces/punctuation are fine.)
 - **Tied to a specific criterion or edge** — each piece of evidence maps to an acceptance criterion
-  (adapter §7 `## Acceptance Criteria`) or a specific edge/regression I probed. Evidence that doesn't
+  (the spec field's `## Acceptance Criteria` — concept #2) or a specific edge/regression I probed. Evidence that doesn't
   map to anything is noise; a criterion with no evidence is an unproven pass.
 - **Both the pass and the guarded failure** — for a rejection/error-path criterion ("over-balance
   transfer is rejected"), the *proof* is a screenshot of the rejection happening, not of the happy
@@ -74,25 +66,25 @@ tied to a ranked criterion, each self-describing. My verdict comment then refere
 
 ## Reading evidence back
 
-Reading an attachment *back* uses the MCP, not REST: `wit_get_work_item_attachment` (adapter §2/§9).
-The tech-lead pulls my evidence this way during review; the `project-manager` pulls it (client-side)
-when assembling the `Sprints/Sprint-<n>-Review` page. So the two directions split cleanly:
-**upload = the `az-attach.sh` REST carve-out; read-back = the MCP.** I only own the upload leg; I
-don't need REST to read.
+Reading an attachment *back* goes through the active backend's adapter (concept #12).
+The tech-lead pulls my evidence this way during review; the `project-manager` pulls it
+when assembling the `Sprints/Sprint-<n>-Review` durable-knowledge page. I own the attach; the
+read-back is there for whoever weighs the verdict — I attach the proof, they inspect it.
 
 ## Where evidence lives, and where it doesn't
 
 - **Evidence attaches to the work-item.** It is per-work-unit execution proof — transient state tied
-  to this task's verification (adapter §8: work-items are transient execution state).
+  to this task's verification (work-items are transient execution state; the durable-knowledge store
+  is current-truth — concept #9).
 - **My verdict comment references it** by attachment name, so a reader goes from "pass on AC-2" to
   the exact screenshot in one hop.
-- **I do not put evidence in the project wiki.** Worker-dispatch agents don't write the wiki
-  (adapter §8); it's durable current-truth, not per-task proof. The wiki records what the project
-  *is*, not that one task passed.
+- **I do not put evidence in the durable-knowledge store.** Worker-dispatch agents don't write it
+  (concept #9); it's durable current-truth, not per-task proof. The durable-knowledge store records
+  what the project *is*, not that one task passed.
 - **The craft of evidence-collecting is role-craft** — it travels with me via `/drain` to this
   child. A durable lesson ("for mobile criteria, always attach the emulator screenshot *and* the
   device/orientation it ran on, because a reviewer can't reproduce the lease") generalizes into this
-  file, never into a project's wiki.
+  file, never into a project's durable-knowledge store.
 
 ## Evidence checklist (per verdict)
 
@@ -102,7 +94,7 @@ don't need REST to read.
       mobile via the emulator lease (see [`mobile-and-web-surfaces.md`](mobile-and-web-surfaces.md))
 - [ ] Boundary/rejection criteria evidenced by the *guard holding*, not the happy path
 - [ ] Each attachment self-describing (name + `comment` tie it to a criterion/edge)
-- [ ] Attached via `scripts/az-attach.sh` (no literal PAT anywhere; helper handled the two-leg
-      upload+link)
+- [ ] Attached per the active backend's adapter (concept #12) — no literal credential anywhere; the
+      adapter handled the upload+link
 - [ ] The verdict comment references every attachment by name; no unproven pass, no orphan evidence
-- [ ] Read-back path confirmed available for the reviewer (`wit_get_work_item_attachment`)
+- [ ] Read-back path confirmed available for the reviewer (per the active adapter, concept #12)

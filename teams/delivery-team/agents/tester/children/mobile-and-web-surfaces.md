@@ -62,7 +62,7 @@ When a work-unit has a mobile criterion, I treat the emulator as a lease with a 
    the sharp edge here: iOS emulators in particular have real boot latency and a GUI requirement, so
    "the emulator isn't up" is a live, common failure mode — not a corner case.
 3. **Run the mobile checks** against the booted emulator, capturing evidence (screenshots of each
-   mobile criterion satisfied) for attachment via `scripts/az-attach.sh` (see
+   mobile criterion satisfied) for attachment per the active backend's adapter (concept #12; see
    [`evidence-collection.md`](evidence-collection.md)).
 4. **Release the lease** as soon as I'm done — win or lose. Holding the slot after I've finished
    starves the next work-unit's mobile verification for no reason. Release is not conditional on a
@@ -80,7 +80,7 @@ is **unverified** — and an unverified criterion is **not** a green:
   mobile gate is the worst thing I can do — it lets un-verified mobile behavior merge under a false
   green, and the whole point of my step is that the green is trustworthy (my half of
   `green = tests ∧ review`, [`verification-blueprint.md`](verification-blueprint.md)).
-- This mirrors the adapter's own "list means all — never silently truncate" posture (adapter §4):
+- This mirrors the interface's own "list means all — never silently truncate" posture (concept #10):
   an incomplete result is an error to surface, never a complete one to assume. A gate that couldn't
   run is the verification analogue of a paged read that got truncated.
 
@@ -112,4 +112,4 @@ silent-pass — is project-agnostic **role-craft** and lives in this child; a du
 "always give the emulator preflight a second boot attempt before calling it a fail") generalizes here
 via `/drain`. The *project's* actual surfaces (which screens exist, which flows matter) are project
 facts I read from the work-item at runtime; I never pre-author them, and I never write them to the
-project wiki (worker-dispatch agents don't write the wiki — adapter §8).
+durable-knowledge store (worker-dispatch agents don't write it — concept #9).

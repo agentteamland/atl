@@ -1,5 +1,5 @@
 ---
-knowledge-base-summary: "How I run the cross-unit integration checkpoint at sprint-review: verifying that the units merged to dev over the sprint actually cohere as a whole (not just per-unit green), surfacing integration findings the per-unit gate can't see, filing forward-fix Tasks for what doesn't cohere (idempotently, per adapter §5), and PROMOTING the project facts workers surfaced up into my Architecture/ / Conventions/ / ADR wiki pages (adapter §8) — the mechanism that turns worker-surfaced facts into durable current-truth."
+knowledge-base-summary: "How I run the cross-unit integration checkpoint at sprint-review: verifying that the units merged to dev over the sprint actually cohere as a whole (not just per-unit green), surfacing integration findings the per-unit gate can't see, filing forward-fix Tasks for what doesn't cohere (idempotently, concept #10), and PROMOTING the project facts workers surfaced up into my Architecture/ / Conventions/ / ADR durable-knowledge pages (concept #9) — the mechanism that turns worker-surfaced facts into durable current-truth."
 ---
 
 # Integration Checkpoint
@@ -26,13 +26,13 @@ whole-sprint view can answer, over the units that merged to `dev` this sprint:
   `Architecture/` boundaries and the `Conventions/` in force — or did the aggregate quietly erode
   a boundary I own?
 - **Is the Feature's intent actually delivered?** The units collectively satisfy the Feature's
-  Acceptance Criteria (from the `System.Description` I read at decomposition), not just each
+  Acceptance Criteria (from the spec field, concept #2, I read at decomposition), not just each
   Task's local goal.
 
-I read the sprint's merged units with `wit_get_work_items_for_iteration` (batching, per adapter
-§4 — **"list means all"**, never a silently-truncated read; if the set could exceed the tool's
-return I close the gap with a high-`top` `wit_query_by_wiql` and treat a result *at* the cap as a
-truncation error, not a complete read). I read their PRs/threads on the Azure-native surface.
+I read the sprint's merged units (concept #6, batched) under the **"list means all"** policy —
+never a silently-truncated read; if the set could exceed the tool's return I close the gap with
+the idempotency/velocity query (concept #10) and treat a capped result as a truncation error, not
+a complete read. I read their PRs/threads on the active backend's PR surface (concept #11).
 
 ## Surfacing integration findings and filing forward-fixes
 
@@ -40,23 +40,23 @@ An integration finding is, by definition, something no per-unit review could cat
 re-litigate the merged units; I record what doesn't cohere and route it forward:
 
 - I **file a forward-fix Task** for each real integration break, as a new work-unit the next
-  sprint's dispatch will pick up. I create it under the right parent and **idempotently** (adapter
-  §5): compute `atl-key = hash(parent-id + plan-ordinal)` with a fresh ordinal in the parent's
-  plan, run the check-first WIQL, found → reuse+update, not-found → create-then-stamp. A re-run of
-  the checkpoint must not duplicate the forward-fix — the same idempotency discipline as
-  decomposition ([decomposition-blueprint.md](decomposition-blueprint.md)).
-- I **area-tag** each forward-fix (`area:<name>`, adapter §7) and add any `Dependency` links, so
-  the scheduler orders it correctly — same rules as any unit I decompose.
+  sprint's dispatch will pick up. I create it under the right parent and **idempotently** (concept
+  #10): compute `atl-key = hash(parent-id + plan-ordinal)` with a fresh ordinal in the parent's
+  plan, run the check-first idempotency query, found → reuse+update, not-found → create-then-stamp.
+  A re-run of the checkpoint must not duplicate the forward-fix — the same idempotency discipline
+  as decomposition ([decomposition-blueprint.md](decomposition-blueprint.md)).
+- I **area-tag** each forward-fix (`area:<name>`, concept #4) and add any dependency links (concept
+  #8), so the scheduler orders it correctly — same rules as any unit I decompose.
 - I apply the **evidence discipline** here too: an integration finding I file names the concrete
   seam (which two units, which surface, what breaks) — not a vague "these don't feel integrated."
   Same standard as the review evidence gate; a finding I can't point at isn't a finding.
-- I resolve any work-item state at runtime (`wit_get_work_item_type`, adapter §6) — never a
-  hardcoded literal.
+- I resolve any work-item state at runtime (concept #7) — never a hardcoded literal.
 
-## Promoting worker-surfaced project facts up to the wiki
+## Promoting worker-surfaced project facts up to the durable-knowledge store
 
-This is the checkpoint's other half, and it is a rule the adapter states explicitly (adapter §8):
-**developer/tester workers do NOT write the wiki.** During a sprint, workers *surface* real
+This is the checkpoint's other half, and it is a rule the interface states explicitly (concept
+#9): **developer/tester workers do NOT write the durable-knowledge store.** During a sprint,
+workers *surface* real
 project facts — "this boundary is leaky," "this area has a hidden dependency on that one," "the
 real contract here differs from what the analysis assumed." Those facts arrive to me through the
 sprint's work-items (progress comments, PR threads) and the tester's evidence. Two destinations,
@@ -73,9 +73,9 @@ I promote the project facts by **upserting** the relevant page
 boundary as it really is, add a `Conventions/` line if the sprint established a cross-area
 agreement, and — if a fact revealed a decision that is significant AND hard-to-reverse — write an
 **ADR** (or supersede one). This is the mechanism that turns transient, worker-surfaced facts into
-**durable current-truth**: work-items are transient execution state; the wiki is the durable
-record (adapter §8), and I am the one owner of these namespaces, so promotion goes through me and
-there is no write race.
+**durable current-truth**: work-items are transient execution state; the durable-knowledge store
+is the durable record (concept #9), and I am the one owner of these namespaces, so promotion goes
+through me and there is no write race.
 
 Why this matters: without the promotion step, hard-won knowledge (a boundary a worker discovered
 was wrong) evaporates when the isolated worker exits, and the next sprint's workers rediscover it
@@ -85,15 +85,15 @@ page.
 
 ## Checklist
 
-- [ ] Read all units merged to `dev` this sprint (`wit_get_work_items_for_iteration`, batched);
-      "list means all" — no silent truncation; cap-at-`top` treated as a truncation error.
+- [ ] Read all units merged to `dev` this sprint (concept #6, batched); "list means all" — no
+      silent truncation; a capped result treated as a truncation error.
 - [ ] Verified seams between dependent/same-area units line up as built.
 - [ ] Verified the aggregate still fits `Architecture/` boundaries + `Conventions/`, and the
       Feature's Acceptance Criteria are collectively delivered.
 - [ ] Each integration finding names the concrete seam (two units + surface + break) — evidenced,
       not vague.
-- [ ] Forward-fix Tasks filed **idempotently** (adapter §5: atl-key by parent+fresh-ordinal,
-      check-first WIQL), area-tagged, dependency-linked; state resolved at runtime.
+- [ ] Forward-fix Tasks filed **idempotently** (concept #10: atl-key by parent+fresh-ordinal,
+      check-first idempotency query), area-tagged, dependency-linked; state resolved at runtime.
 - [ ] Worker-surfaced **project facts** promoted to `Architecture/` / `Conventions/` / an ADR by
       me (upsert); worker **role-craft** learnings left to their own `children/` via `/drain`.
 - [ ] Pages left as current-truth (updated in place, stale lines removed); ADR added/superseded,

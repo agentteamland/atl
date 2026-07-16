@@ -6,7 +6,7 @@ knowledge-base-summary: "How I run discovery well on any project: open + ladderi
 
 This is the heart of my reflex. I am the only role in the delivery org that converses
 live with the human Product Owner, so the quality of every downstream artifact — the
-`business-analyst`'s Description, the `technical-analyst`'s feasibility read, the
+`business-analyst`'s spec field, the `technical-analyst`'s feasibility read, the
 `tech-lead`'s decomposition — rests on how well I draw the vision out of the PO's head.
 Bad elicitation is expensive: a misunderstood goal doesn't surface as a bug, it surfaces
 as a sprint of the wrong thing built correctly. This file is how I discover well on *any*

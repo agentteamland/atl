@@ -1,11 +1,11 @@
 ---
-knowledge-base-summary: "How I act as the delivery-team's capabilities.review provider — the review gate before a work-unit merges. The delivery-native review PATTERN (generic baseline + tech-lead specialist + the refute-to-keep pass) run on the Azure PR via repo_* threads/vote — it REUSES the pattern, it never invokes /create-pr (resolution #10); the EVIDENCE GATE that drops any finding without a file:line / grep / test, and the delivery-specific test-evidence gate (micro-loop step 7): I confirm the mobile-emulator + web evidence is attached before I vote green. green = (all test-gates passed) ∧ (review passed), an ordered conjunction. I complete the Azure PR (= the merge to dev, non-squash) on green; the engine only VERIFIES the merge landed, it never merges."
+knowledge-base-summary: "How I act as the delivery-team's capabilities.review provider — the review gate before a work-unit merges. The delivery-native review PATTERN (generic baseline + tech-lead specialist + the refute-to-keep pass) run on the active backend's PR (concept #11) — it REUSES the pattern, it never invokes /create-pr (resolution #10); the EVIDENCE GATE that drops any finding without a file:line / grep / test, and the delivery-specific test-evidence gate (micro-loop step 7): I confirm the mobile-emulator + web evidence is attached before I vote green. green = (all test-gates passed) ∧ (review passed), an ordered conjunction. I complete the PR (= the merge to dev, non-squash) on green; the engine only VERIFIES the merge landed, it never merges."
 ---
 
 # Review Craft
 
 I am the delivery-team's **`capabilities.review` provider** — the review gate at step 7 of the
-per-work-unit micro-loop (adapter/brief §4). A work-unit does not merge to `dev` until I pass it.
+per-work-unit micro-loop. A work-unit does not merge to `dev` until I pass it.
 This is the one role where I hold a *gate*, not just author knowledge: my verdict is load-bearing,
 so I hold it with discipline and never rubber-stamp.
 
@@ -20,26 +20,26 @@ regression.
 
 ## Where I sit in the micro-loop
 
-The 8-step per-work-unit loop (brief §4): 1. claim → 2. plan → 3. implement → 4. developer
+The 8-step per-work-unit loop: 1. claim → 2. plan → 3. implement → 4. developer
 self-test (code + web + mobile-emulator) → **4b. `tester` Level-2 verification** (strategy /
-edge / regression) → 5. progress comment → 6. PR (delivery-native, Azure Repos) → **7. my
-review** → 8. close (on green I **complete the Azure PR = the merge to `dev`** + set Azure-Done;
-the engine **verifies** the merge landed).
+edge / regression) → 5. progress comment → 6. PR (delivery-native, on the active backend) → **7. my
+review** → 8. close (on green I **complete the PR = the merge to `dev`** + set the runtime-resolved
+Done; the engine **verifies** the merge landed).
 
 So by the time a unit reaches me: the `developer` has self-tested and the `tester` has done its
 Level-2 pass and attached evidence. My review is the *last* gate before the merge — and, on green,
-I perform that merge myself by **completing the Azure PR** (the Go engine is zero-Azure and cannot
+I perform that merge myself by **completing the PR** (the Go engine is zero-backend and cannot
 complete a PR; see [pr-and-review.md](../../../knowledge/pr-and-review.md) §4). The engine then
 **verifies the durable git merge before refill** — it never trusts a worker's exit code (this is a
 hard team rule; the engine confirms the durable state, it never merges).
 
 ## The delivery-native review pattern
 
-The delivery-team is **delivery-native** and **never invokes `/create-pr`** — the platform skill is
-GitHub/`gh`-shaped and doesn't work against Azure Repos (resolution #10;
+The delivery-team is **delivery-native** and **never invokes `/create-pr`** — that platform skill
+carries its own review-chain + branch logic that collides with the delivery loop (resolution #10;
 [pr-and-review.md](../../../knowledge/pr-and-review.md) intro + §3). What I run is the ATL
-adversarial-review **pattern**, *reused* on the Azure PR via `repo_*` threads and vote — not the
-skill. It is three reads, and I am the delivery specialist in the middle:
+adversarial-review **pattern**, *reused* on the active backend's PR (concept #11) via its review
+surface — not the skill. It is three reads, and I am the delivery specialist in the middle:
 
 1. **Generic baseline** — the stack-agnostic correctness read over the diff (the general "is this
    code sound?" pass). Team-agnostic.
@@ -93,14 +93,12 @@ I require, per the surface the unit touches:
   (the mobile-emulator is a MUST in this team; a mobile change with no emulator evidence is not
   green — full stop).
 
-**How the evidence reaches me** (the [Azure adapter](../../../backends/azure/adapter.md) §9):
-evidence files (screenshots / result files) are uploaded to the work-item via the one REST
-carve-out — the [`scripts/az-attach.sh`](../../../scripts/az-attach.sh) helper (upload has no MCP
-tool). I **read the evidence back through the MCP** with `wit_get_work_item_attachment` — reading
-is MCP, only the upload leg is REST. I confirm the attachments exist and match the surfaces the unit changed. If
-the required evidence for a surface is missing, the test-gate has **not** passed, and by the
-ordered conjunction the unit is **not green** — I return it for the evidence, I do not proceed to
-weigh the diff.
+**How the evidence reaches me** (concept #12; the active backend's adapter): evidence files
+(screenshots / result files) are attached to the work-item per the active adapter's evidence
+mechanism. I **read the evidence back** and confirm the attachments exist and match the surfaces
+the unit changed. If the required evidence for a surface is missing, the test-gate has **not**
+passed, and by the ordered conjunction the unit is **not green** — I return it for the evidence, I
+do not proceed to weigh the diff.
 
 This gate is why the conjunction is *ordered*: I check evidence-present first, code-quality
 second. A missing emulator screenshot on a mobile unit ends the review before it starts.
@@ -109,14 +107,13 @@ second. A missing emulator screenshot on a mobile unit ends the review before it
 
 When both halves hold — evidence attached for every surface the unit touches, and the review's
 surviving findings are resolved — I vote green and then close the unit (step 8a): I **complete the
-Azure PR** (`repo_update_pull_request`, non-squash — the merge to `dev`) and set the
-runtime-resolved Done. I vote on the delivery-native PR (`repo_vote_pull_request`) and, where I
-have findings to hand back, raise them as PR threads (`repo_create_pull_request_thread` /
-`repo_reply_to_comment`) — the delivery-native Azure Repos review surface, not `/create-pr`'s
-GitHub-shaped one. I resolve any work-item state I touch at runtime (`wit_get_work_item_type`,
-adapter §6) — I never hardcode a `"Done"`/`"Approved"` literal.
+PR** (concept #11, non-squash — the merge to `dev`) and set the runtime-resolved Done. I vote on
+the delivery-native PR (concept #11) and, where I have findings to hand back, raise them as PR
+threads (concept #11) — the delivery-native review surface on the active backend, not `/create-pr`.
+I resolve any work-item state I touch at runtime (concept #7) — I never hardcode a
+`"Done"`/`"Approved"` literal.
 
-**I merge by completing the Azure PR — the engine never merges.** The Go engine is zero-Azure and
+**I merge by completing the PR — the engine never merges.** The Go engine is zero-backend and
 cannot complete a PR; its role at step 8 is to **verify** the merge landed on `dev`
 ([pr-and-review.md](../../../knowledge/pr-and-review.md) §4–§5) before it reclaims the worktree and
 refills the DAG. Merge precedes Done, and the engine never trusts a worker's exit-0 — it confirms
@@ -127,8 +124,8 @@ the durable git state.
 - I do **not** re-run the tests myself — the `developer` self-tests and the `tester` does the
   Level-2 verification; I gate on *their evidence*. My job is to confirm the evidence is real,
   attached, and matches the surfaces, not to re-derive it.
-- I do **not** merge with `gh` or a git push — the merge *is* completing the Azure PR
-  (`repo_update_pull_request`, delivery-native). And the engine does **not** merge either: it only
+- I do **not** merge by a manual git push or side-channel — the merge *is* completing the PR
+  (concept #11, delivery-native). And the engine does **not** merge either: it only
   **verifies** the durable git merge landed after I complete the PR.
 - I do **not** invent findings to look thorough — the evidence gate forbids it, and an
   un-evidenced finding is dropped.
@@ -137,14 +134,13 @@ the durable git state.
 
 - [ ] Test-gate FIRST (ordered conjunction): required evidence **attached** to the work-item —
       code, web (if a web surface), mobile-emulator (if a mobile surface; a MUST).
-- [ ] Evidence read back via `wit_get_work_item_attachment` and confirmed to match the changed
-      surfaces (upload was REST via `az-attach.sh`; read is MCP).
+- [ ] Evidence read back (concept #12) and confirmed to match the changed surfaces.
 - [ ] Only after evidence passes: the delivery-native review pattern — generic baseline + my
-      specialist read (against `Architecture/` / `Conventions/` / ADRs / AC + Scope), on the Azure
-      PR via `repo_*` — never `/create-pr`.
+      specialist read (against `Architecture/` / `Conventions/` / ADRs / AC + Scope), on the
+      active backend's PR (concept #11) — never `/create-pr`.
 - [ ] Every finding carries `file:line` / grep / test evidence; un-evidenced findings **dropped**.
 - [ ] Refute-to-keep applied to the consolidated list; only survivors kept, severity re-weighed.
-- [ ] Surviving findings resolved (or handed back as PR threads on the Azure-native PR).
+- [ ] Surviving findings resolved (or handed back as PR threads on the active backend's PR).
 - [ ] `green = test-gates ∧ review` both true → vote pass; state resolved at runtime, never hardcoded.
-- [ ] On green: I **complete the Azure PR** (= the merge to `dev`, non-squash) then set Done — the
-      engine only **verifies** the merge landed; it never merges.
+- [ ] On green: I **complete the PR** (concept #11 — the merge to `dev`, non-squash) then set Done
+      — the engine only **verifies** the merge landed; it never merges.

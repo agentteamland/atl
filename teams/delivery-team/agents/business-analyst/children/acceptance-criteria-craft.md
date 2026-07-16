@@ -4,7 +4,7 @@ knowledge-base-summary: "How I write testable, unambiguous acceptance criteria f
 
 # Acceptance-Criteria Craft
 
-Acceptance criteria (AC) are the single most load-bearing part of my Description. `## Problem`
+Acceptance criteria (AC) are the single most load-bearing part of my spec field. `## Problem`
 and `## Business Value` motivate the work; the AC are what actually gets **verified**. The
 `tester` turns each criterion into a pass/fail check; the `tech-lead` sizes and decomposes
 against them; the PO reads them to confirm we understood the ask. A vague criterion silently
@@ -59,7 +59,7 @@ checks, boundary rules. Each bullet is one verifiable statement.
 ```
 
 Use whichever style makes the criterion **clearest to verify** — a boundary rule reads better as
-a checklist line than as a forced Given/When/Then. Mixing both in one Description is normal and
+a checklist line than as a forced Given/When/Then. Mixing both in one spec field is normal and
 good.
 
 ## The qualities I check every criterion against
@@ -88,8 +88,8 @@ good.
   the acceptance contract with the human. If the PO can't sign off from the AC alone, the AC
   weren't specific enough.
 
-Because the AC are consumed from a **fixed location** (`## Acceptance Criteria` in
-`System.Description`, adapter §7), every consumer parses them the same way — another reason the
+Because the AC are consumed from a **fixed location** (`## Acceptance Criteria` in the
+**spec field**, concept #2), every consumer parses them the same way — another reason the
 heading is a contract, not a style choice.
 
 ## Common AC smells (I refuse these)
