@@ -1,5 +1,5 @@
 ---
-knowledge-base-summary: "When I can't proceed — a real blocker, an ambiguous brief, a missing pack, or an un-runnable surface — I set status.json's `blocker` (non-empty ⇒ terminal, I exit), mark the work-item blocked via a `blocked` tag + the `Microsoft.VSTS.CMMI.Blocked` field (not a state — Azure has no blocked state-category), comment why, and escalate after one honest retry. The cardinal rule: I NEVER fake a green to get past a wall — a false green is the worst thing I can emit."
+knowledge-base-summary: "When I can't proceed — a real blocker, an ambiguous brief, a missing pack, or an un-runnable surface — I set status.json's `blocker` (non-empty ⇒ terminal, I exit), mark the work-item blocked with the `blocked` flag (a `blocked` tag/label + a diagnostic comment, never a state transition — concept #7), and escalate after one honest retry. The cardinal rule: I NEVER fake a green to get past a wall — a false green is the worst thing I can emit."
 ---
 
 # Escalation & Blocking
@@ -18,10 +18,10 @@ a temporary hiccup:
 
 - **A real dependency/implementation blocker** — the unit depends on something that isn't there (a
   sibling contract that didn't land the way the brief said, a missing service, an impossible
-  acceptance criterion). Not a transient Azure 429 — that's resilience, not a blocker (adapter §3;
-  I pause the call and retry, [`azure-touchpoints.md`](azure-touchpoints.md)).
+  acceptance criterion). Not a transient backend rate-limit — that's resilience, not a blocker (the
+  resilience policy; I pause the call and retry, [`backend-touchpoints.md`](backend-touchpoints.md)).
 - **An ambiguous or contradictory brief** — the canonical brief's goal can't be reconciled with the
-  work-item's `## Acceptance Criteria`, or it points at wiki pages that contradict each other. I do
+  work-item's `## Acceptance Criteria`, or it points at durable-knowledge pages that contradict each other. I do
   **not** silently pick an interpretation and build to it; guessing intent on ambiguous input is how
   a worker ships the wrong feature confidently. I surface the ambiguity to the human owner (the PO /
   tech-lead) rather than resolve it myself.
@@ -42,7 +42,7 @@ a temporary hiccup:
 ## One honest retry, then escalate
 
 For a condition that *might* be transient (a flaky emulator preflight, a first build failure with a
-plausible fix, a wiki page that failed to fetch once), I take **one honest retry** — a genuine second
+plausible fix, a durable-knowledge page that failed to fetch once), I take **one honest retry** — a genuine second
 attempt at resolving it, not a re-label of the same failure. If the retry doesn't clear it, I
 **escalate**; I do not burn the work-unit's budget in an unbounded retry loop (that reads as a stall
 to the supervisor anyway). The rule is *one retry, then surface* — enough to absorb real flakiness,
@@ -61,26 +61,25 @@ When I've decided a condition is terminal, I signal it on **both** my channels, 
    supervisor this worker is blocked, and **I then exit** — I do not keep running a worker that's
    declared itself blocked. This is my primary, deterministic signal; the supervisor owns
    `status.json` and acts on `blocker` without parsing my chat output.
-2. **Mark the work-item blocked (Azure milestone).** Blocking is **not a state** — Azure has no
-   blocked state-category and the standard templates ship no `Blocked` state (adapter §6) — so I do
-   **not** change `System.State` (the unit stays in its in-progress state). Instead I add a `blocked`
-   tag to `System.Tags` (the universal, process-template-agnostic signal), and where the type exposes
-   the `Microsoft.VSTS.CMMI.Blocked` field (Task has it; PBI/Feature don't) I also set it to `Yes` —
-   both via `wit_update_work_item`. I **never invent a `"Blocked"` state to transition to.** I pair it
-   with a comment (`wit_add_work_item_comment`) stating the blocker plainly so a human reading the
-   board sees *why*, not just *that*, it's stuck.
+2. **Mark the work-item blocked (a durable-milestone write).** Blocking is **not a state** — it is a
+   **flag** (concept #7): so I do **not** change the work-item's state (the unit stays in its
+   in-progress state). Instead I mark it blocked through the active backend's adapter — a `blocked`
+   tag/label (the universal, template-agnostic signal; the adapter states any backend-specific blocked
+   field it also sets) plus a diagnostic comment. I **never invent a `"Blocked"` state to transition
+   to.** The comment states the blocker plainly so a human reading the board sees *why*, not just
+   *that*, it's stuck.
 3. **A clear `lastOutputSummary`** — a short human line ("blocked: area:mobile has no pack on disk;
    need packs/mobile/ or a re-tag") so the progress signal matches the blocker.
 
 The order matters: `status.json` first (the deterministic supervisor signal that stops me cleanly),
-then the Azure milestone (the durable, human-legible record on the board). Both, so neither the
+then the backend milestone (the durable, human-legible record on the board). Both, so neither the
 engine nor a human is left guessing.
 
 **When I *can't* mark it — a crash or a silent stall.** The contract above is my *clean* path: I
 decide, I mark the board, I exit. If I instead crash or hang without ever writing a `blocker`, I mark
 nothing — but the supervisor's recovery ladder still ends by writing a durable `BlockedReport` to
 `.delivery/blocked/<id>.json`. That report is drained at `/sprint-review` (its step 2), which
-reflects the same `blocked` tag + diagnostic comment onto the work-item and clears the report — so a
+reflects the same `blocked` flag + diagnostic comment onto the work-item and clears the report — so a
 unit that dies mid-flight still reaches the board, just at sprint close instead of the instant I'd
 have marked it myself.
 

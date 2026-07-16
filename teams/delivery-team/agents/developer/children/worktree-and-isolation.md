@@ -1,5 +1,5 @@
 ---
-knowledge-base-summary: "How I run: a fresh git worktree branched off `dev`, an isolated `claude -p` context with no carry-over, and status.json as my ONLY channel back to the supervisor (four fields: phase, heartbeatTs, blocker, lastOutputSummary; the six phase values claim → plan → implement → self-test → comment → pr). WHY isolation makes me parallel-safe and WHY I bound my context to brief+pack+task rather than the whole repo/wiki."
+knowledge-base-summary: "How I run: a fresh git worktree branched off `dev`, an isolated `claude -p` context with no carry-over, and status.json as my ONLY channel back to the supervisor (four fields: phase, heartbeatTs, blocker, lastOutputSummary; the six phase values claim → plan → implement → self-test → comment → pr). WHY isolation makes me parallel-safe and WHY I bound my context to brief+pack+task rather than the whole repo or durable-knowledge store."
 ---
 
 # Worktree & Isolation
@@ -8,8 +8,9 @@ knowledge-base-summary: "How I run: a fresh git worktree branched off `dev`, an 
 (`claude -p "<prompt>" --dangerously-skip-permissions --output-format json [--mcp-config <path>]`).
 My cwd is my **own git worktree** — `.delivery/worktrees/<sprint>/<work-item-id>/`, branched off a
 fresh `dev`. I have **no carry-over** from any previous worker or ceremony: a brand-new context, the
-inherited `azureDevOps` MCP, and the Azure PAT already in my environment (set by the engine via
-`WorkerSpec.ExtraEnv` — never in argv, never logged). I do my work, and I exit on completion.
+active backend's operation surface inherited from the engine, and the backend credential already in my
+environment (set by the engine via `WorkerSpec.ExtraEnv` — never in argv, never logged). I do my work,
+and I exit on completion.
 
 This isolation is not an accident of the harness — it is *the* design property that lets the team run
 N workers in parallel. This child is how I live inside that isolation correctly.
@@ -23,7 +24,7 @@ N workers in parallel. This child is how I live inside that isolation correctly.
 - **My own worktree.** A separate worktree per unit means N developers can implement concurrently
   without touching each other's working trees — no file-level contention, no half-committed state
   bleeding between units. My change lives only on my branch until the **tech-lead** completes the PR
-  = the merge to `dev` (the engine only *verifies* the merge — it is zero-Azure); never me —
+  = the merge to `dev` (the engine only *verifies* the merge — it is zero-backend); never me —
   [`implementation-blueprint.md`](implementation-blueprint.md) step 8.
 - **I never leave my worktree.** I implement, self-test, and stage only inside
   `.delivery/worktrees/<sprint>/<work-item-id>/`. Reaching outside it — editing another unit's tree,
@@ -40,7 +41,7 @@ point:
   blank worker behaves as if it sat in the `/refine` room.
 - **Deterministic, reproducible runs.** With no hidden carried context, the same work-item + the same
   brief + the same pack produce the same behavior. That reproducibility is what makes a crashed unit
-  safe to re-dispatch: a re-claim converges on the existing work-item (adapter §5), it doesn't fork.
+  safe to re-dispatch: a re-claim converges on the existing work-item (idempotency — concept #10), it doesn't fork.
 - **Clean parallelism.** Isolation is what lets the engine fan out ~4–6 workers without them
   interfering — no shared context, no shared tree, no shared mutable state (the one genuinely shared
   resource, the mobile emulator, is serialized behind a lease, not shared — see
@@ -48,8 +49,8 @@ point:
 
 ## status.json — my only channel back to the supervisor
 
-The Go engine is a **deterministic, zero-LLM, zero-Azure supervisor**: it does not read Azure to
-track me, and it does not parse my chat output. My **only** channel back to it is
+The Go engine is a **deterministic, zero-LLM, zero-backend supervisor**: it does not read the backend
+to track me, and it does not parse my chat output. My **only** channel back to it is
 `<worktree>/status.json`, a small file I write. It has exactly four fields:
 
 | Field | I write it… | Meaning |
@@ -65,10 +66,11 @@ that's a stall, and the supervisor will act on it. This two-signal liveness is w
 `phase` honestly and tick the heartbeat during any long step (a slow build, a booting emulator):
 going quiet reads as death.
 
-**Azure is written at durable milestones, never for liveness** (adapter §3): I heartbeat to
-`status.json`, and I touch Azure only at the milestone writes (claim, progress comment, PR link,
-evidence attach). An Azure 429/5xx is **not** a task failure — I pause the call, heartbeat a degraded
-note in `lastOutputSummary`, and let the milestone write retry (adapter §3). Liveness lives in the
+**The backend is written at durable milestones, never for liveness** (the resilience policy): I
+heartbeat to `status.json`, and I touch the backend only at the milestone writes (claim, progress
+comment, PR link, evidence attach). A backend rate-limit or transient error (a 429/5xx, a
+secondary-rate-limit) is **not** a task failure — I pause the call, heartbeat a degraded note in
+`lastOutputSummary`, and let the milestone write retry (the resilience policy). Liveness lives in the
 file the supervisor owns, not behind a rate-limited network call.
 
 ## The phase vocabulary (the canonical `phase` values)
@@ -91,17 +93,17 @@ claim → plan → implement → self-test → comment → pr
 ## Bounding my own context — brief + pack + task, not the whole repo
 
 Because my context is finite and my worktree may hold a large project, I **do not** load the whole
-repo or the whole wiki. I bound my context to exactly what this unit needs:
+repo or the whole durable-knowledge store. I bound my context to exactly what this unit needs:
 
-- **the task** — the work-item (`## Acceptance Criteria` and the rest of the Description H2s) +
-  the `**[Technical Analysis]**` sentinel comment ([`azure-touchpoints.md`](azure-touchpoints.md));
+- **the task** — the work-item (`## Acceptance Criteria` and the rest of the spec-field H2s) +
+  the `**[Technical Analysis]**` sentinel comment ([`backend-touchpoints.md`](backend-touchpoints.md));
 - **the pack** — only the tech-lead-tagged area's `packs/<area>/` ([`pack-loading.md`](pack-loading.md));
 - **the brief** — the tech-lead's `**[Canonical Brief]**` sentinel comment, which names the area and
-  **embeds the exact wiki page paths** I load (not "read the whole wiki");
-- **the brief-named wiki pages** — pulled individually via `wiki_get_page_content`, not a wiki scan.
+  **embeds the exact durable-knowledge page paths** I load (not "read the whole store");
+- **the brief-named durable-knowledge pages** — pulled individually from the durable-knowledge store, not a full scan.
 
 The reason is the same isolation logic: a bounded context is what keeps me **both correct and
-parallel**. Loading the whole repo/wiki would drown the acceptance criteria in noise and blow the
+parallel**. Loading the whole repo or durable-knowledge store would drown the acceptance criteria in noise and blow the
 context budget I need for the actual change. The tech-lead bounds the *knowledge* (via the brief); I
 bound the *code surface* (to my worktree + the files my change touches). Precise bounding — not
 breadth — is what makes an isolated worker produce work that fits.

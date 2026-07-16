@@ -1,5 +1,5 @@
 ---
-knowledge-base-summary: "My Level-1 self-test (micro-loop step 4): the fast author-side gate on the surfaces my unit touches — code/web at full concurrency, mobile only on the single-slot serialized emulator lease with a preflight bootability check. Block-never-silently-pass an un-run surface; attach evidence via scripts/az-attach.sh. The Level-1 (me) vs Level-2 (the tester) boundary and WHY both exist."
+knowledge-base-summary: "My Level-1 self-test (micro-loop step 4): the fast author-side gate on the surfaces my unit touches — code/web at full concurrency, mobile only on the single-slot serialized emulator lease with a preflight bootability check. Block-never-silently-pass an un-run surface; attach evidence per the active adapter (concept #12). The Level-1 (me) vs Level-2 (the tester) boundary and WHY both exist."
 ---
 
 # Self-Test Craft
@@ -108,9 +108,9 @@ the web preview won't render), that criterion is **unverified**, and an unverifi
 ## Evidence — the proof, not my word
 
 My self-test isn't done when the tests are green in my terminal; it's done when the **proof is
-attached to the work-item**. Evidence (test output, surface screenshots) attaches via the
-`scripts/az-attach.sh` REST helper — the **one** non-MCP Azure operation (adapter §9), which runs the
-worker's env PAT (never argv) and is worker-runnable. Attached evidence is what lets the tester's
+attached to the work-item**. Evidence (test output, surface screenshots) attaches per the active
+backend's adapter (the test-evidence concept #12), which runs the worker's env credential (never
+argv) and is worker-runnable. Attached evidence is what lets the tester's
 Level-2 build on my self-test and the tech-lead's review trust it: a self-test with no attached
 evidence is a claim; a self-test with evidence is a verification the rest of the loop can stand on.
 
@@ -123,5 +123,5 @@ emulator preflight a second boot attempt before calling it a fail") generalizes 
 ([`learning-routing.md`](learning-routing.md)). The **stack-specific** *how* (which command runs the
 unit tests, how to drive the web preview, how to boot the emulator for this stack) lives in the
 loaded pack's `testing.md`; the **project-specific** *what* (which screens exist, which flows matter)
-I read at runtime from the work-item and the brief-named wiki pages — I never pre-author them and I
-never write them to the project wiki (adapter §8).
+I read at runtime from the work-item and the brief-named durable-knowledge pages — I never pre-author
+them and I never write them to the durable-knowledge store (concept #9).
