@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-07-15T00:00:00Z",
+  "generatedAt": "2026-07-17T00:00:00Z",
   "teams": [
     {
       "handle": "agentteamland",
@@ -21,17 +21,18 @@
       "source": {
         "repo": "agentteamland/atl",
         "subpath": "teams/profile-team",
-        "ref": "v2.6.0"
+        "ref": "v2.8.0"
       }
     },
     {
       "handle": "agentteamland",
       "name": "delivery-team",
-      "version": "0.2.0",
-      "description": "Azure DevOps work-item-driven, sprint-based autonomous software delivery: role-agents + ceremony skills orchestrated by atl work dispatch over isolated claude -p workers in git worktrees.",
+      "version": "0.3.0",
+      "description": "Work-item-driven, sprint-based autonomous software delivery on a pluggable backend (Azure DevOps or GitHub): role-agents + ceremony skills orchestrated by atl work dispatch over claude -p workers.",
       "keywords": [
         "delivery",
         "azure-devops",
+        "github",
         "scrum",
         "sprint",
         "orchestration",
@@ -43,7 +44,7 @@
       "source": {
         "repo": "agentteamland/atl",
         "subpath": "teams/delivery-team",
-        "ref": "v2.6.0"
+        "ref": "v2.8.0"
       }
     },
     {
@@ -66,7 +67,7 @@
       "source": {
         "repo": "agentteamland/atl",
         "subpath": "teams/personal-advisory-team",
-        "ref": "v2.6.0"
+        "ref": "v2.8.0"
       }
     }
   ]
