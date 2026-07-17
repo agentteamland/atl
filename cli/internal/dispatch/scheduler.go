@@ -146,7 +146,7 @@ func (s *Scheduler) Run() (Summary, error) {
 // RunContext drives the scheduler to completion: reconcile leftover worktrees
 // from a prior (crashed) run, then loop step() on the poll interval until the
 // sprint is terminal or ctx is cancelled, then return the outcome summary.
-// Resumability rests on Azure state + branches (#11) — a fresh run owns no live
+// Resumability rests on the backend's durable state + branches (#11) — a fresh run owns no live
 // process handles, so every leftover delivery/* worktree is reconciled (clean
 // reclaimed, unmerged preserved) and the plan is re-driven from durable state
 // (workers are idempotent per #16).
@@ -170,10 +170,11 @@ func (s *Scheduler) RunContext(ctx context.Context) (Summary, error) {
 	}
 	defer lock.Release()
 
-	// Load the project's Azure coordinates once (org/project/pat.ref) so each worker
-	// is spawned with an azureDevOps MCP scoped to THIS project's org (D3) + its PAT
-	// env (#17). A missing config → nil → workers fall back to ambient inheritance
-	// (the Layer-A harness has no config); a malformed config is a real error.
+	// Load the project's backend coordinates once so each worker is spawned with the
+	// active backend's per-worker wiring (Azure: an azureDevOps MCP scoped to THIS
+	// project's org (D3) + its PAT env (#17); GitHub: the GH_TOKEN env, no MCP). A
+	// missing config → nil → workers fall back to ambient inheritance (the Layer-A
+	// harness has no config); a malformed config is a real error.
 	cfg, err := LoadDeliveryConfig(s.ProjectRoot)
 	if err != nil {
 		return Summary{}, err
@@ -650,7 +651,7 @@ func (s *Scheduler) summary() Summary {
 // Stage is one step of a work-unit's delivery pipeline. Each unit runs the stages
 // in order, each a fresh `claude -p` worker in the SAME worktree (pr-and-review §1):
 // the developer implements + opens the PR, the tester runs independent Level-2
-// verification, and the tech-lead reviews + — on green — completes the Azure PR
+// verification, and the tech-lead reviews + — on green — completes the PR
 // (= the merge to dev) + sets Done. The engine advances stage on a worker's exit-0
 // and only runs the merge-verify (complete()) after the final stage.
 type Stage string
@@ -672,16 +673,17 @@ var deliveryPipeline = []Stage{StageDeveloper, StageTester, StageTechLead}
 // (the worktree lives under root, so a root-anchored path is readable regardless of the
 // worktree's own checkout).
 //
-// Fork A (worker-fetches-from-Azure): the plan carries only the work-item id, so each
-// assembled prompt directs the worker to fetch the rest — brief, area tag, pack, wiki,
-// PR — from Azure over its MCP at runtime. This keeps the engine zero-Azure and the
-// plan contract minimal. This builder returns the base spec (prompt + worktree); the
-// scheduler's spawnStage augments MCPConfigPath + ExtraEnv per-worker from
-// .delivery/config.json (D3 / #17 — an azureDevOps MCP scoped to the project's org so a
-// worker can't inherit the operator's global MCP, plus the PAT env the MCP server +
-// az-attach.sh consume). The PAT never enters the argv (spawn.go), so it can't leak
-// into logs. The real runtime wiring (MCP reachable, PAT format accepted by the live
-// server) is what the stone-#9 Layer-B / #17 run validates; this assembles it.
+// Fork A (worker-fetches-from-the-tracker): the plan carries only the work-item id, so
+// each assembled prompt directs the worker to fetch the rest — brief, area tag, pack,
+// durable-knowledge pages, PR — from the tracker at runtime through the active backend's
+// adapter tools. This keeps the engine backend-agnostic and the plan contract minimal.
+// This builder returns the base spec (prompt + worktree); the scheduler's spawnStage
+// augments MCPConfigPath + ExtraEnv per-worker from .delivery/config.json (D3 / #17) —
+// for the Azure backend an azureDevOps MCP scoped to the project's org (so a worker can't
+// inherit the operator's global MCP) plus its PAT env; for the GitHub backend the
+// GH_TOKEN env and no MCP. The credential never enters the argv (spawn.go), so it can't
+// leak into logs. The Azure per-worker wiring is what the stone-#9 Layer-B / #17 run
+// validates; the GitHub engine path awaits its own e2e proof.
 func DeliveryWorkerSpec(root string) func(u WorkUnit, stage Stage, worktreeDir string) WorkerSpec {
 	return func(u WorkUnit, stage Stage, worktreeDir string) WorkerSpec {
 		return WorkerSpec{
@@ -710,63 +712,69 @@ func deliveryStagePrompt(u WorkUnit, root string, stage Stage) string {
 
 // deliveryDeveloperPrompt is the stage-1 prompt: the developer agent (+ its children/)
 // is the authoritative manual, so the prompt points the worker at it, names the one
-// work-item, and inlines the load-bearing invariants (fetch-from-Azure, the six phases,
-// block-never-fake, job-ends-at-PR) as a safety net.
+// work-item, and inlines the load-bearing invariants (fetch-from-the-tracker, the six
+// phases, block-never-fake, job-ends-at-PR) as a safety net. It is backend-neutral: the
+// concrete tool binding lives in the active backend's adapter, not here.
 func deliveryDeveloperPrompt(u WorkUnit, root string) string {
 	agentDir := filepath.Join(root, ".claude", "agents", "developer")
 	configPath := filepath.Join(root, ".delivery", "config.json")
 	packsDir := filepath.Join(root, ".claude", "packs")
-	return fmt.Sprintf(`You are the delivery-team developer — a fresh, isolated worker spawned for exactly one Azure work-item. Your complete operating manual is the developer agent at %[2]s/agent.md and every file under %[2]s/children/. Read them first and follow them exactly; they are authoritative over the summary below.
+	backendsDir := filepath.Join(root, ".claude", "backends")
+	return fmt.Sprintf(`You are the delivery-team developer — a fresh, isolated worker spawned for exactly one work-item. Your complete operating manual is the developer agent at %[2]s/agent.md and every file under %[2]s/children/. Read them first and follow them exactly; they are authoritative over the summary below.
 
-Assignment: Azure work-item #%[1]d — %[4]q. Run your micro-loop to turn it into a green, review-ready pull request in this worktree, then stop.
+Assignment: work-item #%[1]d — %[4]q. Run your micro-loop to turn it into a green, review-ready pull request in this worktree, then stop.
 
 Ground rules (your agent manual holds the full detail):
-- Read %[3]s for the Azure org/project/repo, branchPair, and pat.ref. Reach Azure ONLY through the azureDevOps MCP — never a raw call, never an invented tool name, and never a hardcoded state literal (resolve state and type at runtime via wit_get_work_item_type).
-- The engine handed you only this work-item's id; fetch everything else from Azure at runtime: claim the item (transition it to the runtime-resolved in-progress state plus a claim comment), then read the work-item, its **[Technical Analysis]** sentinel comment, and the tech-lead's **[Canonical Brief]** sentinel comment (both matched by their exact first-line sentinel via wit_list_work_item_comments, never "the newest comment"); resolve your area:<name> tag and load ONLY that area's pack under %[5]s/<area>/; read the brief-named Architecture/ and Conventions/ wiki pages.
+- Read %[3]s for the active backend + its coordinates, branchPair, and credential ref. Reach the tracker + repo ONLY through the tools your active backend's adapter binds — read %[6]s/<backend>/adapter.md (the backend is config.backend) and use ONLY the tools it names; never a raw call, never an invented tool name, and never a hardcoded state literal (resolve state and type at runtime the way the adapter directs).
+- The engine handed you only this work-item's id; fetch everything else from the tracker at runtime: claim the item (transition it to the runtime-resolved in-progress state plus a claim comment), then read the work-item, its **[Technical Analysis]** sentinel comment, and the tech-lead's **[Canonical Brief]** sentinel comment (both matched by their exact first-line sentinel, never "the newest comment"); resolve your area:<name> tag and load ONLY that area's pack under %[5]s/<area>/; read the brief-named Architecture/ and Conventions/ durable-knowledge pages.
 - Before anything else, write status.json with a starting phase and a fresh heartbeat — a worker that writes no status.json within a few minutes is reclaimed as stalled. Then run your six phases, in order: claim -> plan -> implement -> self-test -> comment -> pr, writing a fresh phase + heartbeat to status.json on each and at least every couple of minutes.
-- Self-test every surface the unit touches and attach evidence via scripts/az-attach.sh. A surface you could not run is UNVERIFIED — set status.json blocker and stop; never fake a green.
-- Your job ENDS at the pull request: do NOT review your own PR, do NOT merge, and do NOT set the work-item Done — the tester verifies next, then the tech-lead reviews and, on green, completes the Azure PR (= the merge to dev) and sets Done; the engine only verifies the merge landed.`,
-		u.ID, agentDir, configPath, u.Title, packsDir)
+- Self-test every surface the unit touches and attach evidence per the active adapter's evidence mechanism. A surface you could not run is UNVERIFIED — set status.json blocker and stop; never fake a green.
+- Your job ENDS at the pull request: do NOT review your own PR, do NOT merge, and do NOT set the work-item Done — the tester verifies next, then the tech-lead reviews and, on green, completes the PR (= the merge to dev) and sets Done; the engine only verifies the merge landed.`,
+		u.ID, agentDir, configPath, u.Title, packsDir, backendsDir)
 }
 
 // deliveryTesterPrompt is the stage-2 prompt: independent Level-2 verification over the
 // developer's branch. It points at the tester agent (children/verification-blueprint.md
 // is the operative file) and inlines the re-derive-intent-fresh, evidence-attach, and
-// hard-boundary invariants (owns tests, not code/review/state).
+// hard-boundary invariants (owns tests, not code/review/state). It is backend-neutral:
+// the concrete tool binding lives in the active backend's adapter, not here.
 func deliveryTesterPrompt(u WorkUnit, root string) string {
 	agentDir := filepath.Join(root, ".claude", "agents", "tester")
 	configPath := filepath.Join(root, ".delivery", "config.json")
-	return fmt.Sprintf(`You are the delivery-team tester — a fresh, isolated worker spawned to independently verify one Azure work-item that the developer has just turned into a pull request in this worktree. Your complete operating manual is the tester agent at %[2]s/agent.md and every file under %[2]s/children/ (start with children/verification-blueprint.md). Read them first and follow them exactly; they are authoritative over the summary below.
+	backendsDir := filepath.Join(root, ".claude", "backends")
+	return fmt.Sprintf(`You are the delivery-team tester — a fresh, isolated worker spawned to independently verify one work-item that the developer has just turned into a pull request in this worktree. Your complete operating manual is the tester agent at %[2]s/agent.md and every file under %[2]s/children/ (start with children/verification-blueprint.md). Read them first and follow them exactly; they are authoritative over the summary below.
 
-Assignment: Azure work-item #%[1]d — %[4]q. Run your Level-2 verification micro-loop over the developer's branch in this worktree, then stop.
+Assignment: work-item #%[1]d — %[4]q. Run your Level-2 verification micro-loop over the developer's branch in this worktree, then stop.
 
 Ground rules (your agent manual holds the full detail):
-- Read %[3]s for the Azure org/project/repo and pat.ref. Reach Azure ONLY through the azureDevOps MCP — never a raw call, never an invented tool name, and never a hardcoded state literal.
-- Re-derive intent FRESH from Azure — never inherit the developer's: read the work-item (System.Description acceptance criteria = the spec), its **[Technical Analysis]** sentinel comment, and the tech-lead's **[Canonical Brief]** sentinel comment (both matched by their exact first-line sentinel via wit_list_work_item_comments, never "the newest comment"); resolve the area:<name> tag.
+- Read %[3]s for the active backend + its coordinates and credential ref. Reach the tracker + repo ONLY through the tools your active backend's adapter binds — read %[5]s/<backend>/adapter.md (the backend is config.backend) and use ONLY the tools it names; never a raw call, never an invented tool name, and never a hardcoded state literal.
+- Re-derive intent FRESH from the tracker — never inherit the developer's: read the work-item (its acceptance criteria = the spec), its **[Technical Analysis]** sentinel comment, and the tech-lead's **[Canonical Brief]** sentinel comment (both matched by their exact first-line sentinel, never "the newest comment"); resolve the area:<name> tag.
 - Build a risk-ranked strategy, then run the test-gates on the right surface (code; web via the preview MCP; or — only after acquiring the serialized single-slot emulator lease with a bootability preflight — mobile) and hunt edges + regression.
-- Attach every piece of evidence to the work-item via scripts/az-attach.sh, then emit ONE verdict comment (pass/fail + criteria covered + edges probed + evidence pointers). A surface you could NOT run is UNVERIFIED — set status.json blocker and stop; never fake a green.
+- Attach every piece of evidence to the work-item per the active adapter's evidence mechanism, then emit ONE verdict comment (pass/fail + criteria covered + edges probed + evidence pointers). A surface you could NOT run is UNVERIFIED — set status.json blocker and stop; never fake a green.
 - Your boundaries: do NOT write or fix implementation code, do NOT judge code quality or architecture (that is the tech-lead), do NOT transition the work-item state, do NOT open or merge a PR. You own the test half of green = tests then review; the tech-lead reviews next and, on green, completes the PR (= the merge to dev) and sets Done; the engine only verifies the merge.
 - Write status.json with a starting phase and a fresh heartbeat as your FIRST action — before you read your manual or re-derive intent — because a worker that writes no status.json within a few minutes is reclaimed as stalled; then keep it fresh on every step, at least every couple of minutes.`,
-		u.ID, agentDir, configPath, u.Title)
+		u.ID, agentDir, configPath, u.Title, backendsDir)
 }
 
 // deliveryTechLeadPrompt is the stage-3 prompt: the single review gate + the closer.
 // It points at the tech-lead agent (children/review-craft.md is the operative file) and
-// inlines the ordered test-gate-first, the delivery-native-on-the-Azure-PR review with
-// refute-to-keep, and the on-green complete-then-Done contract (§1/§4/§5).
+// inlines the ordered test-gate-first, the delivery-native-on-the-PR review with
+// refute-to-keep, and the on-green land-then-Done contract (§1/§4/§5). It is
+// backend-neutral: the concrete tool binding lives in the active backend's adapter.
 func deliveryTechLeadPrompt(u WorkUnit, root string) string {
 	agentDir := filepath.Join(root, ".claude", "agents", "tech-lead")
 	configPath := filepath.Join(root, ".delivery", "config.json")
-	return fmt.Sprintf(`You are the delivery-team tech-lead — a fresh, isolated worker spawned to review one Azure work-item's pull request and, on green, land it. Your complete operating manual is the tech-lead agent at %[2]s/agent.md and every file under %[2]s/children/ (the operative file for THIS stage is children/review-craft.md). Read them first and follow them exactly; they are authoritative over the summary below.
+	backendsDir := filepath.Join(root, ".claude", "backends")
+	return fmt.Sprintf(`You are the delivery-team tech-lead — a fresh, isolated worker spawned to review one work-item's pull request and, on green, land it. Your complete operating manual is the tech-lead agent at %[2]s/agent.md and every file under %[2]s/children/ (the operative file for THIS stage is children/review-craft.md). Read them first and follow them exactly; they are authoritative over the summary below.
 
-Assignment: Azure work-item #%[1]d — %[4]q. Review its pull request to dev, then either return it with findings or land it, then stop.
+Assignment: work-item #%[1]d — %[4]q. Review its pull request to dev, then either return it with findings or land it, then stop.
 
 Ground rules (your agent manual holds the full detail):
-- Read %[3]s for the Azure org/project/repo and pat.ref. Reach Azure ONLY through the azureDevOps MCP — never a raw call, never an invented tool name, and never a hardcoded state literal (resolve state and type at runtime via wit_get_work_item_type).
-- Test-gate FIRST (green = tests then review, in that order): confirm the required evidence is ATTACHED to the work-item — code, web if a web surface, and the mobile-emulator run if a mobile surface (a MUST; missing = NOT green, full stop). Read it back via wit_get_work_item_attachment and confirm it matches the changed surfaces. Evidence missing → return the unit via a PR thread; do NOT weigh the diff.
-- Then run the delivery-native review ON THE AZURE PR (never /create-pr): a generic baseline read + your tech-lead specialist read (against the Architecture/ boundaries, Conventions/, ADRs, and the AC + Scope you own) + a refute-to-keep pass — every finding needs a file:line / grep / failing-test anchor or it is DROPPED; each survivor is actively refuted and kept only if refutation fails. Raise surviving findings as PR threads (repo_create_pull_request_thread / repo_reply_to_comment).
-- On green: vote (repo_vote_pull_request), then COMPLETE the Azure PR (repo_update_pull_request with autoComplete + mergeStrategy NoFastForward — never Rebase or Squash: both rewrite the branch's commit SHAs, so the supervisor's deterministic merge-verify (branch reachable from dev) would not recognize the landed merge and would false-block the unit — and transitionWorkItems:false); completing the PR IS the merge to dev. Then set the work-item to the runtime-resolved Done (wit_get_work_item_type, never a literal). Merge first, then Done.
+- Read %[3]s for the active backend + its coordinates and credential ref. Reach the tracker + repo ONLY through the tools your active backend's adapter binds — read %[5]s/<backend>/adapter.md (the backend is config.backend) and use ONLY the tools it names; never a raw call, never an invented tool name, and never a hardcoded state literal (resolve state and type at runtime the way the adapter directs).
+- Test-gate FIRST (green = tests then review, in that order): confirm the required evidence is ATTACHED to the work-item — code, web if a web surface, and the mobile-emulator run if a mobile surface (a MUST; missing = NOT green, full stop). Read it back the way the adapter directs and confirm it matches the changed surfaces. Evidence missing → return the unit via a PR thread; do NOT weigh the diff.
+- Then run the delivery-native review ON THE PR (never /create-pr): a generic baseline read + your tech-lead specialist read (against the Architecture/ boundaries, Conventions/, ADRs, and the AC + Scope you own) + a refute-to-keep pass — every finding needs a file:line / grep / failing-test anchor or it is DROPPED; each survivor is actively refuted and kept only if refutation fails. Raise surviving findings as PR review threads the way the adapter directs.
+- On green: record your approving vote, then LAND the PR to dev the way your active adapter directs — a real merge commit only, never squash or rebase: both rewrite the branch's commit SHAs, so the supervisor's deterministic merge-verify (branch reachable from dev) would not recognize the landed merge and would false-block the unit. Landing the PR IS the merge to dev; do not also transition the work-item as a merge side effect. Then set the work-item to the runtime-resolved Done (resolve the state at runtime, never a literal). Merge first, then Done.
 - If the review is not green, hand the findings back as PR threads and set a status.json blocker rather than merging — never fake a green. The engine only VERIFIES your merge landed on dev; it never merges for you.
 - Write status.json with a starting phase and a fresh heartbeat as your FIRST action — before you read your manual or re-derive intent — because a worker that writes no status.json within a few minutes is reclaimed as stalled; then keep it fresh on every step, at least every couple of minutes.`,
-		u.ID, agentDir, configPath, u.Title)
+		u.ID, agentDir, configPath, u.Title, backendsDir)
 }

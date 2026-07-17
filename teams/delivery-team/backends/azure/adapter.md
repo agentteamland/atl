@@ -243,7 +243,27 @@ gap.)
 - Reading an attachment back (for the sprint-review report) uses the MCP
   (`wit_get_work_item_attachment`), so only the upload leg is REST.
 
-## 10. Mockability & testing (how this contract is exercised)
+## 10. PR completion — the merge contract
+
+The tech-lead worker lands a green unit's PR to `dev`; the engine only VERIFIES the merge
+landed (`MergedToBase` = `rev-list origin/dev..branch == 0`) — it never merges.
+
+- **Open:** the developer opens a PR to `dev` (the `config.branchPair.dev` branch); its job
+  ends at the open PR.
+- **Review:** the tech-lead reviews **on the Azure PR** — findings as PR threads
+  (`repo_create_pull_request_thread` / `repo_reply_to_comment`), never `/create-pr`.
+- **Merge = `repo_update_pull_request` with `autoComplete` + `mergeStrategy` `NoFastForward` ONLY**
+  (a real merge commit). **Never `Squash`/`Rebase`/`RebaseMerge`** — they rewrite the branch's
+  commit SHAs and false-block the engine's `MergedToBase` (`rev-list origin/dev..branch == 0`),
+  the Azure twin of GitHub's `gh pr merge --merge` requirement. Set `transitionWorkItems: false`
+  — the tech-lead owns the single Done transition, *after* the merge (§6, resolved at runtime).
+  Vote first (`repo_vote_pull_request`), then complete; completing the PR IS the merge to `dev`.
+- **NEVER-merge carve-out (D3):** the autonomous tech-lead **worker** performs this green
+  feature→`dev` merge — that is the machine's job and the loop breaks without it. The human PO
+  reviews only at sprint review (`dev`→`release` promotion). The carve-out is scoped to the
+  machine, never the interactive session.
+
+## 11. Mockability & testing (how this contract is exercised)
 
 - **Layer-B (real, the load-bearing proof):** a real `claude -p` worker doing a full
   single-task micro-lifecycle against a **real Azure DevOps test project** — claim →
