@@ -43,8 +43,9 @@ id, title, story points. This is the honest "what shipped" list.
 
 ### `## Carryover`
 Every admitted item that did **not** complete, with the reason (blocked on a dependency, ran out
-of sprint, review not passed). These return to the backlog for the next `/sprint-plan` — I never
-silently drop them (see [reject-and-carryover.md](reject-and-carryover.md)). Listing carryover
+of sprint, review not passed). Each **carries to the next sprint as top priority** (workable) or is
+**surfaced-but-not-workable** (blocked) — I never silently drop them, and unfinished work is never
+bumped by newer work (see [reject-and-carryover.md](reject-and-carryover.md)). Listing carryover
 explicitly is what keeps the backlog honest and the next velocity mean correct. A `blocked` entry
 may be one the dispatch engine surfaced: `/sprint-review`'s step 2 drains any
 `.delivery/blocked/<id>.json` report, reflects it onto the work-item, and feeds it here with its
@@ -125,7 +126,7 @@ _Sprint <n> · <iteration-name> · closed <date>_
 - [ ] `## Completed` lists only items at the runtime-resolved Completed category (never literal
       `"Done"`); Done set read to exhaustion ("list means all", concept #10).
 - [ ] `## Carryover` names every admitted-but-incomplete item with its reason — nothing silently
-      dropped; each returns to the backlog.
+      dropped; each carries to the next sprint (top priority if workable, surfaced if blocked).
 - [ ] `## Per-item evidence` has a PR link + test evidence per completed item (attachments read
       via the active adapter, concept #12; I read, I don't re-test).
 - [ ] `## Deployable dev preview` reports `dev` state read-only; **no promotion** (PO owns that).

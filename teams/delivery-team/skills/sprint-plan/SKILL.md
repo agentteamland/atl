@@ -34,9 +34,9 @@ reference from the environment, never in argv).
   the ceremony blends the PO's `seedVelocity` with accumulating real data (Step 2). If
   `seedVelocity` is `null`, the ceremony **prompts the PO** rather than guessing.
 - **Re-run** to re-plan after a crash, a partial run, or a scope change — idempotent; see
-  [Idempotent re-run](#idempotent-re-run). A prior `/sprint-review` that rejected work simply
-  returned those items to the backlog with a recorded reason; a re-run picks them up as ordinary
-  backlog candidates, with no special "rejected" handling.
+  [Idempotent re-run](#idempotent-re-run). A prior `/sprint-review` that rejected work carried those
+  items forward with a recorded reason; a re-run re-admits them **first, as top priority** (ahead of
+  new work) — same one admission algorithm, carryover at the front, no separate "rejected" pipeline.
 
 ## Procedure
 
@@ -130,12 +130,23 @@ feasibility against the `Architecture/` durable-knowledge store before the assig
   a mix within a sprint** (#15 — no mixed granularity). Mixing a parent and its own child double-counts points
   and confuses the DAG. Which level is a project/ceremony decision read from the hierarchy, not one
   the ceremony invents.
-- **Select by priority up to capacity** — take units in ascending priority order (concept #5 —
-  lower value = higher priority; the board orders ascending) until the summed story points (the
-  story-points field) would exceed `capacity`. An item with no estimate is a planning gap — surface
-  it, never admit an unestimated unit (its point cost is unknown and corrupts the capacity math).
-  Equal/absent priority falls back to the stable backlog order returned by the ordered-backlog read
-  (concept #10).
+- **Carryover FIRST, then new work by priority up to capacity** — admit the **workable carryover**
+  returning from the prior sprint — found by the **`carryover` tag** (concept #4) set at
+  `/sprint-review`, still not-Completed and **DAG-ready** (all predecessors Done — a `carryover` unit
+  whose predecessor is still not-Done stays blocked and waits; workability is **DAG-derived**, and
+  `blocked` is only a surfacing label, not the admission gate, since nothing clears it when the block
+  lifts)
+  ([`../../agents/project-manager/children/reject-and-carryover.md`](../../agents/project-manager/children/reject-and-carryover.md))
+  — **ahead of all new candidates, regardless of any new unit's priority**: unfinished committed work
+  outranks new work, so it takes the front of the admission and is admitted in full even if it alone
+  meets or exceeds `capacity` (the team over-committed last sprint — an honest signal, not a reason to
+  drop committed work). **Then** take the remaining **new** units in ascending priority order (concept
+  #5 — lower value = higher priority; the board orders ascending) until the summed story points (the
+  story-points field) would exceed the capacity that *remains* after carryover (possibly zero). A
+  *blocked* carryover is surfaced but **not** admitted to the workable set until it unblocks (it can't
+  be worked yet). An item with no estimate is a planning gap — surface it, never admit an unestimated
+  unit (its point cost is unknown and corrupts the capacity math). Equal/absent priority among the new
+  units falls back to the stable backlog order returned by the ordered-backlog read (concept #10).
 - **Feasibility pass (as the `tech-lead`)** — read the relevant `Architecture/` durable-knowledge
   pages (concept #9; search the store for discovery) and flag any selected unit whose approach
   is infeasible or mis-scoped for this sprint; hand any such flag back to the PM step to drop or
@@ -146,8 +157,10 @@ feasibility against the `Architecture/` durable-knowledge store before the assig
   idempotency contract), **not** a create-membership — a re-run sets the same iteration to the same
   value, a safe no-op.
 
-Nothing is silently dropped: units that don't fit this sprint's capacity, or are held back for
-feasibility, stay on the backlog for the next `/sprint-plan`.
+Nothing is silently dropped: **new** units that don't fit this sprint's *remaining* capacity, or are
+held back for feasibility, stay on the backlog for the next `/sprint-plan`. Carryover is never bumped
+by a capacity shortfall — it is committed work, admitted first; only new work is subject to the
+capacity that remains after it.
 
 ## Idempotency
 

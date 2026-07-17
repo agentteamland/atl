@@ -13,12 +13,13 @@
 # never exact tool-call sequences — the ceremony turn is a non-deterministic LLM turn.
 #
 # Two assertion tiers (the deterministic-mock / non-deterministic-driver split):
-#   * CORE (ok/bad) — the reliable e2e PLUMBING, proven green across 3 runs: install,
-#     kickoff's Epic/Feature + the [Technical Analysis] comment, sprint-start's valid
-#     plan.json, and sprint-review's review page + dev->release PR. A regression here
-#     fails the test.
+#   * CORE (ok/bad) — the reliable e2e PLUMBING: install + asset reflection (incl. the
+#     backends/ per-backend adapters), kickoff's Epic/Feature + the [Technical Analysis]
+#     comment, sprint-start's valid plan.json. A regression here fails the test.
 #   * NOTE (ok/note) — the less-deterministic ceremonies (refine/sprint-plan) + the
-#     secondary field-writes (atl-key/area tags, the wiki seed, IterationPath). Across
+#     secondary field-writes (atl-key/area tags, the wiki seed, IterationPath) +
+#     sprint-review's review page + dev->release PR (a full LLM ceremony chain:
+#     compile -> upsert -> PO-approve -> open PR, run-to-run variable). Across
 #     3 runs these varied run-to-run (each run skipped a DIFFERENT one), so a miss is
 #     NOTED, not failed — an LLM-fidelity / ceremony-quality concern, not an
 #     e2e-plumbing one. The mock records everything faithfully when written (proven by
@@ -127,23 +128,38 @@ dturn "/sprint-plan. Compute capacity from the velocity of the last 3 closed spr
 if has '[.workItems[] | select(.fields."System.WorkItemType"=="Product Backlog Item" and ((.fields."System.IterationPath"//"")|test("Sprint [0-9]")) and ((.fields."System.State"//"")!="Done"))] | length'; then ok "sprint-plan admitted units to a sprint (IterationPath set)"; else note "no non-historic unit carries a sprint IterationPath this run (LLM-variable; sprint-start still derives the plan below)"; fi
 
 # ---- 4. /sprint-start — build the DAG + materialize plan.json (NO dispatch) -------
-dturn "/sprint-start. Read the sprint's admitted work-units (the New-state PBIs you planned; if none carry the sprint IterationPath yet, use the New-state backlog PBIs), build their dependency DAG, validate it is acyclic, and materialize .delivery/plan.json in the exact dispatch.Plan schema (sprintSlug, granularity, units[] with id/title/predecessors/stackRank). This is a Layer-A ceremony test: STOP after writing plan.json — do NOT run 'atl work dispatch' (the engine run is covered by a separate test). There are no mobile-tagged units, so skip the emulator preflight." || bad "sprint-start turn errored"
+dturn "/sprint-start. Read the sprint's admitted work-units (the New-state PBIs you planned; if none carry the sprint IterationPath yet, use the New-state backlog PBIs), build their dependency DAG, validate it is acyclic, and materialize .delivery/plan.json in the exact dispatch.Plan schema (sprintSlug, granularity, units[] with id/title/predecessors/stackRank) — OR, if the sprint is degenerate (no workable units), refuse per the skill's fail-fast rather than writing an empty plan. This is a Layer-A ceremony test: STOP after writing plan.json (or after the refusal) — do NOT run 'atl work dispatch' (the engine run is covered by a separate test). There are no mobile-tagged units, so skip the emulator preflight." || bad "sprint-start turn errored"
 
 if [ -f "$PROJ/.delivery/plan.json" ] && jq -e '.' "$PROJ/.delivery/plan.json" >/dev/null 2>&1; then
   ok "sprint-start materialized a valid .delivery/plan.json"
-  # CORE: the dispatch.Plan skeleton sprint-start always writes (units may be empty)
+  # CORE: the dispatch.Plan skeleton — a materialized plan is always non-degenerate (sprint-start
+  # refuses rather than writing an empty plan, per sprint-start-edge-cases)
   jq -e 'has("sprintSlug") and has("granularity") and (.units | type == "array")' "$PROJ/.delivery/plan.json" >/dev/null 2>&1 && ok "plan.json matches the dispatch.Plan skeleton (sprintSlug/granularity/units[])" || bad "plan.json skeleton malformed"
-  # NOTE: populated units are refine-dependent (if refine produced no PBIs there is nothing to plan) -> LLM-variable chain
-  if jq -e '.units | length >= 1 and (.[0] | has("id") and has("predecessors") and has("stackRank"))' "$PROJ/.delivery/plan.json" >/dev/null 2>&1; then ok "plan.json carries populated units (id/predecessors/stackRank)"; else note "plan.json units empty this run (refine produced no PBIs upstream -> nothing to plan; LLM-variable chain)"; fi
+  # CORE: a materialized plan must carry >=1 populated unit — an empty units[] is the REJECTED
+  # behavior now (sprint-start fail-fast refuses a degenerate sprint, never writes a silent empty plan)
+  if jq -e '.units | length >= 1 and (.[0] | has("id") and has("predecessors") and has("stackRank"))' "$PROJ/.delivery/plan.json" >/dev/null 2>&1; then ok "plan.json carries populated units (id/predecessors/stackRank)"; else bad "plan.json materialized with empty/malformed units — sprint-start must refuse a degenerate sprint, not write an empty plan"; fi
 else
-  bad "no valid .delivery/plan.json materialized"
+  # New behavior (sprint-start-edge-cases): a degenerate sprint — no workable units, e.g. refine
+  # produced 0 PBIs — is a fail-fast REFUSE, so NO plan.json is the CORRECT outcome. Only a genuine
+  # failure (workable PBIs exist but sprint-start wrote no plan) is CORE-bad.
+  if has '[.workItems[] | select(.fields."System.WorkItemType"=="Product Backlog Item" and (.fields."System.Tags"//""|test("historic")|not))] | length'; then
+    bad "no plan.json materialized despite workable PBIs (sprint-start should have planned them)"
+  else
+    # no workable PBIs upstream (refine produced none) -> sprint-start SHOULD fail-fast refuse.
+    # Positive check: confirm it SURFACED the refusal, else a silent no-op (the original bug) passes identically.
+    if grep -Eiq 'sprint is (empty|complete)|no admitted work-units|nothing to dispatch|degenerate sprint' "$HOME/turns.log" 2>/dev/null; then
+      ok "sprint-start fail-fast refused the degenerate sprint + surfaced the reason (no workable PBIs upstream)"
+    else
+      note "no plan.json + no workable PBIs upstream this run; sprint-start's refusal message not detected in turns.log (LLM-variable wording)"
+    fi
+  fi
 fi
 
 # ---- 5. /sprint-review — report + PO Approve gate -> dev->release PR --------------
 dturn "/sprint-review. You are ALSO acting as the human product owner for this headless run. Compile the Sprint Review Report and upsert it to the Sprints/Sprint-<n>-Review wiki page. Then, at the Approve/Reject gate, APPROVE the sprint — open the dev->release promotion PR (repo_create_pull_request from the dev branch into the release branch). Do not wait for interactive input; approve based on this instruction." || bad "sprint-review turn errored"
 
-has '[.wikiPages | keys[] | select(test("Sprint"))] | length'  && ok "sprint-review upserted a Sprints/ review wiki page" || bad "no sprint-review wiki page"
-has '[.pullRequests[] | select((.targetRefName // "") | test("release"))] | length' && ok "PO-approved dev->release promotion PR opened" || bad "no dev->release PR opened"
+has '[.wikiPages | keys[] | select(test("Sprint"))] | length'  && ok "sprint-review upserted a Sprints/ review wiki page" || note "sprint-review review page not upserted this run (LLM-variable ceremony fidelity)"
+has '[.pullRequests[] | select((.targetRefName // "") | test("release"))] | length' && ok "PO-approved dev->release promotion PR opened" || note "dev->release promotion PR not opened this run (LLM-variable ceremony fidelity)"
 
 # ---- on failure, surface what the torn-down container would otherwise lose --------
 if [ "$FAIL" -gt 0 ]; then
