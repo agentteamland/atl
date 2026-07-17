@@ -77,6 +77,24 @@ As `project-manager`, this reuses the DAG your `sprint-planning-blueprint.md` al
 per-unit brief a `developer` worker reads — `canonical-brief.md`) recorded, since the engine's
 workers depend on it. This is a re-read + confirm, not a re-decomposition.
 
+**Degenerate sprint — refuse before validating, materialize nothing (fail-fast).** With the admitted
+units read, if there is **no workable unit to dispatch**, do not fabricate a plan — refuse and
+surface *why*, exactly as a cycle or a missing device does. **Never** silently write an empty
+`plan.json` and no-op the engine: a degenerate sprint is a planning state to surface, not a silent
+pass. Two cases, two **distinct** messages, so the PO knows which and can act:
+
+- **Empty** — zero units admitted to this sprint (an empty backlog, or `/refine` produced nothing):
+  *"Sprint is empty — no admitted work-units. Run `/sprint-plan` to admit from the backlog, or
+  `/refine` first if the backlog itself is empty."*
+- **Complete** — every admitted unit is already in the runtime-resolved completed state (concept #7 —
+  a re-run, or all work finished): *"Sprint is complete — all N admitted units are already Done.
+  Nothing to dispatch."*
+
+(A *blocked* carryover unit that is not yet workable does not, by itself, count toward the workable
+set — see [`reject-and-carryover.md`](../../agents/project-manager/children/reject-and-carryover.md);
+a sprint holding only blocked units likewise has nothing workable, so it refuses too, naming the
+blocked units awaiting their unblock.)
+
 ### 2. Validate acyclicity FIRST — refuse and surface a cycle (fail-fast)
 
 Before anything else, topologically sort the DAG (Kahn's algorithm: repeatedly remove a node with

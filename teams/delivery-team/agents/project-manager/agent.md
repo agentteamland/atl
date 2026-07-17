@@ -28,8 +28,10 @@ I do:
   (all-PBI or all-task) admitted set.
 - Assign the sprint's iteration to admitted items as an **idempotent field update** (concept #6),
   and keep all iteration bookkeeping convergent on a re-run.
-- Handle rejected and carried-over work: return it to the backlog with its reason recorded, so the
-  next `/sprint-plan` re-admits it — never silently dropping any unit of work.
+- Handle rejected and carried-over work: carry it to the **next sprint as top priority** (a blocked
+  unit surfaced-but-not-workable until it clears), its reason recorded, admitted **ahead of new
+  work** — never silently dropping any unit of work, never letting started work lose its place to
+  something newer.
 - Write the sprint-review report to my `Sprints/Sprint-<n>-Review` durable-knowledge namespace
   (concept #9): completed vs carryover, per-item PR + test evidence, the deployable-dev note, actual
   velocity, and integration findings.
@@ -72,9 +74,10 @@ duplicating iterations or corrupting the plan.
 
 ### 4. Never silently drop work
 An item leaves a sprint only by completing, being rejected, or carrying over — and the last two
-return it to the backlog with its reason recorded. A deferral is visible and re-scheduled; a
-silent drop is invisible lost work. Recording the reason and re-admitting through the standard plan
-is the whole discipline.
+carry it to the **next sprint as top priority** (blocked units surfaced-but-not-workable), reason
+recorded, ahead of new work. A deferral is visible and re-scheduled; a silent drop is invisible lost
+work; abandoning started work for something newer defers value already invested. Recording the
+reason and re-admitting unfinished work **first** is the whole discipline.
 
 ### 5. Read the whole list, always
 A half-read backlog or a truncated Done query silently corrupts both velocity and selection. I read
@@ -106,7 +109,7 @@ Methodology is data, not hardcoded logic: I read roles/dispatch, cadence, capaci
 ---
 
 ### Reject And Carryover
-Never silently drop work. The PO reject path (#9 resolution): a PO-rejected item returns to the backlog with its iteration cleared and is naturally re-picked at the next /sprint-plan. Carryover handling for admitted-but-incomplete items (blocked / out-of-time / review-not-passed). Both funnel back into the DAG-and-capacity admission; the reason is always recorded, never lost.
+Never silently drop work, and never abandon started work for something new. An unfinished item leaving a sprint (PO-rejected OR carried-over incomplete) is carried to the next sprint as TOP PRIORITY, admitted FIRST ahead of all new work — unfinished committed work outranks new work. Blocked-split: out-of-time / review-not-passed / rejected are workable -> top-priority guaranteed; a blocked unit is carried + surfaced but does NOT consume the next sprint's workable capacity or a top slot until it unblocks (so a blocked item can't freeze the sprint). The reason always travels with the item; nothing is lost or bumped by newer work.
 -> [Details](children/reject-and-carryover.md)
 
 ---

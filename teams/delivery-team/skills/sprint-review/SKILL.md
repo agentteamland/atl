@@ -20,7 +20,7 @@ through the active backend's adapter.
 | `dev` HEAD + its green CI run + preview URL | read | read the `dev` branch state via the active adapter + pipeline/build status |
 | Sprint Review Report | write (idempotent upsert) | the durable-knowledge store `Sprints/Sprint-<n>-Review` (concept #9) |
 | dev→release PR (on PO Approve only) | write | open the promotion PR, per the active adapter (concept #11) |
-| Rejected PBI (on PO Reject only) | write (idempotent field update + comment) | clear its iteration (concept #6), set the runtime-resolved rework state (concept #7), comment the reason (concept #3) (the #9 resolution — reuse, don't file a parallel item) |
+| Rejected PBI (on PO Reject only) | write (idempotent tag + field + comment) | tag `carryover` (concept #4 — the carry-forward signal `/sprint-plan` admits first), set the runtime-resolved rework state (concept #7), comment the reason (concept #3); **iteration left in place** (the #9 resolution — reuse, don't file a parallel item) |
 | Blocked-unit reports (dispatch engine) | read + clear | `<projectRoot>/.delivery/blocked/*.json` |
 | Blocked reflection on each report's work-item | write (idempotent tag + comment) | resolve the completion/state model (concept #7) → update the work-item (merge the `blocked` tag, concept #4; completion-state + iteration untouched) + add the diagnostic comment (concept #3) |
 
@@ -88,8 +88,8 @@ or stalled unit accumulates on disk, invisible to the PO.
   **NOT** a state transition: resolve the completion/state model (concept #7), then update the
   work-item to **merge** `blocked` into the item's tags (concept #4; never clobber existing tags).
   Leave the completion-state **and** the iteration **unchanged** here — the item must stay in the
-  closed iteration so the report (step 3) still reads it as carryover; its return to the backlog is
-  the standard carryover handling
+  closed iteration so the report (step 3) still reads it as carryover; its carry-forward (surfaced
+  as blocked-not-workable until it unblocks, then top-priority) is the standard carryover handling
   ([reject-and-carryover.md](../../agents/project-manager/children/reject-and-carryover.md)), not
   this step's job.
 - **Record the diagnostic as a comment** (concept #3) whose first line is the supervisor sentinel
@@ -120,8 +120,10 @@ truncation error, never a complete read). The six sections:
 
 1. **Completed vs carryover** — partition the sprint's PBIs by the **runtime-resolved
    Completed-category** state (concept #7, from step 1), each with id / title / story-points; every
-   admitted item that did NOT complete is flagged as carryover for re-planning (never silently
-   dropped — [`reject-and-carryover.md`](../../agents/project-manager/children/reject-and-carryover.md)).
+   admitted item that did NOT complete is **tagged `carryover`** (concept #4 — the durable signal the
+   next `/sprint-plan` admits FIRST, at top priority; a blocked one additionally keeps `blocked`) and
+   flagged in the report for the PO (never silently dropped —
+   [`reject-and-carryover.md`](../../agents/project-manager/children/reject-and-carryover.md)).
 2. **Per-PBI PR links** — for each unit, the PR merged into `dev` this sprint, read from the
    work-item↔PR link written at the micro-loop's PR step (concept #11), read back by reading the
    work-item / its comments; the active adapter's PR surface resolves PR title/status if needed —
@@ -198,13 +200,14 @@ resolution**) — reject reuses the **EXISTING** item; it does **not** file a pa
 second scheduling path would be complexity for no gain — one admission algorithm handles new,
 carried-over, and rejected work identically):
 
-- For each rejected PBI, **clear its iteration** (concept #6 — an idempotent field update), which
-  returns it to the backlog, and **set its state to the runtime-resolved rework category** (concept
+- For each rejected PBI, **tag it `carryover`** (concept #4 — the durable signal the next
+  `/sprint-plan` admits first) and **set its state to the runtime-resolved rework category** (concept
   #7 — never a literal like `New`/`Active`/`Reopened`).
 - **Record the rejection reason as a comment on that item** (concept #3), so the next developer who
   picks it up knows the acceptance gap that brought it back.
-- The next `/sprint-plan` re-picks the item (now with no iteration) as an ordinary backlog candidate
-  — **no special "rejected" queue**.
+- The next `/sprint-plan` admits the item **FIRST, at top priority** (ahead of all new work) — a
+  rejected item is unfinished committed work; the one admission algorithm takes carryover at the
+  front, so there is still **no special "rejected" queue**.
 - Also record the rejection reason on the review page (idempotent upsert, step 5).
 - Do **not** open or complete any dev→release PR — `release` is untouched.
 
