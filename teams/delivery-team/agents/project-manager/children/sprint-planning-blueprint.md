@@ -77,15 +77,23 @@ concept #7) or from a prior sprint. These are the only items *eligible* to be ad
 - An item with an unsatisfied in-sprint predecessor is **not ready yet** — it becomes ready when
   its predecessor completes (§6, refill-on-Done).
 - An item whose predecessor is an **out-of-sprint, not-yet-Done** item is **blocked**: I do not
-  admit it and I note why (its predecessor isn't scheduled). I never silently drop it — it stays
-  on the backlog for a future `/sprint-plan` (see [reject-and-carryover.md](reject-and-carryover.md)
-  for the "never silently drop work" discipline).
+  admit it and I note why (its predecessor isn't scheduled). I never silently drop it — it **carries
+  + is surfaced** but is not admitted to the workable set until its predecessor clears, then becomes
+  top-priority workable-carryover (see [reject-and-carryover.md](reject-and-carryover.md) for the
+  blocked-split + "never silently drop work" discipline).
 
 ### 4. Cap-admit ~4–6 unblocked items against capacity (keystone #4)
 
 Admit from the ready-queue until either the **story-point capacity** is reached **or** the
 **concurrency cap** of ~4–6 items is hit — whichever binds first.
 
+- **Carryover FIRST — workable carryover ahead of all new work.** Before selecting any new backlog
+  unit, admit the prior sprint's **workable carryover**: the `carryover`-tagged, not-yet-Completed
+  units whose predecessors are all Done (DAG-ready; a still-un-Done-predecessor carryover stays
+  blocked and waits — workability is DAG-derived, not the persistent `blocked` surfacing label),
+  regardless of stackRank. Committed work is never dropped — it consumes capacity first, in full even
+  if it alone reaches the ceiling; only the capacity that *remains* is offered to the new candidates
+  below (see [reject-and-carryover.md](reject-and-carryover.md)).
 - The concurrency cap ~4–6 mirrors `atl work dispatch`'s parallel-worker budget (keystone #4). It
   is a **concurrency** ceiling, not a total-work ceiling: it bounds how many work-units are
   in-flight at once, which is what keeps backend rate-limits (429s) and worktree contention
