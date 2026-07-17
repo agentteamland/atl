@@ -46,14 +46,15 @@ func TestCopyAssets(t *testing.T) {
 	writeFile(t, filepath.Join(src, "rules/r.md"), "RULE")
 	writeFile(t, filepath.Join(src, "knowledge/adapter.md"), "ADAPTER")
 	writeFile(t, filepath.Join(src, "scripts/helper.sh"), "#!/usr/bin/env bash\necho hi\n")
-	writeFile(t, filepath.Join(src, "packs/web/pack.md"), "PACK") // M1 knowledge-pack seam — must reflect too
+	writeFile(t, filepath.Join(src, "packs/web/pack.md"), "PACK")                // M1 knowledge-pack seam — must reflect too
+	writeFile(t, filepath.Join(src, "backends/github/adapter.md"), "GH-ADAPTER") // per-backend adapter contract — must reflect too
 
 	claude := t.TempDir()
 	files, err := CopyAssets(src, claude)
 	if err != nil {
 		t.Fatalf("CopyAssets: %v", err)
 	}
-	for _, rel := range []string{"agents/api/agent.md", "skills/build/skill.md", "rules/r.md", "knowledge/adapter.md", "scripts/helper.sh", "packs/web/pack.md"} {
+	for _, rel := range []string{"agents/api/agent.md", "skills/build/skill.md", "rules/r.md", "knowledge/adapter.md", "scripts/helper.sh", "packs/web/pack.md", "backends/github/adapter.md"} {
 		if _, err := os.Stat(filepath.Join(claude, rel)); err != nil {
 			t.Errorf("missing copied %s: %v", rel, err)
 		}

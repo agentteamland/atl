@@ -26,12 +26,14 @@ import (
 // (CopyAssets), update (reflectWithFanout), and reclamation (gc.Scan) so the three
 // can never drift. agents/skills/rules are what Claude Code reads directly;
 // knowledge/scripts carry a team's runtime reference docs + helper scripts (e.g.
-// delivery-team's Azure adapter contract + attachment helper); packs carry a
-// software team's area-keyed stack knowledge — the M1 seam, where a generic
-// developer worker loads packs/<area>/ for the work-unit's tech-lead-tagged area.
+// delivery-team's attachment helper); backends carry a team's per-backend adapter
+// contracts (delivery-team's backends/{azure,github}/adapter.md — the operation→tool
+// map every ceremony + worker loads for the active backend); packs carry a software
+// team's area-keyed stack knowledge — the M1 seam, where a generic developer worker
+// loads packs/<area>/ for the work-unit's tech-lead-tagged area.
 // All are consulted by a team's agents/skills/workers at run time. Everything else
 // in the team repo (team.json, README, LICENSE, ...) is not an installable asset.
-var AssetDirs = []string{"agents", "skills", "rules", "knowledge", "scripts", "packs"}
+var AssetDirs = []string{"agents", "skills", "rules", "knowledge", "backends", "scripts", "packs"}
 
 // TeamManifest is the subset of team.json install needs. Extra v1 fields
 // (agents[], capabilities, extends, ...) are tolerated and ignored.
