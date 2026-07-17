@@ -36,6 +36,14 @@ headless_claude_setup() {
 # `atl install` resolves them offline (index.Resolve prefers the cache). The
 # propose-upstream fixture is always present; pass an owner login to also add the
 # own-team fixture (<login>/atl-e2e-owned).
+# A note on generatedAt below: index.Resolve UNION-merges the binary's embedded
+# seed with this cache and, for a team present in BOTH (any first-party team),
+# the entry with the NEWER generatedAt wins. These test indices must therefore
+# out-date the embedded seed, or the seed's (stale, released-tag) version of a
+# first-party team wins and the blueprint silently tests the wrong content. A
+# fixed past date rots as each release bumps the seed's generatedAt; a far-future
+# date keeps the cache authoritative forever. (Invisible for teams with no drift
+# vs the seed; it bit delivery-team once backends/ diverged from the v2.6.0 seed.)
 write_test_index() {
   local owned_login="${1:-}"
   mkdir -p "$HOME/.atl"
@@ -44,7 +52,7 @@ write_test_index() {
   if [ -n "$owned_login" ]; then
     teams=$(echo "$teams" | jq --arg l "$owned_login" '. + [{handle:$l,name:"atl-e2e-owned",version:"0.1.0",description:"e2e fixture (own-team).",keywords:["e2e"],scope:"global",verified:false,source:{repo:($l+"/atl-e2e-owned"),subpath:"",ref:"main"}}]')
   fi
-  jq -n --argjson teams "$teams" '{schemaVersion:1,generatedAt:"2026-06-15T00:00:00Z",teams:$teams}' > "$HOME/.atl/index.json"
+  jq -n --argjson teams "$teams" '{schemaVersion:1,generatedAt:"2099-01-01T00:00:00Z",teams:$teams}' > "$HOME/.atl/index.json"
 }
 
 # write_test_index_profile seeds ~/.atl/index.json with the first-party
@@ -54,7 +62,7 @@ write_test_index() {
 # blueprint stays hermetic (no dedicated fixture repo) and auth-free.
 write_test_index_profile() {
   mkdir -p "$HOME/.atl"
-  jq -n '{schemaVersion:1,generatedAt:"2026-07-02T00:00:00Z",teams:[{handle:"agentteamland",name:"profile-team",version:"1.0.0",description:"profile-team e2e (monorepo subpath).",keywords:["profile"],scope:"global",verified:true,source:{repo:"agentteamland/atl",subpath:"teams/profile-team",ref:"main"}}]}' > "$HOME/.atl/index.json"
+  jq -n '{schemaVersion:1,generatedAt:"2099-01-01T00:00:00Z",teams:[{handle:"agentteamland",name:"profile-team",version:"1.0.0",description:"profile-team e2e (monorepo subpath).",keywords:["profile"],scope:"global",verified:true,source:{repo:"agentteamland/atl",subpath:"teams/profile-team",ref:"main"}}]}' > "$HOME/.atl/index.json"
 }
 
 # write_test_index_delivery seeds ~/.atl/index.json with the first-party
@@ -66,7 +74,7 @@ write_test_index_profile() {
 # delivery-team change on the branch still tests against the merged ceremonies.
 write_test_index_delivery() {
   mkdir -p "$HOME/.atl"
-  jq -n '{schemaVersion:1,generatedAt:"2026-07-06T00:00:00Z",teams:[{handle:"agentteamland",name:"delivery-team",version:"0.1.0",description:"delivery-team e2e (monorepo subpath).",keywords:["delivery"],scope:"project",verified:true,source:{repo:"agentteamland/atl",subpath:"teams/delivery-team",ref:"main"}}]}' > "$HOME/.atl/index.json"
+  jq -n '{schemaVersion:1,generatedAt:"2099-01-01T00:00:00Z",teams:[{handle:"agentteamland",name:"delivery-team",version:"0.1.0",description:"delivery-team e2e (monorepo subpath).",keywords:["delivery"],scope:"project",verified:true,source:{repo:"agentteamland/atl",subpath:"teams/delivery-team",ref:"main"}}]}' > "$HOME/.atl/index.json"
 }
 
 # gh_login echoes the authenticated GitHub login (GH_TOKEN is passed through by
