@@ -43,7 +43,8 @@ atl install agentteamland/delivery-team >/dev/null 2>&1 || bad "install errored"
 [ -f "$PROJ/.claude/skills/kickoff/SKILL.md" ]        && ok "kickoff skill reflected"        || bad "kickoff skill missing"
 [ -f "$PROJ/.claude/skills/sprint-start/SKILL.md" ]   && ok "sprint-start skill reflected"    || bad "sprint-start skill missing"
 [ -f "$PROJ/.claude/skills/sprint-review/SKILL.md" ]  && ok "sprint-review skill reflected"   || bad "sprint-review skill missing"
-[ -f "$PROJ/.claude/knowledge/azure-adapter.md" ]     && ok "adapter knowledge reflected"     || bad "adapter knowledge missing (stone #3 reflection)"
+[ -f "$PROJ/.claude/backends/azure/adapter.md" ]      && ok "azure adapter reflected"          || bad "azure adapter missing (backends/ reflection)"
+[ -f "$PROJ/.claude/backends/github/adapter.md" ]     && ok "github adapter reflected"         || bad "github adapter missing (backends/ reflection)"
 
 # ---- seed the project's .delivery/ config + point ceremonies at the mock MCP ----
 mkdir -p "$PROJ/.delivery"
