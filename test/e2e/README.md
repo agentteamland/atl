@@ -44,6 +44,7 @@ learning blueprints stay non-flaky).
 | `publish-propose` | gh | a gain in a team you don't own → real fork + PR (then cleanup) |
 | `publish-own` | gh | a team you own → real commit + version bump + tag |
 | `github-delivery-loop` | gh+token | the GitHub-backend Layer-B / T-point: real `claude -p` ceremonies + a developer→tech-lead micro-loop on a real fixture repo + Project — Epic/Feature issues + `[Technical Analysis]`, `plan.json`, a PR merged to `dev` + its issue closed (§10), the dev→release PR |
+| `github-delivery-engine` | gh+token | the follow-on to `github-delivery-loop`: the Go engine (`atl work dispatch`) driving REAL developer→tester→tech-lead `claude -p` workers on GitHub — seeds one buildable PBI + `plan.json`, then proves the (backend-neutral) worker prompts reach `gh` and land a real merge to `dev` (issue closed, worktree reclaimed). The github twin of the real-Azure engine run; the deterministic engine loop is covered by `work-dispatch` |
 
 ## Fixtures
 
@@ -55,10 +56,10 @@ publish blueprints exercise actual GitHub:
   blueprint force-resets it to the fixture baseline each run, so it's repeatable)
 - `agentteamland/atl-e2e-delivery` — the GitHub-backend delivery fixture, in the org
   (ATL's own infra, alongside `atl-e2e-team`; override for a fork with
-  `ATL_E2E_DELIVERY_OWNER`). Create it once. The `github-delivery-loop` blueprint
-  force-resets it to the `fixtures/delivery-repo/` baseline (main/dev/release, no stale
-  issues/PRs) and creates a fresh `atl-e2e-delivery` Project each run, so the T-point
-  loop is repeatable. The runner's token needs `repo` + `project` rights on the owner;
+  `ATL_E2E_DELIVERY_OWNER`). Create it once. The `github-delivery-loop` +
+  `github-delivery-engine` blueprints force-reset it to the `fixtures/delivery-repo/`
+  baseline (main/dev/release, no stale issues/PRs) and create a fresh `atl-e2e-delivery`
+  Project each run, so the loop is repeatable. The runner's token needs `repo` + `project` rights on the owner;
   the container ships a modern `gh` for Projects v2 (`field-create`/`item-edit`).
 
 The blueprints inject a test-only `~/.atl/index.json` (via `write_test_index` in
