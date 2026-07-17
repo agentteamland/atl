@@ -116,7 +116,8 @@ func (w *Worktree) Teardown(slug string, id int) error {
 // integrate to dev with NoFastForward — a merge commit that keeps the branch's
 // commits as ancestors of dev; a rebase or squash rewrites those SHAs, so a
 // genuinely-merged branch would look unmerged here and false-block, which is why
-// the tech-lead prompt permits only NoFastForward.)
+// the tech-lead prompt + the active backend's adapter require a real merge commit
+// (Azure: NoFastForward; GitHub: `gh pr merge --merge`).)
 func (w *Worktree) MergedToBase(slug string, id int) (bool, error) {
 	branch := BranchName(slug, id)
 	if _, err := w.git("fetch", "origin", w.BaseRef); err != nil {

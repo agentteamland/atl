@@ -34,14 +34,14 @@ const (
 	GranularityTask Granularity = "task"
 )
 
-// WorkUnit is one schedulable Azure work-item in the plan. Its branch and
+// WorkUnit is one schedulable work-item in the plan. Its branch and
 // worktree are both derived as delivery/<sprint-slug>/<ID> — there is no
-// separate slug field; the ID (the Azure work-item id) makes every branch trace
+// separate slug field; the ID (the backend's work-item id) makes every branch trace
 // to exactly one unit and one PR.
 type WorkUnit struct {
-	ID           int    `json:"id"`           // Azure work-item id — the stable identity
+	ID           int    `json:"id"`           // the backend's work-item id — the stable identity
 	Title        string `json:"title"`        // for logging + PR/branch context
-	Predecessors []int  `json:"predecessors"` // work-item ids that must be Done first (Dependency-Reverse links)
+	Predecessors []int  `json:"predecessors"` // work-item ids that must be Done first (dependency links)
 	StackRank    int    `json:"stackRank"`    // Microsoft.VSTS.Common.StackRank — admission tie-break
 }
 
