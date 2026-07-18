@@ -147,10 +147,19 @@ consuming the analysts' just-produced output. This is the ceremony's core write.
    - Compute `atl-key = hash(parent-id + plan-ordinal)`.
    - **Check-first idempotency query** (concept #10) filtered to that `atl-key` tag: **found →** reuse +
      update the existing item to the intended state (title, description, links, area) — never a
-     second one; **not-found →** create it (concept #1 — create the work-item, or nest it under
+     second one; **not-found →** first run the brainstorm-provenance adoption check (next bullet); only
+     if that too finds nothing do you create it (concept #1 — create the work-item, or nest it under
      the parent), then **stamp** its tags (concept #4) with `atl-key:<hash>` +
      `atl-run:refine:<sprint-or-scope>` (provenance), as close to atomic as the API allows. A
      409/duplicate on create is **caught and resolved to the existing item**, never surfaced.
+   - **Adopt a brainstorm-sourced item in place — never duplicate it (concept #10).** A backlog item
+     created by `/brainstorm done`'s board-sync carries the provenance label `atl-brainstorm:<slug>`
+     but **no `atl-key`** (a brainstorm item has no parent/plan-ordinal), so the `atl-key` check-first
+     above misses it. When a planned unit *is* such an in-scope item, run a check-first query filtered
+     to `atl-brainstorm:<slug>` via the adapter (concept #10) and, on a title match to the planned
+     unit, **adopt** the existing item — update it in place and stamp it with the computed
+     `atl-key:<hash>` (+ `atl-run` provenance) — rather than creating a parallel unit. Adoption is
+     one-time: once stamped, every later re-run converges through the normal `atl-key` check-first.
    - Resolve the concrete work-item **type** at runtime (concept #7) (the
      `artifactHierarchy` `Epic → Feature → PBI → Task` is abstract; the real backend type name is
      model-dependent) — **never** hardcode a type/state literal (concept #7).
@@ -224,6 +233,11 @@ no local ledger (concept #10).
 - **Before any create, run a check-first idempotency query** (concept #10) for that `atl-key`:
   **found → reuse + update** (converge to the intended state), **not-found → create-then-stamp**. A
   409/duplicate on create is caught and resolved to the existing item, never surfaced.
+- **Brainstorm-sourced items are adopted, not duplicated.** An item created by `/brainstorm done`
+  carries `atl-brainstorm:<slug>` and no `atl-key`; the first time it enters a decomposition plan the
+  `atl-key` check-first misses it, so refine runs a second check-first on `atl-brainstorm:<slug>` and
+  **adopts** it in place (stamp the computed `atl-key`) — a one-time bridge from the brainstorm-
+  provenance key to the loop's `atl-key`, after which convergence is the normal `atl-key` path.
 - **The spec-field / durable-knowledge writes are idempotent updates/upserts** — updating the
   work-item (concept #2) writes the spec field in place and a durable-knowledge upsert (concept #9)
   is idempotent. Comments are add-only by contract (concept #3): a re-run first **sentinel-matches**

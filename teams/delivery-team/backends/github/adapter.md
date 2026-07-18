@@ -87,6 +87,15 @@ truth (no local ledger).
   existing item is resolved to it, not surfaced as an error.
 - Keys derive from stable `parent + ordinal` (not a per-run GUID) → convergent resume, not
   merely dedup-attempted. Label length limit (50 chars) bounds the hash — use a short digest.
+- **Brainstorm-sourced items carry `atl-brainstorm:<slug>`, not `atl-key`.** `/brainstorm done`'s
+  board-sync creates deferred backlog issues with an `atl-brainstorm:<brainstorm-slug>` label (its own
+  provenance key — a brainstorm item has no parent/plan-ordinal, so no `atl-key`), and dedups its own
+  re-runs by a check-first `gh search issues 'label:atl-brainstorm:<slug>'` plus the item title. When
+  `/refine` later plans a unit that IS such an issue, its `atl-key` search misses it; before creating,
+  it searches `label:atl-brainstorm:<slug>` for the in-scope item and, on a title match, **adopts** it
+  — `gh issue edit` in place + stamp the computed `atl-key:<hash>` label — instead of opening a
+  duplicate. After adoption it converges via the normal `atl-key` search. (50-char label limit — use a
+  short slug/digest, as with `atl-key`.)
 
 ## 6. State & completion — one fixed model (no runtime template resolution)
 
