@@ -40,9 +40,22 @@ var removeCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		fmt.Printf("atl remove: removed %s/%s (%d files) from %s scope — reversible with `atl gc --undo`\n", handle, name, n, sc)
+		fmt.Println(removeSummary(handle, name, n, sc))
 		return nil
 	},
+}
+
+// removeSummary builds the `atl remove` success line. It only promises
+// `atl gc --undo` reversibility when files were actually soft-deleted (n>0); when
+// n==0 nothing was moved to gc-trash (the manifest's files were already absent on
+// disk), so it drops the hollow undo promise and says the files were already
+// absent — the same misleading-success class the `atl update` offline-honesty fix
+// closed. Pure of I/O so it's unit-testable.
+func removeSummary(handle, name string, n int, sc scope.Scope) string {
+	if n == 0 {
+		return fmt.Sprintf("atl remove: dropped %s/%s manifest from %s scope — no files were soft-deleted (they were already absent)", handle, name, sc)
+	}
+	return fmt.Sprintf("atl remove: removed %s/%s (%d files) from %s scope — reversible with `atl gc --undo`", handle, name, n, sc)
 }
 
 // removeTeam soft-deletes a team's manifest-recorded files to ~/.atl/gc-trash and

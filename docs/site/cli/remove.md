@@ -32,10 +32,16 @@ acme/example-team is not installed at project scope
 3. The directories that held those files are pruned, deepest first — but only the ones that are now empty. A directory still holding another team's files or your own content is left in place.
 4. The manifest itself is removed.
 
-The removal is reversible: [`atl gc --undo`](/cli/gc) restores the most recent batch, and [`atl gc --purge`](/cli/gc) clears the trash for good. The output reports how many files were removed and from which scope:
+When files were soft-deleted, the removal is reversible: [`atl gc --undo`](/cli/gc) restores the most recent batch, and [`atl gc --purge`](/cli/gc) clears the trash for good. The output reports how many files were removed and from which scope:
 
 ```
 atl remove: removed <handle>/<name> (N files) from <scope> scope — reversible with `atl gc --undo`
+```
+
+If the manifest's files were already gone from disk, nothing is moved to `~/.atl/gc-trash` — so the output omits the reversibility promise and reports that the files were already absent (only the manifest is dropped):
+
+```
+atl remove: dropped <handle>/<name> manifest from <scope> scope — no files were soft-deleted (they were already absent)
 ```
 
 ::: tip Only manifest-recorded files are removed
