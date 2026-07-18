@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "name": "profile-team",
-  "version": "1.5.0",
-  "description": "Curates a cross-project profile of the people in your world: drains profile-fact markers into person profiles at ~/.atl/profiles, each grown through a self-describing, versioned interface.",
+  "version": "1.5.1",
+  "description": "Curates a cross-project profile of the entities in your world: drains profile-fact markers into entity profiles at ~/.atl/profiles, each grown through a self-describing, versioned interface.",
   "author": {
     "name": "AgentTeamLand",
     "url": "https://github.com/agentteamland"
@@ -23,7 +23,7 @@
   "agents": [
     {
       "name": "profile-curator",
-      "description": "Drains profile-fact markers into person profiles under ~/.atl/profiles: detects the entity type, selects or evolves its interface, fills fields, and rebuilds the profile index."
+      "description": "Drains profile-fact markers into entity profiles under ~/.atl/profiles: detects the entity type, selects or evolves its interface, fills fields, and rebuilds the profile index."
     }
   ],
   "skills": [

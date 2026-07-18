@@ -157,12 +157,14 @@ Every item ends in exactly one of three states:
 - **Un-placeable** (a corrupt-looking real fact, an unresolvable entity) → leave it
   **un-acked** and report it; a human looks next time.
 
-Ack deletes the item. It leaves no tombstone, and the capture cursor re-scans a
-still-growing transcript, so a Dropped illustration the assistant keeps writing in the
-*current* session can re-enqueue and re-Drop until that transcript ages behind the cursor —
-**bounded, always visible in the report, and never a fabricated profile.** This is not silent
-data loss: the gate's promise is that the junk never becomes a profile, not that it never
-re-appears in the queue.
+Ack deletes the item **and tombstones its ID** in the queue's processed-set. Because enqueue
+dedups against both the pending items and those tombstones, a re-scan that re-derives the same
+marker ID is a no-op — a drained (acked) item, whether it was **Integrated or Dropped**, can
+**never** re-enqueue or re-Drop; exactly-once holds. The capture cursor's modtime filter is
+only a performance optimization, not the correctness mechanism. The one item that legitimately
+re-appears is an **un-acked** un-placeable fact: it was never deleted, so never tombstoned, and
+it is *meant* to resurface for a human on the next drain — bounded, always visible in the
+report, and never a fabricated profile.
 
 ## After the batch — rebuild the index
 When every item is processed, rebuild `~/.atl/profiles/_index.md` (`index-rebuild.md`).
