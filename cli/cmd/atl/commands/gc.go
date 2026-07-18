@@ -32,6 +32,10 @@ var gcCmd = &cobra.Command{
 		purge, _ := cmd.Flags().GetBool("purge")
 		includeGains, _ := cmd.Flags().GetBool("include-gains")
 
+		if err := gcFlagConflict(apply, undo, purge, includeGains); err != nil {
+			return err
+		}
+
 		trash, err := gc.TrashRoot()
 		if err != nil {
 			return err
@@ -118,6 +122,22 @@ var gcCmd = &cobra.Command{
 		reportRetainedGains(gains)
 		return nil
 	},
+}
+
+// gcFlagConflict rejects selecting more than one mutually exclusive gc mode.
+// gc has three modes — reclaim (--apply, optionally narrowed by its
+// --include-gains modifier), --undo, and --purge — dispatched by the RunE
+// switch. Selecting more than one is contradictory intent the switch would
+// otherwise resolve silently by precedence (e.g. `--purge --apply` runs the
+// irreversible purge and drops --apply). --include-gains only shapes the
+// reclaim path, so `--apply --include-gains` is a single mode; pairing
+// --include-gains with --undo or --purge is rejected like any other cross-mode
+// combination rather than being silently ignored.
+func gcFlagConflict(apply, undo, purge, includeGains bool) error {
+	if boolCount(apply || includeGains, undo, purge) > 1 {
+		return fmt.Errorf("conflicting gc modes: --apply (optionally with --include-gains), --undo and --purge are mutually exclusive")
+	}
+	return nil
 }
 
 // reportRetainedGains notes the gains gc kept (files beside an installed unit
