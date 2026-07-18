@@ -189,8 +189,10 @@ inference; wait for the explicit decision.
   the GitHub backend it is `gh pr merge --merge`. Where the backend cannot merge non-interactively,
   hand the PO the created PR link to complete the merge in the backend. This ceremony **never
   fabricates a merge mechanism and never merges outside the PO-approved PR.**
-- Then mark the iteration reviewed (a runtime-resolved state update, concept #7 — never a hardcoded
-  literal), and record the approval on the review page (idempotent upsert, step 5).
+- **Record the approval on the review page** (idempotent upsert, step 5). The merged promotion PR
+  plus the `Sprints/Sprint-<n>-Review` page ARE the sprint's durable review record — there is no
+  separate "iteration reviewed" state to set (a sprint is concept #6, not a work-item with a
+  completion state; concept #7 governs work-item units, not iterations).
 
 **On REJECT — the release STAYS PUT (forward-fix, never a revert):**
 
@@ -230,8 +232,6 @@ local ledger):
   never `hash(title)`). Before any create, a **check-first query** (concept #10) for that `atl-key`
   reuses+updates a found item and only creates when not-found; a 409/duplicate is resolved to the
   existing item, never surfaced.
-- **The iteration-reviewed transition** is an idempotent work-item field update (concept #10) —
-  re-setting the same runtime-resolved state is a safe no-op.
 - **The dev→release promotion** is not re-fired on a re-run: before opening a promotion PR, check the
   active adapter's PR surface (concept #11) for a PR already open/completed for this sprint's
   `branchPair.dev`→`branchPair.release` and reuse it, so a re-run after approval does not open a
