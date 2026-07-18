@@ -151,6 +151,14 @@ func (w *Worktree) Quarantine(slug string, id int, suffix string) (Orphan, error
 	branch := BranchName(slug, id)
 	path := w.path(slug, id)
 
+	// Fetch the base first so the classification runs against the freshly-fetched
+	// RemoteRef, not the stale local BaseRef (#158): a remote merge never advances
+	// the local ref, so without this a genuinely-merged leftover would be
+	// misclassified as unmerged and needlessly preserved (mirrors MergedToBase).
+	if _, err := w.git("fetch", "origin", w.BaseRef); err != nil {
+		return Orphan{}, err
+	}
+
 	unmerged, err := w.hasUnmergedCommits(branch)
 	if err != nil {
 		return Orphan{}, err
@@ -211,12 +219,21 @@ func (w *Worktree) Quarantine(slug string, id int, suffix string) (Orphan, error
 // (active = branch names currently in use) and applies the branch-hygiene
 // asymmetry. A worktree with NO commits beyond BaseRef is safely reclaimed
 // (worktree + branch removed). A worktree WITH commits beyond BaseRef is
-// preserved and surfaced — never deleted. Detection is deliberately
-// conservative: any commit in the branch but not in BaseRef counts as unmerged,
-// even one that was actually squash-merged (a safe false-positive — it only
-// preserves+surfaces an already-merged branch; it never risks dropping real
-// unmerged work).
+// preserved and surfaced — never deleted. It fetches origin/BaseRef first and
+// classifies against that freshly-fetched ref (#158), never the stale local one.
+// Detection is deliberately conservative: any commit in the branch but not in the
+// fetched base counts as unmerged, even one that was actually squash-merged (a
+// safe false-positive — it only preserves+surfaces an already-merged branch; it
+// never risks dropping real unmerged work).
 func (w *Worktree) Reconcile(active map[string]bool) ([]Orphan, error) {
+	// Fetch the base once up front so every leftover is classified against the
+	// freshly-fetched RemoteRef, not the stale local BaseRef (#158): a remote
+	// merge never advances the local ref, so a stale-ref comparison surfaces every
+	// already-merged leftover as a false unmerged orphan. A fetch failure aborts
+	// rather than risk misclassifying (mirrors MergedToBase).
+	if _, err := w.git("fetch", "origin", w.BaseRef); err != nil {
+		return nil, err
+	}
 	entries, err := w.listWorktrees()
 	if err != nil {
 		return nil, err
@@ -268,9 +285,18 @@ func (w *Worktree) Reconcile(active map[string]bool) ([]Orphan, error) {
 	return orphans, nil
 }
 
-// hasUnmergedCommits reports whether branch carries any commit not in BaseRef.
+// hasUnmergedCommits reports whether branch carries any commit not in the
+// freshly-fetched base (RemoteRef, e.g. origin/dev). The caller MUST fetch
+// origin/BaseRef first: a remote merge (gh pr merge / Azure NoFastForward) never
+// advances the LOCAL BaseRef, so comparing against it would count a
+// genuinely-merged leftover's commits as "unmerged" and surface it as a false
+// orphan (#158). Comparing against the fetched RemoteRef mirrors MergedToBase,
+// which fetches + compares against RemoteRef for exactly this reason, and keeps
+// the never-delete-real-work invariant: a branch reachable-from RemoteRef is
+// integrated, and a squash/rebase-merged branch still counts as unmerged here (a
+// safe false-positive that only over-preserves, never drops work).
 func (w *Worktree) hasUnmergedCommits(branch string) (bool, error) {
-	out, err := w.git("rev-list", "--count", w.BaseRef+".."+branch)
+	out, err := w.git("rev-list", "--count", w.RemoteRef+".."+branch)
 	if err != nil {
 		return false, err
 	}

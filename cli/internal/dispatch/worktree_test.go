@@ -170,6 +170,14 @@ func TestReconcileReclaimsClean(t *testing.T) {
 	if !f.called("branch -D delivery/s1/99") {
 		t.Error("clean orphan branch should be deleted")
 	}
+	// #158: classify against the freshly-fetched origin/dev, never the stale local
+	// ref — else a remote-merged leftover surfaces as a false unmerged orphan.
+	if !f.called("fetch origin dev") {
+		t.Error("Reconcile must fetch the base before classifying (#158)")
+	}
+	if !f.called("rev-list --count origin/dev..delivery/s1/99") {
+		t.Errorf("Reconcile must classify against origin/dev, not local dev (#158): %v", f.calls)
+	}
 }
 
 // The load-bearing safety test: an orphan branch with UNMERGED commits must be
@@ -240,6 +248,132 @@ func TestReconcileReclaimsIgnoringStatusJson(t *testing.T) {
 	}
 }
 
+// Direct #158 regression (real git): a leftover branch whose work already landed
+// on origin/dev out of band (a PR merged remotely) must be RECLAIMED — not
+// surfaced as a false unmerged orphan. The local dev ref never fast-forwards, and
+// the origin/dev tracking ref is left deliberately stale here, so ONLY Reconcile's
+// own fetch + comparison against origin/dev (the fix) classifies it correctly; the
+// pre-fix code compared the stale local dev and wrongly preserved every
+// remote-merged leftover.
+func TestReconcileReclaimsRemotelyMergedLeftover(t *testing.T) {
+	repo := t.TempDir()
+	run := func(dir string, args ...string) string {
+		t.Helper()
+		out, err := exec.Command("git", append([]string{"-C", dir}, args...)...).CombinedOutput()
+		if err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+		return strings.TrimSpace(string(out))
+	}
+	run(repo, "init", "-q", "-b", "dev")
+	run(repo, "config", "user.email", "e2e@atl.local")
+	run(repo, "config", "user.name", "atl")
+	if err := os.WriteFile(filepath.Join(repo, "seed.txt"), []byte("x\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	run(repo, "add", "-A")
+	run(repo, "commit", "-q", "-m", "seed")
+	seed := run(repo, "rev-parse", "dev")
+
+	origin := t.TempDir()
+	if out, err := exec.Command("git", "init", "-q", "--bare", origin).CombinedOutput(); err != nil {
+		t.Fatalf("bare origin init: %v\n%s", err, out)
+	}
+	run(repo, "remote", "add", "origin", origin)
+	run(repo, "push", "-q", "origin", "dev")
+
+	// A worker unit committed real work on its branch.
+	root := filepath.Join(repo, ".delivery", "worktrees")
+	if err := os.MkdirAll(filepath.Join(root, "s1"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	wtPath := filepath.Join(root, "s1", "88")
+	run(repo, "worktree", "add", "-q", "-b", "delivery/s1/88", wtPath, "dev")
+	if err := os.WriteFile(filepath.Join(wtPath, "done.go"), []byte("package main\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	run(wtPath, "add", "-A")
+	run(wtPath, "commit", "-q", "-m", "work")
+
+	// The PR merged remotely: the branch's work fast-forwards origin/dev. Then reset
+	// this repo's origin/dev tracking ref stale (as if it never fetched), so the
+	// fetch inside Reconcile is what discovers the merge.
+	run(repo, "push", "-q", "origin", "delivery/s1/88:refs/heads/dev")
+	run(repo, "update-ref", "refs/remotes/origin/dev", seed)
+
+	w := &Worktree{RepoDir: repo, Root: root, BaseRef: "dev", RemoteRef: "origin/dev", Run: ExecRunner}
+	orphans, err := w.Reconcile(map[string]bool{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(orphans) != 1 || orphans[0].Unmerged {
+		t.Fatalf("a remotely-merged leftover must be reclaimed (Unmerged=false), got %+v", orphans)
+	}
+	if out := run(repo, "branch", "--list", "delivery/s1/88"); out != "" {
+		t.Errorf("the reclaimed branch should be deleted, still present: %q", out)
+	}
+}
+
+// The safety half of the #158 fix (real git): a leftover branch with a committed
+// commit that is NOT on origin/dev holds real un-integrated work and MUST be
+// preserved+surfaced, never reclaimed — even after Reconcile's own fetch. Proves
+// the fetch+RemoteRef switch did not weaken the never-delete-real-work invariant
+// (the reclaim half is TestReconcileReclaimsRemotelyMergedLeftover).
+func TestReconcilePreservesCommittedUnmergedAgainstRealOrigin(t *testing.T) {
+	repo := t.TempDir()
+	run := func(dir string, args ...string) string {
+		t.Helper()
+		out, err := exec.Command("git", append([]string{"-C", dir}, args...)...).CombinedOutput()
+		if err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+		return strings.TrimSpace(string(out))
+	}
+	run(repo, "init", "-q", "-b", "dev")
+	run(repo, "config", "user.email", "e2e@atl.local")
+	run(repo, "config", "user.name", "atl")
+	if err := os.WriteFile(filepath.Join(repo, "seed.txt"), []byte("x\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	run(repo, "add", "-A")
+	run(repo, "commit", "-q", "-m", "seed")
+
+	origin := t.TempDir()
+	if out, err := exec.Command("git", "init", "-q", "--bare", origin).CombinedOutput(); err != nil {
+		t.Fatalf("bare origin init: %v\n%s", err, out)
+	}
+	run(repo, "remote", "add", "origin", origin)
+	run(repo, "push", "-q", "origin", "dev")
+
+	// A worker committed real work that NEVER landed on origin/dev.
+	root := filepath.Join(repo, ".delivery", "worktrees")
+	if err := os.MkdirAll(filepath.Join(root, "s1"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	wtPath := filepath.Join(root, "s1", "91")
+	run(repo, "worktree", "add", "-q", "-b", "delivery/s1/91", wtPath, "dev")
+	if err := os.WriteFile(filepath.Join(wtPath, "done.go"), []byte("package main\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	run(wtPath, "add", "-A")
+	run(wtPath, "commit", "-q", "-m", "unmerged work")
+
+	w := &Worktree{RepoDir: repo, Root: root, BaseRef: "dev", RemoteRef: "origin/dev", Run: ExecRunner}
+	orphans, err := w.Reconcile(map[string]bool{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(orphans) != 1 || !orphans[0].Unmerged {
+		t.Fatalf("a committed-unmerged leftover must be preserved (Unmerged=true), got %+v", orphans)
+	}
+	if out := run(repo, "branch", "--list", "delivery/s1/91"); out == "" {
+		t.Error("SAFETY VIOLATION: the unmerged branch was deleted, must be preserved")
+	}
+	if _, err := os.Stat(wtPath); err != nil {
+		t.Errorf("SAFETY VIOLATION: the unmerged worktree was removed: %v", err)
+	}
+}
+
 func TestMergedToBase(t *testing.T) {
 	// Contained in origin/dev (rev-list 0) → merged; must fetch first + compare
 	// against RemoteRef (the local BaseRef is never fast-forwarded, so it is stale).
@@ -301,6 +435,13 @@ func TestQuarantineReclaimsClean(t *testing.T) {
 	}
 	if f.called("worktree move") || f.called("branch -m") {
 		t.Error("a clean quarantine must not move/rename — nothing to preserve")
+	}
+	// #158: classify against the freshly-fetched origin/dev, never the stale local ref.
+	if !f.called("fetch origin dev") {
+		t.Error("Quarantine must fetch the base before classifying (#158)")
+	}
+	if !f.called("rev-list --count origin/dev..delivery/s1/42") {
+		t.Errorf("Quarantine must classify against origin/dev, not local dev (#158): %v", f.calls)
 	}
 }
 
@@ -370,6 +511,16 @@ func TestQuarantineRealGitPreservesDirtyWorktree(t *testing.T) {
 	git("add", "-A")
 	git("commit", "-q", "-m", "seed")
 
+	// Give the repo an origin so Quarantine's fetch (the #158 stale-ref fix) works,
+	// and classification runs against the freshly-fetched origin/dev — the same
+	// real-remote shape production always has.
+	origin := t.TempDir()
+	if out, err := exec.Command("git", "init", "-q", "--bare", origin).CombinedOutput(); err != nil {
+		t.Fatalf("bare origin init: %v\n%s", err, out)
+	}
+	git("remote", "add", "origin", origin)
+	git("push", "-q", "origin", "dev")
+
 	root := filepath.Join(repo, ".delivery", "worktrees")
 	if err := os.MkdirAll(filepath.Join(root, "s1"), 0o755); err != nil {
 		t.Fatal(err)
@@ -381,7 +532,7 @@ func TestQuarantineRealGitPreservesDirtyWorktree(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	w := &Worktree{RepoDir: repo, Root: root, BaseRef: "dev", RemoteRef: "dev", Run: ExecRunner}
+	w := &Worktree{RepoDir: repo, Root: root, BaseRef: "dev", RemoteRef: "origin/dev", Run: ExecRunner}
 	orphan, err := w.Quarantine("s1", 42, "stall0")
 	if err != nil {
 		t.Fatalf("Quarantine on a dirty worktree failed (git worktree move refused a dirty tree?): %v", err)
