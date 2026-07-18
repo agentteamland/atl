@@ -20,6 +20,28 @@ func writeF(t *testing.T, path, body string) {
 	}
 }
 
+// TestUpToDateMessage proves the offline-honest selection: an online no-op keeps
+// the plain "everything up to date" line, while an offline run (the refresh
+// errored and Resolve fell back to the cached/embedded index) says so instead of
+// asserting a network-confirmed state.
+func TestUpToDateMessage(t *testing.T) {
+	cases := []struct {
+		name    string
+		offline bool
+		want    string
+	}{
+		{"online refresh, nothing changed", false, "atl update: everything up to date"},
+		{"offline, refresh could not run", true, "atl update: up to date (offline — using cached index)"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := upToDateMessage(tc.offline); got != tc.want {
+				t.Errorf("upToDateMessage(%v) = %q, want %q", tc.offline, got, tc.want)
+			}
+		})
+	}
+}
+
 // TestFanOut proves the core rule: an unmodified project file refreshes from the
 // global layer, a user-modified one is preserved.
 func TestFanOut(t *testing.T) {
