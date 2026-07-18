@@ -45,6 +45,12 @@ When nothing was outstanding:
 atl update: everything up to date
 ```
 
+When nothing was outstanding **and** the index refresh could not reach the network (you're offline), it says so rather than asserting a network-confirmed result — the resolve step falls back to the cached/embedded index:
+
+```text
+atl update: up to date (offline — using cached index)
+```
+
 If core files changed, a separate line precedes the summary:
 
 ```text

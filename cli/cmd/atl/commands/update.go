@@ -28,8 +28,9 @@ var updateCmd = &cobra.Command{
 			return err
 		}
 		// Best-effort network refresh of the index cache; Resolve falls back to
-		// cache/embedded on failure, so being offline is fine.
-		_ = index.RefreshCache(index.RawURL)
+		// cache/embedded on failure, so being offline is fine. Capture the error
+		// so the "nothing changed" message can be honest about an offline run.
+		refreshErr := index.RefreshCache(index.RawURL)
 
 		upgraded, err := updateTeams(projectRoot)
 		if err != nil {
@@ -54,7 +55,7 @@ var updateCmd = &cobra.Command{
 		case refreshed > 0:
 			fmt.Printf("atl update: refreshed %d file(s) from the global layer\n", refreshed)
 		default:
-			fmt.Println("atl update: everything up to date")
+			fmt.Println(upToDateMessage(refreshErr != nil))
 		}
 
 		// F4: this is the throttled network pass, which already re-fetched above,
@@ -63,6 +64,17 @@ var updateCmd = &cobra.Command{
 		suggestPublishable()
 		return nil
 	},
+}
+
+// upToDateMessage picks the "nothing changed" line for `atl update`. When the
+// network refresh could not run (offline / fetch failed), Resolve fell back to
+// the cached/embedded index — so asserting "everything up to date" would falsely
+// imply the check reached the network. Say so honestly instead.
+func upToDateMessage(offline bool) string {
+	if offline {
+		return "atl update: up to date (offline — using cached index)"
+	}
+	return "atl update: everything up to date"
 }
 
 // fanOut performs the local fan-out (decision doc 5.5): for every team installed

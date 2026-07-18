@@ -45,6 +45,12 @@ Bekleyen bir şey yoksa:
 atl update: everything up to date
 ```
 
+Bekleyen bir şey **yoksa ve** dizin yenilemesi ağa ulaşamadıysa (çevrimdışıysanız), ağdan doğrulanmış bir sonuç varmış gibi davranmak yerine bunu açıkça belirtir — çözümleme adımı önbellekteki/gömülü dizine geri düşer:
+
+```text
+atl update: up to date (offline — using cached index)
+```
+
 Çekirdek dosyalar değiştiyse özetten önce ayrı bir satır görünür:
 
 ```text
