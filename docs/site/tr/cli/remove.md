@@ -32,10 +32,16 @@ acme/example-team is not installed at project scope
 3. Bu dosyaları barındıran dizinler en derinden başlayarak budanır — yalnızca artık boş olanlar. Başka bir takımın dosyalarını ya da kendi içeriğini barındıran bir dizine dokunulmaz.
 4. Manifestonun kendisi kaldırılır.
 
-Kaldırma geri alınabilir: [`atl gc --undo`](/tr/cli/gc) en son grubu geri yükler, [`atl gc --purge`](/tr/cli/gc) çöpü kalıcı temizler. Çıktı, kaç dosyanın kaldırıldığını ve hangi kapsamdan kaldırıldığını raporlar:
+Dosyalar yumuşak-silindiyse kaldırma geri alınabilir: [`atl gc --undo`](/tr/cli/gc) en son grubu geri yükler, [`atl gc --purge`](/tr/cli/gc) çöpü kalıcı temizler. Çıktı, kaç dosyanın kaldırıldığını ve hangi kapsamdan kaldırıldığını raporlar:
 
 ```
 atl remove: removed <handle>/<name> (N files) from <scope> scope — reversible with `atl gc --undo`
+```
+
+Manifestonun dosyaları diskten zaten kaybolmuşsa `~/.atl/gc-trash` içine hiçbir şey taşınmaz — bu yüzden çıktı geri-alınabilirlik vaadini atlar ve dosyaların zaten yok olduğunu bildirir (yalnızca manifesto düşürülür):
+
+```
+atl remove: dropped <handle>/<name> manifest from <scope> scope — no files were soft-deleted (they were already absent)
 ```
 
 ::: tip Yalnızca manifesto kaydındaki dosyalar kaldırılır
