@@ -275,7 +275,38 @@ type/state names at connect time via the active adapter, never hardcoded):
 If the user chose non-default `dev` / `release` names, mirror them into **both**
 `config.branchPair` and `methodology.branches` so the two agree.
 
-### 6. Report
+### 6. Write `.delivery/.gitignore` — keep engine scratch out of git
+
+`.delivery/` is committed, but only its **two source files** belong in git — `config.json`
+and `methodology.json`. Everything else the engine and ceremonies drop here is regenerated
+every run and must never be committed (the `mcp/` config can even embed a credential). Write
+`.delivery/.gitignore` with exactly these entries (every `#` is a full-line comment — git does
+not honor a trailing inline `#`, so keep each "why" on its own line above the pattern):
+
+```gitignore
+# .delivery/ is committed, but ONLY these two source files belong in git:
+#   config.json, methodology.json  (written by /delivery-init).
+# Everything below is engine-derived scratch — regenerated each run; never commit it.
+
+# per-unit git worktrees, incl. the nested .quarantine/ (atl work dispatch)
+worktrees/
+# supervisor run state (atl work dispatch)
+runstate.json
+# materialized sprint DAG, derived from the backend (/sprint-start)
+plan.json
+# blocked-unit reports, drained back to the board by /sprint-review
+blocked/
+# generated worker MCP config — may embed a credential (atl work dispatch)
+mcp/
+# single-dispatch mutex
+dispatch.lock
+```
+
+Idempotent: on a re-run, if `.delivery/.gitignore` already exists and matches, leave it;
+otherwise (re)write it. `config.json` / `methodology.json` match no pattern, so they stay
+tracked.
+
+### 7. Report
 
 Summarize what was written — the backend, its coordinates (Azure: org/project/repo + the
 `wikiId` or the "provision a wiki" note; GitHub: `owner/repo` + the resolved `projectNumber` +
