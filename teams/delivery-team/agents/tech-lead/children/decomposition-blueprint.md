@@ -86,10 +86,17 @@ duplicates:
 2. **Check-first idempotency query** (concept #10) filtered to that `atl-key` tag.
    - **Found** → reuse + update the existing item (converge it to the intended state: title,
      description, links, area tag). Do NOT create a second one.
-   - **Not found** → create it (concept #1 — create the work-item, or nest it under the parent),
+   - **Not found** → first run the brainstorm-provenance adoption check (2b); only if that too
+     finds nothing do I create it (concept #1 — create the work-item, or nest it under the parent),
      then **stamp** its tags (concept #4) with `atl-key:<hash>` +
      `atl-run:<ceremony>:<sprint-id>` (provenance) as close to atomic as the API allows. A
      **duplicate on create is caught and resolved to the existing item**, not surfaced.
+2b. **Adopt a brainstorm-sourced item — don't duplicate it (concept #10).** If the `atl-key` query
+    is not-found but the planned unit *is* an existing backlog item created by `/brainstorm done` (it
+    carries `atl-brainstorm:<slug>` and no `atl-key`), query that provenance label via the adapter and,
+    on a title match, **adopt** it: update in place + stamp the computed `atl-key:<hash>` (+ `atl-run`),
+    never create a parallel unit. One-time bridge — after adoption the normal `atl-key` check-first
+    converges.
 3. Apply the **area tag** (below) and the **dependency links** (below).
 
 I resolve the concrete work-item **type** at runtime — the `artifactHierarchy` in
@@ -154,6 +161,8 @@ one review."
 - [ ] For each unit: `atl-key = hash(parent-id + ordinal)` computed; **check-first idempotency
       query** run (concept #10); found → reuse+update, not-found → create-then-stamp; duplicate
       resolved to existing.
+- [ ] A planned unit that is a brainstorm-sourced backlog item (`atl-brainstorm:<slug>`, no
+      `atl-key`) is **adopted in place + stamped** with the computed `atl-key`, never duplicated.
 - [ ] `atl-run:<ceremony>:<sprint-id>` provenance tag stamped alongside `atl-key`.
 - [ ] Concrete type resolved at runtime (concept #7); no hardcoded type/state literal.
 - [ ] Each unit tagged `area:<name>` (I decide; analyst only suggested); one primary area per unit.

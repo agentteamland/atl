@@ -115,6 +115,14 @@ ledger — a lost/stale ledger silently reintroduces duplication).
   update** (converge to intended state), **not-found → create-then-stamp**. Create +
   stamp as close to atomic as the API allows; a **409/duplicate on create is caught
   and resolved to the existing item**, not surfaced as an error.
+- **Brainstorm-sourced items carry `atl-brainstorm:<slug>`, not `atl-key`.** `/brainstorm done`'s
+  board-sync creates deferred backlog items with `atl-brainstorm:<brainstorm-slug>` in `System.Tags`
+  (its own provenance key — a brainstorm item has no parent/plan-ordinal, so no `atl-key`), and dedups
+  its own re-runs by a check-first WIQL on that tag plus the item title. When a decomposition ceremony
+  (`/refine`) later plans a unit that IS such an item, its `atl-key` check-first misses it; before
+  creating, it runs a second check-first WIQL on `atl-brainstorm:<slug>` for the in-scope item and, on
+  a title match, **adopts** it — `wit_update_work_item` in place + stamp the computed `atl-key:<hash>`
+  — instead of creating a duplicate. After adoption the item converges via the normal `atl-key` query.
 - **`wit_add_child_work_items` takes no tags/fields** — only `wit_create_work_item`
   accepts `System.Tags` inline. A child created with `wit_add_child_work_items` is
   stamped (`atl-key`/`atl-run`/`area:<name>`) by a **follow-up `wit_update_work_item`**;
