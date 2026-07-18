@@ -39,6 +39,14 @@ var learningsStatusCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+		if jsonOut, _ := cmd.Flags().GetBool("json"); jsonOut {
+			out, err := statusJSON(counts)
+			if err != nil {
+				return err
+			}
+			fmt.Println(out)
+			return nil
+		}
 		if len(counts) == 0 {
 			fmt.Println("learning queue: empty (nothing pending)")
 			return nil
@@ -224,6 +232,22 @@ var learningsTranscriptCmd = &cobra.Command{
 	},
 }
 
+// statusJSON marshals the per-channel pending counts to a stable JSON object
+// (channel→count). An empty or nil queue marshals to "{}" rather than JSON
+// null, so a caller always gets an object. queue.Channel is a string type, so
+// encoding/json emits the keys in sorted order — deterministic output tooling
+// can rely on.
+func statusJSON(counts map[queue.Channel]int) (string, error) {
+	if len(counts) == 0 {
+		return "{}", nil
+	}
+	b, err := json.Marshal(counts)
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
+}
+
 // knownChannel reports whether ch is a queue channel the platform recognizes.
 func knownChannel(ch queue.Channel) bool {
 	return ch == queue.ChannelLearning || ch == queue.ChannelProfileFact
@@ -295,6 +319,7 @@ func openQueue() (*queue.Store, string, error) {
 }
 
 func init() {
+	learningsStatusCmd.Flags().Bool("json", false, "emit pending counts as JSON")
 	learningsPeekCmd.Flags().Bool("json", false, "emit pending items as JSON")
 	learningsPeekCmd.Flags().String("channel", "", "filter to one channel (e.g. learning)")
 	learningsTranscriptCmd.Flags().Bool("json", false, "emit turns as JSON")

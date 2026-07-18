@@ -18,6 +18,37 @@ func TestFirstLine(t *testing.T) {
 	}
 }
 
+func TestStatusJSON(t *testing.T) {
+	cases := []struct {
+		name   string
+		counts map[queue.Channel]int
+		want   string
+	}{
+		// Empty must be an object, "{}", not JSON null — so tooling always
+		// gets a channel→count map even when nothing is pending.
+		{"nil map", nil, "{}"},
+		{"empty map", map[queue.Channel]int{}, "{}"},
+		// Multi-channel: string-kinded keys sort deterministically, so the
+		// output is stable ("learning" before "profile-fact").
+		{
+			"multi-channel",
+			map[queue.Channel]int{queue.ChannelLearning: 2, queue.ChannelProfileFact: 1},
+			`{"learning":2,"profile-fact":1}`,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := statusJSON(tc.counts)
+			if err != nil {
+				t.Fatalf("statusJSON(%v) error: %v", tc.counts, err)
+			}
+			if got != tc.want {
+				t.Errorf("statusJSON(%v) = %q, want %q", tc.counts, got, tc.want)
+			}
+		})
+	}
+}
+
 func TestResolveAckID(t *testing.T) {
 	items := []queue.Item{
 		{ID: "aa11cccccccccccc", Channel: queue.ChannelLearning},

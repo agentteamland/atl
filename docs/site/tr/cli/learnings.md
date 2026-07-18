@@ -19,6 +19,7 @@ Bunları elle pek nadiren çalıştırırsın — döngü onları kendiliğinden
 
 ```bash
 atl learnings status                 # kanal başına bekleyen sayılar
+atl learnings status --json          # bekleyen sayılar JSON olarak (kanal→sayı)
 atl learnings peek                   # bekleyen öğeleri listele (insan-okunur)
 atl learnings peek --json            # tam makine-okunur liste
 atl learnings peek --channel learning  # tek bir kanala filtrele
@@ -43,6 +44,17 @@ Aksi hâlde:
 learning queue — pending by channel:
   learning       3
   profile-fact   1
+```
+
+`--json` ile aynı sayıları bunun yerine kararlı bir JSON nesnesi (`kanal→sayı`) olarak verir — kardeşleri `peek` ve `transcript`'in zaten sunduğu hafif, makine-okunur görünüm. Anahtarlar sıralıdır ve boş kuyruk `null` değil `{}`'dir; böylece çıktı betikler için kararlıdır.
+
+| Bayrak | Tip | Varsayılan | Ne yapar |
+|---|---|---|---|
+| `--json` | bool | `false` | Bekleyen sayıları bir JSON nesnesi (`kanal→sayı`) olarak verir; boşken `{}`. |
+
+```bash
+$ atl learnings status --json
+{"learning":3,"profile-fact":1}
 ```
 
 ### `atl learnings peek`
