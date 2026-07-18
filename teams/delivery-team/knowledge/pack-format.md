@@ -158,15 +158,18 @@ its own. This mirrors how `capabilities.profile` enforcement waited for its firs
 consumer — we ship a working reference now and grow the separate-team wiring when a
 real consumer needs it.
 
-The reference pack fills three portable, concern-based areas, each with one concrete
-stack — chosen so the pack exercises all three test surfaces (see the tester's
-`mobile-and-web-surfaces.md`):
+The reference pack fills portable, concern-based areas, each with one concrete
+stack. The first three were chosen so the pack exercises all three test surfaces (see
+the tester's `mobile-and-web-surfaces.md`); `go-cli` was added so the delivery-team can
+**self-deliver its own Go CLI (ATL itself)** on the code surface — the M1 seam applied
+to the platform's own repo, first exercised by the self-host dogfood:
 
 | area (`packs/<name>/`) | reference stack | testing surface it exercises |
 |---|---|---|
 | `web` | React + TypeScript + Vite | web (preview / chrome-devtools MCP) + code (CI) |
 | `mobile` | Flutter + Dart | mobile (booted emulator/simulator) + code (CI) — the design's emphasized, riskiest surface |
 | `api` | Node.js + Express + TypeScript | code (CI) |
+| `go-cli` | Go + Cobra CLI | code (CI) — the stack of ATL's own tooling; the platform's self-delivery pack |
 
 Each is `pack.md` + topic files, release-grade and real (not stubs) but minimal and
 focused. The `mobile` pack carries the *knowledge* of how to boot and drive an
