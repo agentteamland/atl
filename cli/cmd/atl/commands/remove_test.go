@@ -3,6 +3,7 @@ package commands
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/agentteamland/atl/cli/internal/fanout"
@@ -66,6 +67,46 @@ func TestRemoveTeam(t *testing.T) {
 	}
 	if _, err := manifest.Read(projLayer, "acme", "other"); err != nil {
 		t.Error("sibling manifest should survive")
+	}
+}
+
+// TestRemoveSummary: the success line promises `atl gc --undo` reversibility only
+// when files were actually soft-deleted (n>0). For n==0 nothing moved to gc-trash
+// (the manifest's files were already absent on disk), so the summary must omit the
+// hollow undo promise and state the files were already absent instead.
+func TestRemoveSummary(t *testing.T) {
+	cases := []struct {
+		name    string
+		n       int
+		want    []string // substrings the summary must contain
+		notWant []string // substrings it must not contain
+	}{
+		{
+			name: "files soft-deleted → count + reversible promise",
+			n:    3,
+			want: []string{"acme/demo", "3 files", "reversible with `atl gc --undo`"},
+		},
+		{
+			name:    "nothing soft-deleted → already-absent, no undo promise",
+			n:       0,
+			want:    []string{"acme/demo", "already", "absent"},
+			notWant: []string{"reversible", "atl gc --undo", "undo"},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := removeSummary("acme", "demo", tc.n, scope.Project)
+			for _, w := range tc.want {
+				if !strings.Contains(got, w) {
+					t.Errorf("summary must contain %q: %q", w, got)
+				}
+			}
+			for _, nw := range tc.notWant {
+				if strings.Contains(got, nw) {
+					t.Errorf("summary must not contain %q: %q", nw, got)
+				}
+			}
+		})
 	}
 }
 

@@ -19,6 +19,7 @@ You will rarely run these by hand — the loop drives them automatically. Reach 
 
 ```bash
 atl learnings status                 # pending counts per channel
+atl learnings status --json          # pending counts as JSON (channel→count)
 atl learnings peek                   # list pending items (human-readable)
 atl learnings peek --json            # full machine-readable list
 atl learnings peek --channel learning  # filter to one channel
@@ -43,6 +44,17 @@ Otherwise:
 learning queue — pending by channel:
   learning       3
   profile-fact   1
+```
+
+With `--json` it emits the same counts as a stable JSON object (`channel→count`) instead — the lightweight machine-readable view its siblings `peek` and `transcript` already expose. The keys are sorted, and an empty queue is `{}` (not `null`), so the output is stable for scripts.
+
+| Flag | Type | Default | What it does |
+|---|---|---|---|
+| `--json` | bool | `false` | Emit the pending counts as a JSON object (`channel→count`); `{}` when empty. |
+
+```bash
+$ atl learnings status --json
+{"learning":3,"profile-fact":1}
 ```
 
 ### `atl learnings peek`
