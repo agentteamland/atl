@@ -77,6 +77,40 @@ Her konuşmanın başında ajan şunları okur (geçerli olduğu durumda):
 
 Ajan bütün wiki sayfalarını okumaz. Dizini okur (kendiliğinden yüklenir) ve yalnızca görev o alana dokunduğunda ayrıntı sayfalarına olan bağları izler. Bu, bağlamı sıkı tutarken keşfedilebilirliği korur.
 
+## Erişim — her istemde bilgiye danışmak
+
+Wiki dizinini konuşmanın başında bir kez okumak yeterli değildir. Konular kayar ve önündeki istem için önemli olan sayfa, açılış taramasının atladığı bir sayfa olabilir — ya da 60 sayfalık bir dizinde başlığının tek başına ilgisini ele vermediği bir sayfa. Bu yüzden `atl` bilgi katmanına **her istemde** de danışır.
+
+### Kanca (hook)
+
+`UserPromptSubmit` kancasına bağlı `atl retrieve`, projenin bilgi sayfalarını her isteme göre sıralar ve en iyi eşleşmeleri bağlam olarak sunar — yazma tarafı yakalama + [`/drain`](/skills/drain) olan döngünün okuma tarafı. Sıralama **hibrittir**:
+
+- **Sözcüksel (BM25)** tam tanımlayıcıları yakalar — bir fonksiyon adı, bir bayrak, bir `atl#140` — ki semantik model bunları bulanıklaştırır.
+- **Semantik** — küçük bir yerel gömme (embedding) modeli — anahtar-kelime aramasının kaçırdığı kavramsal ve eşanlamlı eşleşmeleri yakalar.
+- İkisi tek bir top-k'ye **RRF ile birleştirilir**.
+
+**Fail-open**'dır: eksik bir dizin, olmayan bir model ya da herhangi bir hata hiçbir şey yazdırmaz ve istemi asla bloklamaz veya geciktirmez.
+
+### Yerel model — harici servis yok
+
+Semantik yarı, küçük bir ONNX modelini (**all-MiniLM-L6-v2**, ~22 MB) tamamen yerelde, saf-Go bir çalışma zamanıyla çalıştırır. İlk kullanımda **bir kez indirilir** (sha256 doğrulamalı), `~/.atl/models` altına konur, ikiliye (binary) gömülmez ve asla harici bir servise çağrı yapmaz — istemleriniz ve bilginiz makineden çıkmaz. Bu, size cevap veren ikinci bir model değil, bir metin→vektör aracıdır; ajan hâlâ Claude'dur. Arka plan dizinlemesini kapatmak için `ATL_NO_RETRIEVE_INDEX` ayarlayın.
+
+### Otomatik, artımlı, arka planda
+
+Bir drain bilgi tabanını değiştirdiğinde dizin kendini yeniden kurar. [`atl session-start`](/cli/setup-hooks) korpusun değiştiğini fark eder ve derlemeyi **arka planda** (ayrık/detached) başlatır, böylece oturumu asla bloklamaz; ve derleme **artımlıdır** — yalnızca metni gerçekten değişen sayfalar yeniden gömülür, dolayısıyla rutin bir drain saniyeler içinde tazelenir. Bu oturumda drain ettiğiniz, bir sonraki oturumda erişilebilir. (`atl work dispatch` altında, worktree başına worker'lar yeniden-derleme fırtınasını önlemek için otomatik derlemeyi atlar.)
+
+### Disiplin
+
+Erişim yargıyı tetikler, onun yerine geçmez. Kanca yapacağınız işle konusu eşleşen bir sayfa sunduğunda, **cevaplamadan önce onu okuyun**. Ve konuşma konu değiştirdiğinde, kancanın sıralamamış olabileceği bir sayfa için sürekli-yüklü `wiki:index`'i yeniden tarayın — dizin sıfır maliyetle bağlamdadır. Kaynak kural: [`core/rules/knowledge-system.md`](https://github.com/agentteamland/atl/blob/main/core/rules/knowledge-system.md).
+
+### Elle kontrol
+
+Derleme normalde kendi kendine çalışır, ama elle de sürebilirsiniz:
+
+- `atl retrieve index` — bu projenin dizinini şimdi (artımlı) yeniden kur.
+- `atl retrieve index --lexical` — yalnızca BM25 dizini kur (model yok, çevrimdışı).
+- `atl retrieve warm` — modeli indir ve boru hattının yüklendiğini kanıtla.
+
 ## Neden iki katman, üç değil?
 
 v1 üç katman tanımlıyordu: **memory** (proje başına, ajan başına, yalnızca eklemeli geçmiş), **journal** (proje başına, ajanlar arası sinyaller, yalnızca eklemeli) ve **wiki** (proje başına, konu tabanlı, yerine yazma / güncelleme).

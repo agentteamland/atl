@@ -38,3 +38,12 @@ At the start of a conversation, an agent reads, when applicable:
 4. **Project-specific rules** under `.atl/` if present.
 
 The agent does NOT read every wiki page — it reads the index and follows links only when the task touches that domain. Tight context, full discoverability.
+
+## Consulting the knowledge layer per prompt
+
+Reading the map once at startup isn't enough: a long conversation shifts topics, and the page that matters for the current prompt may be one the opening scan skipped — or one whose relevance the title alone doesn't reveal. So the knowledge layer is consulted **per prompt**, from two directions:
+
+- **Automatic retrieval (the mechanism).** The `atl retrieve` UserPromptSubmit hook ranks the project's knowledge pages against each prompt — lexical (BM25) fused with a local semantic embedder — and surfaces the top matches as context. It is fail-open and fires with no action from you. When it surfaces a page whose topic matches what you're about to do, **read that page before answering**: it's there because it's likely relevant, including in ways a title scan would miss.
+- **The reflex (the discipline).** Retrieval prompts judgment, it doesn't replace it. When the topic shifts mid-conversation, re-scan the always-loaded `wiki:index` for a page the hook may not have ranked, and follow the link. The index is in context at zero cost — use it rather than answering from memory on a topic the project already has a page on.
+
+The hook rebuilds its index automatically — incrementally, in the background — whenever a drain changes the knowledge base, so what you drain this session is retrievable the next.
