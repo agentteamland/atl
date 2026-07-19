@@ -8,20 +8,27 @@ import (
 	"time"
 )
 
-// RunState is the supervisor's durable mirror of in-flight work (#11/#12): which
-// unit is running where, since when, and the last phase the supervisor observed.
-// It is persisted via the canonical tmp+rename atomic write.
+// RunState is the supervisor's durable mirror of in-flight work (#11/#12): the
+// RUNNING units (which unit is running where, since when, the last phase observed)
+// plus the ids that reached DONE. It is persisted via the canonical tmp+rename write.
 //
-// It is an OBSERVABILITY snapshot, not the recovery substrate: restart
-// reconciliation is worktree/branch-based (Run -> Worktree.Reconcile applies the
-// branch-hygiene asymmetry to leftover delivery/* worktrees), because the durable
-// git state — not a supervisor-written mirror — is the source of truth a fresh
-// process can trust. This file lets a human (or a future status surface) see the
-// last in-flight set; ReadRunState exists for that, not for recovery. Zero LLM
-// context — pure run-state, never a conversation.
+// The RUNNING set is an OBSERVABILITY snapshot: restart reconciliation of in-flight
+// worktrees is git-based (Run -> Worktree.Reconcile applies the branch-hygiene
+// asymmetry to leftover delivery/* worktrees), because durable git state — not a
+// supervisor mirror — is what a fresh process trusts for un-integrated work.
+//
+// The DONE set is the one genuinely recovery-relevant field, and it exists because
+// git CANNOT recover done-ness once a completed unit's branch is torn down (Teardown
+// deletes it locally + on origin, and plan.json stores no tip SHA), and the
+// zero-backend engine cannot ask the tracker. So the ids that reached done are
+// checkpointed here and re-seeded at restart (markPreviouslyDone) so a restart never
+// re-runs an already-merged, already-closed unit (which would re-open a Done item and
+// open a duplicate PR). Guarded by SprintSlug so a stale/other-sprint file can never
+// wrongly skip work. Zero LLM context — pure run-state, never a conversation.
 type RunState struct {
 	SprintSlug string                `json:"sprintSlug"`
-	Units      map[int]*UnitRunState `json:"units"` // keyed by work-item id
+	Units      map[int]*UnitRunState `json:"units"`          // keyed by work-item id — the RUNNING set (observability)
+	Done       []int                 `json:"done,omitempty"` // ids that reached stateDone — the restart-idempotency substrate
 	UpdatedAt  time.Time             `json:"updatedAt"`
 }
 

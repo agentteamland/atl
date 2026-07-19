@@ -140,9 +140,10 @@ Confirm `gh` is installed and authenticated **before** asking anything, by calli
 > **Interactive init vs. the autonomous worker.** This skill runs interactively under the
 > user's own `gh` auth. At run time the autonomous worker gets its token as `GH_TOKEN` injected
 > by the engine (`workerenv.go`, per `backends/github/adapter.md` §1) — **never** from this
-> config. Both need `repo` + `project` scope. The token env var is **fixed to `GH_TOKEN`** (both
-> `gh` and the engine read only `GH_TOKEN`); the config's `credential.ref` (step 4) merely
-> *records* that fact for the reader — it is not engine-read and never stores the token.
+> config. Both need `repo` + `project` scope. The worker always receives its token **as `GH_TOKEN`**
+> (what `gh` reads), but the SOURCE is `config.credential.ref` (step 4): the engine reads
+> `os.Getenv(credential.ref)` (default `GH_TOKEN`) and injects it as `GH_TOKEN` — parity with Azure's
+> `pat.ref`. It never stores the token.
 
 #### 3B.2 Discover and confirm the repo (`owner/repo`)
 
@@ -250,10 +251,11 @@ GitHub-native (`owner` / `repo` / `projectNumber`, not `org` / `project`):
 }
 ```
 
-For GitHub the token env var is **fixed to `GH_TOKEN`** — the engine hardcodes `os.Getenv("GH_TOKEN")`
-and `gh` itself reads only `GH_TOKEN` / `GITHUB_TOKEN`. So `credential.ref` is an *informational
-record* (it documents where the token lives), **not** the configurable indirection Azure's
-`pat.ref` is (which the engine genuinely reads); keep it `"GH_TOKEN"`.
+For GitHub the worker receives its token **as `GH_TOKEN`** (what `gh` reads), but `credential.ref`
+names the SOURCE env var the engine reads the value FROM: the engine reads
+`os.Getenv(config.credential.ref)` (default `GH_TOKEN`) and injects it as `GH_TOKEN` — the same
+configurable indirection Azure's `pat.ref` is. `"GH_TOKEN"` is the sensible default; re-point it
+only if your token lives in a differently-named var.
 
 ### 5. Write `.delivery/methodology.json` — the shared Scrum descriptor
 

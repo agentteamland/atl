@@ -54,8 +54,15 @@ holds *intent*; the active backend holds concrete *names* (resolved at runtime, 
 The descriptor is deliberately **not** a per-phase state-machine — phase flow lives in the
 ceremony-skills, not in descriptor-encoded transitions. Encoding transitions/guards here would
 be the multi-methodology *engine*, which is deferred (YAGNI: build the config-seam, not the
-engine). A second methodology (Kanban/SAFe) would ship as a second descriptor instance that
-overrides these fields without touching any ceremony.
+engine). A second methodology **that stays Scrum-shaped** (e.g. a different velocity window or capacity
+unit) ships as a second descriptor instance overriding these fields with no ceremony edit. But a
+**genuinely different** methodology (Kanban's WIP-limited continuous flow, SAFe's program-increment
+tier) is **not** a descriptor swap: `/sprint-plan` is velocity-driven sprint selection *by
+definition*, so Kanban needs its own planning/dispatch/review ceremonies, and the descriptor's
+`cadence.planningCeremonies` *names* them — so those ceremonies must exist. The config-seam is
+ceremony-agnostic (the deterministic engine reads `plan.json`, never the descriptor), which is why
+the seam is done; but "multi-methodology" means writing a second ceremony chain, not one more JSON
+file.
 
 ## 2. `config.json` — connection identity (no secret)
 
@@ -113,7 +120,7 @@ procedure).
 | `branchPair` | the project's actual `dev` / `release` branch names — same two-branch delivery flow as Azure. |
 | `backend` | `"github"`. |
 | `methodology` | the `id` of the active `methodology.json` (v1: `"scrum"`) — backend-independent. |
-| `credential` | **`{ "ref": "GH_TOKEN" }` — an informational record of where the token lives, never the token.** For GitHub the token env var is **fixed to `GH_TOKEN`** (both `gh` itself and the engine read only `GH_TOKEN`/`GITHUB_TOKEN`): the engine hardcodes `os.Getenv("GH_TOKEN")` and injects it into workers (`workerenv.go`), and does **not** parse this field. So — unlike Azure's `pat.ref` (§ Azure), which the engine genuinely reads to locate the PAT — `credential.ref` documents rather than configures; changing it does not change which env var is read. There is no token field. |
+| `credential` | **`{ "ref": "GH_TOKEN" }` — a **by-name** pointer to the env var the GitHub token lives in, never the token itself.** The engine reads the value from that env var (`os.Getenv(config.credential.ref)`, defaulting to `GH_TOKEN`) and injects it into workers **as** `GH_TOKEN` so `gh` finds it (`workerenv.go`) — so `credential.ref` names the SOURCE env var the engine reads from (parity with Azure's `pat.ref`), and re-pointing it re-points the read. There is no token field. |
 
 GitHub carries **no** `wikiId` (its durable-knowledge store is in-repo `/docs`, which has no id —
 see `backends/github/adapter.md` §9) and **no** `transport` / `restFallbackEnabled` (those are
@@ -124,10 +131,10 @@ the Azure MCP-first transport policy; GitHub is `gh`-native, no MCP, no REST car
 
 - **Azure** — `pat.ref` in priority: (1) the Azure MCP's own configured auth, (2) an env var
   named by `pat.ref` (default `AZURE_DEVOPS_PAT`), (3) the OS keychain.
-- **GitHub** — the token env var is **fixed to `GH_TOKEN`**: the engine reads `GH_TOKEN` from its
-  own environment and injects it into workers (`workerenv.go`), so `gh` finds it. `credential.ref`
-  records this for the reader but is **not** engine-read — it is not a configurable indirection
-  like Azure's `pat.ref`.
+- **GitHub** — `credential.ref` (default `GH_TOKEN`): the engine reads the value from the env var it
+  names (`os.Getenv(config.credential.ref)`) and injects it into workers **as** `GH_TOKEN` so `gh`
+  finds it (`workerenv.go`) — the same configurable indirection as Azure's `pat.ref` (the worker's
+  token is always exposed as `GH_TOKEN`; `credential.ref` names where the engine reads it from).
 
 A committed token is exactly the exfiltration surface `atl guard` + the `untrusted-input` rule
 exist to protect — `/delivery-init` **refuses to write a literal token**, and no ceremony ever
