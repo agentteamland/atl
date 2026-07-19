@@ -41,9 +41,9 @@ semantic passes below.
 ### 2. Focus on what changed (change-aware)
 A full-corpus sweep every time is wasteful. Scope to the skills/agents touched
 since the last stocktake — the cursor is in `~/.atl/skill-stocktake-state.json`
-(`lastStocktakeSHA`):
+(`lastSHA`):
 ```bash
-git diff --name-only <lastStocktakeSHA>..HEAD -- core/skills core/rules teams
+git diff --name-only <lastSHA>..HEAD -- core/skills core/rules teams
 ```
 If nothing changed and you were not asked for `--all`, there's nothing to sweep —
 record and stop. `--all` forces the whole corpus.

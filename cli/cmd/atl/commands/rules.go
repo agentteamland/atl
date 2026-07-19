@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/agentteamland/atl/cli/internal/rulesscan"
-	"github.com/agentteamland/atl/cli/internal/rulesstate"
+	"github.com/agentteamland/atl/cli/internal/sweepstate"
 	"github.com/spf13/cobra"
 )
 
@@ -47,7 +47,7 @@ var rulesScanCmd = &cobra.Command{
 
 		if record {
 			if sha := gitHEAD(root); sha != "" {
-				_ = rulesstate.Record(sha, time.Now())
+				_ = sweepstate.Rules.Record(sha, time.Now())
 			}
 			fmt.Printf("atl rules: recorded HEAD as the last distill (%d candidate statement(s))\n", len(stmts))
 			return nil
@@ -79,25 +79,9 @@ func rulesSessionSignal() {
 	if err != nil {
 		return
 	}
-	if rulesDistillDue(root) {
+	if sweepstate.Rules.Due(root) {
 		fmt.Println("atl rules: a distill is due — run /rules-distill to mine recurring principles into core rules")
 	}
-}
-
-// rulesDistillDue reports whether a /rules-distill sweep is due: corpus-affecting
-// commits (core/ or teams/) have landed since the last recorded distill, gated by
-// a ~1-day runaway-guard. Mirrors stocktakeDue / docsAuditDue.
-func rulesDistillDue(repoRoot string) bool {
-	st, err := rulesstate.Load()
-	if err != nil {
-		return false
-	}
-	if st.LastDistillAt != "" {
-		if t, perr := time.Parse(time.RFC3339, st.LastDistillAt); perr == nil && time.Since(t) < 24*time.Hour {
-			return false
-		}
-	}
-	return assetAffectingCommitsSince(repoRoot, st.LastDistillSHA)
 }
 
 func init() {
