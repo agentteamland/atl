@@ -3,13 +3,11 @@ package commands
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/agentteamland/atl/cli/internal/skillcheck"
-	"github.com/agentteamland/atl/cli/internal/skillsstate"
+	"github.com/agentteamland/atl/cli/internal/sweepstate"
 	"github.com/spf13/cobra"
 )
 
@@ -62,7 +60,7 @@ var skillsCheckCmd = &cobra.Command{
 
 		if record && fails == 0 {
 			if sha := gitHEAD(root); sha != "" {
-				_ = skillsstate.Record(sha, time.Now())
+				_ = sweepstate.Skills.Record(sha, time.Now())
 			}
 		}
 
@@ -120,53 +118,9 @@ func skillsSessionSignal() {
 	if fails > 0 {
 		fmt.Printf("atl skills: %d asset quality item(s) — run `atl skills check`\n", fails)
 	}
-	if stocktakeDue(root) {
+	if sweepstate.Skills.Due(root) {
 		fmt.Println("atl skills: a stocktake is due — run /skill-stocktake to sweep skills for obedience + redundancy")
 	}
-}
-
-// stocktakeDue reports whether a /skill-stocktake full sweep is due:
-// asset-affecting commits (core/ or teams/) have landed since the last recorded
-// stocktake, gated by a ~1-day runaway-guard. Mirrors docsAuditDue.
-func stocktakeDue(repoRoot string) bool {
-	st, err := skillsstate.Load()
-	if err != nil {
-		return false
-	}
-	if st.LastStocktakeAt != "" {
-		if t, perr := time.Parse(time.RFC3339, st.LastStocktakeAt); perr == nil && time.Since(t) < 24*time.Hour {
-			return false // runaway-guard: don't sweep again within ~1 day
-		}
-	}
-	return assetAffectingCommitsSince(repoRoot, st.LastStocktakeSHA)
-}
-
-// assetAffectingCommitsSince reports whether any commit touching core/ or teams/
-// has landed since sinceSHA (or, when sinceSHA is empty, whether the repo has any
-// such commit at all — i.e. it was never stocktaken).
-func assetAffectingCommitsSince(repoRoot, sinceSHA string) bool {
-	run := func(sha string) ([]byte, error) {
-		args := []string{"-C", repoRoot, "log", "--oneline", "-1"}
-		if sha != "" {
-			args = append(args, sha+"..HEAD")
-		}
-		args = append(args, "--", "core", "teams")
-		return exec.Command("git", args...).Output()
-	}
-	out, err := run(sinceSHA)
-	if err != nil {
-		// A recorded SHA git no longer knows (rebase / squash / gc) makes the range
-		// query fail — treat it as never-audited (retry with no range) so the stocktake
-		// / distill signal doesn't go permanently silent, rather than reading the git
-		// failure as "nothing changed".
-		if sinceSHA == "" {
-			return false
-		}
-		if out, err = run(""); err != nil {
-			return false
-		}
-	}
-	return len(strings.TrimSpace(string(out))) > 0
 }
 
 func init() {
