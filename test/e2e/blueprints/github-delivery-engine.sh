@@ -200,7 +200,7 @@ echo "$out" | tail -25
 
 # NOTE: the engine's own summary (LLM worker may block → surfaced by the CORE PR assertion)
 [ "$rc" -eq 0 ] && ok "engine dispatch returned rc=0" || note "dispatch rc=$rc (a blocked worker is a real signal — the merged-PR gate below is the CORE truth)"
-echo "$out" | grep -q "1 done" && ok "the engine reported the unit done" || note "engine did not print '1 done' (LLM worker fidelity; see the merged-PR gate)"
+echo "$out" | grep -q "complete: 1 done" && ok "the engine reported the unit done" || note "engine did not print 'complete: 1 done' (LLM worker fidelity; see the merged-PR gate)"
 
 # CORE: the ENGINE's real worker opened + landed a merge to dev THIS run.
 mrg=$(gh pr list --repo "$REPO" --base dev --state merged --limit 400 --json number -q 'length' 2>/dev/null || echo 0)
