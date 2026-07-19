@@ -156,6 +156,17 @@ Offer discovered values rather than asking the user to type identifiers blind:
 - **Branch pair** — the `dev` / `release` names (defaults `dev` / `release`; confirm, allow
   override). Same two-branch delivery flow as Azure.
 - **Methodology** — confirm Scrum (the only v1 instance; the seam is real).
+- **Merge method (preflight — warn, don't block)** — the autonomous loop completes a PBI by
+  merging its PR with a **real merge commit** (`gh pr merge --merge`), which the engine's
+  `MergedToBase` check then verifies; a squash- or rebase-merge rewrites the SHA, so a
+  genuinely-merged unit would look unmerged and false-block (see
+  [`backends/github/adapter.md`](../../backends/github/adapter.md) §10). Read the repo's setting
+  with `gh api repos/<owner>/<repo> --jq '.allow_merge_commit'`. If it returns `false`, **warn
+  and continue** (this is a fixable repo setting, not a config value — same warn-and-continue
+  posture as a missing Iteration field below): tell the user that *Allow merge commits* is
+  disabled on this repo, so the autonomous merge gate will error or false-block completions, and
+  to enable it under **Settings → General → Pull Requests** before running a sprint. `true`
+  (GitHub's default) → nothing to do.
 
 #### 3B.3 Board (GitHub Project) — connect an existing one or create a new one
 

@@ -184,7 +184,9 @@ The interface's PR concept (#11), bound to `gh`, honouring the D3 decision:
 - **Merge = `gh pr merge --merge` ONLY** (a real merge commit). **Never `--squash`/`--rebase`** —
   they rewrite the SHA and false-block the engine's `MergedToBase` (`rev-list origin/dev..branch
   == 0`), the exact GitHub twin of Azure's NoFastForward requirement. **Repo prerequisite:**
-  "Allow merge commits" enabled on the repo.
+  "Allow merge commits" enabled on the repo — `/delivery-init` preflights this (§3B.2:
+  `gh api repos/<owner>/<repo> --jq '.allow_merge_commit'`) and warns if it is disabled, but a
+  repo switched to squash-only *after* init still needs it re-enabled.
 - **Issue completion:** `Fixes #N` auto-closes an issue **only on merge to the DEFAULT branch**,
   but the flow merges to `dev` → so on merge-verify the tech-lead explicitly `gh issue close #N`
   + sets the Projects Status to Done. Do not rely on auto-close for the `dev` merge.
