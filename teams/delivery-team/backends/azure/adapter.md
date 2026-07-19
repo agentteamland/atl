@@ -186,7 +186,12 @@ guessing**:
   Description headings) + `wit_list_work_item_comments` filtered to the comment starting
   with its sentinel — `**[Technical Analysis]**` for the analysis, `**[Canonical Brief]**`
   for the brief — a **sentinel match, not "the newest comment"**, so a later human comment
-  never shadows either. (The brief's `atl-key` stays the idempotency key — a re-run
+  never shadows either. For a decomposed child unit with no `**[Technical Analysis]**` of its
+  own (only the tech-lead's `**[Canonical Brief]**`), read the analysis from its **nearest
+  ancestor** Feature — traverse the parent via `wit_get_work_item` relations (the
+  `System.LinkTypes.Hierarchy-Reverse` parent link), climbing parent links until you reach the
+  ancestor that bears a `**[Technical Analysis]**` (concept #1). (The brief's `atl-key` stays
+  the idempotency key — a re-run
   sentinel-matches and updates in place; the sentinel is the *locator*, the key is the
   *convergence* guard.)
 
@@ -211,7 +216,8 @@ no two roles fight over a page:
   `/refine` / integration review. This keeps write-authority clean and avoids
   N-worker write races.
 - **Read contract:** a developer worker's context = stack-pack + project-wiki + task +
-  the tech-lead's canonical brief. The **brief embeds the relevant wiki page paths**
+  the item's `**[Technical Analysis]**` (its own, or its nearest ancestor Feature's for a
+  decomposed unit) + the tech-lead's canonical brief. The **brief embeds the relevant wiki page paths**
   (`Architecture/` + `Conventions/` for the task's area); the worker pulls them via
   `wiki_get_page_content`; `search_wiki` handles discovery when a path isn't pre-named.
 - **Write mechanics:** `wiki_create_or_update_page` is an **idempotent upsert** (safe
