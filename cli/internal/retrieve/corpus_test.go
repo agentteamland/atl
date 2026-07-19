@@ -47,3 +47,27 @@ func TestWalkCorpusEmptyInput(t *testing.T) {
 		t.Fatalf("nil dirs: want no docs no error, got %d docs, err %v", len(docs), err)
 	}
 }
+
+func TestWalkCorpusSkipsVendorAndHidden(t *testing.T) {
+	root := t.TempDir()
+	write := func(rel string) {
+		p := filepath.Join(root, rel)
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte("# T\nbody"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("real.md")
+	write("node_modules/dep/README.md") // vendored — must be skipped
+	write(".cache/stale.md")            // hidden dir — must be skipped
+
+	docs, err := WalkCorpus([]string{root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(docs) != 1 || filepath.Base(docs[0].Path) != "real.md" {
+		t.Fatalf("want only real.md, got %+v", docs)
+	}
+}

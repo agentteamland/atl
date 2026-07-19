@@ -134,6 +134,13 @@ var sessionStartCmd = &cobra.Command{
 		// opts out. This is the "manual atl update becomes unnecessary" v2 promise.
 		autoUpdateTeams(project)
 
+		// Automatic retrieval index refresh — the #140 read side. When this
+		// project's knowledge corpus changed since the last build, spawn a detached
+		// `atl retrieve index` so the per-prompt hook has a fresh index. Deterministic
+		// (no reliance on the LLM drain skill), throttled, worktree-skipping, and
+		// never-fail; ATL_NO_RETRIEVE_INDEX opts out.
+		autoIndexRetrieval(project)
+
 		return nil
 	},
 }

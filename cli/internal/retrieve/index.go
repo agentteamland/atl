@@ -8,9 +8,12 @@ import (
 	"path/filepath"
 )
 
-// indexFormatVersion bumps when the on-disk gob layout changes. The index is a
-// rebuildable cache, so a version mismatch is treated as "no index yet" (rebuild
-// on the next drain) rather than an error.
+// indexFormatVersion bumps when the on-disk gob layout OR the embedding model
+// changes — the incremental reuse key is (path, text), which is blind to the
+// model, so swapping models without a bump would produce a silently mixed index
+// (old-model vectors on unchanged docs, new-model on changed ones). The index is
+// a rebuildable cache, so a version mismatch is treated as "no index yet" (a full
+// rebuild) rather than an error.
 const indexFormatVersion = 1
 
 // Index is the persisted retrieval index for one corpus: the documents plus one
@@ -29,23 +32,41 @@ type Result struct {
 	Title string
 }
 
-// Build indexes docs, producing one vector per document (see embedDoc for how a
-// long document is chunked and pooled). It is best-effort: a document whose text
-// cannot be embedded gets a nil vector and stays lexically searchable, rather
-// than failing the whole index. A nil embedder builds a lexical-only index (no
-// vectors) — so retrieval works from the first drain, before the model has
-// downloaded, degrading to BM25. Build is the cold path — run at drain time, not
-// per query.
+// Build indexes docs from scratch — see BuildIncremental, which it delegates to
+// with no prior index.
 func Build(ctx context.Context, docs []Doc, e *Embedder) (*Index, error) {
+	return BuildIncremental(ctx, docs, e, nil), nil
+}
+
+// BuildIncremental indexes docs, producing one vector per document (see embedDoc
+// for how a long document is chunked and pooled), reusing the embedding of any
+// document whose path and text are unchanged from old. That reuse is what makes
+// re-indexing cheap: a drain that touched one page re-embeds only that page
+// (seconds) instead of the whole corpus (minutes). It is best-effort — a document
+// that can't be embedded gets a nil vector and stays lexically searchable. A nil
+// embedder builds a lexical-only index (no vectors) so retrieval works before the
+// model has downloaded, degrading to BM25. This is the cold path — run at drain
+// time, not per query.
+func BuildIncremental(ctx context.Context, docs []Doc, e *Embedder, old *Index) *Index {
 	ix := &Index{Version: indexFormatVersion, Docs: docs}
 	if e == nil {
-		return ix, nil // lexical-only index
+		return ix // lexical-only index
+	}
+	reuse := make(map[string][]float32, len(docs))
+	if old != nil && len(old.Vecs) == len(old.Docs) {
+		for i, d := range old.Docs {
+			reuse[d.Path+"\x00"+d.Text] = old.Vecs[i]
+		}
 	}
 	ix.Vecs = make([][]float32, len(docs))
 	for i, d := range docs {
+		if v, ok := reuse[d.Path+"\x00"+d.Text]; ok {
+			ix.Vecs[i] = v // unchanged since the last index — reuse the embedding
+			continue
+		}
 		ix.Vecs[i] = embedDoc(ctx, e, d.Text)
 	}
-	return ix, nil
+	return ix
 }
 
 // embedDoc turns a document into one vector. The embedder has a hard 512-token

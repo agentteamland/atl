@@ -94,6 +94,37 @@ func TestBuildQueryLexicalOnly(t *testing.T) {
 	}
 }
 
+// TestBuildIncrementalReuse verifies the perf contract: an unchanged document
+// carries its old vector over (the exact backing slice), while a changed one is
+// re-embedded. Model-gated (needs the embedder to produce vectors).
+func TestBuildIncrementalReuse(t *testing.T) {
+	dir := modelDirIfPresent(t)
+	ctx := context.Background()
+	e, err := NewEmbedder(ctx, dir)
+	if err != nil {
+		t.Fatalf("NewEmbedder: %v", err)
+	}
+	defer e.Close()
+
+	docs := []Doc{{Path: "a", Text: "alpha content about a dispatch merge"}}
+	old, err := Build(ctx, docs, e)
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	// Identical docs → the vector slice is reused, not recomputed.
+	same := BuildIncremental(ctx, docs, e, old)
+	if len(same.Vecs) != 1 || &same.Vecs[0][0] != &old.Vecs[0][0] {
+		t.Fatal("unchanged doc should reuse the old vector slice")
+	}
+
+	// Changed text → re-embedded (a different backing slice).
+	changed := BuildIncremental(ctx, []Doc{{Path: "a", Text: "completely different text"}}, e, old)
+	if len(changed.Vecs[0]) > 0 && &changed.Vecs[0][0] == &old.Vecs[0][0] {
+		t.Fatal("changed doc should be re-embedded, not reused")
+	}
+}
+
 // TestBuildQueryEndToEnd exercises the full hybrid path with the real embedder.
 // It skips when the model is not downloaded locally (CI stays offline).
 func TestBuildQueryEndToEnd(t *testing.T) {
