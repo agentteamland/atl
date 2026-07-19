@@ -1,6 +1,7 @@
 package dispatch
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -62,5 +63,36 @@ func TestPlanPath(t *testing.T) {
 	want := filepath.Join("/proj", ".delivery", "plan.json")
 	if got != want {
 		t.Errorf("PlanPath = %q, want %q", got, want)
+	}
+}
+
+func TestWorkUnitPriorityKey(t *testing.T) {
+	// The engine must accept either the preferred "priority" key or the legacy
+	// "stackRank" key as the admission tie-break, so a ceremony emitting either
+	// lands a real value instead of a silent 0 (which would flatten the frontier
+	// to id-order). "priority" wins when both are present.
+	cases := []struct {
+		name string
+		json string
+		want int
+	}{
+		{"stackRank only (legacy)", `{"id":1,"stackRank":7}`, 7},
+		{"priority only (preferred)", `{"id":1,"priority":5}`, 5},
+		{"both — priority wins", `{"id":1,"priority":5,"stackRank":9}`, 5},
+		{"neither — zero", `{"id":1}`, 0},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			var u WorkUnit
+			if err := json.Unmarshal([]byte(c.json), &u); err != nil {
+				t.Fatalf("Unmarshal: %v", err)
+			}
+			if u.StackRank != c.want {
+				t.Errorf("StackRank = %d, want %d", u.StackRank, c.want)
+			}
+			if u.ID != 1 {
+				t.Errorf("ID = %d, want 1 (sibling fields must still unmarshal via the alias)", u.ID)
+			}
+		})
 	}
 }
