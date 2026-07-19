@@ -162,7 +162,10 @@ verbatim):
   identity, so there is no separate slug field), `title` (for logging + PR/branch context),
   `predecessors` (the work-item ids that must complete first — the predecessor edges from step 1,
   concept #8, **among this sprint's units only**), and `stackRank` (the priority, concept #5 — the
-  admission tie-break: lower value = higher priority).
+  admission tie-break: lower value = higher priority). The engine accepts **either** JSON key for
+  this field — `priority` (the concept-#5 name) **or** the legacy `stackRank` — so a plan emitting
+  either lands a real value (`priority` wins if both are present); emit neither and the frontier
+  falls back to id-order.
 
 Then launch the engine: run **`atl work dispatch`** (optionally `--cap N`; the default cap is `4`,
 matching the ~4–6 concurrency budget). The deterministic Go scheduler reads `plan.json`,
