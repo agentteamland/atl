@@ -57,7 +57,8 @@ export default defineConfig({
                 { text: 'Concepts', link: '/guide/concepts' },
                 { text: 'Karpathy guidelines', link: '/guide/karpathy-guidelines' },
                 { text: 'Skill selection discipline', link: '/guide/skill-selection-discipline' },
-                { text: 'Untrusted input', link: '/guide/untrusted-input' }
+                { text: 'Untrusted input', link: '/guide/untrusted-input' },
+                { text: 'Execution hygiene', link: '/guide/execution-hygiene' }
               ]
             },
             {
@@ -196,7 +197,8 @@ export default defineConfig({
                 { text: 'Kavramlar', link: '/tr/guide/concepts' },
                 { text: 'Karpathy ilkeleri', link: '/tr/guide/karpathy-guidelines' },
                 { text: 'Skill seçim disiplini', link: '/tr/guide/skill-selection-discipline' },
-                { text: 'Güvenilmez girdi', link: '/tr/guide/untrusted-input' }
+                { text: 'Güvenilmez girdi', link: '/tr/guide/untrusted-input' },
+                { text: 'İcra hijyeni', link: '/tr/guide/execution-hygiene' }
               ]
             },
             {
