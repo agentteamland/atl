@@ -404,6 +404,56 @@ func TestMarkPreviouslyBlockedSkipsUnitOnRestart(t *testing.T) {
 	}
 }
 
+func TestMarkPreviouslyDoneSkipsUnitOnRestart(t *testing.T) {
+	// A prior run completed unit 1 (its branch/worktree torn down, no BlockedReport); the
+	// durable run-state checkpointed it done. On restart the engine must NOT re-admit it —
+	// a re-run would re-open a Done work-item and open a duplicate/empty PR. RED before
+	// markPreviouslyDone existed (unit 1 was re-spawned because done was never reconstructed).
+	plan := planOf("s1", WorkUnit{ID: 1})
+	s, w := newTestScheduler(t, plan, 1)
+	if err := WriteRunState(RunStatePath(s.ProjectRoot), &RunState{SprintSlug: "s1", Done: []int{1}}, w.now); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	sum, err := s.RunContext(ctx) // ctx-bounded so a regression (unit re-admitted) fails fast, never hangs the suite
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.stateOf(1) != stateDone {
+		t.Fatalf("unit 1 was done in the prior run; restart must seed it done, got %v", s.stateOf(1))
+	}
+	if _, spawned := w.handles[1]; spawned {
+		t.Fatal("unit 1 must NOT be re-admitted / re-spawned on restart")
+	}
+	if len(sum.Done) != 1 || sum.Done[0] != 1 {
+		t.Errorf("the previously-done unit should surface as done, got %+v", sum)
+	}
+}
+
+func TestMarkPreviouslyDoneGuardsOnSprintSlug(t *testing.T) {
+	// A run-state left by a DIFFERENT sprint must never skip this sprint's work.
+	plan := planOf("s2", WorkUnit{ID: 1})
+	s, w := newTestScheduler(t, plan, 1)
+	if err := WriteRunState(RunStatePath(s.ProjectRoot), &RunState{SprintSlug: "s1", Done: []int{1}}, w.now); err != nil {
+		t.Fatal(err)
+	}
+	s.markPreviouslyDone()
+	if s.stateOf(1) != statePending {
+		t.Fatalf("a run-state from sprint s1 must not seed done in sprint s2; unit 1 should stay pending, got %v", s.stateOf(1))
+	}
+	// the matching-sprint case DOES seed done.
+	plan2 := planOf("s1", WorkUnit{ID: 1})
+	s2, w2 := newTestScheduler(t, plan2, 1)
+	if err := WriteRunState(RunStatePath(s2.ProjectRoot), &RunState{SprintSlug: "s1", Done: []int{1}}, w2.now); err != nil {
+		t.Fatal(err)
+	}
+	s2.markPreviouslyDone()
+	if s2.stateOf(1) != stateDone {
+		t.Fatalf("a matching-sprint run-state must seed done; got %v", s2.stateOf(1))
+	}
+}
+
 // --- abort cleanup: an aborting Run kills every still-running worker -----------
 
 func TestAbortRunningKillsLiveWorkers(t *testing.T) {
