@@ -186,6 +186,11 @@ func (s *Scheduler) RunContext(ctx context.Context) (Summary, error) {
 	// (which would reset its retry budget across the restart).
 	s.markPreviouslyBlocked()
 
+	// Respect a prior run's completions too: a unit that reached done in a prior run is
+	// re-seeded from the durable run-state so a restart never re-runs it (git can't
+	// recover done-ness once the branch is torn down) — the done-side sibling of the above.
+	s.markPreviouslyDone()
+
 	orphans, err := s.Worktree.Reconcile(map[string]bool{})
 	if err != nil {
 		return Summary{}, err
@@ -351,17 +356,18 @@ func (s *Scheduler) complete(u *unitSched, now time.Time) error {
 	}
 	if dirty {
 		s.Log(fmt.Sprintf("unit %d done (merged to %s) but left uncommitted changes at %s — preserved; inspect + remove when reviewed", u.unit.ID, s.Worktree.BaseRef, u.rs.WorktreePath))
-		u.state = stateDone
-		s.finishRunning(u)
-		return nil
+	} else {
+		if err := s.Worktree.Teardown(s.Plan.SprintSlug, u.unit.ID); err != nil {
+			return err
+		}
+		s.Log(fmt.Sprintf("unit %d done — merged to %s, worktree reclaimed", u.unit.ID, s.Worktree.BaseRef))
 	}
-	if err := s.Worktree.Teardown(s.Plan.SprintSlug, u.unit.ID); err != nil {
-		return err
-	}
-	s.Log(fmt.Sprintf("unit %d done — merged to %s, worktree reclaimed", u.unit.ID, s.Worktree.BaseRef))
 	u.state = stateDone
 	s.finishRunning(u)
-	return nil
+	// Checkpoint the done set to the durable run-state immediately — not just at the next
+	// poll's persist — so a crash between this merge and the next step cannot re-run this
+	// already-completed unit on restart (markPreviouslyDone re-seeds it).
+	return s.persist(now)
 }
 
 // recover runs the #12 ladder for a stalled or crashed worker: kill it, then
@@ -553,10 +559,14 @@ func (s *Scheduler) spawnStage(us *unitSched, worktreePath string, now time.Time
 func (s *Scheduler) persist(now time.Time) error {
 	rs := &RunState{SprintSlug: s.Plan.SprintSlug, Units: make(map[int]*UnitRunState)}
 	for id, u := range s.units {
-		if u.state == stateRunning && u.rs != nil {
+		switch {
+		case u.state == stateRunning && u.rs != nil:
 			rs.Units[id] = u.rs
+		case u.state == stateDone:
+			rs.Done = append(rs.Done, id) // the restart-idempotency substrate (markPreviouslyDone re-seeds it)
 		}
 	}
+	sort.Ints(rs.Done) // deterministic output (map iteration order is random)
 	return WriteRunState(RunStatePath(s.ProjectRoot), rs, now)
 }
 
@@ -600,6 +610,31 @@ func (s *Scheduler) markPreviouslyBlocked() {
 			u.state = stateBlocked
 			s.Log(fmt.Sprintf("unit %d was blocked in a prior run (%s) — skipping; clear the report to retry",
 				id, filepath.Join(BlockedDir(s.ProjectRoot), e.Name())))
+		}
+	}
+}
+
+// markPreviouslyDone re-seeds the done set from the durable run-state so a restart
+// never re-admits a unit that already merged-and-completed in a prior run. Git cannot
+// recover done-ness once the unit's branch is torn down (Teardown deletes it locally +
+// on origin, and plan.json carries no tip SHA), and the zero-backend engine can't ask
+// the tracker — so RunState.Done, checkpointed at complete(), is the only signal. Without
+// this a restart re-opens a Done work-item and opens a duplicate/empty PR, and holds the
+// unit's successors until the redundant re-run finishes. The done-side sibling of
+// markPreviouslyBlocked; guarded by SprintSlug so a stale or other-sprint run-state file
+// never wrongly skips this sprint's work.
+func (s *Scheduler) markPreviouslyDone() {
+	rs, err := ReadRunState(RunStatePath(s.ProjectRoot))
+	if err != nil {
+		return // no run-state yet (first run) — nothing to re-seed
+	}
+	if rs.SprintSlug != s.Plan.SprintSlug {
+		return // a run-state left by a different sprint — not ours
+	}
+	for _, id := range rs.Done {
+		if u, ok := s.units[id]; ok && u.state == statePending {
+			u.state = stateDone
+			s.Log(fmt.Sprintf("unit %d was completed in a prior run — skipping (restart idempotency)", id))
 		}
 	}
 }
