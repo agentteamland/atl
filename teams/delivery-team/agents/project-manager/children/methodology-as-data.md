@@ -40,10 +40,13 @@ exist to stop.
 | `branches` | the descriptor's *default* dev/release names — but the *authoritative* names are `config.branchPair` (see the reconciliation below). |
 
 > **WHY methodology-as-data and not baked-in logic.** If "3-sprint velocity window" or "Scrum"
-> lived in my prose, a second methodology would require rewriting the role. Reading it from a
-> descriptor makes the methodology a *swappable instance*: Kanban ships as a second
-> `methodology.json` that overrides these fields, and every ceremony/role — including me — works
-> unchanged. This is the config-seam's whole point: settings are data a ceremony reads, never logic
+> lived in my prose, tuning the *parameters* would require rewriting the role. Reading them from a
+> descriptor makes them *swappable data*: a descriptor with a different `velocityWindowN` or capacity
+> `unit` changes my math with zero change to me. That **parametric** swap is ceremony-free — but a
+> **genuinely different** methodology (Kanban's WIP-limited flow, SAFe's PI tier) is NOT: `/sprint-plan`
+> is velocity-driven sprint selection *by definition*, so Kanban needs its own ceremonies, which
+> `cadence.planningCeremonies` would *name* (so they must exist). This is the config-seam's point:
+> settings are data a ceremony reads, never logic
 > baked into an agent (`config-and-methodology.md` §3). The descriptor is deliberately **not** a
 > per-phase state machine — encoding phase transitions would be the multi-methodology *engine*,
 > which is deferred (YAGNI); I read intent and act, I don't execute a descriptor-encoded FSM.

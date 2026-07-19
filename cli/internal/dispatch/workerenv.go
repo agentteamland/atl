@@ -26,6 +26,9 @@ type DeliveryConfig struct {
 	PAT struct {
 		Ref string `json:"ref"`
 	} `json:"pat"`
+	Credential struct {
+		Ref string `json:"ref"`
+	} `json:"credential"`
 }
 
 // DevBranch is the integration branch the engine forks worktrees off and merges
@@ -81,6 +84,18 @@ func (c *DeliveryConfig) patRef() string {
 	return "AZURE_DEVOPS_PAT"
 }
 
+// githubTokenRef is the env-var name the GitHub token is read from — config.credential.ref,
+// defaulting to GH_TOKEN (matching /delivery-init + backends/github/adapter.md). The engine
+// reads the value from THAT env var and injects it into the worker as GH_TOKEN, so `gh` always
+// finds it while config.credential.ref names WHERE the value comes from — parity with Azure's
+// config.pat.ref, and no longer an inert field.
+func (c *DeliveryConfig) githubTokenRef() string {
+	if c != nil && c.Credential.Ref != "" {
+		return c.Credential.Ref
+	}
+	return "GH_TOKEN"
+}
+
 // mcpConfigJSON is the .mcp.json binding the `azureDevOps` server to the official
 // @azure-devops/mcp launcher scoped to THIS project's org (D3). Generated from
 // config.json's org so a spawned worker ALWAYS gets the project's target org
@@ -124,9 +139,11 @@ func deliveryWorkerEnv(cfg *DeliveryConfig) []string {
 	if cfg.activeBackend() == "github" {
 		// GitHub backend (D3): the worker drives `gh`, which reads GH_TOKEN from its
 		// env — no Azure org/PAT and no azureDevOps MCP (the scheduler skips
-		// writeMCPConfig for github). If GH_TOKEN is unset the worker blocks honestly
+		// writeMCPConfig for github). The token is read from the engine's own env under
+		// config.credential.ref (default GH_TOKEN) and injected as GH_TOKEN so `gh` finds
+		// it — parity with Azure's config.pat.ref. If it is unset the worker blocks honestly
 		// at its first gh call — never a silent green, the same discipline as Azure.
-		if tok := os.Getenv("GH_TOKEN"); tok != "" {
+		if tok := os.Getenv(cfg.githubTokenRef()); tok != "" {
 			return []string{"GH_TOKEN=" + tok}
 		}
 		return nil
