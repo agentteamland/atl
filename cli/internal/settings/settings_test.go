@@ -123,6 +123,38 @@ func TestInstallHooksCommandShape(t *testing.T) {
 	}
 }
 
+// TestInstallHooksMultiplePerEvent: two atl hooks on the same event (e.g. tick +
+// retrieve, both UserPromptSubmit) must coexist, and re-installing must not
+// duplicate or drop either.
+func TestInstallHooksMultiplePerEvent(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	hooks := []Hook{
+		{Event: "UserPromptSubmit", Command: "atl tick --throttle=10m"},
+		{Event: "UserPromptSubmit", Command: "atl retrieve"},
+	}
+	path, err := InstallHooks(hooks)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := InstallHooks(hooks); err != nil { // idempotent re-install
+		t.Fatal(err)
+	}
+
+	groups, _ := readHooks(t, path)["UserPromptSubmit"].([]any)
+	if len(groups) != 2 {
+		t.Fatalf("want 2 UserPromptSubmit groups after two installs, got %d", len(groups))
+	}
+	got := map[string]bool{}
+	for _, g := range groups {
+		for _, h := range g.(map[string]any)["hooks"].([]any) {
+			got[h.(map[string]any)["command"].(string)] = true
+		}
+	}
+	if !got["atl tick --throttle=10m"] || !got["atl retrieve"] {
+		t.Fatalf("both commands must survive; got %v", got)
+	}
+}
+
 // TestInstallHooksRefusesUnparseable: a non-empty settings.json that won't parse
 // must NOT be silently overwritten (which would wipe every non-hook key).
 func TestInstallHooksRefusesUnparseable(t *testing.T) {

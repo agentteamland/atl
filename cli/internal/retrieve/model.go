@@ -78,6 +78,24 @@ func EnsureModel(ctx context.Context) (string, error) {
 	return ensureModel(ctx, miniLMInt8)
 }
 
+// ModelDirIfPresent returns the default model's local directory and true only if
+// every file is already present at its expected size — the cheap check (no hash,
+// no network) the retrieval hook uses to decide whether it can run the semantic
+// half without triggering a multi-second download on a prompt.
+func ModelDirIfPresent() (string, bool) {
+	root, err := modelsRoot()
+	if err != nil {
+		return "", false
+	}
+	dir := filepath.Join(root, miniLMInt8.dir)
+	for _, f := range miniLMInt8.files {
+		if !hasFile(filepath.Join(dir, f.name), f.size) {
+			return "", false
+		}
+	}
+	return dir, true
+}
+
 func ensureModel(ctx context.Context, spec modelSpec) (string, error) {
 	root, err := modelsRoot()
 	if err != nil {

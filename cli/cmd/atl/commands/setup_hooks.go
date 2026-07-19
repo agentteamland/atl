@@ -15,6 +15,7 @@ var setupHooksCmd = &cobra.Command{
 		"a mandatory part of install — automation is on by default, not opt-in.\n\n" +
 		"  SessionStart     → atl session-start   (drain previous session + doctor)\n" +
 		"  UserPromptSubmit → atl tick --throttle  (in-session drain every interval)\n" +
+		"  UserPromptSubmit → atl retrieve         (surface relevant knowledge pages)\n" +
 		"  PreToolUse       → atl guard            (block irreversible ops + grep-before-edit nudge)\n\n" +
 		"Idempotent: re-running replaces the atl hooks without duplicating, and\n" +
 		"leaves any hooks you added yourself untouched.",
@@ -30,6 +31,7 @@ var setupHooksCmd = &cobra.Command{
 		path, err := settings.InstallHooks([]settings.Hook{
 			{Event: "SessionStart", Command: "atl session-start"},
 			{Event: "UserPromptSubmit", Command: "atl tick --throttle=" + interval},
+			{Event: "UserPromptSubmit", Command: "atl retrieve"},
 			{Event: "PreToolUse", Matcher: "Bash|Edit|Write", Command: "atl guard"},
 		})
 		if err != nil {
@@ -38,6 +40,7 @@ var setupHooksCmd = &cobra.Command{
 		fmt.Printf("atl: hooks installed into %s\n", path)
 		fmt.Println("  SessionStart     → atl session-start")
 		fmt.Printf("  UserPromptSubmit → atl tick --throttle=%s\n", interval)
+		fmt.Println("  UserPromptSubmit → atl retrieve")
 		fmt.Println("  PreToolUse       → atl guard")
 		return nil
 	},
