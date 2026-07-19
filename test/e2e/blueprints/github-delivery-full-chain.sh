@@ -204,7 +204,7 @@ DEP_IDS=$(jq -r '.units[] | select((.predecessors|length)>=1) | .id' "$PROJ/.del
 
 # Baseline the merged-into-dev PR count BEFORE dispatch: merged PRs are immutable GitHub
 # records the repo reset CANNOT remove, so assert an INCREASE this run, never an all-time count.
-prev_dev=$(gh pr list --repo "$REPO" --base dev --state merged --json number -q 'length' 2>/dev/null || echo 0)
+prev_dev=$(gh pr list --repo "$REPO" --base dev --state merged --limit 400 --json number -q 'length' 2>/dev/null || echo 0)
 
 # PRECONDITION: agentteamland/atl-e2e-delivery must allow MERGE COMMITS — every unit lands
 # via `gh pr merge --merge`, and the engine's MergedToBase (worktree.go) false-blocks a
@@ -229,7 +229,7 @@ done_count=$(echo "$out" | grep -oE 'complete: [0-9]+ done' | tail -1 | grep -oE
   || bad "the engine reported <2 units done (${done_count:-none}) — the multi-node dispatch did not complete (see DEBUG for blocked units)"
 
 # CORE: GitHub-side cross-check — >=2 NEW merges to dev this run (real merge commits, §10).
-mrg=$(gh pr list --repo "$REPO" --base dev --state merged --json number -q 'length' 2>/dev/null || echo 0)
+mrg=$(gh pr list --repo "$REPO" --base dev --state merged --limit 400 --json number -q 'length' 2>/dev/null || echo 0)
 { [ "$mrg" -ge "$((prev_dev + 2))" ]; } 2>/dev/null \
   && ok "the ENGINE landed >=2 NEW merges into dev this run ($prev_dev -> $mrg; real merge commits)" \
   || bad "engine landed <2 new merges into dev ($prev_dev -> $mrg) — the multi-node dispatch did not complete"

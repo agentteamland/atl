@@ -192,7 +192,7 @@ export GH_TOKEN="${GH_TOKEN:-$(gh auth token 2>/dev/null)}"
 # Baseline the merged-into-dev PR count BEFORE dispatch: a merged PR is an immutable
 # GitHub record the repo reset CANNOT remove, so assert an INCREASE this run, never an
 # all-time count (which would false-pass on every run after the first).
-prev_dev=$(gh pr list --repo "$REPO" --base dev --state merged --json number -q 'length' 2>/dev/null || echo 0)
+prev_dev=$(gh pr list --repo "$REPO" --base dev --state merged --limit 400 --json number -q 'length' 2>/dev/null || echo 0)
 
 echo ">> running: atl work dispatch --cap 1 (real claude -p workers) ..."
 out="$(cd "$PROJ" && atl work dispatch --cap 1 2>&1)"; rc=$?
@@ -200,10 +200,10 @@ echo "$out" | tail -25
 
 # NOTE: the engine's own summary (LLM worker may block → surfaced by the CORE PR assertion)
 [ "$rc" -eq 0 ] && ok "engine dispatch returned rc=0" || note "dispatch rc=$rc (a blocked worker is a real signal — the merged-PR gate below is the CORE truth)"
-echo "$out" | grep -q "1 done" && ok "the engine reported the unit done" || note "engine did not print '1 done' (LLM worker fidelity; see the merged-PR gate)"
+echo "$out" | grep -q "complete: 1 done" && ok "the engine reported the unit done" || note "engine did not print 'complete: 1 done' (LLM worker fidelity; see the merged-PR gate)"
 
 # CORE: the ENGINE's real worker opened + landed a merge to dev THIS run.
-mrg=$(gh pr list --repo "$REPO" --base dev --state merged --json number -q 'length' 2>/dev/null || echo 0)
+mrg=$(gh pr list --repo "$REPO" --base dev --state merged --limit 400 --json number -q 'length' 2>/dev/null || echo 0)
 { [ "$mrg" -gt "$prev_dev" ]; } 2>/dev/null \
   && ok "the ENGINE's real worker merged a PR into dev (neutralized prompt reached gh; adapter §10 real merge commit)" \
   || bad "no NEW merged PR into dev — the engine's real worker did not land a merge"
