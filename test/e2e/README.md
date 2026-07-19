@@ -45,6 +45,7 @@ learning blueprints stay non-flaky).
 | `publish-own` | gh | a team you own → real commit + version bump + tag |
 | `github-delivery-loop` | gh+token | the GitHub-backend Layer-B / T-point: real `claude -p` ceremonies + a developer→tech-lead micro-loop on a real fixture repo + Project — Epic/Feature issues + `[Technical Analysis]`, `plan.json`, a PR merged to `dev` + its issue closed (§10), the dev→release PR |
 | `github-delivery-engine` | gh+token | the follow-on to `github-delivery-loop`: the Go engine (`atl work dispatch`) driving REAL developer→tester→tech-lead `claude -p` workers on GitHub — seeds one buildable PBI + `plan.json`, then proves the (backend-neutral) worker prompts reach `gh` and land a real merge to `dev` (issue closed, worktree reclaimed). The github twin of the real-Azure engine run; the deterministic engine loop is covered by `work-dispatch` |
+| `github-delivery-full-chain` | gh+token | the SEAM joining `github-delivery-loop` (ceremonies) + `github-delivery-engine` (dispatch): the FULL chain `/kickoff → /refine → /sprint-plan → /sprint-start → atl work dispatch --cap 2` with real `claude -p`, over a Feature `/refine` decomposes into 3 dependency-linked PBIs — proves a MULTI-NODE `plan.json` driving the engine to ≥2 dependency-ordered merges to `dev` with genuine cap-2 concurrency (the first real-worker multi-node GitHub run) |
 
 ## Fixtures
 
