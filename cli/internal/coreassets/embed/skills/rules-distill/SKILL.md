@@ -37,9 +37,9 @@ It over-collects on purpose; you do the judging. `--json` gives the machine form
 
 ### 2. Focus on what changed (change-aware)
 A full-corpus distill every time is wasteful. Scope to what changed since the last
-distill — the cursor is in `~/.atl/rules-distill-state.json` (`lastDistillSHA`):
+distill — the cursor is in `~/.atl/rules-distill-state.json` (`lastSHA`):
 ```bash
-git diff --name-only <lastDistillSHA>..HEAD -- core/skills core/rules teams
+git diff --name-only <lastSHA>..HEAD -- core/skills core/rules teams
 ```
 Cross-reference the scan output against the changed files. `--all` forces a
 whole-corpus distill.
