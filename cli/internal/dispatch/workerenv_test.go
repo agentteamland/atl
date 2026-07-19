@@ -158,6 +158,28 @@ func TestDeliveryWorkerEnv(t *testing.T) {
 			t.Errorf("no GH_TOKEN should yield no env vars, got %v", env)
 		}
 	})
+
+	t.Run("github credential.ref names a custom source env var → injected as GH_TOKEN", func(t *testing.T) {
+		var gh DeliveryConfig
+		if err := json.Unmarshal([]byte(`{"backend":"github","credential":{"ref":"MY_GH_TOKEN"}}`), &gh); err != nil {
+			t.Fatal(err)
+		}
+		t.Setenv("GH_TOKEN", "")            // the default source is empty ...
+		t.Setenv("MY_GH_TOKEN", "customtok") // ... but the configured source carries the value
+		m := envMap(deliveryWorkerEnv(&gh))
+		if m["GH_TOKEN"] != "customtok" {
+			t.Errorf("GH_TOKEN = %q, want the value read from credential.ref (MY_GH_TOKEN) — the field is no longer inert", m["GH_TOKEN"])
+		}
+	})
+
+	t.Run("githubTokenRef defaults to GH_TOKEN", func(t *testing.T) {
+		if (*DeliveryConfig)(nil).githubTokenRef() != "GH_TOKEN" {
+			t.Error("nil cfg githubTokenRef should default to GH_TOKEN")
+		}
+		if (&DeliveryConfig{}).githubTokenRef() != "GH_TOKEN" {
+			t.Error("empty cfg githubTokenRef should default to GH_TOKEN")
+		}
+	})
 }
 
 func TestActiveBackend(t *testing.T) {
