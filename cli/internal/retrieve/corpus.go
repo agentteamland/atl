@@ -37,7 +37,17 @@ func WalkCorpus(dirs []string) ([]Doc, error) {
 				}
 				return walkErr
 			}
-			if d.IsDir() || !strings.HasSuffix(path, ".md") {
+			if d.IsDir() {
+				// Never descend into dependency or hidden dirs (node_modules, .git,
+				// a VitePress cache, …) — they hold no project knowledge and a
+				// vendored docs/ tree would otherwise flood the corpus. The walk root
+				// itself is always kept.
+				if path != dir && (d.Name() == "node_modules" || strings.HasPrefix(d.Name(), ".")) {
+					return fs.SkipDir
+				}
+				return nil
+			}
+			if !strings.HasSuffix(path, ".md") {
 				return nil
 			}
 			abs, err := filepath.Abs(path)

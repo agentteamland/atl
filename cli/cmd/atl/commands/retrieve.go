@@ -5,16 +5,31 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/agentteamland/atl/cli/internal/detach"
 	"github.com/agentteamland/atl/cli/internal/retrieve"
 	"github.com/agentteamland/atl/cli/internal/scope"
+	"github.com/agentteamland/atl/cli/internal/throttle"
 	"github.com/agentteamland/atl/cli/internal/transcript"
 	"github.com/spf13/cobra"
 )
+
+// envNoAutoIndex opts out of the background index refresh (a safety valve for the
+// one-time full build's cost), matching the ATL_NO_SELF_UPDATE / ATL_NO_TEAM_UPDATE
+// pattern.
+const envNoAutoIndex = "ATL_NO_RETRIEVE_INDEX"
+
+// retrieveAutoIndexThrottle bounds how often session-start fires a rebuild. It is
+// set above the cold-build time (minutes) so a session restarted mid-build does
+// not spawn a second, overlapping build; once a build lands, the corpus-freshness
+// check (not the throttle) is what gates any further rebuild.
+const retrieveAutoIndexThrottle = 10 * time.Minute
 
 // retrieveTopK is how many knowledge pages the hook surfaces per prompt.
 const retrieveTopK = 5
@@ -155,15 +170,14 @@ var retrieveIndexCmd = &cobra.Command{
 			}
 		}
 
-		t0 := time.Now()
-		ix, err := retrieve.Build(ctx, docs, e)
-		if err != nil {
-			return err
-		}
 		idxPath, err := indexPathFor(root)
 		if err != nil {
 			return err
 		}
+		old, _ := retrieve.Load(idxPath) // reuse unchanged pages; nil on first build
+
+		t0 := time.Now()
+		ix := retrieve.BuildIncremental(ctx, docs, e, old)
 		if err := ix.Save(idxPath); err != nil {
 			return err
 		}
@@ -206,22 +220,27 @@ var retrieveWarmCmd = &cobra.Command{
 	},
 }
 
-// corpusDirs returns the knowledge-corpus roots to index for a project: the
-// project's own knowledge — the wiki (current truth) and journal (history).
-// Missing dirs are skipped by the walker. The agent knowledge base and, for a
-// delivery project, the in-repo docs/ store are deferred corpus expansions
-// (they need frontmatter handling and, for global agents, cross-project
-// relevance gating); v1 surfaces project knowledge, the core of what #140 exists
-// for.
+// corpusDirs returns the knowledge-corpus roots to index for a project: its own
+// knowledge — the wiki (current truth) and journal (history). A delivery project
+// (GitHub backend) keeps durable knowledge in the in-repo docs/ tree, so docs/ is
+// added ONLY when the .delivery marker is present — an ordinary repo's docs/ site
+// is often a large vendored tree (node_modules and all) that must not pollute the
+// corpus. The agent knowledge base is a deferred corpus expansion (global agent
+// KBs need cross-project relevance gating); v1 surfaces project knowledge, the
+// core of what #140 exists for.
 func corpusDirs(projectRoot string) ([]string, error) {
 	atlDir, err := scope.LayerDir(scope.Project, projectRoot)
 	if err != nil {
 		return nil, err
 	}
-	return []string{
+	dirs := []string{
 		filepath.Join(atlDir, "wiki"),
 		filepath.Join(atlDir, "journal"),
-	}, nil
+	}
+	if _, err := os.Stat(filepath.Join(projectRoot, ".delivery", "config.json")); err == nil {
+		dirs = append(dirs, filepath.Join(projectRoot, "docs"))
+	}
+	return dirs, nil
 }
 
 // indexPathFor is the on-disk index for a project: a global cache keyed by the
@@ -295,6 +314,96 @@ func excerpt(path string) string {
 		s = strings.TrimSpace(s[:max]) + "…"
 	}
 	return s
+}
+
+// autoIndexRetrieval refreshes the project's retrieval index in the background
+// when its knowledge corpus has changed since the last build. It runs from
+// session-start: deterministic (no reliance on the LLM drain skill), self-healing,
+// and reaching any project a session opens — the "index on drain" mechanism.
+// Fail-open: it never blocks or fails the hook. It skips git worktrees so
+// `atl work dispatch`'s N per-worktree workers don't each storm a full rebuild
+// (per-worker retrieval is a separate follow-up), and honors ATL_NO_RETRIEVE_INDEX.
+func autoIndexRetrieval(project string) {
+	if project == "" || os.Getenv(envNoAutoIndex) != "" {
+		return
+	}
+	stamp, err := throttle.StampPath("retrieve-index-" + transcript.SlugForPath(project))
+	if err != nil || !throttle.Gate(stamp, retrieveAutoIndexThrottle) {
+		return
+	}
+	if inGitWorktree(project) { // the git exec runs only after the cheap gate passes
+		return
+	}
+	dirs, err := corpusDirs(project)
+	if err != nil {
+		return
+	}
+	idxPath, err := indexPathFor(project)
+	if err != nil {
+		return
+	}
+	if !corpusStale(dirs, idxPath) {
+		return
+	}
+	_ = throttle.Touch(stamp)
+	_ = detach.Spawn("retrieve", "index") // detached: inherits cwd (= project)
+}
+
+// corpusStale reports whether any corpus Markdown file is newer than the index
+// (or the index is missing) — and there is at least one file to index. A missing
+// index with a non-empty corpus is stale (build it); an empty corpus never is.
+func corpusStale(dirs []string, idxPath string) bool {
+	var idxTime time.Time
+	if info, err := os.Stat(idxPath); err == nil {
+		idxTime = info.ModTime()
+	} // else zero time: any corpus file counts as newer
+	var any, newer bool
+	for _, dir := range dirs {
+		_ = filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
+			if err != nil || d.IsDir() || !strings.HasSuffix(p, ".md") {
+				return nil
+			}
+			any = true
+			if info, e := d.Info(); e == nil && info.ModTime().After(idxTime) {
+				newer = true
+			}
+			return nil
+		})
+	}
+	return any && newer
+}
+
+// inGitWorktree reports whether dir is inside a linked git worktree (as opposed
+// to a main working tree): a worktree's --git-dir and its shared --git-common-dir
+// are different directories, a main repo's are the same one. The two are compared
+// by identity (os.SameFile), not by path string — git returns one absolute
+// (symlink-resolved) and one relative path, so a lexical string compare would
+// wrongly flag a main repo reached through a symlinked path as a worktree and
+// silently disable auto-indexing. A non-git directory is not a worktree.
+func inGitWorktree(dir string) bool {
+	gd, e1 := gitRevParsePath(dir, "--git-dir")
+	cd, e2 := gitRevParsePath(dir, "--git-common-dir")
+	if e1 != nil || e2 != nil {
+		return false
+	}
+	gi, e1 := os.Stat(gd)
+	ci, e2 := os.Stat(cd)
+	if e1 != nil || e2 != nil {
+		return false
+	}
+	return !os.SameFile(gi, ci)
+}
+
+func gitRevParsePath(dir, flag string) (string, error) {
+	out, err := exec.Command("git", "-C", dir, "rev-parse", flag).Output()
+	if err != nil {
+		return "", err
+	}
+	p := strings.TrimSpace(string(out))
+	if !filepath.IsAbs(p) {
+		p = filepath.Join(dir, p) // a relative git path is relative to dir
+	}
+	return p, nil
 }
 
 func init() {
