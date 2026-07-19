@@ -101,7 +101,7 @@ rm -f "$HOME/stagelog"
 out="$(atl work dispatch --cap 2 2>&1)"; rc=$?
 echo "$out"
 [ "$rc" -eq 0 ] && ok "dispatch ran to completion" || bad "dispatch errored -- rc=$rc"
-echo "$out" | grep -q "2 done" && ok "both work-units reported done" || bad "not all units done -- [$out]"
+echo "$out" | grep -q "complete: 2 done" && ok "both work-units reported done" || bad "not all units done -- [$out]"
 # Each of the 2 units ran the FULL 3-stage pipeline (developer→tester→tech-lead) —
 # proves the engine spawned three sequential workers per unit, not one.
 for role in developer tester tech-lead; do
