@@ -81,8 +81,10 @@ func upgradeTeam(m *manifest.Manifest, entry *index.Entry, layer, claude string)
 
 // reflectWithFanout reflects a freshly fetched team (srcDir) onto claudeDir under
 // fan-out discipline against the install baseline: unmodified files refresh to
-// the new upstream, user-modified files are preserved, brand-new files are
-// added. Returns the next baseline (the new files map).
+// the new upstream, user-modified files are preserved, and a brand-new file is
+// added only when no divergent local file already occupies its path (a colliding
+// local file — the user's or the learning loop's — is preserved, never clobbered).
+// Returns the next baseline (the new files map).
 func reflectWithFanout(srcDir, claudeDir string, baseline map[string]string) (map[string]string, error) {
 	next := map[string]string{}
 	for _, ad := range teampkg.AssetDirs {
@@ -115,11 +117,23 @@ func reflectWithFanout(srcDir, claudeDir string, baseline map[string]string) (ma
 			}
 			base, known := baseline[rel]
 			switch {
-			case !known: // brand-new file in the new version → add it
-				if err := teampkg.CopyFile(p, dst); err != nil {
-					return err
+			case !known:
+				// A path the install did not previously own but the new version now
+				// ships. Take it only when there is no divergent local file there —
+				// otherwise it is the user's own (or the learning loop's) file at a
+				// colliding path, and copying over it would silently destroy local
+				// work. Mirror the promote fan-out's Decide("", local, upstream)
+				// handling: an empty baseline + a divergent local resolves to Preserve.
+				switch fanout.Decide("", local, upstream) {
+				case fanout.Refresh: // no local file → add the new upstream file
+					if err := teampkg.CopyFile(p, dst); err != nil {
+						return err
+					}
+					next[rel] = upstream
+				case fanout.UpToDate: // local already equals upstream → safe to own
+					next[rel] = upstream
 				}
-				next[rel] = upstream
+				// Preserve → keep the user's file, and do not claim ownership of it.
 			case fanout.Decide(base, local, upstream) == fanout.Refresh:
 				if err := teampkg.CopyFile(p, dst); err != nil {
 					return err

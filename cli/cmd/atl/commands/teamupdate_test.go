@@ -64,3 +64,47 @@ func TestReflectWithFanout(t *testing.T) {
 		t.Error("baseline c should be the new file's hash")
 	}
 }
+
+// TestReflectWithFanoutPreservesLocalCollision: a brand-new upstream file at a
+// path the install never owned, but where the user (or the learning loop) already
+// created a divergent local file, must NOT be clobbered — copying over it would
+// silently destroy local work — and the preserved file must not be claimed in the
+// manifest. Regression for the data-loss the old unconditional-copy `!known`
+// branch caused.
+func TestReflectWithFanoutPreservesLocalCollision(t *testing.T) {
+	src := t.TempDir()
+	claude := t.TempDir()
+	w := func(dir, rel, body string) {
+		p := filepath.Join(dir, rel)
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// The new version now ships knowledge/notes.md — but the user already has a
+	// different local file at that path, and it was never in the install baseline.
+	w(src, "knowledge/notes.md", "UPSTREAM")
+	w(claude, "knowledge/notes.md", "USER")
+	// A genuinely-new file with no local copy must still be added.
+	w(src, "knowledge/fresh.md", "FRESH")
+	baseline := map[string]string{}
+
+	next, err := reflectWithFanout(src, claude, baseline)
+	if err != nil {
+		t.Fatalf("reflectWithFanout: %v", err)
+	}
+	if b, _ := os.ReadFile(filepath.Join(claude, "knowledge/notes.md")); string(b) != "USER" {
+		t.Fatalf("a colliding local file must be preserved, not clobbered; got %q", b)
+	}
+	if _, owned := next["knowledge/notes.md"]; owned {
+		t.Error("a preserved local file must not be recorded in the manifest")
+	}
+	if b, _ := os.ReadFile(filepath.Join(claude, "knowledge/fresh.md")); string(b) != "FRESH" {
+		t.Errorf("a genuinely-new file (no local) must still be added, got %q", b)
+	}
+	if next["knowledge/fresh.md"] != fanout.Hash([]byte("FRESH")) {
+		t.Error("the new file should be recorded in the manifest")
+	}
+}
