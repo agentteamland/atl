@@ -71,6 +71,41 @@ TMP="$(mktemp -d)"
 cd "$TMP"
 
 curl -fsSL -o "$ARCHIVE" "$URL"
+
+# --- verify checksum (fail-closed) ------------------------------------------
+# goreleaser publishes atl_<version>_checksums.txt listing "<sha256>␣␣<archive>"
+# for every release asset. Verify the downloaded archive against it before
+# extracting — a silently-skipped check is worse than none, so any failure aborts.
+CHECKSUMS="atl_${VERSION_NO_V}_checksums.txt"
+CHECKSUMS_URL="https://github.com/${REPO}/releases/download/${VERSION}/${CHECKSUMS}"
+echo "→ Verifying checksum"
+curl -fsSL -o "$CHECKSUMS" "$CHECKSUMS_URL"
+
+if command -v sha256sum >/dev/null 2>&1; then
+  SHA_CMD="sha256sum"
+elif command -v shasum >/dev/null 2>&1; then
+  SHA_CMD="shasum -a 256"
+else
+  echo "Cannot verify checksum: neither sha256sum nor shasum is available." >&2
+  exit 1
+fi
+
+# awk exact-field match (not grep): a missing line yields "" rather than a
+# non-zero exit that `set -e` would turn into a silent abort before the check.
+EXPECTED="$(awk -v f="$ARCHIVE" '$2 == f { print $1 }' "$CHECKSUMS")"
+if [ -z "$EXPECTED" ]; then
+  echo "Checksum for ${ARCHIVE} not found in ${CHECKSUMS}." >&2
+  exit 1
+fi
+ACTUAL="$($SHA_CMD "$ARCHIVE" | awk '{ print $1 }')"
+if [ "$EXPECTED" != "$ACTUAL" ]; then
+  echo "Checksum MISMATCH for ${ARCHIVE} — aborting." >&2
+  echo "  expected: $EXPECTED" >&2
+  echo "  actual:   $ACTUAL" >&2
+  exit 1
+fi
+echo "✓ checksum verified"
+
 tar xzf "$ARCHIVE"
 
 if [ ! -f "$BINARY_NAME" ]; then
