@@ -69,6 +69,31 @@ func TestQueryEmptyIndex(t *testing.T) {
 	}
 }
 
+// TestBuildQueryLexicalOnly covers the graceful-degradation path: a nil embedder
+// builds a vector-less index, and Query over it degrades to BM25 (no model, no
+// panic) — the offline / model-not-yet-downloaded case.
+func TestBuildQueryLexicalOnly(t *testing.T) {
+	ctx := context.Background()
+	docs := []Doc{
+		{Path: "a", Title: "A", Text: "the dispatch engine verifies a git merge landed"},
+		{Path: "b", Title: "B", Text: "a banana bread recipe with ripe bananas and cinnamon"},
+	}
+	ix, err := Build(ctx, docs, nil) // nil embedder -> lexical-only index
+	if err != nil {
+		t.Fatalf("Build(nil): %v", err)
+	}
+	if ix.Vecs != nil {
+		t.Fatalf("lexical-only index should carry no vectors, got %d", len(ix.Vecs))
+	}
+	res, err := ix.Query(ctx, "dispatch merge", nil, 5)
+	if err != nil {
+		t.Fatalf("Query: %v", err)
+	}
+	if len(res) == 0 || res[0].Path != "a" {
+		t.Fatalf("BM25-only query should rank doc a first, got %+v", res)
+	}
+}
+
 // TestBuildQueryEndToEnd exercises the full hybrid path with the real embedder.
 // It skips when the model is not downloaded locally (CI stays offline).
 func TestBuildQueryEndToEnd(t *testing.T) {

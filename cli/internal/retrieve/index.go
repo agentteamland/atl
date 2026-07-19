@@ -32,10 +32,15 @@ type Result struct {
 // Build indexes docs, producing one vector per document (see embedDoc for how a
 // long document is chunked and pooled). It is best-effort: a document whose text
 // cannot be embedded gets a nil vector and stays lexically searchable, rather
-// than failing the whole index. Build is the cold path — run at drain time, not
+// than failing the whole index. A nil embedder builds a lexical-only index (no
+// vectors) — so retrieval works from the first drain, before the model has
+// downloaded, degrading to BM25. Build is the cold path — run at drain time, not
 // per query.
 func Build(ctx context.Context, docs []Doc, e *Embedder) (*Index, error) {
 	ix := &Index{Version: indexFormatVersion, Docs: docs}
+	if e == nil {
+		return ix, nil // lexical-only index
+	}
 	ix.Vecs = make([][]float32, len(docs))
 	for i, d := range docs {
 		ix.Vecs[i] = embedDoc(ctx, e, d.Text)
@@ -124,11 +129,11 @@ func (ix *Index) Query(ctx context.Context, prompt string, e *Embedder, k int) (
 
 	var semantic []int
 	if e != nil && len(ix.Vecs) == len(ix.Docs) {
-		qv, err := e.Embed(ctx, []string{prompt})
-		if err != nil {
-			return nil, err
+		// A failed or empty query embed degrades to BM25-only rather than failing
+		// the query — retrieval stays useful (and, for the fail-open hook, alive).
+		if qv, err := e.Embed(ctx, []string{prompt}); err == nil && len(qv) > 0 {
+			semantic = semanticRank(qv[0], ix.Vecs)
 		}
-		semantic = semanticRank(qv[0], ix.Vecs)
 	}
 
 	fused := rrf(lexical, semantic)

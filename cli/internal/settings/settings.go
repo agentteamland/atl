@@ -59,24 +59,39 @@ func InstallHooks(hooks []Hook) (string, error) {
 		hooksMap = map[string]any{}
 	}
 
+	// Group the wanted hooks by event, preserving first-seen order. Multiple atl
+	// hooks can share an event (e.g. two UserPromptSubmit hooks): filter that
+	// event's existing atl groups exactly once, then append every wanted group.
+	// Filtering per-hook instead would make the second hook's pass see the first
+	// hook's freshly-added group as an existing atl group and drop it.
+	byEvent := map[string][]Hook{}
+	var order []string
 	for _, h := range hooks {
-		groups, _ := hooksMap[h.Event].([]any)
-		kept := make([]any, 0, len(groups)+1)
+		if _, seen := byEvent[h.Event]; !seen {
+			order = append(order, h.Event)
+		}
+		byEvent[h.Event] = append(byEvent[h.Event], h)
+	}
+	for _, event := range order {
+		groups, _ := hooksMap[event].([]any)
+		kept := make([]any, 0, len(groups)+len(byEvent[event]))
 		for _, g := range groups {
 			if !isAtlGroup(g) { // preserve the user's own hooks
 				kept = append(kept, g)
 			}
 		}
-		group := map[string]any{
-			"hooks": []any{
-				map[string]any{"type": "command", "command": h.Command},
-			},
+		for _, h := range byEvent[event] {
+			group := map[string]any{
+				"hooks": []any{
+					map[string]any{"type": "command", "command": h.Command},
+				},
+			}
+			if h.Matcher != "" {
+				group["matcher"] = h.Matcher
+			}
+			kept = append(kept, group)
 		}
-		if h.Matcher != "" {
-			group["matcher"] = h.Matcher
-		}
-		kept = append(kept, group)
-		hooksMap[h.Event] = kept
+		hooksMap[event] = kept
 	}
 	obj["hooks"] = hooksMap
 
