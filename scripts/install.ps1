@@ -33,18 +33,42 @@ $Arch = switch -Regex ($env:PROCESSOR_ARCHITECTURE) {
 
 if (-not $Version) {
     Write-Host '→ Resolving latest release...'
+    # Prefer the latest stable release.
     try {
         $Release = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/latest" `
                                      -UserAgent 'atl-installer' `
                                      -Headers @{ 'Accept' = 'application/vnd.github+json' }
         $Version = $Release.tag_name
     } catch {
-        Write-Error "Could not reach GitHub releases API. Set `$env:ATL_VERSION = 'vX.Y.Z' and re-run. Original error: $_"
+        # /releases/latest 404s when only prereleases exist (a pre-1.0 alpha train);
+        # fall through to the full release list below.
+        $Version = $null
     }
-}
 
-if (-not $Version) {
-    Write-Error 'Version resolution returned empty. Set $env:ATL_VERSION = "vX.Y.Z" and re-run.'
+    # Fallback: no stable release — pick the highest version across ALL releases
+    # (prereleases included). The list order is not reliably newest-first, so pick
+    # the max by version, never just the first entry. Mirrors install.sh's awk:
+    # strip 'v', zero-pad each numeric run to 9 digits, string-compare, take the max.
+    if (-not $Version) {
+        try {
+            $Releases = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases" `
+                                          -UserAgent 'atl-installer' `
+                                          -Headers @{ 'Accept' = 'application/vnd.github+json' }
+        } catch {
+            Write-Error "Could not reach GitHub releases API. Set `$env:ATL_VERSION = 'vX.Y.Z' and re-run. Original error: $_"
+        }
+        $Version = $Releases |
+            Where-Object { $_.tag_name -match '^v[0-9]' } |
+            Sort-Object -Property @{ Expression = {
+                ([regex]::Matches($_.tag_name.TrimStart('v'), '\d+') |
+                    ForEach-Object { '{0:D9}' -f [int]$_.Value }) -join ''
+            } } |
+            Select-Object -Last 1 -ExpandProperty tag_name
+    }
+
+    if (-not $Version) {
+        Write-Error 'Could not resolve latest version. Set $env:ATL_VERSION = "vX.Y.Z" and re-run.'
+    }
 }
 
 $VersionNoV = $Version.TrimStart('v')
@@ -64,6 +88,36 @@ try {
     Write-Error "Download failed: $_`nURL: $Url"
 }
 
+# --- verify checksum (fail-closed) ------------------------------------------
+# goreleaser publishes atl_<version>_checksums.txt listing "<sha256>  <archive>".
+# Verify the downloaded archive before extracting; any failure aborts.
+$Checksums     = "atl_${VersionNoV}_checksums.txt"
+$ChecksumsUrl  = "https://github.com/$Repo/releases/download/$Version/$Checksums"
+$ChecksumsPath = Join-Path $Tmp.FullName $Checksums
+
+Write-Host '→ Verifying checksum'
+try {
+    Invoke-WebRequest -Uri $ChecksumsUrl -OutFile $ChecksumsPath -UseBasicParsing
+} catch {
+    Write-Error "Could not download checksums file: $_`nURL: $ChecksumsUrl"
+}
+
+$Expected = Get-Content $ChecksumsPath |
+    Where-Object { $_ -match "\s$([regex]::Escape($Archive))$" } |
+    ForEach-Object { ($_ -split '\s+')[0] } |
+    Select-Object -First 1
+if (-not $Expected) {
+    Write-Error "Checksum for $Archive not found in $Checksums."
+}
+
+# -ine is load-bearing: Get-FileHash returns UPPERCASE hex, the goreleaser file is
+# lowercase, so a case-sensitive compare would false-mismatch on every install.
+$Actual = (Get-FileHash -Path $ArchivePath -Algorithm SHA256).Hash
+if ($Actual -ine $Expected) {
+    Write-Error "Checksum MISMATCH for $Archive — aborting.`n  expected: $Expected`n  actual: $Actual"
+}
+Write-Host '✓ checksum verified'
+
 Write-Host "→ Extracting to $Tmp"
 Expand-Archive -Path $ArchivePath -DestinationPath $Tmp.FullName -Force
 
@@ -81,10 +135,33 @@ if (-not (Test-Path $InstallDir)) {
 $Target = Join-Path $InstallDir $BinaryName
 Write-Host "→ Installing to $Target"
 
-# Stop any running atl.exe so the overwrite can succeed.
-Get-Process -Name 'atl' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+# Windows locks a running .exe, so a reinstall may need to stop the instance
+# holding $Target. Never blind-kill every 'atl': a live `atl work dispatch`
+# supervisor owns git worktrees + claude -p workers and must not be torn down.
+try {
+    Copy-Item -Path $Exe -Destination $Target -Force
+} catch {
+    # Copy failed — the destination is almost certainly locked by a running atl.
+    $running = Get-CimInstance Win32_Process -Filter "Name = 'atl.exe'" -ErrorAction SilentlyContinue
 
-Copy-Item -Path $Exe -Destination $Target -Force
+    $dispatch = $running | Where-Object { $_.CommandLine -match '\bwork\s+dispatch\b' }
+    if ($dispatch) {
+        Write-Error ("Cannot replace $Target while a live 'atl work dispatch' supervisor is running " +
+                     "(PID $($dispatch.ProcessId -join ', ')). Stopping it would orphan its in-flight " +
+                     "worktrees and workers. Let the sprint finish (or stop it yourself), then re-run.")
+    }
+
+    # Only processes actually launched from $Target hold the lock — stop just those,
+    # never an unrelated 'atl' (a dev build, another install) elsewhere.
+    $holders = $running | Where-Object { $_.ExecutablePath -ieq $Target }
+    if ($holders) {
+        Write-Host "→ Stopping $($holders.Count) atl instance(s) running from $Target to unlock the file"
+        $holders | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+        Start-Sleep -Milliseconds 500
+    }
+
+    Copy-Item -Path $Exe -Destination $Target -Force   # retry; if still locked, this throws (honest failure)
+}
 
 # Ensure install dir is on the user PATH.
 $UserPath = [Environment]::GetEnvironmentVariable('Path', 'User')
