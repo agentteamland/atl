@@ -156,11 +156,11 @@ fi
 # Baseline the merged-into-dev PR count BEFORE the micro-loop: a merged PR is an
 # immutable GitHub record the repo reset CANNOT remove, so assert an INCREASE this run,
 # never an all-time count (which would false-pass on every run after the first).
-prev_dev=$(gh pr list --repo "$REPO" --base dev --state merged --json number -q 'length' 2>/dev/null || echo 0)
+prev_dev=$(gh pr list --repo "$REPO" --base dev --state merged --limit 400 --json number -q 'length' 2>/dev/null || echo 0)
 gturn "Act as the developer, then the tech-lead, for ONE open area:web PBI issue (pick the lowest-numbered open one; if none, pick any open type:feature issue). DEVELOPER: from the local checkout create a branch off 'dev', add a small real change to app.js (e.g. extend the add function or add a sub function) plus a matching case in app.test.js, run 'node --test' to confirm it passes, commit, push the branch, and open a PR into 'dev' with 'Fixes #<n>' in the body (gh pr create --base dev). TECH-LEAD: review the PR, then merge it with 'gh pr merge --merge' ONLY (never --squash/--rebase), then 'gh issue close #<n>' and set the issue's Project #$PROJNUM Status field to Done. Report the PR number and the merged issue number." || bad "developer/tech-lead micro-loop turn errored"
 
 # CORE: a NEW PR to dev was MERGED this run (real merge commit -> MergedToBase valid)
-mrg=$(gh pr list --repo "$REPO" --base dev --state merged --json number -q 'length' 2>/dev/null || echo 0)
+mrg=$(gh pr list --repo "$REPO" --base dev --state merged --limit 400 --json number -q 'length' 2>/dev/null || echo 0)
 { [ "$mrg" -gt "$prev_dev" ]; } 2>/dev/null && ok "a developer PR was merged into dev this run (adapter §10, real merge commit)" || bad "no NEW merged PR into dev"
 # CORE: an issue is CLOSED (the completion gate; auto-close doesn't fire on the dev base).
 # Sound because reset_delivery_repo verified a zero-issue baseline, so any closed issue is
@@ -175,11 +175,11 @@ ge "$done_ct" && ok "a board item reached Status=Done" || note "no board item at
 # ---- 6. /sprint-review — report to docs/sprints + PO approve -> dev->release PR ----
 # Baseline the dev->release PR count FIRST: its head is `dev` (never branch-deleted by
 # the reset), so the PR record persists across runs — assert an INCREASE this run.
-prev_rel=$(gh pr list --repo "$REPO" --base release --state all --json number -q 'length' 2>/dev/null || echo 0)
+prev_rel=$(gh pr list --repo "$REPO" --base release --state all --limit 400 --json number -q 'length' 2>/dev/null || echo 0)
 gturn "/sprint-review. You are ALSO acting as the human product owner for this headless run. Compile the Sprint Review Report and upsert it to docs/sprints/sprint-1-review.md in the repo (the in-repo durable-knowledge store). Then, at the Approve/Reject gate, APPROVE the sprint — open the dev->release promotion PR (gh pr create --base release --head dev). Do not wait for interactive input; approve based on this instruction." || bad "sprint-review turn errored"
 
 # CORE: a NEW dev->release promotion PR opened this run
-rel=$(gh pr list --repo "$REPO" --base release --state all --json number -q 'length' 2>/dev/null || echo 0)
+rel=$(gh pr list --repo "$REPO" --base release --state all --limit 400 --json number -q 'length' 2>/dev/null || echo 0)
 { [ "$rel" -gt "$prev_rel" ]; } 2>/dev/null && ok "PO-approved dev->release promotion PR opened this run (§10)" || bad "no NEW dev->release PR opened"
 # NOTE: the sprint-review page written to docs/sprints/
 if gh api "repos/$REPO/contents/docs/sprints/sprint-1-review.md" >/dev/null 2>&1; then ok "sprint-review upserted a docs/sprints review page (§9)"; else note "no docs/sprints review page this run (LLM-variable)"; fi

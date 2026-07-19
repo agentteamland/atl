@@ -177,7 +177,7 @@ items=$(gh project item-list "$PROJNUM" --owner "$OWNER" --format json -q '.item
 ge "$items" && ok "sprint-plan added units to the Project board" || note "no board items this run (LLM-variable; sprint-start derives the plan from open PBIs)"
 
 # ---- 4. /sprint-start — build the MULTI-NODE DAG + materialize plan.json (harness dispatches)
-gturn "/sprint-start. Read the sprint's admitted work-units (the open area:web PBIs; if none are on the board, use ALL open area:web PBIs). Read each PBI's '**[Canonical Brief]**' comment '## Depends On' lines to build the dependency DAG (a '#<n>' line under ## Depends On means this unit depends on unit n). Validate the DAG is acyclic. Materialize .delivery/plan.json in the EXACT dispatch.Plan schema: {\"sprintSlug\":\"<fs-safe-slug>\",\"granularity\":\"pbi\",\"units\":[{\"id\":<issue#>,\"title\":\"<title>\",\"predecessors\":[<issue#>...],\"stackRank\":<n>}]}. Use the JSON key 'stackRank' (NOT 'priority'). There are no mobile-tagged units, so skip the emulator preflight. STOP after writing plan.json — do NOT run 'atl work dispatch'; the harness drives the engine." || bad "sprint-start turn errored"
+gturn "/sprint-start. Read the sprint's admitted work-units (the open area:web PBIs; if none are on the board, use ALL open area:web PBIs). Read each PBI's '**[Canonical Brief]**' comment '## Depends On' lines to build the dependency DAG (a '#<n>' line under ## Depends On means this unit depends on unit n). Validate the DAG is acyclic. Materialize .delivery/plan.json in the EXACT dispatch.Plan schema: {\"sprintSlug\":\"<fs-safe-slug>\",\"granularity\":\"pbi\",\"units\":[{\"id\":<issue#>,\"title\":\"<title>\",\"predecessors\":[<issue#>...],\"stackRank\":<n>}]}. Use the JSON key 'stackRank' (the engine accepts 'priority' too, but this blueprint's assertions check 'stackRank'). There are no mobile-tagged units, so skip the emulator preflight. STOP after writing plan.json — do NOT run 'atl work dispatch'; the harness drives the engine." || bad "sprint-start turn errored"
 
 # CORE checkpoint: plan.json exists, valid, and a MULTI-NODE DAG (>=2 units, >=1 real edge, stackRank keys)
 if [ -f "$PROJ/.delivery/plan.json" ] && jq -e '.' "$PROJ/.delivery/plan.json" >/dev/null 2>&1; then
@@ -204,7 +204,7 @@ DEP_IDS=$(jq -r '.units[] | select((.predecessors|length)>=1) | .id' "$PROJ/.del
 
 # Baseline the merged-into-dev PR count BEFORE dispatch: merged PRs are immutable GitHub
 # records the repo reset CANNOT remove, so assert an INCREASE this run, never an all-time count.
-prev_dev=$(gh pr list --repo "$REPO" --base dev --state merged --json number -q 'length' 2>/dev/null || echo 0)
+prev_dev=$(gh pr list --repo "$REPO" --base dev --state merged --limit 400 --json number -q 'length' 2>/dev/null || echo 0)
 
 # PRECONDITION: agentteamland/atl-e2e-delivery must allow MERGE COMMITS — every unit lands
 # via `gh pr merge --merge`, and the engine's MergedToBase (worktree.go) false-blocks a
@@ -229,7 +229,7 @@ done_count=$(echo "$out" | grep -oE 'complete: [0-9]+ done' | tail -1 | grep -oE
   || bad "the engine reported <2 units done (${done_count:-none}) — the multi-node dispatch did not complete (see DEBUG for blocked units)"
 
 # CORE: GitHub-side cross-check — >=2 NEW merges to dev this run (real merge commits, §10).
-mrg=$(gh pr list --repo "$REPO" --base dev --state merged --json number -q 'length' 2>/dev/null || echo 0)
+mrg=$(gh pr list --repo "$REPO" --base dev --state merged --limit 400 --json number -q 'length' 2>/dev/null || echo 0)
 { [ "$mrg" -ge "$((prev_dev + 2))" ]; } 2>/dev/null \
   && ok "the ENGINE landed >=2 NEW merges into dev this run ($prev_dev -> $mrg; real merge commits)" \
   || bad "engine landed <2 new merges into dev ($prev_dev -> $mrg) — the multi-node dispatch did not complete"
