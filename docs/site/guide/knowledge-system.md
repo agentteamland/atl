@@ -77,6 +77,40 @@ At the start of every conversation, the agent reads (when applicable):
 
 The agent does NOT read all wiki pages. It reads the index (auto-loaded), and only follows links to detail pages when the task touches that domain. This keeps context tight while preserving discoverability.
 
+## Retrieval — consulting knowledge per prompt
+
+Reading the wiki index once at the start of a conversation isn't enough. Topics shift, and the page that matters for the prompt in front of you may be one the opening scan skipped — or one whose relevance its title alone wouldn't reveal in a 60-page index. So `atl` also consults the knowledge layer **on every prompt**.
+
+### The hook
+
+`atl retrieve`, wired to the `UserPromptSubmit` hook, ranks the project's knowledge pages against each prompt and surfaces the top matches as context — the read side of the loop whose write side is capture + [`/drain`](/skills/drain). Ranking is **hybrid**:
+
+- **Lexical (BM25)** nails exact identifiers — a function name, a flag, an `atl#140` — that a semantic model blurs.
+- **Semantic** — a small local embedding model — catches the conceptual and synonym matches a keyword search misses.
+- The two are **RRF-fused** into one top-k.
+
+It is **fail-open**: a missing index, an absent model, or any error prints nothing and never blocks or delays the prompt.
+
+### The local model — no external service
+
+The semantic half runs a small ONNX model (**all-MiniLM-L6-v2**, ~22 MB) entirely locally, through a pure-Go runtime. It is **downloaded once on first use** (sha256-verified) into `~/.atl/models`, never embedded in the binary, and never calls out to an external service — your prompts and knowledge never leave the machine. It is a text→vector utility, not a second model answering you; Claude remains the agent. Set `ATL_NO_RETRIEVE_INDEX` to turn the background indexing off.
+
+### Automatic, incremental, background
+
+The index rebuilds itself whenever a drain changes the knowledge base. [`atl session-start`](/cli/setup-hooks) notices the corpus changed and spawns the build **in the background** (detached), so it never blocks the session, and the build is **incremental** — only pages whose text actually changed are re-embedded, so a routine drain refreshes in seconds. What you drain this session is retrievable the next. (Under `atl work dispatch`, per-worktree workers skip the auto-build to avoid a rebuild storm.)
+
+### The discipline
+
+Retrieval prompts judgment, it doesn't replace it. When the hook surfaces a page whose topic matches what you're about to do, **read it before answering**. And when the conversation shifts topic, re-scan the always-loaded `wiki:index` for a page the hook may not have ranked — the index is in context at zero cost. The canonical rule is [`core/rules/knowledge-system.md`](https://github.com/agentteamland/atl/blob/main/core/rules/knowledge-system.md).
+
+### Manual control
+
+The build normally runs itself, but you can drive it by hand:
+
+- `atl retrieve index` — (re)build this project's index now (incremental).
+- `atl retrieve index --lexical` — build a BM25-only index (no model, offline).
+- `atl retrieve warm` — download the model and prove the pipeline loads.
+
 ## Why two layers, not three
 
 v1 defined three layers: **memory** (per-project, per-agent, append-only history), **journal** (per-project, cross-agent signals, append-only), **wiki** (per-project, topic-based, replace/update).
