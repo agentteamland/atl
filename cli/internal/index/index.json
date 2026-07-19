@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-07-18T18:00:00Z",
+  "generatedAt": "2026-07-19T00:00:00Z",
   "teams": [
     {
       "handle": "agentteamland",
       "name": "profile-team",
-      "version": "1.5.0",
-      "description": "Curates a cross-project profile of the people in your world: drains profile-fact markers into person profiles at ~/.atl/profiles, each grown through a self-describing, versioned interface.",
+      "version": "1.5.1",
+      "description": "Curates a cross-project profile of the entities in your world: drains profile-fact markers into entity profiles at ~/.atl/profiles, each grown through a self-describing, versioned interface.",
       "keywords": [
         "profile",
         "memory",
@@ -21,13 +21,13 @@
       "source": {
         "repo": "agentteamland/atl",
         "subpath": "teams/profile-team",
-        "ref": "v2.8.3"
+        "ref": "v2.8.4"
       }
     },
     {
       "handle": "agentteamland",
       "name": "delivery-team",
-      "version": "0.5.0",
+      "version": "0.5.1",
       "description": "Work-item-driven, sprint-based autonomous software delivery on a pluggable backend (Azure DevOps or GitHub): role-agents + ceremony skills orchestrated by atl work dispatch over claude -p workers.",
       "keywords": [
         "delivery",
@@ -44,7 +44,7 @@
       "source": {
         "repo": "agentteamland/atl",
         "subpath": "teams/delivery-team",
-        "ref": "v2.8.3"
+        "ref": "v2.8.4"
       }
     },
     {
@@ -67,7 +67,7 @@
       "source": {
         "repo": "agentteamland/atl",
         "subpath": "teams/personal-advisory-team",
-        "ref": "v2.8.3"
+        "ref": "v2.8.4"
       }
     }
   ]
