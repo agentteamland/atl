@@ -58,6 +58,14 @@ agent role-craft.
 These principles are **the same across backends**; only the per-tool mechanism differs (the
 adapter pack states it). Agent role-craft states the principle; the pack states the how.
 
+- **Analysis lives on the analyzed item; a decomposed child reads its nearest ancestor.** The
+  `**[Technical Analysis]**` (concept #3) is authored per *framed/analyzed* item — a Feature at
+  kickoff — **not** per decomposed child unit (`/refine` gives each child a `**[Canonical Brief]**`,
+  not its own analysis). So a worker (developer/tester) on a child unit (PBI/Task) that has no
+  `**[Technical Analysis]**` of its own reads the **nearest ancestor** that bears one, traversing
+  the parent-containment link (concept #1; each adapter binds the traversal). The
+  `**[Canonical Brief]**` needs no such fallback — the tech-lead authors one per decomposed unit,
+  so it is always on the unit itself.
 - **Idempotency = stamp + check-before-create**, store-side keys as source of truth (no local
   ledger). Key = `hash(parent-id + plan-ordinal)` (stable across re-runs → convergent resume,
   not merely dedup). Same principle on both backends; the *query* differs (concept #10).

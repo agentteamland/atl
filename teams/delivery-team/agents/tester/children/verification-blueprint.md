@@ -80,7 +80,9 @@ Read the work-item fresh (per the active adapter): the business analysis lives i
 `## Acceptance Criteria`, `## Out of Scope`), authored by the `business-analyst`
 (concept #2). Read the technical analysis from the **single comment whose first line is the exact
 sentinel `**[Technical Analysis]**`** — matched by sentinel among the work-item's comments (concept #3),
-**never** "the newest comment" (a later human comment must not shadow it). Read the tech-lead's
+or, for a decomposed child unit that has none of its own, among its **nearest ancestor** Feature's
+comments (the adapter binds the parent traversal), **never** "the newest comment" (a later human
+comment must not shadow it). Read the tech-lead's
 canonical brief the same way — the **single comment whose first line is the exact sentinel
 `**[Canonical Brief]**`**, matched by sentinel among the comments (concept #3), never "the newest
 comment" — then pull the durable-knowledge pages it names (`Architecture/`, `Conventions/` for this area)

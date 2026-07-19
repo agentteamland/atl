@@ -8,11 +8,13 @@ The developer worker in this team is a **fresh, isolated `claude -p` per work-un
 config-and-methodology `roles[].dispatch: worker`): its own git worktree, its own context, **no
 carry-over** from any other unit or ceremony. That isolation is a feature — it keeps workers
 parallel and context clean — but it means a worker knows *nothing* except what its context is
-assembled from. The read contract (concept #9) says that context is:
+assembled from. The read contract says that context is:
 
-> stack-pack + durable-knowledge store + task + **the tech-lead's canonical brief**.
+> stack-pack + durable-knowledge store + task + the item's **[Technical Analysis]** (its own,
+> or — for a decomposed child unit — its nearest ancestor Feature's, concept #3) + **the
+> tech-lead's canonical brief**.
 
-The **canonical brief is mine.** It is the piece that turns four disconnected inputs into a
+The **canonical brief is mine.** It is the piece that turns these disconnected inputs into a
 worker that behaves as if it had sat in the `/refine` room. Getting it right is what makes an
 isolated worker produce work that fits the architecture and obeys the conventions — without a
 human re-explaining the project every time.

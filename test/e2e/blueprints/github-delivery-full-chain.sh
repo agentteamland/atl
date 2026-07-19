@@ -34,10 +34,12 @@
 #     >=2 NEW merges to dev, with at least one dependent issue CLOSED no earlier than the
 #     foundation (the scheduler enforced the edge).
 #   * NOTE (ok/note) — LLM-variable fidelity: the full 3-way fan-out, worktree reclaim,
-#     Status=Done, the per-PBI TA comment, the exact code on dev, sprint-plan's Iteration
-#     write (the fixture Project has no Iteration field — gh cannot create it — so
-#     sprint-plan stays NOTE and sprint-start derives the DAG from the PBIs' `## Depends On`
-#     briefs, not the board).
+#     Status=Done, the exact code on dev, sprint-plan's Iteration write (the fixture Project
+#     has no Iteration field — gh cannot create it — so sprint-plan stays NOTE and
+#     sprint-start derives the DAG from the PBIs' `## Depends On` briefs, not the board).
+#     The workers run against the no-per-PBI-TA steady state (they read the [Technical
+#     Analysis] from the ancestor Feature, delivery-team >= 0.5.2); the ancestor traversal
+#     itself is NOT independently asserted here — a trivial task completes from the brief.
 #
 # SETUP: same as the two blueprints above — the fixture repo agentteamland/atl-e2e-delivery
 # must exist and the token must carry repo + project scope (a fresh Project is created per
@@ -151,17 +153,23 @@ PBI_CT=$(gh issue list --repo "$REPO" --state all --json labels -q '[.[] | selec
   && ok "refine produced $PBI_CT area:web PBIs (>=2 — a multi-node decomposition)" \
   || bad "refine produced <2 area:web PBIs ($PBI_CT) — no multi-node decomposition to dispatch"
 
-# worker-unblock BACKSTOP (NOT the seam): ensure each open area:web PBI carries a [Technical
-# Analysis] comment so the developer worker's "read the analysis" step never blocks. The
-# dependency EDGES live in the [Canonical Brief] ## Depends On (refine's job, asserted via
-# plan.json below); this backstop only seeds a trivial per-PBI TA if refine omitted one.
+# No per-PBI [Technical Analysis] backstop (removed with delivery-team >= 0.5.2). /refine writes
+# the [Technical Analysis] at the FEATURE level; a decomposed PBI carries only its [Canonical
+# Brief], and the developer/tester workers read the analysis from the nearest ancestor Feature
+# via the parent link (backend-interface concept #3 fallback). Dropping the old shim (which
+# seeded a TA on every PBI) makes this run exercise the real no-per-PBI-TA steady state instead
+# of masking it. Honest caveat: the ancestor traversal is NOT independently asserted — this
+# trivial task (subtract/absDiff/isZeroDiff) completes from the Canonical Brief alone, so a green
+# run does not by itself prove the fallback fired; the fix's correctness is prose-verified (the
+# worker prompts + the concept #3 rule + the adapters). This gate confirms only no-regression:
+# the workers still complete with no per-PBI TA present.
+own_ta=0
 for n in $(gh issue list --repo "$REPO" --label area:web --state open --json number -q '.[].number' 2>/dev/null); do
-  if ! gh issue view "$n" --repo "$REPO" --comments 2>/dev/null | grep -q '\[Technical Analysis\]'; then
-    printf '**[Technical Analysis]**\n\n## Approach\nImplement per the Canonical Brief on this issue.\n\n## Feasibility & Risks\nTrivial pure function.\n\n## NFRs\nNone.\n\n## Dependencies\nSee this issue'\''s Canonical Brief ## Depends On.\n\n## Suggested Areas\nweb\n' \
-      | gh issue comment "$n" --repo "$REPO" --body-file - >/dev/null 2>&1 || true
-    note "seeded a fallback [Technical Analysis] on PBI #$n (refine omitted it — worker-unblock, not the seam)"
-  fi
+  gh issue view "$n" --repo "$REPO" --comments 2>/dev/null | grep -q '\[Technical Analysis\]' && own_ta=$((own_ta + 1))
 done
+[ "$own_ta" = 0 ] \
+  && note "no PBI carries its own [Technical Analysis] — workers ran the ancestor-Feature fallback steady state (traversal not independently asserted; trivial task completes from the brief)" \
+  || note "$own_ta PBI(s) carry an own TA this run (refine-variable); the ancestor fallback still applies to the rest"
 
 # ---- 3. /sprint-plan — cold-start; NOTE (the fixture Project has no Iteration field) -
 gturn "/sprint-plan. You are ALSO acting as the human product owner. This is a cold-start project (no closed sprints) — use the po-seed velocity path with a seed velocity of 8 story points. Set a Story Points estimate (1-2 points each, they are small) on every open area:web PBI and admit them to the sprint. NOTE: the fixture GitHub Project has no Iteration field (it cannot be created via the CLI); if you cannot set Iteration, say so and proceed — /sprint-start will derive the plan from the open area:web PBIs. Report the seed velocity used." || bad "sprint-plan turn errored"

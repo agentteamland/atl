@@ -127,7 +127,8 @@ truth:
 | **canonical brief** (tech-lead) | the **bridge** — names the area (→ which pack) and embeds the exact durable-knowledge page paths for the unit | tech-lead, per work-unit | this work-unit only |
 
 A **developer's context** = **pack (tagged area) + durable-knowledge store (brief-named
-pages) + task + brief**. The brief is what makes a fresh, isolated worker load the
+pages) + task + the item's [Technical Analysis] (its own, or its nearest-ancestor Feature's
+for a decomposed unit) + brief**. The brief is what makes a fresh, isolated worker load the
 *right* project knowledge: it names the area so the pack loads, and it embeds the
 `Architecture/`/`Conventions/` page paths so the worker pulls them from the
 durable-knowledge store (searching it for discovery when a path isn't pre-named —

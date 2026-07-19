@@ -124,7 +124,12 @@ Identical discipline to the interface (#2/#3), GitHub binding:
 - **Area** → an `area:<name>` **label**, applied by the tech-lead at decomposition.
 - **Read-back** = `gh issue view` (parse body headings) + list comments filtered to the one
   starting with its sentinel — a **sentinel match, not "the newest comment"**, so a later human
-  comment never shadows it.
+  comment never shadows it. For a decomposed child unit (a sub-issue) with no
+  `**[Technical Analysis]**` of its own (only the tech-lead's `**[Canonical Brief]**`), read the
+  analysis from its **nearest ancestor** Feature — resolve the parent via **GraphQL `Issue.parent`**
+  (`gh api graphql` — `{ repository(owner,name){ issue(number:N){ parent { number } } } }`; the REST
+  `sub_issues` endpoint lists an issue's *children*, not its parent), climbing parent links until you
+  reach the Feature that bears a `**[Technical Analysis]**` (concept #1).
 
 ## 8. Dependency links — the `## Depends On` convention
 

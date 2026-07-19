@@ -68,7 +68,7 @@ three layers, each answering a different question (concept #9 read contract):
 | **durable-knowledge store** (`Architecture/`, `Conventions/`) | **project-specific** current-truth — this project's shape + its conventions atop the pack's generic ones | "How does *this project* do it?" | the **tech-lead** (concept #9) |
 | **canonical brief** (tech-lead) | the **bridge** — names the area (→ which pack) and embeds the exact durable-knowledge page paths for this unit | "Which pack + which project pages, for *this* unit?" | the **tech-lead** |
 
-So my assembled context = **pack (tagged area) + durable-knowledge (brief-named pages) + task + brief**.
+So my assembled context = **pack (tagged area) + durable-knowledge (brief-named pages) + task + the item's [Technical Analysis] (its own, or its nearest-ancestor Feature's for a decomposed unit) + brief**.
 The layering is *atop*, not *instead*: the project's `Conventions/` page **overrides or extends** the
 pack's generic conventions where they differ. When the two disagree, the **durable-knowledge store
 wins** — it's the more specific current-truth for *this* project; the pack is the generic default the

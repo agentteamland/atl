@@ -23,7 +23,7 @@ active backend's adapter operation-map resolves each to its concrete tool:
 | My operation | Backend concept (the active adapter binds the tool) |
 |---|---|
 | Read my assigned work-item (spec-field H2s `## Problem` / `## Business Value` / `## Scope` / `## Acceptance Criteria` / `## Out of Scope`) | read the work-item — the spec field (concept #2) |
-| Read the technical-analysis comment (the one whose **first line is the exact sentinel `**[Technical Analysis]**`**) | read comments, sentinel-matched (concept #3) |
+| Read the technical-analysis comment (the one whose **first line is the exact sentinel `**[Technical Analysis]**`**) — on the item, or its nearest ancestor Feature for a decomposed child (concept #3 fallback) | read comments, sentinel-matched; parent traversal per the adapter (concept #3 / #1) |
 | Read the tech-lead's canonical brief (the one whose **first line is the exact sentinel `**[Canonical Brief]**`**) | read comments, sentinel-matched (concept #3) |
 | **Claim** — transition to the in-progress state (resolved at runtime) | resolve the completion/state model, then set the in-progress state (concept #7) |
 | Write a claim / progress comment | add a comment (concept #3) |
@@ -48,8 +48,12 @@ The content-placement contract (concepts #2/#3) exists so I read analysis back *
   `**[Technical Analysis]**` (its H2s: `## Approach`, `## Feasibility & Risks`, `## NFRs`,
   `## Dependencies`, `## Suggested Areas`). I read the comments (concept #3) and **match by the
   sentinel — never "the newest comment"** — because a later human comment must not shadow the
-  analysis. I **read** this comment; I never write it — it belongs to the `technical-analyst`
-  (concept #3). My own comments are plain progress/claim comments.
+  analysis. **Fallback for a decomposed child unit:** the analysis is authored per *analyzed*
+  item (a Feature at kickoff), not per decomposed unit — so if my assigned item has no
+  `**[Technical Analysis]**` of its own (only its `**[Canonical Brief]**`), I read it from my
+  **nearest ancestor** Feature (concept #3; the adapter binds the parent traversal). I **read**
+  this comment; I never write it — it belongs to the `technical-analyst` (concept #3). My own
+  comments are plain progress/claim comments.
 - **Canonical brief** is a **single comment** whose first line is the exact sentinel
   `**[Canonical Brief]**` (its H2s: `## Goal`, `## Area`, `## Load These Pages`, `## Depends On`,
   `## Evidence Before Review`). I read it the same way — the comment channel, **matched by the
