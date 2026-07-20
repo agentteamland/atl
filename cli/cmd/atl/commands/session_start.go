@@ -2,7 +2,10 @@ package commands
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/agentteamland/atl/cli/internal/buildinfo"
@@ -117,6 +120,11 @@ var sessionStartCmd = &cobra.Command{
 		// Rules-distill "distill due" signal — monorepo-internal, same shape.
 		rulesSessionSignal()
 
+		// Board-tracked-work signal — fires in ANY project with a delivery board
+		// backend (a .delivery/config.json), not just the monorepo: reminds the
+		// agent the board-tracked-work rule is active here. Silent otherwise.
+		boardTrackedSignal(project)
+
 		// Binary self-update — once/24h, check for a newer stable release and, if
 		// there is one, spawn a detached `atl upgrade` so the download + swap runs
 		// independently and the next session runs the new binary. Bounded (short
@@ -143,4 +151,32 @@ var sessionStartCmd = &cobra.Command{
 
 		return nil
 	},
+}
+
+// boardTrackedSignal fires in any project that has a delivery board backend
+// configured (a .delivery/config.json at the project root). It reminds the agent
+// that the board-tracked-work rule is ACTIVE here: every shippable unit needs a
+// board item before it ships, and work discovered mid-task gets its own item — so
+// the board reflects reality. Unlike the docs/skills/rules "due" signals (which are
+// monorepo-internal), the trigger is the config file, present in any board-backed
+// project. Never fails: a hook must not block the session.
+func boardTrackedSignal(projectRoot string) {
+	if projectRoot == "" {
+		return
+	}
+	b, err := os.ReadFile(filepath.Join(projectRoot, ".delivery", "config.json"))
+	if err != nil {
+		return // no board backend here — the rule is dormant
+	}
+	var cfg struct {
+		Backend string `json:"backend"`
+	}
+	if err := json.Unmarshal(b, &cfg); err != nil {
+		return // malformed config — stay silent, never fail a hook
+	}
+	backend := cfg.Backend
+	if backend == "" {
+		backend = "azure" // the schema default
+	}
+	fmt.Printf("atl: this project is board-backed (%s) — record every shippable unit on the board before it ships, and give new work discovered mid-task its own item (board-tracked-work rule)\n", backend)
 }

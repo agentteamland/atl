@@ -60,7 +60,8 @@ export default defineConfig({
                 { text: 'Untrusted input', link: '/guide/untrusted-input' },
                 { text: 'Execution hygiene', link: '/guide/execution-hygiene' },
                 { text: 'Idempotent writes', link: '/guide/idempotent-writes' },
-                { text: 'No fabrication', link: '/guide/no-fabrication' }
+                { text: 'No fabrication', link: '/guide/no-fabrication' },
+                { text: 'Board-tracked work', link: '/guide/board-tracked-work' }
               ]
             },
             {
@@ -202,7 +203,8 @@ export default defineConfig({
                 { text: 'Güvenilmez girdi', link: '/tr/guide/untrusted-input' },
                 { text: 'İcra hijyeni', link: '/tr/guide/execution-hygiene' },
                 { text: 'Idempotent yazımlar', link: '/tr/guide/idempotent-writes' },
-                { text: 'Uydurma yok', link: '/tr/guide/no-fabrication' }
+                { text: 'Uydurma yok', link: '/tr/guide/no-fabrication' },
+                { text: "Board'a-işlenen iş", link: '/tr/guide/board-tracked-work' }
               ]
             },
             {
