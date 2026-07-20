@@ -226,7 +226,7 @@ local ledger):
   state has no side effect.
 - **The review page is an idempotent upsert** — upserting the durable-knowledge store overwrites
   `Sprints/Sprint-<n>-Review` in place rather than appending a duplicate.
-- **Any created item** — an integration forward-fix task (step 4) or a reject follow-up (step 6) —
+- **Any created item** — an integration forward-fix task (step 4) —
   carries tags (concept #4) of `atl-run:sprint-review:<sprint-id>` (provenance) + `atl-key:<hash>`
   where `hash = hash(parent-id + plan-ordinal)` (a **stable plan-ordinal**, never a per-run GUID,
   never `hash(title)`). Before any create, a **check-first query** (concept #10) for that `atl-key`

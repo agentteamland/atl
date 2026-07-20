@@ -162,7 +162,7 @@ held back for feasibility, stay on the backlog for the next `/sprint-plan`. Carr
 by a capacity shortfall — it is committed work, admitted first; only new work is subject to the
 capacity that remains after it.
 
-## Idempotency
+## Idempotent re-run
 
 A re-run must **not duplicate items or double-assign iterations** (#16 — idempotency), and it converges
 on the intended plan:
