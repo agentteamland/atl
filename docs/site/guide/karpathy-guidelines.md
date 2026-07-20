@@ -99,15 +99,15 @@ You'll know they're being skipped when:
 
 ## How it ships to your project
 
-The rule lives in [`core/rules/karpathy-guidelines.md`](https://github.com/agentteamland/core/blob/main/rules/karpathy-guidelines.md). Every project that has run [`atl install`](/cli/install) (any team) gets it auto-installed via the `core` cache, and `atl update` keeps it current via the [project-local copy refresh model](/cli/update#what-it-updates).
+The rule lives in [`core/rules/karpathy-guidelines.md`](https://github.com/agentteamland/atl/blob/main/core/rules/karpathy-guidelines.md). It ships embedded in the `atl` binary and is reflected into your global `~/.claude/rules/` directory on install, update, and session-start, so every project picks it up automatically and the reflection keeps it in lockstep with your binary version.
 
-The rule is loaded into Claude's context on every session start (per the [knowledge-system architecture](https://github.com/agentteamland/core/blob/main/rules/knowledge-system.md)) — no per-prompt invocation needed.
+The rule is loaded into Claude's context on every session start (per the [knowledge-system architecture](https://github.com/agentteamland/atl/blob/main/core/rules/knowledge-system.md)) — no per-prompt invocation needed.
 
 ## Going deeper
 
 - Upstream paired examples (side-by-side wrong/right code for each principle): [EXAMPLES.md](https://github.com/forrestchang/andrej-karpathy-skills/blob/main/EXAMPLES.md)
 - Original Karpathy thread: [@karpathy on X](https://x.com/karpathy/status/2015883857489522876)
-- The rule's source-of-truth (what's loaded into your sessions): [core/rules/karpathy-guidelines.md](https://github.com/agentteamland/core/blob/main/rules/karpathy-guidelines.md)
+- The rule's source-of-truth (what's loaded into your sessions): [core/rules/karpathy-guidelines.md](https://github.com/agentteamland/atl/blob/main/core/rules/karpathy-guidelines.md)
 
 ## Related
 

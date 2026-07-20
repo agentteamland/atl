@@ -7,7 +7,8 @@ This is a **maintainer-side** gate that runs against the monorepo's `core/` and 
 ## Usage
 
 ```bash
-atl skills check    # validate frontmatter, team.json consistency, agent-KB children
+atl skills check                      # validate frontmatter, team.json consistency, agent-KB children
+atl skills check --record-stocktake   # stamp HEAD as the last-stocktaken commit (run by /skill-stocktake after a sweep)
 ```
 
 ## What it checks
@@ -21,6 +22,8 @@ Every check is **zero-false-positive by construction** — a failure is always a
 | **children** | Every agent-KB child (`agents/<x>/children/*.md`) declares a non-empty `knowledge-base-summary` frontmatter — the KB-rebuild contract. |
 
 `atl skills check` exits non-zero on any failure, so it **gates every PR in CI** alongside the docs-drift gate. The judgment half — does a skill obey its own documented flow? do two skills overlap? — is the job of the companion [`/skill-stocktake`](/skills/skill-stocktake) skill (LLM), not this deterministic net. That split is the CLI/Skill boundary: deterministic checks here, grounded judgment in the skill.
+
+`--record-stocktake` stamps HEAD as the last-stocktaken commit (in `~/.atl` state) when the run is free of failures — the `/skill-stocktake` skill calls it at the end of a sweep to reset the session-start "a stocktake is due" signal, the sibling of `atl rules scan --record`.
 
 ## Related
 

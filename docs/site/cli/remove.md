@@ -28,7 +28,7 @@ acme/example-team is not installed at project scope
 ## What happens
 
 1. The install manifest for the team at the chosen scope is read from `<layer>/.atl/installed/<handle>__<name>.json` — `<layer>` is `~/.atl` for `--global`, `<project>/.atl` for the project scope.
-2. Every file the manifest recorded (under the installed asset dirs — `.claude/agents/`, `skills/`, `rules/`, `knowledge/`, `scripts/`, `packs/`) is **soft-deleted** into `~/.atl/gc-trash`, not hard-deleted — so a promoted gain that landed in the manifest can always be recovered.
+2. Every file the manifest recorded (under the installed asset dirs — `.claude/agents/`, `skills/`, `rules/`, `knowledge/`, `backends/`, `scripts/`, `packs/`) is **soft-deleted** into `~/.atl/gc-trash`, not hard-deleted — so a promoted gain that landed in the manifest can always be recovered.
 3. The directories that held those files are pruned, deepest first — but only the ones that are now empty. A directory still holding another team's files or your own content is left in place.
 4. The manifest itself is removed.
 

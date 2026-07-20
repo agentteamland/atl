@@ -36,7 +36,9 @@
 
 **knowledge-base-summary** — her `children/{topic}.md` dosyasında zorunlu olan YAML frontmatter alanı. [`/drain`](/tr/skills/drain)'in üst `agent.md`'nin Knowledge Base bölümünü yeniden inşa ederken çıkardığı bir-üç satırlık özet. Kaynak doğruluktur — yeniden inşa edilmiş bölüme yapılan elle düzenlemeler bir sonraki `/drain` çalıştırmasında üzerine yazılır.
 
-**knowledge-system** — iki katmanlı bilgi modelini (`journal/` + `wiki/`) tanımlayan çekirdek kural. `agent-memory` katmanı journal'a katıldıktan sonra `memory-system` adından yeniden adlandırıldı.
+**knowledge-system** — iki katmanlı bilgi modelini (`journal/` + `wiki/`) ve prompt başına danışma disiplinini (`atl retrieve` kancasıyla otomatik geri getirme, artı dizini yeniden tarama refleksi) tanımlayan çekirdek kural. `agent-memory` katmanı journal'a katıldıktan sonra `memory-system` adından yeniden adlandırıldı.
+
+**Geri getirme (bilgi dizini) (Retrieval / knowledge index)** — bilgi döngüsünün okuma tarafı: projenin bilgi sayfalarının (wiki + journal; bir delivery-backend projesinde, depo içindeki `docs/` deposu da) proje başına bir dizini; her promptta `atl retrieve` UserPromptSubmit kancası tarafından sorgulanarak (yerel bir anlamsal gömücüyle harmanlanmış BM25, RRF ile sıralanır) en ilgili sayfaları bağlam olarak yüzeye çıkarır. Fail-open (başarısızlıkta açık kalır) — bir hata promptu asla engellemez; bir drain bilgi tabanını değiştirdiğinde dizin arka planda artımlı olarak yeniden inşa edilir. `~/.atl/cache/retrieve/<project-slug>/index.gob` konumunda saklanır.
 
 **Öğrenme işaretçisi** — bir öğrenme anı geçtiğinde Claude'un konuşma sırasında düşürdüğü satır içi HTML yorumu. Biçim: `<!-- learning: serbest metin -->`. `atl tick` tarafından dayanıklı kuyruğa (`~/.atl/queue.db`) alınır (içerik hash'iyle tekilleştirilerek, tam bir kez), ardından [`/drain`](/tr/skills/drain) tarafından işlenir ve silinir.
 

@@ -196,9 +196,8 @@ The user ends the skill on the target branch, with the merged change incorporate
 
 1. **Never merge directly.** The skill uses `gh pr merge --auto --squash` (auto-merge enable) only when `--auto-merge` is passed. An immediate `gh pr merge --squash`/`--merge`/`--rebase` (without `--auto`) is **always forbidden** — auto-merge preserves the required-check gate, and the user opted in by typing the flag.
 2. **Idempotent drain.** Running `/drain` here is safe — it processes only unacknowledged queue entries.
-3. **team.json validation.** If the staged diff touches a `team.json`, the skill verifies that the file parses, has a `name` field, and all declared assets exist on disk before push.
-4. **Branch hygiene before start.** Before deriving the new branch, the skill verifies the local default branch is current with origin; if behind, it fast-forwards first (per [`branch-hygiene`](https://github.com/agentteamland/atl/blob/main/core/rules/branch-hygiene.md)).
-5. **No silent partial failures.** If any step fails, the skill stops and reports — the user always knows where they are.
+3. **Branch hygiene before start.** Before deriving the new branch, the skill verifies the local default branch is current with origin; if behind, it fast-forwards first (per [`branch-hygiene`](https://github.com/agentteamland/atl/blob/main/core/rules/branch-hygiene.md)).
+4. **No silent partial failures.** If any step fails, the skill stops and reports — the user always knows where they are.
 
 ## Related
 

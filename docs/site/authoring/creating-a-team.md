@@ -135,7 +135,7 @@ gh repo create you/my-team --public --source=. --push
 gh repo edit you/my-team --add-topic atl-team
 ```
 
-The index reindexes from public `atl-team`-tagged repos, so within a short window your team is discoverable as `you/my-team`.
+An hourly index job discovers public `atl-team`-tagged repos and opens a catalog-refresh PR against the catalog; once a maintainer merges it, your team is discoverable as `you/my-team` — so expect a delay for that review, not instant availability.
 
 ### Step 6 — Install it
 
@@ -173,6 +173,10 @@ atl update
 ```
 
 `atl update` refreshes copies you haven't modified and leaves your local edits in place.
+
+::: warning Releases pin installs
+If your repo has GitHub Releases, the catalog pins installs to the latest release's tag — cut a new GitHub Release (not just a git tag) for each version you ship. A plain push to `main` only reaches installers while the repo has no releases.
+:::
 
 ### Step 8 — (Optional) Add skills and rules
 
@@ -263,7 +267,7 @@ my-team/
     └── file-naming.md
 ```
 
-`atl` copies every file under the team's asset directories (`agents/`, `skills/`, `rules/`, plus `knowledge/`, `scripts/`, `packs/`) into the consumer's `.claude/`. The `team.json` `agents[]`/`skills[]`/`rules[]` arrays are catalog metadata — they describe the team in `atl search`, they do not decide what gets copied. Only files outside those asset directories (`team.json`, `README`, `LICENSE`) stay behind.
+`atl` copies every file under the team's asset directories (`agents/`, `skills/`, `rules/`, plus `knowledge/`, `backends/`, `scripts/`, `packs/`) into the consumer's `.claude/`. The `team.json` `agents[]`/`skills[]`/`rules[]` arrays are catalog metadata — they describe the team in `atl search`, they do not decide what gets copied. Only files outside those asset directories (`team.json`, `README`, `LICENSE`) stay behind.
 
 ---
 
@@ -300,7 +304,7 @@ There is no persistent clone cache and no separate ATL asset store — team asse
 Yes. `atl install` resolves handles against the GitHub-backed catalog, so a team needs a public repo tagged `atl-team` (or one `atl publish` has run against) before it can be installed by handle.
 
 **Can multiple teams coexist in one project?**
-Yes — install as many as you like. Each team's items are copied into the shared `.claude/` directory. If two teams declare an item with the same name, the most recently installed one wins and `atl` prints a one-line warning.
+Yes — install as many as you like. Each team's items are copied into the shared `.claude/` directory. If two teams declare an item with the same name, a first install lets the most recently installed team's file silently overwrite the earlier one — `atl` does not currently warn about the collision. On `atl update` (and re-installs) the fan-out discipline preserves a divergent local file at a colliding path rather than clobbering it, so the newcomer does not win there either. Prefer unique agent/skill/rule names to avoid the ambiguity.
 
 **What Markdown format does atl use?**
 Plain Markdown with optional YAML frontmatter. Claude Code's agent and skill format is supported natively.

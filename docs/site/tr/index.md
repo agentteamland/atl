@@ -25,7 +25,7 @@ features:
     details: Bir takım; belirli bir tür iş için uzmanlaşmış agent'ları, skill'leri ve rule'ları bir arada paketler — full-stack uygulamalar, design system'ler ve dahası. Tek komutla kur, projenin Claude Code dizinine kopyalansın.
   - icon: ⚡
     title: Tek static binary
-    details: atl, runtime bağımlılığı olmayan ~7 MB'lık bir Go binary'si. Tek bir curl (macOS/Linux) ya da PowerShell (Windows) komutuyla kur.
+    details: atl, runtime bağımlılığı olmayan ~18 MB'lık bir Go binary'si. Tek bir curl (macOS/Linux) ya da PowerShell (Windows) komutuyla kur.
   - icon: 🔄
     title: Kendi kendini süren güncelleme + öğrenme
     details: Hook'lar takımlarını güncel tutar ve session içi öğrenimleri kendiliğinden bilgi tabanına işler — kazanımları global katmanına promote et, üst kaynağa publish et.
@@ -63,7 +63,7 @@ irm https://raw.githubusercontent.com/agentteamland/atl/main/scripts/install.ps1
 ```bash
 # Sonra, herhangi bir projede:
 atl install <handle>/<takım>      # takımı atl search ile keşfet
-atl setup-hooks                   # opsiyonel: her Claude Code session'ında auto-update + öğrenme yakalama
+atl setup-hooks                   # gerekmez — atl install otomasyon hook'larını zaten bağlar (yalnızca yeniden bağlamak veya --throttle'ı değiştirmek için çalıştır)
 ```
 
 Kurduğun takımın agent'ları, skill'leri ve rule'ları projenin `.claude/` dizinine kopyalanır — Claude Code hepsini anında görür, hemen kullanıma hazırdır.

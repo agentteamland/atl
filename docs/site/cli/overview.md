@@ -26,7 +26,7 @@ As your agents work, they accumulate **gains** — new learnings, sharpened skil
 | `atl publish` | Publish your global-layer gains — re-publish your own team, or propose them upstream as a GitHub PR. |
 | `atl pin` | Keep a project-local path from being promoted to global. |
 | `atl unpin` | Allow a previously pinned path to be promoted again. |
-| `atl learnings` | Inspect the durable learning queue: `status` (pending per channel/project), `peek` (list items, used by the `/drain` skill), `ack <id>` (mark an item processed). |
+| `atl learnings` | Inspect the durable learning queue: `status` (pending per channel/project), `peek` (list items, used by the `/drain` skill), `ack <id>` (mark an item processed), `transcript` (recent conversation flow, for `/drain`'s correction-mining). |
 
 ## Automation commands
 
@@ -34,7 +34,7 @@ These are wired to Claude Code hooks by [`atl setup-hooks`](/cli/setup-hooks) an
 
 | Command | What it does |
 |---|---|
-| [`atl setup-hooks`](/cli/setup-hooks) | One-time install/remove of the Claude Code hooks (`SessionStart`, `UserPromptSubmit`) that drive the automation below. |
+| [`atl setup-hooks`](/cli/setup-hooks) | One-time install of the Claude Code hooks (`SessionStart`, `UserPromptSubmit`, `PreToolUse`) that drive the automation below. |
 | `atl session-start` | Boot-time maintenance run by the `SessionStart` hook (core refresh + previous-transcript marker scan + doctor self-heal + a once-a-day [binary self-update](/cli/upgrade) check). |
 | `atl tick` | The in-session maintenance tick (every 5–10 minutes via prompt-piggyback): drains throttled background work. |
 | `atl doctor` | The self-heal daemon — diagnoses drift and repairs the install automatically. |
@@ -77,9 +77,13 @@ Assets live in **Claude Code's own directories**, in one of two scopes — there
 ├── queue.db               ← the durable learning queue (bbolt)
 ├── index.json             ← cached team catalog (refreshed by atl update)
 ├── generation             ← global-layer change counter (drives every-prompt fan-out)
-├── pins.json              ← paths held back from promotion
 ├── cache/                 ← cache stamps
 └── installed/             ← per-team install manifests + integrity baselines
+```
+
+```
+<project>/.atl/
+└── pins.json              ← paths held back from promotion (one file per project)
 ```
 
 ## Philosophy

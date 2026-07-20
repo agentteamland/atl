@@ -21,6 +21,7 @@ Eşzamanlamadan sonra `./repos/`, v2 aktif depolarını ve arşivlenmiş v1 depo
 ```
 repos/
 ├── atl/                       # v2 monorepo — cli + core + takımlar + belgeler
+├── atl-e2e-team/              # e2e publish blueprint'leri için gerçek-GitHub fixture takımı
 └── .github/                   # organizasyon profili
 
 # Arşivlenmiş v1 depoları (salt okunur, tarih için saklanmış):
@@ -32,6 +33,7 @@ repos/
 ├── software-project-team/     # 🗄 ARCHIVED 2026-06-21 — atl monoreposuna aktarıldı
 ├── design-system-team/        # 🗄 ARCHIVED 2026-06-21 — atl monoreposuna aktarıldı
 ├── starter-extended/          # 🗄 ARCHIVED 2026-06-21 — kalıtım v2'de kaldırıldı
+├── create-project/            # 🗄 ARCHIVED 2026-05-03 — v1 proje iskeletleyici, yerine yenisi geldi
 ├── registry/                  # 🗄 ARCHIVED 2026-06-21 — GitHub konu kataloğuyla değiştirildi
 ├── homebrew-tap/ scoop-bucket/ # 🗄 ARCHIVED 2026-06-21 — dağıtım artık yalnızca GitHub Releases üzerinden
 └── docs/                      # 🗄 ARCHIVED 2026-06-22 — belgeler sitesi atl monoreposuna aktarıldı (docs/site/)
@@ -100,7 +102,7 @@ Toparlanırken:
 ./scripts/push-all.sh      # push'lanmamış ne var, gör
 ```
 
-Daha kapsamlı bir oturum sonu geçişi için [`/repo-cleanup`](https://github.com/agentteamland/workspace/blob/main/.claude/skills/repo-cleanup/SKILL.md) şunları otomatikleştirir: `/drain` → dal + commit + push + PR + auto-merge → etiket + dal budama. Çalışma alanında Claude Code'un içinden çalıştır.
+Daha kapsamlı bir oturum sonu geçişi için [`/repo-cleanup`](https://github.com/agentteamland/workspace/blob/main/.claude/skills/repo-cleanup/SKILL.md) şunları otomatikleştirir: bir öğrenme-yakalama drain'i → dal + commit + push + PR + auto-merge → etiket + dal budama. Çalışma alanında Claude Code'un içinden çalıştır.
 
 ## İlgili
 

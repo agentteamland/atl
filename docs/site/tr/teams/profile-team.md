@@ -8,12 +8,13 @@ Duraklatılmış kişisel-danışman yığınının üstüne kurulduğu temeldir
 yönettiği profilleri okur.
 
 ```bash
-atl install profile-team
+atl install agentteamland/profile-team
 ```
 
 Varsayılan olarak global kurulur (`team.json`'ı `scope: global` bildirir); `profile-curator`
-ajanını, `/profile-drain` becerisini ve `profile-capture` kuralını `~/.claude`'a yerleştirir,
-profilleri `~/.atl/profiles/` altında saklar.
+ajanını, `/profile-drain`, `/profile-backup` ve `/profile-restore` becerilerini ve
+`profile-capture` kuralını `~/.claude`'a yerleştirir, profilleri `~/.atl/profiles/` altında
+saklar.
 
 ## Profil dünyası
 
@@ -26,10 +27,10 @@ Her şey global ATL katmanı altında `~/.atl/profiles/`'te yaşar:
 │   ├── person.md                 #   (+ yeni türler için ajan-yazımı arayüzler)
 │   ├── org.md · animal.md · place.md · object.md · project.md
 │   └── migrations/               # kırıcı-değişiklik migration dosyaları, dokununca uygulanır
-└── people/
-    └── <slug>/
+└── <type-dir>/                   # tür başına bir dizin: people · orgs · animals ·
+    └── <slug>/                   #   places · objects · projects (+ taslaklar için unknown/)
         ├── profile.md            # frontmatter çekirdek + anlatı gövdesi
-        ├── wiki/                 # bu kişi için konu-organizasyonlu güncel gerçek
+        ├── wiki/                 # bu varlık için konu-organizasyonlu güncel gerçek
         └── learnings/            # örüntü-organizasyonlu, KB'den yeniden derlenen
 ```
 

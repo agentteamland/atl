@@ -51,8 +51,7 @@ Rules:
 - **Written by [`/drain`](/skills/drain)** from your inline `<!-- learning -->` markers — topic-shaped current truth lands here, time-stamped narrative goes to the journal
 - **Pages reflect what is true NOW** — old info is replaced, not appended
 - **Cross-referenced:** related pages link to each other
-- **`index.md` is the table of contents**
-- **A `<!-- wiki:index -->` marker block** at the top of `CLAUDE.md` auto-aggregates the topic list, so agents discover pages at zero cost
+- **The table of contents is the `<!-- wiki:index -->` marker block** at the top of `CLAUDE.md`, auto-aggregated by [`/drain`](/skills/drain) so agents discover pages at zero cost — there is no separately-maintained `index.md`
 
 ## How knowledge gets written: the learning loop
 

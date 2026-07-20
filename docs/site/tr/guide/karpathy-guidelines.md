@@ -99,15 +99,15 @@ Atlandığını şuradan anlarsın:
 
 ## Projene nasıl ulaşır?
 
-Kuralın kendisi [`core/rules/karpathy-guidelines.md`](https://github.com/agentteamland/core/blob/main/rules/karpathy-guidelines.md) dosyasında yaşar. [`atl install`](/tr/cli/install) komutunu (herhangi bir takım için) çalıştırmış her proje, `core` önbelleği üzerinden bu kuralı kendiliğinden alır; `atl update` ise [proje-yerel kopya yenileme modeli](/tr/cli/update#what-it-updates) üzerinden onu güncel tutar.
+Kuralın kendisi [`core/rules/karpathy-guidelines.md`](https://github.com/agentteamland/atl/blob/main/core/rules/karpathy-guidelines.md) dosyasında yaşar. `atl` ikili dosyasının içine gömülü olarak gelir ve kurulumda, güncellemede ve oturum başında genel `~/.claude/rules/` dizinine yansıtılır; böylece her proje onu kendiliğinden alır ve bu yansıtma, kuralı ikili dosya sürümünle aynı hizada tutar.
 
-Kural her oturum başında Claude'un bağlamına yüklenir (bkz. [knowledge-system mimarisi](https://github.com/agentteamland/core/blob/main/rules/knowledge-system.md)) — istem başına ayrı bir çağrıya gerek yoktur.
+Kural her oturum başında Claude'un bağlamına yüklenir (bkz. [knowledge-system mimarisi](https://github.com/agentteamland/atl/blob/main/core/rules/knowledge-system.md)) — istem başına ayrı bir çağrıya gerek yoktur.
 
 ## Daha derinine
 
 - Üst kaynaktaki yan yana doğru-yanlış kod örnekleri (her ilke için): [EXAMPLES.md](https://github.com/forrestchang/andrej-karpathy-skills/blob/main/EXAMPLES.md)
 - Karpathy'nin orijinal ileti dizisi: [@karpathy on X](https://x.com/karpathy/status/2015883857489522876)
-- Kuralın kaynak doğruluğu (oturumlarına yüklenen sürüm): [core/rules/karpathy-guidelines.md](https://github.com/agentteamland/core/blob/main/rules/karpathy-guidelines.md)
+- Kuralın kaynak doğruluğu (oturumlarına yüklenen sürüm): [core/rules/karpathy-guidelines.md](https://github.com/agentteamland/atl/blob/main/core/rules/karpathy-guidelines.md)
 
 ## İlgili
 

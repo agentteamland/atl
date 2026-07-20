@@ -6,7 +6,7 @@ Birden çok ifadenin olası olduğu karmaşık ya da belirsiz kurallar için do�
 
 Global beceri olarak [atl monorepo](https://github.com/agentteamland/atl) içinde yayımlanır.
 
-## İki kapsam
+## İki kapsam {#two-scopes}
 
 | Bayrak | Hedef | Ne zaman |
 |---|---|---|

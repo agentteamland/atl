@@ -75,7 +75,7 @@ Open Claude Code in this directory. The team's skills are available as slash com
 
 Every agent the team ships is available for Claude to delegate to.
 
-The platform's own global skills are there too — `/drain`, `/create-pr`, `/create-code-diagram`, `/brainstorm`, `/rule`, `/rule-wizard` — usable in any project regardless of which team you installed.
+The platform's own global skills are there too — `/drain`, `/create-pr`, `/create-code-diagram`, `/brainstorm`, `/rule`, `/rule-wizard`, `/docs-audit`, `/publish`, `/skill-stocktake`, `/rules-distill` — usable in any project regardless of which team you installed.
 
 ## 7. Let the learning loop run itself
 

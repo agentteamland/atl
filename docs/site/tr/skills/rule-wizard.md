@@ -4,7 +4,7 @@ Bir kural eklemeden önce **seçenek tabanlı soru-yanıt turları** kullanan bi
 
 Tartışma tamamlanınca sihirbaz, sonlandırılmış metni `/rule`'a verir; böylece kural doğru dosyaya yazılır.
 
-Global beceri olarak [rule](https://github.com/agentteamland/rule) içinde yayımlanır.
+Global beceri olarak [atl monorepo](https://github.com/agentteamland/atl) içinde yayımlanır.
 
 ## Hangi durumda hangisi?
 
@@ -24,7 +24,7 @@ Global beceri olarak [rule](https://github.com/agentteamland/rule) içinde yayı
 
 ## İki kapsam
 
-[`/rule`](/tr/skills/rule#three-scopes) ile aynıdır: proje (varsayılan) ve `--global`. Bayrak verildiğinde sihirbaz kapsam sorusunu atlar.
+[`/rule`](/tr/skills/rule#two-scopes) ile aynıdır: proje (varsayılan) ve `--global`. Bayrak verildiğinde sihirbaz kapsam sorusunu atlar.
 
 ## Aşama 1 — anlama ve hazırlık
 
@@ -223,4 +223,4 @@ Sonunda tek bir mesaj:
 
 ## Kaynak
 
-- Belirtim: [rule/skills/rule-wizard/SKILL.md](https://github.com/agentteamland/rule/blob/main/skills/rule-wizard/SKILL.md).
+- Belirtim: [core/skills/rule-wizard/SKILL.md](https://github.com/agentteamland/atl/blob/main/core/skills/rule-wizard/SKILL.md).

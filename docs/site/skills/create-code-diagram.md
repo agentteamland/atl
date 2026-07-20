@@ -4,7 +4,7 @@ Generate a comprehensive Mermaid class diagram of the entire project codebase. S
 
 This is for **humans** — when you want to see the full picture, understand the system, or debug your mental model of the architecture.
 
-Ships as a global skill in [core](https://github.com/agentteamland/core).
+Ships as a global skill in the [atl monorepo](https://github.com/agentteamland/atl).
 
 ## Usage
 
@@ -44,7 +44,7 @@ For each layer, the skill lists every type with its key members — properties f
 
 | Relationship | Mermaid syntax | When |
 |---|---|---|
-| Inheritance | `Child --|> Parent` | class extends base class |
+| Inheritance | `Child --\|> Parent` | class extends base class |
 | Implementation | `Impl ..\|> Interface` | class implements interface |
 | Dependency | `ClassA --> ClassB` | constructor injection, method call |
 | Composition | `ClassA *-- ClassB` | has property of type ClassB |
@@ -134,4 +134,4 @@ classDiagram
 
 ## Source
 
-- Spec: [core/skills/create-code-diagram/SKILL.md](https://github.com/agentteamland/core/blob/main/skills/create-code-diagram/SKILL.md)
+- Spec: [core/skills/create-code-diagram/SKILL.md](https://github.com/agentteamland/atl/blob/main/core/skills/create-code-diagram/SKILL.md)

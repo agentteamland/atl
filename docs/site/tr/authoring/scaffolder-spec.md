@@ -3,7 +3,7 @@
 Bir **iskele**, takımın yığınında yeni bir projeyi başlatan, `/create-new-project` adıyla anılan takım kapsamlı bir beceridir. Bu sayfa, her iskelenin uyması gereken standart şekli tanımlar.
 
 ::: tip Kanonik kaynak
-Bu belirtimin yetkili sürümü [`agentteamland/core/docs/scaffolder-spec.md`](https://github.com/agentteamland/core/blob/main/docs/scaffolder-spec.md) altında yaşar. Bu sayfa onu yansıtır; ikisi ayrılırsa `core` deposu kazanır.
+Bu sayfa, belirtimin kanonik sürümüdür. (Daha eski bir kopyası arşivlenmiş v1 `agentteamland/core` deposunda yaşıyordu; o kopya yalnızca tarihseldir.)
 :::
 
 ## Neden bir belirtim?
@@ -58,7 +58,8 @@ Yeni projenin ihtiyaç duyduğu her dosyayı yaz. Büyük iskeleler için parale
 
 - Kök dosyalar (`README.md`, `.gitignore`, dile özgü kilit dosyaları).
 - Proje yapılandırması (`CLAUDE.md`, `.mcp.json`, `.env.example`).
-- `.claude/` proje dizini (`agents/`, `skills/`, `rules/`, `docs/`, `brain-storms/`, `wiki/`, `journal/`, `backlog.md`).
+- `.claude/` proje dizini (`agents/`, `skills/`, `rules/`).
+- `.atl/` proje dizini (`docs/`, `brain-storms/`, `wiki/`, `journal/`, `backlog.md`, `tasks.md`) — bilgi + karar katmanı.
 - Kaynak ağacı (uygulamanın gerçekten çalışmasını sağlayan her şey).
 - Konteyner / dağıtım yapılandırması (varsa).
 

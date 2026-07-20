@@ -135,7 +135,7 @@ gh repo create you/my-team --public --source=. --push
 gh repo edit you/my-team --add-topic atl-team
 ```
 
-Dizin herkese açık `atl-team` etiketli depolardan yeniden oluşturulur; kısa süre içinde takımın `you/my-team` olarak keşfedilebilir olur.
+Saatlik çalışan bir dizin işi (index job), herkese açık `atl-team` etiketli depoları keşfeder ve kataloğa karşı bir katalog yenileme PR'ı açar; bir maintainer bunu birleştirdiğinde takımın `you/my-team` olarak keşfedilebilir olur — yani anında değil, o inceleme için bir gecikme bekle.
 
 ### Adım 6 — Kur
 
@@ -173,6 +173,10 @@ atl update
 ```
 
 `atl update`, yerel olarak değiştirmediğin kopyaları yeniler; kendi düzenlemelerine dokunmaz.
+
+::: warning Release'ler kurulumları sabitler
+Reponun GitHub Release'leri varsa katalog, kurulumları en son release'in etiketine (tag) sabitler — gönderdiğin her sürüm için yeni bir GitHub Release oluştur (yalnızca bir git tag değil). `main`'e düz bir push yalnızca repoda hiç release yokken kurucularınıza ulaşır.
+:::
 
 ### Adım 8 — (İsteğe bağlı) Beceri ve kural ekle
 
@@ -263,7 +267,7 @@ my-team/
     └── file-naming.md
 ```
 
-`atl`, takımın varlık dizinleri (`agents/`, `skills/`, `rules/` ve ayrıca `knowledge/`, `scripts/`, `packs/`) altındaki her dosyayı kullanıcının `.claude/` dizinine kopyalar. `team.json` içindeki `agents[]`/`skills[]`/`rules[]` dizileri katalog üst bilgisidir — takımı `atl search` çıktısında tanıtırlar, neyin kopyalanacağına karar vermezler. Yalnızca o varlık dizinlerinin dışındaki dosyalar (`team.json`, `README`, `LICENSE`) geride kalır.
+`atl`, takımın varlık dizinleri (`agents/`, `skills/`, `rules/` ve ayrıca `knowledge/`, `backends/`, `scripts/`, `packs/`) altındaki her dosyayı kullanıcının `.claude/` dizinine kopyalar. `team.json` içindeki `agents[]`/`skills[]`/`rules[]` dizileri katalog üst bilgisidir — takımı `atl search` çıktısında tanıtırlar, neyin kopyalanacağına karar vermezler. Yalnızca o varlık dizinlerinin dışındaki dosyalar (`team.json`, `README`, `LICENSE`) geride kalır.
 
 ---
 
@@ -300,7 +304,7 @@ Kalıcı klonlama önbelleği yoktur, ayrı bir ATL varlık deposu da yoktur. Ta
 Evet. `atl install`, handle'ları GitHub tabanlı katalog üzerinden çözer; dolayısıyla takımın `atl-team` etiketli herkese açık bir deposu olması (ya da `atl publish` çalıştırılmış olması) gerekir.
 
 **Tek bir projede birden çok takım yan yana yaşayabilir mi?**
-Evet — istediğin kadar kur. Her takımın öğeleri paylaşılan `.claude/` dizinine kopyalanır. İki takım aynı adda bir öğe bildirirse en son kurulan kazanır ve `atl` tek satırlık bir uyarı yazdırır.
+Evet — istediğin kadar kur. Her takımın öğeleri paylaşılan `.claude/` dizinine kopyalanır. İki takım aynı adda bir öğe bildirirse, ilk kurulumda en son kurulan takımın dosyası öncekini sessizce üzerine yazar — `atl` bu çakışma için şu an uyarı vermez. `atl update` (ve yeniden kurulum) sırasında ise fan-out (dağıtım) disiplini, çakışan bir yoldaki yerel olarak farklılaşmış dosyayı ezmek yerine korur; dolayısıyla orada yeni gelen kazanmaz. Belirsizliği önlemek için benzersiz ajan/beceri/kural adları tercih et.
 
 **`atl` hangi Markdown biçimini kullanır?**
 İsteğe bağlı YAML frontmatter ile düz Markdown. Claude Code'un ajan ve beceri biçimi yerel olarak desteklenir.

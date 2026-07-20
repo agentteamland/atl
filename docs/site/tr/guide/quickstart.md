@@ -73,7 +73,7 @@ atl list
 
 Bu dizinde Claude Code'u aç. Takımın gönderdiği beceriler eğik çizgili komut olarak hazırdır; ajanları da (örneğin `agents/backend-agent`) Claude'un devredebilmesi için hazır bekler.
 
-Platformun kendi global becerileri de orada — `/drain`, `/create-pr`, `/create-code-diagram`, `/brainstorm`, `/rule`, `/rule-wizard` — hangi takımı kurduğundan bağımsız olarak her projede kullanılabilir.
+Platformun kendi global becerileri de orada — `/drain`, `/create-pr`, `/create-code-diagram`, `/brainstorm`, `/rule`, `/rule-wizard`, `/docs-audit`, `/publish`, `/skill-stocktake`, `/rules-distill` — hangi takımı kurduğundan bağımsız olarak her projede kullanılabilir.
 
 ## 7. Bırak öğrenme döngüsü kendini çalıştırsın
 

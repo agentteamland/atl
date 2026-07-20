@@ -51,8 +51,7 @@ Kurallar:
 - **İçeri aldığın `<!-- learning -->` işaretçilerinden [`/drain`](/tr/skills/drain) tarafından yazılır** — konu biçimli güncel doğru buraya iner, tarihli anlatı journal'a gider.
 - **Sayfalar ŞU AN doğru olanı yansıtır** — eski bilgi yerine yenisi yazılır.
 - **Çapraz başvurulu:** ilgili sayfalar birbirine bağ verir.
-- **`index.md` içindekiler tablosudur.**
-- **`CLAUDE.md` üst kısmındaki `<!-- wiki:index -->` işaretçi bloğu** konu listesini kendiliğinden derler; böylece ajanlar sayfaları sıfır maliyetle keşfeder.
+- **İçindekiler tablosu, `CLAUDE.md` üst kısmındaki `<!-- wiki:index -->` işaretçi bloğudur**; [`/drain`](/tr/skills/drain) tarafından kendiliğinden derlenir, böylece ajanlar sayfaları sıfır maliyetle keşfeder — ayrıca sürdürülen ayrı bir `index.md` yoktur.
 
 ## Bilgi nasıl yazılır: öğrenme döngüsü
 

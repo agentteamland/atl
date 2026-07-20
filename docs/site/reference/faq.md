@@ -22,17 +22,17 @@ No. Claude Code works fine without `atl`. Use `atl` when you want a reproducible
 
 ### Can I install more than one team in the same project?
 
-Yes. Each install adds its own copies into `.claude/`. If two teams ship an agent with the same name, the **most-recently-installed** team's version wins (it overwrites the earlier copy) and `atl` prints a one-line warning. This is collision handling, not inheritance — each team is installed independently. Use [`atl list`](/cli/list) to see what's installed at each scope.
+Yes. Each install adds its own copies into `.claude/`. If two teams ship an agent with the same name, the **most-recently-installed** team's version wins — it silently overwrites the earlier copy (`atl` does not currently warn about the collision). This is collision handling, not inheritance — each team is installed independently. Use [`atl list`](/cli/list) to see what's installed at each scope.
 
 ### Where do teams come from? Can I install from a private repo or a Git URL?
 
-`atl install` is **catalog-only**. It takes a `<handle>/<team>` reference, resolves it against the GitHub-backed catalog (built from public repos tagged with the [`atl-team`](https://github.com/topics/atl-team) topic), fetches the source as an ephemeral HTTPS tarball, and copies the team's installable subtrees (`agents/`, `skills/`, `rules/`, `knowledge/`, `scripts/`, `packs/`) into the scope's `.claude/`.
+`atl install` is **catalog-only**. It takes a `<handle>/<team>` reference, resolves it against the GitHub-backed catalog (built from public repos tagged with the [`atl-team`](https://github.com/topics/atl-team) topic), fetches the source as an ephemeral HTTPS tarball, and copies the team's installable subtrees (`agents/`, `skills/`, `rules/`, `knowledge/`, `backends/`, `scripts/`, `packs/`) into the scope's `.claude/`.
 
 There is no install from a private repo, an arbitrary Git URL, SSH, or a local path — those were v1. If you want a team installable, make its repo public and tag it `atl-team` (or run [`atl publish`](/cli/publish) from the repo). See [`atl search`](/cli/search) for how the catalog is queried.
 
 ### What if my `atl` version is too old for a team?
 
-A team's `team.json` can declare a `requires.atl` minimum to signal the version it expects. To stay current, run `atl update` (it also refreshes the `atl` binary's bundled core), or re-run the install script:
+A team's `team.json` can declare a `requires.atl` minimum to signal the version it expects. To update the binary itself, run [`atl upgrade`](/cli/upgrade) — it downloads the latest stable release, verifies its checksum, and atomically swaps it in (`atl` also checks for and applies this automatically at session start). [`atl update`](/cli/update) refreshes installed teams and core assets, but never changes the binary version. Re-running the install script works too:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/agentteamland/atl/main/scripts/install.sh | sh
@@ -43,13 +43,13 @@ curl -fsSL https://raw.githubusercontent.com/agentteamland/atl/main/scripts/inst
 Nothing global is affected. `atl` keeps two kinds of state, and they're separate:
 
 - **Team assets** live in Claude Code's own `.claude/` directories. Deleting a project deletes that project's `.claude/`; global assets in `~/.claude/` are untouched.
-- **`atl`'s bookkeeping** lives under `~/.atl/` (global) and `<project>/.atl/` (project) — the cached catalog (`index.json`), the learning queue (`queue.db`), pins, and per-team install manifests. The global `~/.atl/` survives; the project's `<project>/.atl/` goes with the project.
+- **`atl`'s bookkeeping** lives under `~/.atl/` (global) and `<project>/.atl/` (project) — the cached catalog (`index.json`), the learning queue (`queue.db`), pins, per-team install manifests, downloaded embedder models (`~/.atl/models/`), and each project's retrieval index (`~/.atl/cache/retrieve/<project-slug>/`). The global `~/.atl/` survives; the project's `<project>/.atl/` goes with the project (its retrieval index lingers in the global cache — a harmless leftover you can delete).
 
 There is no shared clone cache to clean up — sources are fetched as throwaway tarballs at install time, never kept on disk.
 
 ### Can I install a team without running `atl` (by hand)?
 
-Yes — `atl` just automates a copy. Fetch the team repo, then copy its installable subtrees — `agents/`, `skills/`, `rules/`, `knowledge/`, `scripts/`, `packs/` — into the target `.claude/` yourself. There's no inheritance or excludes resolution to replicate, and no persistent cache to populate. The only thing you'd lose is the install manifest `atl` writes (see below), which `atl update` and `atl doctor` rely on for refresh and self-heal.
+Yes — `atl` just automates a copy. Fetch the team repo, then copy its installable subtrees — `agents/`, `skills/`, `rules/`, `knowledge/`, `backends/`, `scripts/`, `packs/` — into the target `.claude/` yourself. There's no inheritance or excludes resolution to replicate, and no persistent cache to populate. The only thing you'd lose is the install manifest `atl` writes (see below), which `atl update` and `atl doctor` rely on for refresh and self-heal.
 
 ### Where does `atl` keep the list of installed teams?
 

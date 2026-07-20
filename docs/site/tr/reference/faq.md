@@ -22,17 +22,17 @@ Hayır. Claude Code `atl` olmadan da iyi çalışır. `atl`'yi, yeniden üretile
 
 ### Aynı projede birden çok takım kurabilir miyim?
 
-Evet. Her kurulum kendi kopyalarını `.claude/` altına ekler. İki takım aynı adda bir ajan yayımlıyorsa **en son kurulanın** sürümü kazanır (önceki kopyanın üzerine yazılır) ve `atl` tek satırlık bir uyarı yazdırır. Bu, kalıtım değil çakışma yönetimidir — her takım bağımsız olarak kurulur. Hangi kapsamda ne kurulu olduğunu görmek için [`atl list`](/tr/cli/list) kullan.
+Evet. Her kurulum kendi kopyalarını `.claude/` altına ekler. İki takım aynı adda bir ajan yayımlıyorsa **en son kurulanın** sürümü kazanır — önceki kopyanın üzerine sessizce yazılır (`atl` şu an bu çakışma için uyarı vermez). Bu, kalıtım değil çakışma yönetimidir — her takım bağımsız olarak kurulur. Hangi kapsamda ne kurulu olduğunu görmek için [`atl list`](/tr/cli/list) kullan.
 
 ### Takımlar nereden geliyor? Özel bir depodan veya Git URL'sinden kurulum yapabilir miyim?
 
-`atl install` **yalnızca katalog üzerinden** çalışır. Bir `<kullanıcı>/<takım>` referansı alır, bunu GitHub destekli kataloga karşı çözer ([`atl-team`](https://github.com/topics/atl-team) konusuyla etiketlenen genel depolardan oluşturulur), kaynağı kısa ömürlü bir HTTPS tarball olarak çeker ve takımın kurulabilir ağaçlarını (`agents/`, `skills/`, `rules/`, `knowledge/`, `scripts/`, `packs/`) kapsamın `.claude/` içine kopyalar.
+`atl install` **yalnızca katalog üzerinden** çalışır. Bir `<kullanıcı>/<takım>` referansı alır, bunu GitHub destekli kataloga karşı çözer ([`atl-team`](https://github.com/topics/atl-team) konusuyla etiketlenen genel depolardan oluşturulur), kaynağı kısa ömürlü bir HTTPS tarball olarak çeker ve takımın kurulabilir ağaçlarını (`agents/`, `skills/`, `rules/`, `knowledge/`, `backends/`, `scripts/`, `packs/`) kapsamın `.claude/` içine kopyalar.
 
 Özel depodan, rastgele bir Git URL'sinden, SSH'tan veya yerel dosya yolundan kurulum yapılamaz — bunlar v1'e aitti. Bir takımı kurulabilir hale getirmek için deposunu genel yap ve `atl-team` etiketiyle etiketle (ya da depodan [`atl publish`](/tr/cli/publish) çalıştır). Kataloğun nasıl sorgulandığını görmek için [`atl search`](/tr/cli/search) sayfasına bakabilirsin.
 
 ### `atl` sürümüm bir takım için çok eskiyse ne olur?
 
-Takımın `team.json` dosyası, beklediği sürümü bildirmek için bir `requires.atl` alt sınırı tanımlayabilir. Güncel kalmak için `atl update` çalıştır (aynı zamanda `atl` ikili dosyasının paketlenmiş çekirdeğini de günceller) ya da kurulum betiğini yeniden çalıştır:
+Takımın `team.json` dosyası, beklediği sürümü bildirmek için bir `requires.atl` alt sınırı tanımlayabilir. İkili dosyanın kendisini güncellemek için [`atl upgrade`](/tr/cli/upgrade) çalıştır — en son kararlı sürümü indirir, sağlama toplamını doğrular ve yerine atomik olarak takar (`atl` bunu oturum başında otomatik olarak da denetleyip uygular). [`atl update`](/tr/cli/update) kurulu takımları ve çekirdek varlıklarını yeniler, ancak ikili dosyanın sürümünü hiçbir zaman değiştirmez. Kurulum betiğini yeniden çalıştırmak da işe yarar:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/agentteamland/atl/main/scripts/install.sh | sh
@@ -43,13 +43,13 @@ curl -fsSL https://raw.githubusercontent.com/agentteamland/atl/main/scripts/inst
 Global hiçbir şey etkilenmez. `atl` iki tür durum tutar ve bunlar ayrıdır:
 
 - **Takım varlıkları** Claude Code'un kendi `.claude/` dizinlerinde yaşar. Bir projeyi silmek o projenin `.claude/` dizinini siler; `~/.claude/` içindeki global varlıklar etkilenmez.
-- **`atl`'nin kayıt bilgileri** `~/.atl/` (global) ve `<proje>/.atl/` (proje) altında yaşar — önbelleğe alınmış katalog (`index.json`), öğrenme kuyruğu (`queue.db`), sabitlemeler ve takım başına kurulum bildirimleri. Global `~/.atl/` kalır; projenin `<proje>/.atl/` dizini projeyle birlikte silinir.
+- **`atl`'nin kayıt bilgileri** `~/.atl/` (global) ve `<proje>/.atl/` (proje) altında yaşar — önbelleğe alınmış katalog (`index.json`), öğrenme kuyruğu (`queue.db`), sabitlemeler, takım başına kurulum bildirimleri, indirilen gömme (embedder) modelleri (`~/.atl/models/`) ve her projenin geri getirme (retrieval) indeksi (`~/.atl/cache/retrieve/<proje-slug>/`). Global `~/.atl/` kalır; projenin `<proje>/.atl/` dizini projeyle birlikte silinir (geri getirme indeksi global önbellekte kalır — silebileceğin zararsız bir artıktır).
 
 Temizlenecek paylaşımlı bir klon önbelleği yoktur — kaynaklar kurulum sırasında tek kullanımlık tarball olarak çekilir, disk üzerinde tutulmaz.
 
 ### Bir takımı `atl` olmadan, elle kurabilir miyim?
 
-Evet — `atl` yalnızca bir kopyalamayı otomatikleştirir. Takım deposunu çek, ardından kurulabilir ağaçlarını — `agents/`, `skills/`, `rules/`, `knowledge/`, `scripts/`, `packs/` — hedef `.claude/` içine kendin kopyala. Çözümlenecek kalıtım veya dışarıda bırakma mantığı yoktur ve doldurulacak kalıcı bir önbellek de bulunmaz. Kaybedeceğin tek şey `atl`'nin yazdığı kurulum bildirimidir (aşağıya bak); `atl update` ve `atl doctor` yenileme ve öz-onarım için bu bildirimlere güvenir.
+Evet — `atl` yalnızca bir kopyalamayı otomatikleştirir. Takım deposunu çek, ardından kurulabilir ağaçlarını — `agents/`, `skills/`, `rules/`, `knowledge/`, `backends/`, `scripts/`, `packs/` — hedef `.claude/` içine kendin kopyala. Çözümlenecek kalıtım veya dışarıda bırakma mantığı yoktur ve doldurulacak kalıcı bir önbellek de bulunmaz. Kaybedeceğin tek şey `atl`'nin yazdığı kurulum bildirimidir (aşağıya bak); `atl update` ve `atl doctor` yenileme ve öz-onarım için bu bildirimlere güvenir.
 
 ### `atl` kurulu takımlar listesini nerede tutar?
 

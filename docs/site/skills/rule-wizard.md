@@ -4,7 +4,7 @@ A clarification wizard that uses **option-based Q&A rounds** before adding a rul
 
 Once the discussion completes, the wizard hands the finalized text to `/rule` to write the rule(s) to the right file.
 
-Ships as a global skill in [rule](https://github.com/agentteamland/rule).
+Ships as a global skill in the [atl monorepo](https://github.com/agentteamland/atl).
 
 ## When to use which
 
@@ -24,7 +24,7 @@ Ships as a global skill in [rule](https://github.com/agentteamland/rule).
 
 ## Two scopes
 
-Same as [`/rule`](/skills/rule#three-scopes): project (default) and `--global`. When the flag is provided, the wizard skips the scope question.
+Same as [`/rule`](/skills/rule#two-scopes): project (default) and `--global`. When the flag is provided, the wizard skips the scope question.
 
 ## Phase 1 — understanding and preparation
 
@@ -223,4 +223,4 @@ Single message at the end:
 
 ## Source
 
-- Spec: [rule/skills/rule-wizard/SKILL.md](https://github.com/agentteamland/rule/blob/main/skills/rule-wizard/SKILL.md)
+- Spec: [core/skills/rule-wizard/SKILL.md](https://github.com/agentteamland/atl/blob/main/core/skills/rule-wizard/SKILL.md)

@@ -4,7 +4,7 @@ Tüm proje kod tabanının kapsamlı bir Mermaid sınıf çizimini üretir. Her 
 
 Bu çıktı **insanlar içindir** — tüm resmi görmek, sistemi anlamak ya da mimariye dair zihinsel modelini ayıklamak istediğinde.
 
-Global beceri olarak [core](https://github.com/agentteamland/core) içinde yayımlanır.
+Global beceri olarak [atl monorepo](https://github.com/agentteamland/atl) içinde yayımlanır.
 
 ## Kullanım
 
@@ -44,7 +44,7 @@ Her katman için beceri, tür başına anahtar üyeleri listeler — varlıklar 
 
 | İlişki | Mermaid sözdizimi | Ne zaman |
 |---|---|---|
-| Kalıtım | `Child --|> Parent` | Sınıf temel sınıfı genişletiyor. |
+| Kalıtım | `Child --\|> Parent` | Sınıf temel sınıfı genişletiyor. |
 | Uygulama | `Impl ..\|> Interface` | Sınıf arabirimi uyguluyor. |
 | Bağımlılık | `ClassA --> ClassB` | Yapıcı enjeksiyonu, yöntem çağrısı. |
 | Kompozisyon | `ClassA *-- ClassB` | `ClassB` türünde bir özellik içeriyor. |
@@ -134,4 +134,4 @@ classDiagram
 
 ## Kaynak
 
-- Belirtim: [core/skills/create-code-diagram/SKILL.md](https://github.com/agentteamland/core/blob/main/skills/create-code-diagram/SKILL.md).
+- Belirtim: [core/skills/create-code-diagram/SKILL.md](https://github.com/agentteamland/atl/blob/main/core/skills/create-code-diagram/SKILL.md).

@@ -28,7 +28,7 @@ Bir beceri, kullanıcının çağırabileceği bir slash komutudur. `/drain`, `/
 
 Beceriler **bilgi deposu değil, yordamdır** — bir beceri, çalıştırılacak adımlardır, dolayısıyla birikmiş-bilgi dizini taşımaz. Bilgi tabanı ajanın `children/` dizininde birleştirilmiştir (v1, bu şekli becerilere `learnings/` dizini olarak yansıtıyordu; v2 bunu kaldırdı, [`core/rules/agent-structure.md`](https://github.com/agentteamland/atl/blob/main/core/rules/agent-structure.md) uyarınca).
 
-Beceriler **global** (`atl`'nin kendisiyle birlikte gelen) ya da **takım kapsamlı** (belirli bir takımca getirilen ve yalnızca o takım kurulduktan sonra görünen) olabilir. Yaptığı iş yığına özgü olan beceriler — örneğin bir takımın proje iskeleti kuran becerisi — takım kapsamlıdır. `/drain`, `/create-pr`, `/create-code-diagram`, `/brainstorm`, `/rule` ve `/rule-wizard` ise globaldir çünkü her yere uygulanır.
+Beceriler **global** (`atl`'nin kendisiyle birlikte gelen) ya da **takım kapsamlı** (belirli bir takımca getirilen ve yalnızca o takım kurulduktan sonra görünen) olabilir. Yaptığı iş yığına özgü olan beceriler — örneğin bir takımın proje iskeleti kuran becerisi — takım kapsamlıdır. `/drain`, `/create-pr`, `/create-code-diagram`, `/brainstorm`, `/rule`, `/rule-wizard`, `/docs-audit`, `/publish`, `/skill-stocktake` ve `/rules-distill` ise globaldir çünkü her yere uygulanır.
 
 Beceri ile CLI arasındaki ayrım bilinçlidir: **CLI deterministiktir** (aynı girdiler, aynı sonuç, LLM yok); **beceriler LLM güdümlüdür** (senin özel kodun üzerinde akıl yürütürler). `/drain`, öğrenme döngüsünün muhakeme yarısıdır; `atl learnings` ise deterministik yarısı. Aşağıdaki [CLI](#the-cli) bölümüne bak.
 
@@ -94,7 +94,7 @@ Bu, v1'in `/save-learnings`'ini (artık `/drain`) değiştirir ve ayrı `memory`
 
 **Otomasyon komutları** (Claude Code hook'larına bağlıdır; bunları nadiren yazarsın):
 
-- `atl setup-hooks` — `SessionStart` + `UserPromptSubmit` hook'larının tek seferlik kurulumu.
+- `atl setup-hooks` — otomasyon hook'larının tek seferlik kurulumu: `SessionStart` (oturum-başı bakımı), `UserPromptSubmit` (`atl tick` + `atl retrieve` ile prompt başına bilgi getirme) ve `PreToolUse` (`atl guard`).
 - `atl session-start` — açılış zamanı bakımı (çekirdek tazeleme + işaretçi taraması + doctor öz-onarımı + günde bir binary self-update kontrolü).
 - `atl tick` — oturum içi bakım tıkırtısı (kısıtlanmış arka plan işini birkaç dakikada bir boşaltır).
 - `atl doctor` — kendini iyileştiren artalan süreci: sapmayı teşhis eder ve kurulumu otomatik onarır.

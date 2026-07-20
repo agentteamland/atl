@@ -1,6 +1,6 @@
 # `atl gc`
 
-Reclaim orphaned assets — the **reversible inverse of install**. Finds files under the installed asset dirs (`.claude/agents|skills|rules|knowledge|scripts|packs`) that no install manifest owns, plus stale promote conflict archives, and removes them without ever destroying anything irreversibly.
+Reclaim orphaned assets — the **reversible inverse of install**. Finds files under the installed asset dirs (`.claude/agents|skills|rules|knowledge|backends|scripts|packs`) that no install manifest owns, plus stale promote conflict archives, and removes them without ever destroying anything irreversibly.
 
 `atl install` / `update` / `promote` write assets into `~/.claude` and `<proj>/.claude` and record each one in an install manifest. Nothing prunes what falls out of that contract — a file dropped upstream on an update (left on disk by design), a learning-loop gain left behind after a team is removed, or a directory you made by hand. Over time these accrete. `atl gc` is the missing cleanup half.
 

@@ -25,18 +25,19 @@ atl tick --file <path>          # drain a single file instead of discovering tra
 In order:
 
 1. **Fan-out (every call, ~free).** Pulls any newly-changed files down from the user-global layer into this project. It's guarded by a global generation counter (`~/.atl/generation`): if the global layer hasn't changed since this project last fanned out, it's a single small file read and does nothing. This step runs **even when the throttle skips everything else** — it's already cheap enough to ride every prompt.
-2. **Throttle gate.** With `--throttle=<dur>`, if the last tick was within `<dur>` the pass stops here (the fast path that keeps the per-prompt hook cheap). The stamp lives at `~/.atl/cache/last-tick`. With no `--throttle` (or `--throttle=0`), the gate always passes.
-3. **Drain.** Discovers this project's Claude Code transcripts modified since the last tick, extracts the assistant text, and transfers any capture markers into the durable queue — **exactly once**. Idempotency comes from the queue's marker-hash dedup, so re-draining the same text enqueues nothing new.
-4. **Doctor self-check.** Runs the same queue-health + asset-integrity checks as [`atl doctor`](/cli/doctor) and [`atl session-start`](/cli/setup-hooks), printing only the lines that are not OK (or that self-healed). Silent when everything is healthy.
-5. **Promote gains (ring 1→2).** Lifts this project's accumulated gains up to the user-global layer. It's additive and conflict-archived, so it's safe to ride the tick rather than waiting for a manual [`atl promote`](/cli/promote). Quiet when there's nothing to lift.
+2. **Auto-drain signal (every call).** If the durable queue holds pending learnings or profile-facts, prints a one-line auto-drain signal per channel (`atl: N learning(s) pending — auto-drain them now in a background subagent …`) so the agent spawns a background [`/drain`](/skills/drain) (or `/profile-drain`) subagent. It's one cheap count read and runs **before** the throttle gate, so it fires on every prompt the queue is non-empty — the throttle never suppresses it.
+3. **Throttle gate.** With `--throttle=<dur>`, if the last tick was within `<dur>` the pass stops here — only the fan-out and the auto-drain signal ran (the fast path that keeps the per-prompt hook cheap). The stamp is per-project, at `~/.atl/cache/last-tick-<project-hash>`, so concurrent sessions in different projects don't starve each other's pass. With no `--throttle` (or `--throttle=0`), the gate always passes.
+4. **Drain.** Discovers this project's Claude Code transcripts modified since the last tick, extracts the assistant text, and transfers any capture markers into the durable queue — **exactly once**. Idempotency comes from the queue's marker-hash dedup, so re-draining the same text enqueues nothing new.
+5. **Doctor self-check.** Runs the same queue-health + asset-integrity checks as [`atl doctor`](/cli/doctor) and [`atl session-start`](/cli/setup-hooks), printing only the lines that are not OK (or that self-healed). Silent when everything is healthy.
+6. **Promote gains (ring 1→2).** Lifts this project's accumulated gains up to the user-global layer. It's additive and conflict-archived, so it's safe to ride the tick rather than waiting for a manual [`atl promote`](/cli/promote). Quiet when there's nothing to lift.
 
-The drain step only **enqueues** learnings. Folding them into the knowledge base is LLM work, so it stays on the skill side of the CLI/Skill boundary — that's what [`/drain`](/skills/drain) does. The doctor surfaces a pending count to nudge you to run it.
+The drain step only **enqueues** learnings. Folding them into the knowledge base is LLM work, so it stays on the skill side of the CLI/Skill boundary — that's what [`/drain`](/skills/drain) does, spawned automatically as a background subagent by the auto-drain signal above whenever the queue is non-empty.
 
 ## Flags
 
 | Flag | Default | Effect |
 |---|---|---|
-| `--throttle <dur>` | `0` | Skip the drain + doctor pass if the last tick was within this duration (e.g. `10m`). The fan-out still runs. A zero/absent value always runs the full pass. |
+| `--throttle <dur>` | `0` | Skip the drain + doctor pass if the last tick was within this duration (e.g. `10m`). The fan-out and the auto-drain signal still run. A zero/absent value always runs the full pass. |
 | `--file <path>` | `""` | Drain a single file instead of discovering transcripts. Manual/debug only — skips the throttle and the cursor; does not advance the drain position. |
 
 ## Example — force a pass

@@ -86,10 +86,17 @@ Fix: one shared pool. Symptom was intermittent timeouts at ~200 rps.
 
 ### `profile-fact` kanalı
 
-Kuyruk çok kanallıdır. İkinci bir kanal, `profile-fact`, kullanıcı ya da birlikte çalıştığı kişiler hakkındaki kalıcı olguları yakalar — aynı gizli-yorum şekli, `profile-fact:` öneki:
+Kuyruk çok kanallıdır. İkinci bir kanal, `profile-fact`, kullanıcının dünyasındaki varlıklar hakkındaki kalıcı olguları yakalar — kişiler, kurumlar, hayvanlar, yerler, nesneler, projeler — profil katmanı için. Aynı gizli-yorum şekli, `profile-fact:` öneki; ancak yük, varlığı ve öğrenilen alanları adlandıran küçük bir YAML gövdesidir (tam biçim, profile-team'in `profile-capture` kuralına aittir):
 
 ```html
-<!-- profile-fact: Prefers TypeScript over JavaScript for all new services. -->
+<!-- profile-fact:
+  entity: alex
+  type: person
+  fields:
+    identity.name: Alex Doe
+    state.emotional: anxious about the new job
+  source: user-confirmed
+-->
 ```
 
 Her iki kanal da aynı şekilde auto-drain olur — `atl tick` her biri için sinyali basar ve ajan arka planda bir drain subagent'ı başlatır. `learning` kanalı `/drain` ile (`learning-capture` kuralına göre) drain edilir; `profile-fact` ise profile-team'in `/profile-drain`'i ile (kendi `profile-capture` kuralına göre, takımla birlikte kurulur) drain edilir — yani profile-team kurulu olmayan bir oturum `profile-fact` sinyaline hiç davranmaz.

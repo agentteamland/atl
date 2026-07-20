@@ -196,9 +196,8 @@ Kullanıcı beceriyi hedef dalda, birleştirilmiş değişiklik dahil edilmiş h
 
 1. **Asla doğrudan birleştirme.** Bu beceri `gh pr merge --auto --squash` (auto-merge etkinleştirme) komutunu yalnızca `--auto-merge` verildiğinde kullanır. Hemen birleştiren bir `gh pr merge --squash`/`--merge`/`--rebase` (`--auto` olmadan) **daima yasaktır** — auto-merge zorunlu-denetim kapısını korur ve kullanıcı bayrağı yazarak bu işe katılmıştır.
 2. **İdempotent drain.** Burada `/drain`'i çalıştırmak güvenlidir — yalnızca onaylanmamış kuyruk girdilerini işler.
-3. **team.json doğrulaması.** Stage'lenmiş fark bir `team.json` dosyasına dokunuyorsa, push'tan önce beceri dosyanın ayrıştırılabilir olduğunu, bir `name` alanı içerdiğini ve bildirilen tüm varlıkların diskte var olduğunu doğrular.
-4. **Başlamadan önce dal hijyeni.** Yeni dalı türetmeden önce beceri yerel varsayılan dalın `origin` ile güncel olduğunu doğrular; geride kalmışsa önce ileri-sarma yapar ([`branch-hygiene`](https://github.com/agentteamland/atl/blob/main/core/rules/branch-hygiene.md) gereği).
-5. **Sessiz, kısmi başarısızlık yok.** Herhangi bir adım başarısız olursa beceri durur ve raporlar — kullanıcı nerede olduğunu daima bilir.
+3. **Başlamadan önce dal hijyeni.** Yeni dalı türetmeden önce beceri yerel varsayılan dalın `origin` ile güncel olduğunu doğrular; geride kalmışsa önce ileri-sarma yapar ([`branch-hygiene`](https://github.com/agentteamland/atl/blob/main/core/rules/branch-hygiene.md) gereği).
+4. **Sessiz, kısmi başarısızlık yok.** Herhangi bir adım başarısız olursa beceri durur ve raporlar — kullanıcı nerede olduğunu daima bilir.
 
 ## İlgili
 

@@ -1,6 +1,6 @@
 # `atl gc`
 
-Sahipsiz varlıkları geri kazan — **kurulumun geri-alınabilir tersi**. Kurulu varlık dizinleri (`.claude/agents|skills|rules|knowledge|scripts|packs`) altında hiçbir kurulum manifestinin sahiplenmediği dosyaları ve bayatlamış promote çakışma arşivlerini bulur; hiçbir şeyi geri-alınamaz biçimde yok etmeden temizler.
+Sahipsiz varlıkları geri kazan — **kurulumun geri-alınabilir tersi**. Kurulu varlık dizinleri (`.claude/agents|skills|rules|knowledge|backends|scripts|packs`) altında hiçbir kurulum manifestinin sahiplenmediği dosyaları ve bayatlamış promote çakışma arşivlerini bulur; hiçbir şeyi geri-alınamaz biçimde yok etmeden temizler.
 
 `atl install` / `update` / `promote`, varlıkları `~/.claude` ve `<proj>/.claude` içine yazar ve her birini bir kurulum manifestine kaydeder. Bu sözleşmenin dışına düşeni ise hiçbir şey budamaz — güncellemede upstream'den düşen bir dosya (tasarım gereği diskte bırakılır), bir takım kaldırıldıktan sonra geride kalan bir öğrenme kazancı, ya da elle oluşturduğun bir dizin. Zamanla bunlar birikir. `atl gc`, eksik olan temizlik yarısıdır.
 

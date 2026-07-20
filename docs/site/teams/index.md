@@ -8,7 +8,7 @@ Teams are ATL's unit of distribution: a versioned package of agents, skills, and
 
 The v1-era first-party teams (a full-stack software team and a design-system team) were **retired in July 2026** — they predated the v2 platform and were removed in favor of a deliberate rebuild on the v2 foundation rather than incremental patching. Their history is preserved in the [atl repository](https://github.com/agentteamland/atl).
 
-The rebuild starts with **[profile-team](/teams/profile-team)** — a global, shared user-profile layer that advisory-style teams build on — **[delivery-team](/teams/delivery-team)**, an Azure DevOps work-item-driven, sprint-based autonomous software-delivery org, and **[personal-advisory-team](/teams/personal-advisory-team)**, an honest, wise personal advisor that comes to know you across conversations. All three are now available. This page becomes the full catalog browse page again as more ship.
+The rebuild starts with **[profile-team](/teams/profile-team)** — a global, shared user-profile layer that advisory-style teams build on — **[delivery-team](/teams/delivery-team)**, a work-item-driven, sprint-based autonomous software-delivery org on a pluggable backend (Azure DevOps or GitHub), and **[personal-advisory-team](/teams/personal-advisory-team)**, an honest, wise personal advisor that comes to know you across conversations. All three are now available. This page becomes the full catalog browse page again as more ship.
 
 ## Browse and install
 
@@ -18,7 +18,7 @@ atl search <keyword>            # find teams by name, description, or keyword
 atl install <handle>/<team>     # install by reference
 ```
 
-Teams install by `<handle>/<name>` reference. [`atl install`](/cli/install) resolves the ref against the GitHub-backed catalog, fetches the source as an ephemeral tarball over HTTPS, and copies the team's `agents/`, `skills/`, and `rules/` into the scope's `.claude/` directory. By default a team installs at the scope its publisher declares (project, global, or both); pass `--global` or `--project` to override. See [scopes](/guide/concepts#scope-global-and-project) for how the two layers interact.
+Teams install by `<handle>/<name>` reference. [`atl install`](/cli/install) resolves the ref against the GitHub-backed catalog, fetches the source as an ephemeral tarball over HTTPS, and copies the team's asset directories (`agents/`, `skills/`, `rules/`, plus `knowledge/`, `backends/`, `scripts/`, and `packs/` when the team ships them) into the scope's `.claude/` directory. By default a team installs at the scope its publisher declares (project, global, or both); pass `--global` or `--project` to override. See [scopes](/guide/concepts#scope-global-and-project) for how the two layers interact.
 
 Teams published under the `agentteamland/` handle (plus a maintainer allowlist) carry the **`[verified]`** badge in [`atl search`](/cli/search). The badge marks teams reviewed by AgentTeamLand maintainers; its absence on a self-published team does not mean the team is unsafe.
 

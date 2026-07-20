@@ -11,9 +11,9 @@ project or folder on your machine.
 atl install agentteamland/personal-advisory-team
 ```
 
-Installing lands the `advisor` agent and the `/advisor` skill globally in `~/.claude`, and — because
-this team declares [profile-team](/teams/profile-team) as a dependency — pulls that team in
-transitively, so the private profile it grows to know you by comes with it.
+Installing lands the `advisor` agent and the `/advisor` and `/advisor-home` skills globally in
+`~/.claude`, and — because this team declares [profile-team](/teams/profile-team) as a dependency —
+pulls that team in transitively, so the private profile it grows to know you by comes with it.
 
 ## Honest by design (read this first)
 

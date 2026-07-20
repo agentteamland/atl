@@ -8,7 +8,7 @@ Takımlar, ATL'nin dağıtım birimidir: tek komutla bir projeye (ya da global o
 
 v1 dönemi first-party takımlar (bir full-stack yazılım takımı ve bir design-system takımı) **Temmuz 2026'da emekliye ayrıldı** — v2 platformundan önce yazılmışlardı ve parça parça yamamak yerine v2 temeli üzerinde bilinçli bir yeniden kurulum tercih edilerek kaldırıldılar. Geçmişleri [atl deposunda](https://github.com/agentteamland/atl) korunuyor.
 
-Yeniden kurulum **[profile-team](/tr/teams/profile-team)** ile başlıyor — danışmanlık tarzı takımların üzerine kurulacağı, global ve ortak kullanıcı-profili katmanı —, **[delivery-team](/tr/teams/delivery-team)**, Azure DevOps iş-öğesi güdümlü, sprint tabanlı otonom bir yazılım-teslim organizasyonu, ve **[personal-advisory-team](/tr/teams/personal-advisory-team)**, seni sohbetler boyunca tanıyan dürüst ve bilge kişisel bir danışman. Üçü de artık kullanılabilir. Daha fazlası yayımlandıkça bu sayfa yeniden tam katalog gezinme sayfası hâline gelecek.
+Yeniden kurulum **[profile-team](/tr/teams/profile-team)** ile başlıyor — danışmanlık tarzı takımların üzerine kurulacağı, global ve ortak kullanıcı-profili katmanı —, **[delivery-team](/tr/teams/delivery-team)**, takılabilir bir arka uç (Azure DevOps veya GitHub) üzerinde çalışan, iş-öğesi güdümlü, sprint tabanlı otonom bir yazılım-teslim organizasyonu, ve **[personal-advisory-team](/tr/teams/personal-advisory-team)**, seni sohbetler boyunca tanıyan dürüst ve bilge kişisel bir danışman. Üçü de artık kullanılabilir. Daha fazlası yayımlandıkça bu sayfa yeniden tam katalog gezinme sayfası hâline gelecek.
 
 ## Göz at ve kur
 
@@ -18,7 +18,7 @@ atl search <anahtar-kelime>     # ada, açıklamaya veya anahtar kelimeye göre 
 atl install <handle>/<takım>    # referansla kur
 ```
 
-Takımlar `<handle>/<ad>` referansıyla kurulur. [`atl install`](/tr/cli/install) referansı GitHub-destekli kataloğa karşı çözer, kaynağı HTTPS üzerinden geçici bir tarball olarak indirir ve takımın `agents/`, `skills/` ve `rules/` içeriğini kapsamın `.claude/` dizinine kopyalar. Bir takım varsayılan olarak yayımcısının bildirdiği kapsamda kurulur (proje, global veya ikisi); `--global` ya da `--project` ile geçersiz kılabilirsin. İki katmanın nasıl etkileştiği için [kapsamlar](/tr/guide/concepts#scope-global-and-project) sayfasına bak.
+Takımlar `<handle>/<ad>` referansıyla kurulur. [`atl install`](/tr/cli/install) referansı GitHub-destekli kataloğa karşı çözer, kaynağı HTTPS üzerinden geçici bir tarball olarak indirir ve takımın varlık dizinlerini (`agents/`, `skills/`, `rules/`, ayrıca takım bunları içeriyorsa `knowledge/`, `backends/`, `scripts/` ve `packs/`) kapsamın `.claude/` dizinine kopyalar. Bir takım varsayılan olarak yayımcısının bildirdiği kapsamda kurulur (proje, global veya ikisi); `--global` ya da `--project` ile geçersiz kılabilirsin. İki katmanın nasıl etkileştiği için [kapsamlar](/tr/guide/concepts#scope-global-and-project) sayfasına bak.
 
 `agentteamland/` handle'ı altında yayımlanan takımlar (ve bir bakımcı izin listesi) [`atl search`](/tr/cli/search) çıktısında **`[verified]`** rozeti taşır. Rozet, AgentTeamLand bakımcılarının incelediği takımları işaretler; kendin yayımladığın bir takımda olmaması takımın güvensiz olduğu anlamına gelmez.
 
