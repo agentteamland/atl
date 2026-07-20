@@ -34,7 +34,7 @@ func TestBoardTrackedSignal(t *testing.T) {
 			t.Fatal(err)
 		}
 		out := captureStdout(t, func() { boardTrackedSignal(root) })
-		if !strings.Contains(out, "board-backed (github)") || !strings.Contains(out, "board-tracked-work rule") {
+		if !strings.Contains(out, "board-backed (github)") || !strings.Contains(out, "board-tracked-work rule") || !strings.Contains(out, "In Progress") {
 			t.Fatalf("expected a github board-tracked signal, got %q", out)
 		}
 	})

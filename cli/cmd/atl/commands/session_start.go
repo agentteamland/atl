@@ -178,5 +178,5 @@ func boardTrackedSignal(projectRoot string) {
 	if backend == "" {
 		backend = "azure" // the schema default
 	}
-	fmt.Printf("atl: this project is board-backed (%s) — record every shippable unit on the board before it ships, and give new work discovered mid-task its own item (board-tracked-work rule)\n", backend)
+	fmt.Printf("atl: this project is board-backed (%s) — record every shippable unit on the board before it ships, give new work discovered mid-task its own item, and on resume check the board for anything already In Progress (board-tracked-work rule)\n", backend)
 }

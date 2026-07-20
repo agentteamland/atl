@@ -16,6 +16,8 @@ It exists to close a specific gap. A board-backed project has a tracker so its s
 
 **The board reflects state.** Items move to *In Progress* on start and *Done* on ship. (On GitHub Projects v2 the start → *In Progress* step is manual — the platform only automates the Done end.)
 
+
+**On resume, check the board first.** When a session resumes (a "continue" after a break), it first looks at the board for anything already *In Progress* and closes the loop on work left mid-flight — a session that ends mid-task leaves its item In Progress, and the next one must not lose it. This is the read side of the same discipline (`atl session-start` prints the reminder). The board tells you *what is in flight*; it does not by itself dictate *what is next* — a backlog can be mostly deferred design work, so for the next thing to do you still consult the project's own resume convention, not the top card. Board-aware, not board-driven.
 ## Why it's a core rule
 
 It is what makes a board-backed project's tracker trustworthy — for a human reviewer and for ATL's own **autonomous delivery**, where the board is the single source of truth the whole loop reads. It extends the delivery-team's "the board is truth" discipline from the formal ceremonies (`/kickoff`, `/refine`, `/sprint-plan`, which already create items) to **all** work in the project — interactive edits, maintenance, ad-hoc runs included — so nothing bypasses the board. The one guard against over-correction: track **deliverables, not keystrokes** — a board item per micro-edit drowns the board as badly as an empty one.
