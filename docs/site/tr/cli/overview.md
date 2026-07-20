@@ -26,7 +26,7 @@ Ajanların çalıştıkça **kazanım** biriktirir — yeni öğrenmeler, keskin
 | `atl publish` | Global katmandaki kazanımlarını yayımlar — kendi takımını yeniden yayımlar ya da onları bir GitHub PR'ı olarak yukarı (upstream) önerir. |
 | `atl pin` | Projeye özel bir yolun global katmana terfi ettirilmesini engeller. |
 | `atl unpin` | Daha önce sabitlenmiş (pin) bir yolun yeniden terfi ettirilebilmesine izin verir. |
-| `atl learnings` | Kalıcı öğrenme kuyruğunu inceler: `status` (kanal/proje başına bekleyenler), `peek` (öğeleri listeler; `/drain` skill'inin kullandığı), `ack <id>` (bir öğeyi işlenmiş olarak işaretler). |
+| `atl learnings` | Kalıcı öğrenme kuyruğunu inceler: `status` (kanal/proje başına bekleyenler), `peek` (öğeleri listeler; `/drain` skill'inin kullandığı), `ack <id>` (bir öğeyi işlenmiş olarak işaretler), `transcript` (yakın geçmişteki konuşma akışı; `/drain`'in düzeltme-madenciliği için). |
 
 ## Otomasyon komutları
 
@@ -34,7 +34,7 @@ Bunlar [`atl setup-hooks`](/tr/cli/setup-hooks) tarafından Claude Code hook'lar
 
 | Komut | Ne yapar |
 |---|---|
-| [`atl setup-hooks`](/tr/cli/setup-hooks) | Aşağıdaki otomasyonu süren Claude Code hook'larının (`SessionStart`, `UserPromptSubmit`) tek seferlik kurulumu/kaldırılması. |
+| [`atl setup-hooks`](/tr/cli/setup-hooks) | Aşağıdaki otomasyonu süren Claude Code hook'larının (`SessionStart`, `UserPromptSubmit`, `PreToolUse`) tek seferlik kurulumu. |
 | `atl session-start` | `SessionStart` hook'unun çalıştırdığı, açılış anındaki bakım işi (çekirdek tazeleme + önceki-transkript işaretçi taraması + doctor öz-onarımı + günde bir [binary self-update](/tr/cli/upgrade) kontrolü). |
 | `atl tick` | Oturum içi bakım tıkı (prompt'a iliştirilerek her 5–10 dakikada bir): kısılmış (throttled) arka plan işlerini boşaltır. |
 | `atl doctor` | Kendi kendini onaran daemon — sapmayı (drift) teşhis eder ve kurulumu kendiliğinden onarır. |
@@ -77,9 +77,13 @@ Varlıklar (assets), iki kapsamdan birinde, **Claude Code'un kendi dizinlerinde*
 ├── queue.db               ← kalıcı öğrenme kuyruğu (bbolt)
 ├── index.json             ← önbelleğe alınmış takım kataloğu (atl update ile yenilenir)
 ├── generation             ← global katman değişim sayacı (her prompt fan-out'unu yönlendirir)
-├── pins.json              ← terfiden alıkonan yollar
 ├── cache/                 ← önbellek damgaları
 └── installed/             ← takım başına kurulum manifestoları + bütünlük (integrity) tabanları
+```
+
+```
+<project>/.atl/
+└── pins.json              ← terfiden alıkonan yollar (proje başına bir dosya)
 ```
 
 ## Felsefe

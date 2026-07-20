@@ -3,7 +3,7 @@
 A **scaffolder** is a team-scoped skill named `/create-new-project` that bootstraps a new project on the team's stack. This page defines the standard shape every scaffolder should follow.
 
 ::: tip Canonical source
-The authoritative version of this spec lives at [`agentteamland/core/docs/scaffolder-spec.md`](https://github.com/agentteamland/core/blob/main/docs/scaffolder-spec.md). This page mirrors it; if they ever diverge, the `core` repo wins.
+This page is the canonical version of the spec. (An earlier copy lived in the archived v1 `agentteamland/core` repo; it is historical only.)
 :::
 
 ## Why a spec?
@@ -58,7 +58,8 @@ Write every file the new project needs. For large scaffolds, delegate to special
 
 - Root files (`README.md`, `.gitignore`, language-specific lockfiles)
 - Project configuration (`CLAUDE.md`, `.mcp.json`, `.env.example`)
-- `.claude/` project directory (`agents/`, `skills/`, `rules/`, `docs/`, `brain-storms/`, `wiki/`, `journal/`, `backlog.md`)
+- `.claude/` project directory (`agents/`, `skills/`, `rules/`)
+- `.atl/` project directory (`docs/`, `brain-storms/`, `wiki/`, `journal/`, `backlog.md`, `tasks.md`) — the knowledge + decision layer
 - Source tree (everything that makes the app actually run)
 - Container / deploy configuration if applicable
 

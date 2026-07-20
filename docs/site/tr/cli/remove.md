@@ -28,7 +28,7 @@ acme/example-team is not installed at project scope
 ## Ne olur?
 
 1. Seçilen kapsamdaki takımın kurulum manifestosu `<layer>/.atl/installed/<handle>__<name>.json` konumundan okunur — `<layer>`, `--global` için `~/.atl`, proje kapsamı için `<proje>/.atl`'dir.
-2. Manifestonun kaydettiği her dosya (kurulu varlık dizinleri altındakiler — `.claude/agents/`, `skills/`, `rules/`, `knowledge/`, `scripts/`, `packs/`) kalıcı silinmez, `~/.atl/gc-trash` içine **yumuşak-silinir** — böylece manifestoya girmiş bir promote kazancı her zaman geri alınabilir.
+2. Manifestonun kaydettiği her dosya (kurulu varlık dizinleri altındakiler — `.claude/agents/`, `skills/`, `rules/`, `knowledge/`, `backends/`, `scripts/`, `packs/`) kalıcı silinmez, `~/.atl/gc-trash` içine **yumuşak-silinir** — böylece manifestoya girmiş bir promote kazancı her zaman geri alınabilir.
 3. Bu dosyaları barındıran dizinler en derinden başlayarak budanır — yalnızca artık boş olanlar. Başka bir takımın dosyalarını ya da kendi içeriğini barındıran bir dizine dokunulmaz.
 4. Manifestonun kendisi kaldırılır.
 

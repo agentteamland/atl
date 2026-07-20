@@ -7,7 +7,8 @@ Bu, monorepo'nun `core/` ve `teams/` ağaçlarına karşı çalışan bir **main
 ## Kullanım
 
 ```bash
-atl skills check    # frontmatter, team.json tutarlılığı, agent-KB çocuklarını doğrula
+atl skills check                      # frontmatter, team.json tutarlılığı, agent-KB çocuklarını doğrula
+atl skills check --record-stocktake   # HEAD'i son-stocktake-yapılan commit olarak damgala (/skill-stocktake bir taramanın sonunda çalıştırır)
 ```
 
 ## Neleri kontrol eder
@@ -21,6 +22,8 @@ Her kontrol **yapısı gereği sıfır-yanlış-pozitiftir** — bir başarısı
 | **children** | Her agent-KB çocuğu (`agents/<x>/children/*.md`) boş olmayan bir `knowledge-base-summary` frontmatter'ı bildirir — KB-yeniden-inşa sözleşmesi. |
 
 `atl skills check` herhangi bir başarısızlıkta sıfırdan farklı çıkar; bu yüzden docs-drift kapısının yanında **her PR'ı CI'da kapılar**. Yargı yarısı — bir skill kendi belgelenmiş akışına uyuyor mu? iki skill örtüşüyor mu? — bu belirlenimci ağın değil, eşlik eden [`/skill-stocktake`](/tr/skills/skill-stocktake) skill'inin (LLM) işidir. Bu ayrım CLI/Skill sınırıdır: belirlenimci kontroller burada, zeminli yargı skill'de.
+
+`--record-stocktake`, çalıştırma hatasız tamamlandığında HEAD'i son-stocktake-yapılan commit olarak (`~/.atl` durumunda) damgalar — `/skill-stocktake` skill'i bunu bir taramanın sonunda, oturum-başındaki "stocktake zamanı geldi" sinyalini sıfırlamak için çağırır; `atl rules scan --record`'un kardeşidir.
 
 ## İlgili
 
