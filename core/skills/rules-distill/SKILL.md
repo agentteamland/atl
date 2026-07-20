@@ -56,8 +56,10 @@ recurrence.
 ### 4. Propose — never auto-write
 For each surviving candidate, **propose** it via **AskUserQuestion**: "principle X
 recurs in A, B, C — promote it to a core rule?" A confirmed candidate is authored
-through `/rule` (which carries the new-rule-shipping-checklist). Never write a core
-rule autonomously — that's the reactive-creation boundary.
+directly into `core/rules/<name>.md` and wired through the new-rule-shipping-checklist
+(the coreassets re-sync + the docs page) — **not** through `/rule`, which writes only
+project/global rules. Never write a core rule autonomously — that's the reactive-creation
+boundary.
 
 ### 5. Record the distill
 ```bash
@@ -76,9 +78,10 @@ The principles proposed, where each recurs, and each proposal's resolution. Shor
   yours. That's the CLI/Skill boundary.
 - **Recurrence is the bar.** A principle earns a rule by recurring across the
   corpus, not by appearing once — require the evidence (the `file:line`s).
-- **Propose, don't author.** A new core rule is structural: human-confirmed via
-  `/rule`, never autonomous.
-- **Complements `/rule`.** distill says *which* rule; `/rule` says *how to ship it*.
+- **Propose, don't author.** A new core rule is structural: human-confirmed before it
+  is authored into `core/rules/`, never autonomous.
+- **Complements `/rule`.** `/rules-distill` mines a corpus-recurring principle into
+  `core/rules/`; `/rule` captures a single project/global rule you already have in mind.
 - **Monorepo-internal.** Outside the repo's own `core/` + `teams/`, nothing to do.
 
 ## Source

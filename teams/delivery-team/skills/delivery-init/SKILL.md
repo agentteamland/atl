@@ -9,8 +9,8 @@ This is the delivery-team's **onboarding** step: the one-time, per-project setup
 *which backend* the project runs on, *where* the work lives (the tracker coordinates, the
 branch pair, the board, the durable-knowledge store), and *which methodology* the team runs —
 so every later ceremony (`/kickoff`, `/refine`, `/sprint-plan`, `/sprint-start`,
-`/sprint-review`) reads a settled config instead of re-asking. It writes two files into a
-committed `.delivery/` directory:
+`/sprint-review`) reads a settled config instead of re-asking. It writes two config files — plus a
+`.gitignore` guard — into a committed `.delivery/` directory:
 
 | File | What it holds |
 |---|---|

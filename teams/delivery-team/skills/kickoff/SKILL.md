@@ -61,7 +61,7 @@ files exist at the project root **before** touching the backend or the PO:
   (Azure: `wikiId`; GitHub: none — the store is the in-repo `/docs` tree, always present), and the
   credential ref (`pat.ref` on Azure, `credential.ref` on GitHub — the env-var **name**, never the
   credential). **Azure only:** if `wikiId` is `null`, tell the user the wiki isn't provisioned yet
-  and that step 2's knowledge-seeding needs it — they should create it and re-run `/delivery-init`
+  and that step 3's knowledge-seeding needs it — they should create it and re-run `/delivery-init`
   before proceeding. (GitHub's in-repo `/docs` store needs no provisioning.)
 - From `methodology.json`, load `roles` (with each `dispatch`), `artifactHierarchy`
   (`["Epic","Feature","Pbi","Task"]`), `cadence`, and `capacityModel`.
