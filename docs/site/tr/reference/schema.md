@@ -14,7 +14,7 @@ v1'de `team.json`, CI ortamında kontrol edilen bağımsız bir `team.schema.jso
 
 - `team.json` geçerli JSON olarak ayrıştırılabilmeli.
 - `name` alanı bulunmalı.
-- Bir varlık dizini (`agents/`, `skills/`, `rules/`, `knowledge/`, `scripts/`, `packs/`) altında en az bir dosya göndermeli.
+- Bir varlık dizini (`agents/`, `skills/`, `rules/`, `knowledge/`, `backends/`, `scripts/`, `packs/`) altında en az bir dosya göndermeli.
 
 Bu kontrollerden herhangi biri başarısız olursa kurulum hata vererek durur. Bildirilen tek tek `agents[]`/`skills[]`/`rules[]` girişleri katalog üst verisidir ve kurulum sırasında diske karşı doğrulanmaz — bildirilen `agents[]` ve `skills[]` girişlerini, birinci taraf takımlar için `atl skills check` geliştirici komutu çapraz kontrol eder. Bunun dışındaki her şey (fazladan alanlar, biçimlendirme) yok sayılır.
 

@@ -36,7 +36,7 @@ Volatile working/sprint state does **not** belong in the always-loaded file — 
 
 All three use the same `<!-- block:start --> ... <!-- block:end -->` delimiter pattern. None of them have a parser in the strict sense — they're convention, not syntax. But the convention is consistent enough to find/update/remove with simple `sed`/regex when needed.
 
-> **Note — why the example block contents below are in English (even on the Turkish mirror of this page):** The three templates (`wiki:index`, `brainstorm:active`, `pending-implementation`) are produced verbatim by `/drain` and `/brainstorm`. Per the `feedback_speak_turkish` rule, these skills always write English (committed files must be English regardless of project language). So in a Turkish project, the `CLAUDE.md` blocks still appear in English — the examples reflect the actual output.
+> **Note — why the example block contents below are in English (even on the Turkish mirror of this page):** The three templates (`wiki:index`, `brainstorm:active`, `pending-implementation`) are produced verbatim by `/drain` and `/brainstorm`. Per the platform's `communication-style` rule (committed artifacts are English-only), these skills always write English — committed files must be English regardless of the conversation language. So in a Turkish project, the `CLAUDE.md` blocks still appear in English — the examples reflect the actual output.
 
 ## `<!-- wiki:index -->` — knowledge map
 

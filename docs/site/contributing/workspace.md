@@ -21,6 +21,7 @@ After sync, `./repos/` contains the v2 active repos plus the archived v1 repos (
 ```
 repos/
 ├── atl/                       # v2 monorepo — cli + core + teams + docs
+├── atl-e2e-team/              # real-GitHub fixture team for the e2e publish blueprints
 └── .github/                   # organization profile
 
 # Archived v1 repos (read-only, kept for history):
@@ -32,6 +33,7 @@ repos/
 ├── software-project-team/     # 🗄 ARCHIVED 2026-06-21 — ported into atl monorepo
 ├── design-system-team/        # 🗄 ARCHIVED 2026-06-21 — ported into atl monorepo
 ├── starter-extended/          # 🗄 ARCHIVED 2026-06-21 — inheritance dropped from v2
+├── create-project/            # 🗄 ARCHIVED 2026-05-03 — v1 project scaffolder, superseded
 ├── registry/                  # 🗄 ARCHIVED 2026-06-21 — replaced by GitHub topic catalog
 ├── homebrew-tap/ scoop-bucket/ # 🗄 ARCHIVED 2026-06-21 — distribution via GitHub Releases only
 └── docs/                      # 🗄 ARCHIVED 2026-06-22 — docs site ported into the atl monorepo (docs/site/)
@@ -100,9 +102,9 @@ When wrapping up:
 ./scripts/push-all.sh      # see what's unpushed
 ```
 
-For a more thorough end-of-session pass, [`/repo-cleanup`](https://github.com/agentteamland/workspace/blob/main/.claude/skills/repo-cleanup/SKILL.md) automates: `/drain` → branch + commit + push + PR + auto-merge → tag + branch prune. Run it from inside Claude Code in the workspace.
+For a more thorough end-of-session pass, [`/repo-cleanup`](https://github.com/agentteamland/workspace/blob/main/.claude/skills/repo-cleanup/SKILL.md) automates: a learning-capture drain → branch + commit + push + PR + auto-merge → tag + branch prune. Run it from inside Claude Code in the workspace.
 
 ## Related
 
 - [Install the `atl` CLI](../guide/install) — if you only want to USE atl, skip the workspace
-- [Knowledge system](../guide/knowledge-system) — the journal + wiki layers the workspace's `.claude/` directory uses
+- [Knowledge system](../guide/knowledge-system) — the journal + wiki layers in the workspace's `.atl/` directory

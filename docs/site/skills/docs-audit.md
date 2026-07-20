@@ -15,6 +15,8 @@ It is **both** manually callable and auto-triggered. [`atl session-start`](/cli/
 
 The skill runs [`atl docs check`](/cli/docs) and fixes every **FAIL** (a missing page, an absent TR mirror, a stale install instruction) — mechanical, zero-false-positive. It never hand-audits what the CLI already proves.
 
+Pass **`--external`** to also probe external-world links over HTTP (`atl docs check --external`) — slow and networked, so it's opt-in; the default sweep covers only in-site checks and prose-vs-code drift.
+
 ### Semantic, grep-grounded, adversarial
 
 Then it sweeps each section of the site (`cli/`, `guide/`, `skills/`, `teams/`, …) and reads each page against the code, `SKILL.md`, or `team.json` it describes. Two guards keep the ~40% multi-agent-audit hallucination rate down:

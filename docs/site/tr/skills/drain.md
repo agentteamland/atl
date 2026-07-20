@@ -109,7 +109,7 @@ Bayraklar:
 - `peek --json` — bekleyen öğeleri JSON olarak yayımlar (id, channel, payload, enqueued_at).
 - `peek --channel <name>` — tek bir kanala süzer (ör. `learning`).
 
-`status` bayrak almaz. `ack` tam olarak bir argüman alır — öğenin `id`'si. Madenleme adımının kendisi, gizli `atl learnings _enqueue learning "<ders>"` yardımcısıyla (yakalamanın kullandığının aynısı) kuyruğa ekler; böylece yineleme ayıklama kuyrukta yaşar.
+`status` isteğe bağlı tek bir bayrak alır — `--json`, bekleyen sayıları JSON olarak yayımlar. `ack` tam olarak bir argüman alır — öğenin `id`'si (bunun belirsizliğe yer bırakmayan bir ön eki de çözümlenir). Madenleme adımının kendisi, gizli `atl learnings _enqueue learning "<ders>"` yardımcısıyla (yakalamanın kullandığının aynısı) kuyruğa ekler; böylece yineleme ayıklama kuyrukta yaşar.
 
 ### Kanallar
 

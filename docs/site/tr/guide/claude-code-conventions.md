@@ -36,7 +36,7 @@ Oynak çalışma/sprint durumu her-zaman-yüklü dosyaya **ait değildir** — h
 
 Üçü de aynı `<!-- block:start --> ... <!-- block:end -->` sınırlayıcı desenini kullanır. Hiçbirinin katı anlamda bir ayrıştırıcısı yoktur — sözdizim değil, sözleşmedir. Ama sözleşme, gerektiğinde basit `sed` ya da düzenli ifadeyle bulmak, güncellemek ve kaldırmak için yeterince tutarlıdır.
 
-> **Not — bu sayfadaki örnek blok içerikleri neden İngilizce?** Aşağıdaki üç şablon (`wiki:index`, `brainstorm:active`, `pending-implementation`) `/drain` ve `/brainstorm` becerileri tarafından otomatik üretilir. Bu beceriler `feedback_speak_turkish` kuralı gereği her zaman İngilizce çıktı verir (taahhüt edilen tüm dosyalar İngilizce olmalıdır). Bu nedenle TR projelerde bile `CLAUDE.md` içindeki bu bloklar İngilizce görünür — örneklerin İngilizce gösterilmesi fiili çıktıyı yansıtır.
+> **Not — bu sayfadaki örnek blok içerikleri neden İngilizce?** Aşağıdaki üç şablon (`wiki:index`, `brainstorm:active`, `pending-implementation`) `/drain` ve `/brainstorm` becerileri tarafından otomatik üretilir. Bu beceriler, platformun `communication-style` kuralı gereği (taahhüt edilen artefaktlar yalnızca İngilizcedir) her zaman İngilizce çıktı verir — konuşma dili ne olursa olsun taahhüt edilen dosyalar İngilizce olmalıdır. Bu nedenle TR projelerde bile `CLAUDE.md` içindeki bu bloklar İngilizce görünür — örneklerin İngilizce gösterilmesi fiili çıktıyı yansıtır.
 
 ## `<!-- wiki:index -->` — bilgi haritası
 

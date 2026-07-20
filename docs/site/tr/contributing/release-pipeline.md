@@ -85,7 +85,8 @@ Yayımın `header` alanı kurulum tek satırlıklarını gömer; böylece GitHub
 
 1. En son yayım etiketini GitHub API üzerinden çözer (ya da sabitlenmiş bir `ATL_VERSION`'a uyar).
 2. İşletim sistemi + mimariyi algılar ve arşiv adını oluşturur (`atl_<version>_<os>_<arch>.tar.gz`).
-3. O arşivi yayımdan indirir, `atl`'yi çıkarır ve kullanıcının `PATH`'ine yerleştirir (`ATL_INSTALL_DIR`, varsayılan `/usr/local/bin`).
+3. O arşivi ve yayımın checksums dosyasını indirir, arşivin sha256'sını ona karşı doğrular — herhangi bir uyuşmazlık ya da eksik girdi kurulumu durdurur (fail-closed).
+4. `atl`'yi çıkarır ve kullanıcının `PATH`'ine yerleştirir (`ATL_INSTALL_DIR`; varsayılan macOS/Linux'ta `/usr/local/bin`, Windows'ta `%LOCALAPPDATA%\Programs\atl` — betiğin ayrıca bu dizini kullanıcının PATH'ine eklediği yer).
 
 Paket yöneticisi yok, tap yok, merkezî katalog yok — yayım çıktısı tek doğru kaynaktır. Kullanıcıya dönük yönergeler için bkz. [Kurulum](../guide/install).
 

@@ -25,7 +25,7 @@ The LLM groups the collected statements into **recurring principles** — the sa
 
 ### Proposes — never auto-writes
 
-Each surviving candidate is **proposed** via AskUserQuestion ("principle X recurs in A, B, C — promote it to a core rule?"). A new core rule is structural growth — the human confirms it, and a confirmed candidate is authored through [`/rule`](/skills/rule), which carries the new-rule-shipping-checklist. `/rules-distill` never writes a core rule autonomously.
+Each surviving candidate is **proposed** via AskUserQuestion ("principle X recurs in A, B, C — promote it to a core rule?"). A new core rule is structural growth — the human confirms it, and a confirmed candidate is then authored directly into `core/rules/<name>.md` and wired through the new-rule-shipping-checklist (the coreassets re-sync + the docs page). `/rules-distill` never writes a core rule autonomously. (`/rule` is the user-facing sibling — it writes project/global rules, not the in-monorepo `core/rules/` a distilled principle belongs to.)
 
 ### Records the distill
 
@@ -33,12 +33,12 @@ On completion the skill stamps the cursor (`atl rules scan --record`), which res
 
 ## The CLI / Skill split
 
-`/rules-distill` is the LLM half of rule discovery. The deterministic half — collecting the grounded candidate statements — is [`atl rules scan`](/cli/rules). The skill never re-derives the collect; it spends LLM effort only on clustering, recurrence-judgment, and the propose step. distill says *which* rule the corpus is asking for; `/rule` says *how to ship it*.
+`/rules-distill` is the LLM half of rule discovery. The deterministic half — collecting the grounded candidate statements — is [`atl rules scan`](/cli/rules). The skill never re-derives the collect; it spends LLM effort only on clustering, recurrence-judgment, and the propose step. `atl rules scan` says *what* normative statements the corpus contains; `/rules-distill` says *which* of them recur into a principle worth promoting to a core rule.
 
 ## Related
 
 - [`atl rules`](/cli/rules) — the deterministic collect this skill builds on.
-- [`/rule`](/skills/rule) — authors a confirmed candidate (rules-distill discovers, /rule ships).
+- [`/rule`](/skills/rule) — the user-facing sibling; authors a single project/global rule you already have in mind (a distilled *core*-rule candidate is authored directly into `core/rules/`, not through `/rule`).
 - [`/skill-stocktake`](/skills/skill-stocktake) — the sibling corpus-hygiene backstop (skill quality; this one is rule discovery).
 
 ## Source

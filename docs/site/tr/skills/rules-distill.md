@@ -25,7 +25,7 @@ LLM, toplanan cümleleri **tekrar eden ilkelere** gruplar — birkaç skill/agen
 
 ### Önerir — asla otomatik yazmaz
 
-Ayakta kalan her aday AskUserQuestion ile **önerilir** ("ilke X, A, B, C'de tekrarlıyor — bir core rule'a yükseltelim mi?"). Yeni bir core rule yapısal büyümedir — insan onaylar ve onaylanan bir aday, new-rule-shipping-checklist'i taşıyan [`/rule`](/tr/skills/rule) ile yazılır. `/rules-distill` asla özerk biçimde core rule yazmaz.
+Ayakta kalan her aday AskUserQuestion ile **önerilir** ("ilke X, A, B, C'de tekrarlıyor — bir core rule'a yükseltelim mi?"). Yeni bir core rule yapısal büyümedir — insan onaylar ve onaylanan bir aday doğrudan `core/rules/<name>.md`'ye yazılır ve new-rule-shipping-checklist üzerinden bağlanır (coreassets yeniden-senkronu + docs sayfası). `/rules-distill` asla özerk biçimde core rule yazmaz. (`/rule` kullanıcıya dönük kardeştir — proje/global kuralları yazar, bir distill edilmiş ilkenin ait olduğu monorepo-içi `core/rules/`'u değil.)
 
 ### Distill'i kaydeder
 
@@ -33,12 +33,12 @@ Tamamlanınca skill imleci damgalar (`atl rules scan --record`); bu, kaçak-koru
 
 ## CLI / Skill ayrımı
 
-`/rules-distill`, kural keşfinin LLM yarısıdır. Belirlenimci yarı — zeminli aday cümleleri toplamak — [`atl rules scan`](/tr/cli/rules)'tir. Skill toplamayı asla yeniden türetmez; LLM çabasını yalnızca kümeleme, tekrar-yargısı ve öneri adımına harcar. distill korpusun *hangi* kuralı istediğini söyler; `/rule` *nasıl ship edileceğini* söyler.
+`/rules-distill`, kural keşfinin LLM yarısıdır. Belirlenimci yarı — zeminli aday cümleleri toplamak — [`atl rules scan`](/tr/cli/rules)'tir. Skill toplamayı asla yeniden türetmez; LLM çabasını yalnızca kümeleme, tekrar-yargısı ve öneri adımına harcar. `atl rules scan` korpusun *hangi* normatif cümleleri içerdiğini söyler; `/rules-distill` bunların *hangisinin* bir core rule'a yükseltilmeye değer bir ilkeye tekrarladığını söyler.
 
 ## İlgili
 
 - [`atl rules`](/tr/cli/rules) — bu skill'in üstüne kurulduğu belirlenimci toplama.
-- [`/rule`](/tr/skills/rule) — onaylanan bir adayı yazar (rules-distill keşfeder, /rule ship eder).
+- [`/rule`](/tr/skills/rule) — kullanıcıya dönük kardeş; aklında zaten olan tek bir proje/global kuralı yazar (distill edilmiş bir *core*-rule adayı doğrudan `core/rules/`'a yazılır, `/rule` üzerinden değil).
 - [`/skill-stocktake`](/tr/skills/skill-stocktake) — kardeş korpus-hijyeni backstop'u (skill kalitesi; bu ise kural keşfi).
 
 ## Kaynak

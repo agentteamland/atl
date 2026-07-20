@@ -8,12 +8,13 @@ foundation the paused personal-advisory stack builds on — advisory lenses read
 it maintains.
 
 ```bash
-atl install profile-team
+atl install agentteamland/profile-team
 ```
 
 It installs globally by default (its `team.json` declares `scope: global`), landing the
-`profile-curator` agent, the `/profile-drain` skill, and the `profile-capture` rule in
-`~/.claude`, with profiles stored under `~/.atl/profiles/`.
+`profile-curator` agent, the `/profile-drain`, `/profile-backup`, and `/profile-restore`
+skills, and the `profile-capture` rule in `~/.claude`, with profiles stored under
+`~/.atl/profiles/`.
 
 ## The profile world
 
@@ -26,10 +27,10 @@ Everything lives under the global ATL layer at `~/.atl/profiles/`:
 │   ├── person.md                 #   (+ agent-authored interfaces for novel types)
 │   ├── org.md · animal.md · place.md · object.md · project.md
 │   └── migrations/               # breaking-change migration files, applied on touch
-└── people/
-    └── <slug>/
+└── <type-dir>/                   # one directory per type: people · orgs · animals ·
+    └── <slug>/                   #   places · objects · projects (+ unknown/ for stubs)
         ├── profile.md            # frontmatter core + narrative body
-        ├── wiki/                 # topic-organized current truth for this person
+        ├── wiki/                 # topic-organized current truth for this entity
         └── learnings/            # pattern-organized, KB-rebuilt
 ```
 

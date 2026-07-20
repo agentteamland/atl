@@ -38,7 +38,7 @@ Bakım geçişinin en son ne zaman çalıştığına bakar (transcript yüksek-s
 
 ### `hooks-bound` — otomasyon gerçekten bağlı mı?
 
-v2'de otomasyon zorunludur, ama sıfırlanmış ya da elle düzenlenmiş bir `~/.claude/settings.json` ATL'nin hook'larını bağsız bırakabilir — bu da tüm döngüyü sessizce öldürür (drain, doctor ve guard tetiklenmez olur). Bu denetim settings dosyasını okur ve üç atl hook'undan (`SessionStart`, `UserPromptSubmit`, `PreToolUse`) herhangi biri eksikse, senin kendi hook'larına asla dokunmayan aynı idempotent kurulumla onları **yeniden bağlar** — bir `(self-healed)` onarımı. Okuyamadığı bir settings dosyası engelleyici değil, bir `WARN`'dır.
+v2'de otomasyon zorunludur, ama sıfırlanmış ya da elle düzenlenmiş bir `~/.claude/settings.json` ATL'nin hook'larını bağsız bırakabilir — bu da tüm döngüyü sessizce öldürür (drain, doctor ve guard tetiklenmez olur). Bu denetim settings dosyasını okur ve dört atl hook'undan (`SessionStart`, iki `UserPromptSubmit` girdisi — `atl tick` ve `atl retrieve` — ve `PreToolUse`) herhangi biri eksikse, senin kendi hook'larına asla dokunmayan aynı idempotent kurulumla onları **yeniden bağlar** — bir `(self-healed)` onarımı. Özelleştirdiğin bir tick throttle değeri (`atl setup-hooks --throttle=…`) korunur, asla varsayılana sıfırlanmaz. Okuyamadığı bir settings dosyası engelleyici değil, bir `WARN`'dır.
 
 ## CLI / Beceri ayrımı
 

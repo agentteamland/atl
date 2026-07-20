@@ -27,7 +27,15 @@ Her sapma upstream'e ait değildir. *Genel* olan kazanımları **tut** — daha 
 
 ### 3a. Sahip OLMADIĞIN takım → upstream'e öner
 
-Mekaniği CLI yapar (fork + branch + tutulan kazanımları uygula + push + kaynak repo'ya PR aç). Sen **PR gövdesini** yazarsın:
+Mekaniği CLI yapar (fork + branch + tutulan kazanımları uygula + push + kaynak repo'ya PR aç). Uygulamayı şununla sür:
+
+```bash
+atl publish <handle>/<team> --apply --body-file <file> --only <path> [--only <path> …]
+```
+
+`--only`, uygulamayı adım-2 muhakemenin tuttuğu alt kümeyle sınırlar — **onsuz her kazanım yayınlanır, bırakmaya karar verdiklerin dahil**, bu yüzden tut/bırak muhakemesi `--only` listesini beslemek zorundadır. `--body-file`, yazdığın PR gövdesini CLI'ya verir; planı önce görmek için `--dry-run` ekle.
+
+Sen **PR gövdesini** yazarsın:
 
 - **Ne değişti ve NEDEN** — kazanım başına kısa bir bölüm, gerekçeyle başla.
 - Gerçek kullanımdan gelen en-iyi-çaba bir katkı olarak çerçevele.

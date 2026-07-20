@@ -25,7 +25,7 @@ features:
     details: A team bundles specialized agents, skills, and rules for a kind of work — full-stack apps, design systems, and more. Install once, copied into your project's Claude Code directory.
   - icon: ⚡
     title: One static binary
-    details: atl is a ~7 MB Go binary with zero runtime dependencies. Install with a single curl (macOS/Linux) or PowerShell (Windows) command.
+    details: atl is a ~18 MB Go binary with zero runtime dependencies. Install with a single curl (macOS/Linux) or PowerShell (Windows) command.
   - icon: 🔄
     title: Self-driving updates + learning
     details: Hooks keep your teams current and fold in-session learnings into their knowledge base automatically — promote gains to your global layer, publish them upstream.
@@ -63,7 +63,7 @@ irm https://raw.githubusercontent.com/agentteamland/atl/main/scripts/install.ps1
 ```bash
 # Then, in any project:
 atl install <handle>/<team>
-atl setup-hooks                   # optional: auto-update + learning capture every Claude Code session
+atl setup-hooks                   # not required — atl install already binds the automation hooks (re-run only to re-bind or change --throttle)
 ```
 
 The team's agents, skills, and rules are wired into your project's `.claude/` directory, ready for Claude Code.

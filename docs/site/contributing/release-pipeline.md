@@ -85,7 +85,8 @@ The install scripts at [`scripts/install.sh`](https://github.com/agentteamland/a
 
 1. Resolve the latest release tag via the GitHub API (or honor a pinned `ATL_VERSION`).
 2. Detect OS + arch and build the archive name (`atl_<version>_<os>_<arch>.tar.gz`).
-3. Download that archive from the release, extract `atl`, and drop it on the user's `PATH` (`ATL_INSTALL_DIR`, default `/usr/local/bin`).
+3. Download that archive and the release's checksums file, and verify the archive's sha256 against it — any mismatch or missing entry aborts the install (fail-closed).
+4. Extract `atl` and drop it on the user's `PATH` (`ATL_INSTALL_DIR`; default `/usr/local/bin` on macOS/Linux, `%LOCALAPPDATA%\Programs\atl` on Windows — where the script also adds the directory to the user PATH).
 
 No package manager, no tap, no central catalog — the release artifact is the source of truth. See [Install](../guide/install) for the user-facing instructions.
 

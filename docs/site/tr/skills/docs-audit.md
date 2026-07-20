@@ -15,6 +15,8 @@ Hem elle çağrılabilir hem otomatik tetiklenir. [`atl session-start`](/tr/cli/
 
 Skill [`atl docs check`](/tr/cli/docs)'i çalıştırır ve her **FAIL**'i düzeltir (eksik sayfa, olmayan TR aynası, bayat kurulum talimatı) — mekanik, sıfır yanlış-pozitif. CLI'nın zaten kanıtladığını asla elle denetlemez.
 
+Dış-dünya linklerini HTTP üzerinden de yoklamak için **`--external`** geç (`atl docs check --external`) — yavaş ve ağ-bağımlı olduğundan opt-in'dir; varsayılan tarama yalnızca site-içi kontrolleri ve prose-kod drift'ini kapsar.
+
 ### Anlamsal, grep-temelli, çekişmeli
 
 Sonra sitenin her bölümünü (`cli/`, `guide/`, `skills/`, `teams/`, …) tarar ve her sayfayı, anlattığı kod / `SKILL.md` / `team.json`'a karşı okur. İki koruma, ~%40'lık çok-ajanlı denetim halüsinasyon oranını aşağıda tutar:

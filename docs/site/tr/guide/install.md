@@ -1,6 +1,6 @@
 # Kurulum
 
-`atl` tek statik bir Go ikili dosyası olarak gelir (~7 MB, hiçbir çalışma-zamanı bağımlılığı yok). Her platform için tek bir betik — önce kurulması gereken bir paket yöneticisi yok.
+`atl` tek statik bir Go ikili dosyası olarak gelir (~18 MB, hiçbir çalışma-zamanı bağımlılığı yok). Her platform için tek bir betik — önce kurulması gereken bir paket yöneticisi yok.
 
 ---
 
@@ -116,6 +116,8 @@ Bu komut Claude Code'un hook'larını bağlar; böylece platform kendini arka pl
 
 - **`SessionStart` → `atl session-start`** — önceki oturumun öğrenmelerini boşaltır, kendini onarmak için `doctor` çalıştırır ve `atl` binary'sini ve kurulu takımlarını güncel tutar (günde bir [self-update](/tr/cli/upgrade) + [takım güncellemesi](/tr/cli/update) kontrolü).
 - **`UserPromptSubmit` → `atl tick --throttle=10m`** — oturum-içi bir bakım tıklaması (kısıtlanmış), böylece güncellemeler, fan-out (dağıtım) ve öğrenme yakalama parmağını kıpırdatmadan gerçekleşir.
+- **`UserPromptSubmit` → `atl retrieve`** — istem başına bilgi getirme (retrieval): projenin wiki/journal sayfalarını her isteme göre sıralar (BM25 ile yerel bir anlamsal gömme (semantic embedder) modelinin harmanı) ve en iyi eşleşmeleri bağlam olarak sunar. Hataya-açık (fail-open) — bir istemi asla engellemez.
+- **`PreToolUse` → `atl guard`** — her `Bash`, `Edit` ve `Write` araç çağrısından önce çalışır: felaket düzeyinde geri-alınamaz komutları ve en bariz sır-sızdırma (secret-exfiltration) çağrılarını deterministik olarak engeller ve mevcut bir dosyanın ilk düzenlemesinde engellemeyen bir düzenle-önce-grep hatırlatması ekler.
 
 v2'de bunun açık olması beklenir, isteğe bağlı değil — otomasyon işin özüdür. `atl update` komutunu elle çalıştırmazsın; takımların ve `atl`'nin kendisi kendiliğinden güncel kalır. Ayrıntı için [`atl setup-hooks`](/tr/cli/setup-hooks).
 

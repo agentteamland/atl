@@ -28,16 +28,18 @@ That's enough to install. The CLI parses the manifest, copies `agents/web-agent.
 | `version` | semver string | ✅ | SemVer 2.0.0 (`1.2.3`, `1.2.3-beta.1`). `atl update` compares this to decide whether to pull. |
 | `description` | string | ✅ | One-sentence pitch shown in `atl search`. Keep it tight — it's a single line in catalog output. |
 | `author` | object | — | Optional metadata the install parser does not currently read. If provided, an object `{ "name": "...", "url": "...", "email": "..." }` is the conventional shape; a plain string is accepted (silently ignored), not rejected. |
-| `license` | SPDX string | — | `"MIT"`, `"Apache-2.0"`, etc. Defaults to `"MIT"` if omitted. |
+| `license` | SPDX string | — | `"MIT"`, `"Apache-2.0"`, etc. Conventional metadata — the CLI and the catalog do not read it. Ship a LICENSE file in the repo alongside it. |
 | `keywords` | string[] | — | For `atl search` matching. `["nextjs", "tailwind", "blog"]`. |
-| `repository` | string | — | The team's source URL, surfaced in the catalog. |
+| `repository` | string | — | The team's source URL. Conventional metadata — the catalog derives the source repo from the discovered GitHub repo itself, not from this field. |
 | `homepage` | string | — | Docs / landing URL. |
 | `agents` | object[] | — | Each: `{ name, description }`. Names must match files/directories under `agents/`. |
 | `skills` | object[] | — | Each: `{ name, description }`. Names must match directories under `skills/`. |
 | `rules` | object[] | — | Each: `{ name, description }`. Names must match files under `rules/`. |
 | `scope` | string | — | Publisher-default install layer: `"project"`, `"global"`, or `"both"`. Defaults to `"project"`. The user can always override at install time with `--global` / `--project`. |
 | `dependencies` | object | — | Map of `team-name → version-constraint` for other teams the CLI installs alongside this one. |
-| `requires.atl` | string | — | Minimum `atl` version, e.g. `">=2.0.0"`. |
+| `requires.atl` | string | — | Declared minimum `atl` version, e.g. `">=2.0.0"`. Conventional metadata — the install parser does not currently enforce it. |
+| `capabilities` | object | — | Optional contracts the platform's skills (not the install parser) read. `capabilities.review: "<agent>"` names the agent [`/create-pr`](/skills/create-pr) spawns as this team's specialist reviewer; `capabilities.profile` declares the profile-layer provider/consumer role (see [profile-team](/teams/profile-team)). |
+| `backends` | string[] | — | For teams shipping per-backend adapter packs under `backends/<name>/` (e.g. the delivery-team's `["azure", "github"]`): declares which backends the team supports. Informational today — the install parser does not read it. |
 
 ::: tip Keep the description short
 `description` is rendered as a single line in `atl search` output, so a long one wraps awkwardly. Aim for one tight sentence — it's a pitch, not a paragraph.
@@ -45,7 +47,7 @@ That's enough to install. The CLI parses the manifest, copies `agents/web-agent.
 
 ## Version constraints
 
-The `dependencies` map and `requires.atl` accept standard SemVer range syntax:
+The `dependencies` values and `requires.atl` are written in standard SemVer range syntax by convention:
 
 | Syntax | Meaning |
 |---|---|
@@ -54,7 +56,7 @@ The `dependencies` map and `requires.atl` accept standard SemVer range syntax:
 | `1.2.3` | Exact pin |
 | `>=1.2.0` | Open-ended minimum |
 
-Caret (`^`) is the default recommendation — it gets patch and minor updates, blocks breaking major bumps.
+Caret (`^`) is the conventional recommendation — semantically it gets patch and minor updates and blocks breaking major bumps. Today, though, the CLI does not evaluate these ranges: `atl install` resolves each dependency by name and installs the version currently in the catalog, and `requires.atl` is not enforced. Declare them anyway — they document intent, and range enforcement can arrive without a manifest change.
 
 ## Directory conventions
 
@@ -77,7 +79,7 @@ my-team/
     └── commit-style.md
 ```
 
-The installable asset directories are `agents/`, `skills/`, `rules/`, `knowledge/`, `scripts/`, and `packs/` (the `teampkg.AssetDirs` set). `agents/`/`skills/`/`rules/` are what Claude Code reads directly; `knowledge/`/`scripts/`/`packs/` carry a team's runtime reference docs, helper scripts, and area packs. Everything else (`team.json`, `README`, `LICENSE`) stays behind.
+The installable asset directories are `agents/`, `skills/`, `rules/`, `knowledge/`, `backends/`, `scripts/`, and `packs/` (the `teampkg.AssetDirs` set). `agents/`/`skills/`/`rules/` are what Claude Code reads directly; `knowledge/`/`scripts/`/`packs/` carry a team's runtime reference docs, helper scripts, and area packs; `backends/` carries a team's per-backend adapter contracts (e.g. the delivery-team's `backends/{azure,github}/`). Everything else (`team.json`, `README`, `LICENSE`) stays behind.
 
 A team must ship at least one file under an asset directory or `atl install` fails (`team ships no installable assets`). Individual declared `agents[]`/`skills[]`/`rules[]` entries are catalog metadata and are not validated against disk at install time — the `atl skills check` dev command cross-checks the declared `agents[]` and `skills[]` for first-party teams.
 

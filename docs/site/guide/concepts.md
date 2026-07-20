@@ -28,7 +28,7 @@ A skill is a user-invocable slash command. `/drain`, `/create-pr`, `/docs-audit`
 
 Skills are **procedures, not knowledge stores** — a skill is the steps to run, so it carries no accumulated-knowledge directory. The knowledge base is unified into the agent's `children/` (v1 mirrored that shape onto skills as a `learnings/` directory; v2 removed it, per [`core/rules/agent-structure.md`](https://github.com/agentteamland/atl/blob/main/core/rules/agent-structure.md)).
 
-Skills can be **global** (shipped with `atl` itself) or **team-scoped** (shipped by a specific team and only visible after the team is installed). Scaffolder skills like `/create-new-project` and `/verify-system` are team-scoped by convention, because the work they do is always stack-specific. `/drain`, `/create-pr`, `/create-code-diagram`, `/brainstorm`, `/rule`, and `/rule-wizard` are global because they apply universally.
+Skills can be **global** (shipped with `atl` itself) or **team-scoped** (shipped by a specific team and only visible after the team is installed). Scaffolder skills like `/create-new-project` and `/verify-system` are team-scoped by convention, because the work they do is always stack-specific. `/drain`, `/create-pr`, `/create-code-diagram`, `/brainstorm`, `/rule`, `/rule-wizard`, `/docs-audit`, `/publish`, `/skill-stocktake`, and `/rules-distill` are global because they apply universally.
 
 The split between a skill and the CLI is deliberate: the **CLI is deterministic** (same inputs, same result, no LLM); **skills are LLM-driven** (they reason about your specific code). `/drain` is the judgment half of the learning loop; `atl learnings` is the deterministic half. See [The CLI](#the-cli) below.
 
@@ -94,7 +94,7 @@ This replaces v1's `/save-learnings` (now `/drain`) and removes the separate `me
 
 **Automation commands** (wired to Claude Code hooks; you rarely type them):
 
-- `atl setup-hooks` — one-time install of the `SessionStart` + `UserPromptSubmit` hooks.
+- `atl setup-hooks` — one-time install of the automation hooks: `SessionStart` (session-start maintenance), `UserPromptSubmit` (`atl tick` + per-prompt knowledge retrieval via `atl retrieve`), and `PreToolUse` (`atl guard`).
 - `atl session-start` — boot-time maintenance (core refresh + marker scan + doctor self-heal + a daily binary self-update check).
 - `atl tick` — the in-session maintenance tick (drains throttled background work every few minutes).
 - `atl doctor` — the self-heal daemon: diagnoses drift and repairs the install automatically.

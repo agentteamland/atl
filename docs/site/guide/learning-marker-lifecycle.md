@@ -85,10 +85,17 @@ Fix: one shared pool. Symptom was intermittent timeouts at ~200 rps.
 
 ### The `profile-fact` channel
 
-The queue is multi-channel. A second channel, `profile-fact`, captures durable facts about the user or the people they work with — same hidden-comment shape, `profile-fact:` prefix:
+The queue is multi-channel. A second channel, `profile-fact`, captures durable facts about the entities in the user's world — people, orgs, animals, places, objects, projects — for the profile layer. Same hidden-comment shape, `profile-fact:` prefix, but the payload is a small YAML body naming the entity and the fields learned (the exact format is owned by profile-team's `profile-capture` rule):
 
 ```html
-<!-- profile-fact: Prefers TypeScript over JavaScript for all new services. -->
+<!-- profile-fact:
+  entity: alex
+  type: person
+  fields:
+    identity.name: Alex Doe
+    state.emotional: anxious about the new job
+  source: user-confirmed
+-->
 ```
 
 Both channels auto-drain the same way — `atl tick` emits the signal for each, and the agent spawns a background drain subagent. The `learning` channel is drained by `/drain` (per the `learning-capture` rule); `profile-fact` is drained by profile-team's `/profile-drain` (per its `profile-capture` rule, installed with the team), so a session without profile-team simply never acts on the `profile-fact` signal.

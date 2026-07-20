@@ -1,6 +1,6 @@
 # Install
 
-`atl` ships as a single static Go binary (~7 MB, zero runtime dependencies). One script per platform — no package manager to set up first.
+`atl` ships as a single static Go binary (~18 MB, zero runtime dependencies). One script per platform — no package manager to set up first.
 
 ---
 
@@ -116,6 +116,8 @@ This wires Claude Code's hooks so the platform runs itself in the background:
 
 - **`SessionStart` → `atl session-start`** — drains the previous session's learnings, runs `doctor` to self-heal, and keeps the `atl` binary and your installed teams current (a daily [self-update](/cli/upgrade) + [team-update](/cli/update) check).
 - **`UserPromptSubmit` → `atl tick --throttle=10m`** — an in-session maintenance tick (throttled), so updates, fan-out, and learning capture happen without you lifting a finger.
+- **`UserPromptSubmit` → `atl retrieve`** — per-prompt knowledge retrieval: ranks the project's wiki/journal pages against each prompt (BM25 fused with a local semantic embedder) and surfaces the top matches as context. Fail-open — it never blocks a prompt.
+- **`PreToolUse` → `atl guard`** — runs before every `Bash`, `Edit`, and `Write` tool call: deterministically blocks catastrophic irreversible commands and the clearest secret-exfiltration calls, and injects a non-blocking grep-before-edit reminder on the first edit of an existing file.
 
 In v2 this is meant to be on, not opt-in — automation is the point. You don't run `atl update` by hand; your teams and `atl` itself stay current automatically. See [`atl setup-hooks`](/cli/setup-hooks) for details.
 

@@ -36,7 +36,9 @@
 
 **knowledge-base-summary** — required YAML frontmatter field on every `children/{topic}.md` file. One- to three-line summary that [`/drain`](/skills/drain) extracts to rebuild the parent `agent.md`'s Knowledge Base section. Source-of-truth — hand edits to the rebuilt section are overwritten on the next `/drain` run.
 
-**knowledge-system** — the core rule that defines the two-layer knowledge model (`journal/` + `wiki/`). Renamed from `memory-system` after the agent-memory layer was merged into journal.
+**knowledge-system** — the core rule that defines the two-layer knowledge model (`journal/` + `wiki/`) and the per-prompt consultation discipline (automatic retrieval via the `atl retrieve` hook, plus the re-scan-the-index reflex). Renamed from `memory-system` after the agent-memory layer was merged into journal.
+
+**Retrieval (knowledge index)** — the read side of the knowledge loop: a per-project index of the project's knowledge pages (wiki + journal; in a delivery-backend project, the in-repo `docs/` store too), queried on every prompt by the `atl retrieve` UserPromptSubmit hook (BM25 fused with a local semantic embedder, RRF-ranked) to surface the most relevant pages as context. Fail-open — an error never blocks the prompt; the index is rebuilt incrementally in the background whenever a drain changes the knowledge base. Stored at `~/.atl/cache/retrieve/<project-slug>/index.gob`.
 
 **Learning marker** — inline HTML comment dropped by Claude during a conversation when a learning moment occurs. Format: `<!-- learning: free text -->`. Enqueued into the durable queue (`~/.atl/queue.db`) by `atl tick` (exactly once, deduped by content hash), then processed by [`/drain`](/skills/drain) and acked (deleted).
 

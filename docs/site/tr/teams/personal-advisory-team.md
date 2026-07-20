@@ -11,9 +11,9 @@ projede ve klasörde kullanılabilir.
 atl install agentteamland/personal-advisory-team
 ```
 
-Kurulum, `advisor` agent'ını ve `/advisor` skill'ini global olarak `~/.claude`'a yerleştirir ve —
-bu takım [profile-team](/tr/teams/profile-team)'i bağımlılık olarak bildirdiği için — onu da
-transitively getirir; böylece seni tanıdığı özel profil de birlikte gelir.
+Kurulum, `advisor` agent'ını ve `/advisor` ile `/advisor-home` skill'lerini global olarak
+`~/.claude`'a yerleştirir ve — bu takım [profile-team](/tr/teams/profile-team)'i bağımlılık olarak
+bildirdiği için — onu da transitively getirir; böylece seni tanıdığı özel profil de birlikte gelir.
 
 ## Tasarım gereği dürüst (önce bunu oku)
 

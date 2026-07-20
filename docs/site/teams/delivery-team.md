@@ -1,17 +1,18 @@
 # delivery-team
 
-**delivery-team** is an **Azure DevOps work-item-driven, sprint-based autonomous software-delivery
-org** — a team of role-agents that plan, decompose, build, verify, review, and ship work items
-against a real Azure DevOps project, with a human as the Product Owner. It is a **project-scope**
-team: it installs into the repository it delivers.
+**delivery-team** is a **work-item-driven, sprint-based autonomous software-delivery org on a
+pluggable backend (Azure DevOps or GitHub)** — a team of role-agents that plan, decompose, build,
+verify, review, and ship work items against a real tracker (Azure Boards + Repos, or GitHub Issues +
+Projects + Pull Requests), with a human as the Product Owner. It is a **project-scope** team: it
+installs into the repository it delivers.
 
 ```bash
 atl install agentteamland/delivery-team
 ```
 
-Installing lands the role-agents, the ceremony skills, the knowledge packs, and the Azure
-operation-contract into the project's `.claude/`, plus a `.delivery/` config the orchestration
-engine reads.
+Installing lands the role-agents, the ceremony skills, the knowledge packs, and both backend adapter
+packs (`backends/azure/`, `backends/github/`) into the project's `.claude/`; running `/delivery-init`
+then writes the `.delivery/` config the ceremonies and the orchestration engine read.
 
 ## The org
 
@@ -36,7 +37,7 @@ A **software team** for a specific stack is just a set of area-keyed knowledge p
 The sprint runs through skills you invoke, each acting as the right role:
 
 ```bash
-/delivery-init      # wire the project to its Azure org/project/repo + methodology
+/delivery-init      # select the backend (azure | github) + wire the project's coordinates + methodology
 /kickoff            # intake + business-analyst shape the Epic/Feature backlog
 /refine             # technical-analyst + tech-lead decompose Features into briefed work-units
 /sprint-plan        # project-manager selects the sprint's units against capacity
@@ -63,17 +64,22 @@ developer  →  tester  →  tech-lead
 The engine advances a stage on a worker's clean exit, verifies the tech-lead's merge landed on `dev`
 by a pure git read (never trusting a worker's exit code), reclaims the worktree, and refills the DAG.
 A stalled or crashed worker is reclaimed and retried once, then mark-blocked — a durable report that
-`/sprint-review` reflects back to Azure (the `blocked` tag + a diagnostic comment) and clears. Each
-worker reaches Azure only through the project-scoped `azureDevOps`
-MCP the engine wires it, so a worker can never touch anything but the configured test/target project.
+`/sprint-review` reflects back to the backend (the `blocked` tag or label + a diagnostic comment) and
+clears. Each worker reaches the tracker only through what the engine wires it — the project-scoped
+`azureDevOps` MCP on the Azure backend, or the `gh` CLI with an engine-injected `GH_TOKEN` (resolved
+from `config.credential.ref`) on the GitHub backend — never the operator's ambient MCP config or
+credentials.
 
-## Azure is the single source of truth
+## The backend is the single source of truth
 
-There is no local database. **Work-items are the transient execution state** and the **project wiki is
-the durable knowledge** (the ATL wiki/journal split, living in Azure). Every role reaches Azure through
-one documented **MCP-first operation-contract** (`backends/azure/adapter.md`) — `wit_*` for work-items,
-`repo_*` for PRs, `wiki_*` for knowledge — with a thin REST carve-out for the one operation the MCP
-lacks (evidence attachment). Content is placed by **machine-locatable sentinels**: the business analysis
+There is no local database. **Work-items are the transient execution state** and the **durable-knowledge
+store holds the durable knowledge** (the ATL wiki/journal split, living in the backend: the project wiki
+on Azure, an in-repo `docs/` tree on GitHub). Every role reaches the backend through one documented
+**provider-neutral operation-contract** (`knowledge/backend-interface.md`), bound per provider by an
+adapter pack — `backends/azure/adapter.md` (the `azureDevOps` MCP: `wit_*` for work-items, `repo_*` for
+PRs, `wiki_*` for knowledge, with a thin REST carve-out for the one operation the MCP lacks, evidence
+attachment) or `backends/github/adapter.md` (the `gh` CLI: Issues, Projects v2, Pull Requests, and the
+in-repo `docs/` store). Content is placed by **machine-locatable sentinels**: the business analysis
 in the Description, the `**[Technical Analysis]**` and `**[Canonical Brief]**` comments each matched by
 their exact first line (never "the newest comment"), and area binding by a `System.Tags: area:<name>`.
 
@@ -82,13 +88,14 @@ their exact first line (never "the newest comment"), and area binding by a `Syst
 Work integrates to **`dev`** (the tech-lead completes each unit's PR on green — the scoped exception to
 the platform's never-merge rule), and the Product Owner promotes an approved sprint from `dev` to
 **`release`**. Review is **delivery-native**: the tech-lead runs the adversarial review pattern
-(evidence gate + refute-to-keep) directly on the Azure PR via `repo_*` threads and vote — not
-`/create-pr`.
+(evidence gate + refute-to-keep) directly on the backend's PR — `repo_*` threads and vote on Azure,
+`gh pr comment` / `gh pr review` on GitHub — not `/create-pr`.
 
 ## What ships
 
-The full role-agent org, the five ceremony skills, the `atl work dispatch` engine, the Azure
-operation-contract, a Scrum `methodology.json`, and a three-area reference pack (web / mobile / api).
+The full role-agent org, the five ceremony skills, the `atl work dispatch` engine, the provider-neutral
+backend interface with Azure DevOps and GitHub adapter packs, a Scrum `methodology.json`, and a
+four-area reference pack (web / mobile / api / go-cli).
 The autonomous developer→tester→tech-lead loop is proven end-to-end against a live Azure DevOps project.
 
 Deferred (design captured, trigger-gated): **multi-methodology** support beyond Scrum, **stack-specific

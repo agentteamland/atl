@@ -25,18 +25,19 @@ atl tick --file <path>          # transkript keşfetmek yerine tek bir dosyayı 
 Sırasıyla:
 
 1. **Fan-out (her çağrıda, ~bedava).** Yeni değişmiş dosyaları kullanıcı-global katmandan bu projeye çeker. Bir global nesil sayacıyla (`~/.atl/generation`) korunur: bu proje en son fan-out yaptığından beri global katman değişmemişse, tek bir küçük dosya okumasıdır ve hiçbir şey yapmaz. Bu adım, **kısıtlama diğer her şeyi atladığında bile** çalışır — her mesaja eşlik edecek kadar zaten ucuzdur.
-2. **Kısıtlama kapısı.** `--throttle=<dur>` ile, son tick `<dur>` içindeyse tur burada durur (mesaj başına hook'u ucuz tutan hızlı yol). Damga `~/.atl/cache/last-tick` içinde yaşar. `--throttle` olmadan (ya da `--throttle=0` ile) kapı her zaman geçer.
-3. **Drain.** Bu projenin son tick'ten beri değiştirilmiş Claude Code transkriptlerini keşfeder, assistant metnini çıkarır ve yakalama işaretçilerini kalıcı kuyruğa aktarır — **tam olarak bir kez**. İdempotenlik kuyruğun işaretçi-hash tekrar-elemesinden gelir; bu yüzden aynı metni yeniden boşaltmak kuyruğa yeni hiçbir şey eklemez.
-4. **Doctor öz-denetimi.** [`atl doctor`](/tr/cli/doctor) ve [`atl session-start`](/tr/cli/setup-hooks) ile aynı kuyruk-sağlığı + varlık-bütünlüğü denetimlerini çalıştırır; yalnızca OK olmayan (ya da kendini onaran) satırları yazdırır. Her şey sağlıklıyken sessizdir.
-5. **Kazanımları yükselt (1→2. halka).** Bu projenin biriken kazanımlarını kullanıcı-global katmana çıkarır. Eklemeli ve çakışma-arşivlidir; bu yüzden elle bir [`atl promote`](/tr/cli/promote) beklemek yerine tick'e eşlik etmesi güvenlidir. Çıkarılacak bir şey olmadığında sessizdir.
+2. **Otomatik-drain sinyali (her çağrıda).** Kalıcı kuyruk bekleyen öğrenmeler ya da profile-fact'ler tutuyorsa, kanal başına tek satırlık bir otomatik-drain sinyali yazdırır (`atl: N learning(s) pending — auto-drain them now in a background subagent …`); böylece ajan arka planda bir [`/drain`](/tr/skills/drain) (ya da `/profile-drain`) alt-ajanı başlatır. Tek bir ucuz sayaç okumasıdır ve kısıtlama kapısından **önce** çalışır; bu yüzden kuyruk boş olmadığı her mesajda tetiklenir — kısıtlama onu asla bastırmaz.
+3. **Kısıtlama kapısı.** `--throttle=<dur>` ile, son tick `<dur>` içindeyse tur burada durur — yalnızca fan-out ve otomatik-drain sinyali çalışmıştır (mesaj başına hook'u ucuz tutan hızlı yol). Damga proje-başınadır, `~/.atl/cache/last-tick-<project-hash>` konumunda; böylece farklı projelerdeki eşzamanlı oturumlar birbirinin turunu aç bırakmaz. `--throttle` olmadan (ya da `--throttle=0` ile) kapı her zaman geçer.
+4. **Drain.** Bu projenin son tick'ten beri değiştirilmiş Claude Code transkriptlerini keşfeder, assistant metnini çıkarır ve yakalama işaretçilerini kalıcı kuyruğa aktarır — **tam olarak bir kez**. İdempotenlik kuyruğun işaretçi-hash tekrar-elemesinden gelir; bu yüzden aynı metni yeniden boşaltmak kuyruğa yeni hiçbir şey eklemez.
+5. **Doctor öz-denetimi.** [`atl doctor`](/tr/cli/doctor) ve [`atl session-start`](/tr/cli/setup-hooks) ile aynı kuyruk-sağlığı + varlık-bütünlüğü denetimlerini çalıştırır; yalnızca OK olmayan (ya da kendini onaran) satırları yazdırır. Her şey sağlıklıyken sessizdir.
+6. **Kazanımları yükselt (1→2. halka).** Bu projenin biriken kazanımlarını kullanıcı-global katmana çıkarır. Eklemeli ve çakışma-arşivlidir; bu yüzden elle bir [`atl promote`](/tr/cli/promote) beklemek yerine tick'e eşlik etmesi güvenlidir. Çıkarılacak bir şey olmadığında sessizdir.
 
-Drain adımı öğrenmeleri yalnızca **kuyruğa alır**. Onları bilgi tabanına katmak LLM işidir; bu yüzden CLI/Skill sınırının beceri tarafında kalır — [`/drain`](/tr/skills/drain) tam da bunu yapar. Doctor, onu çalıştırman için seni dürten bir bekleyen-sayısı yüzeye çıkarır.
+Drain adımı öğrenmeleri yalnızca **kuyruğa alır**. Onları bilgi tabanına katmak LLM işidir; bu yüzden CLI/Skill sınırının beceri tarafında kalır — [`/drain`](/tr/skills/drain) tam da bunu yapar; kuyruk boş olmadığında yukarıdaki otomatik-drain sinyaliyle arka planda bir alt-ajan olarak kendiliğinden başlatılır.
 
 ## Flag'ler
 
 | Flag | Varsayılan | Etki |
 |---|---|---|
-| `--throttle <dur>` | `0` | Son tick bu süre içindeyse drain + doctor turunu atla (örneğin `10m`). Fan-out yine de çalışır. Sıfır/yok bir değer her zaman tam turu çalıştırır. |
+| `--throttle <dur>` | `0` | Son tick bu süre içindeyse drain + doctor turunu atla (örneğin `10m`). Fan-out ve otomatik-drain sinyali yine de çalışır. Sıfır/yok bir değer her zaman tam turu çalıştırır. |
 | `--file <path>` | `""` | Transkript keşfetmek yerine tek bir dosyayı boşalt. Yalnızca elle/hata ayıklama — kısıtlamayı ve imleci atlar; drain konumunu ilerletmez. |
 
 ## Örnek — bir turu zorla

@@ -38,7 +38,7 @@ Looks at how long it's been since the maintenance pass last ran (the wall-clock 
 
 ### `hooks-bound` — is the automation actually wired?
 
-Automation is mandatory in v2, but a reset or hand-edited `~/.claude/settings.json` can leave ATL's hooks unbound — silently killing the whole loop (drain, doctor, and guard stop firing). This check reads the settings file, and if any of the three atl hooks (`SessionStart`, `UserPromptSubmit`, `PreToolUse`) is missing it **re-binds them** via the same idempotent install that never touches your own hooks — a `(self-healed)` repair. A settings file it can't read is a `WARN`, not a blocker.
+Automation is mandatory in v2, but a reset or hand-edited `~/.claude/settings.json` can leave ATL's hooks unbound — silently killing the whole loop (drain, doctor, and guard stop firing). This check reads the settings file, and if any of the four atl hooks (`SessionStart`, the two `UserPromptSubmit` entries — `atl tick` and `atl retrieve` — and `PreToolUse`) is missing it **re-binds them** via the same idempotent install that never touches your own hooks — a `(self-healed)` repair. A tick throttle you customized (`atl setup-hooks --throttle=…`) is preserved, never reset to the default. A settings file it can't read is a `WARN`, not a blocker.
 
 ## The CLI / Skill split
 

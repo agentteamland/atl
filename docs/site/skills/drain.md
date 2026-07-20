@@ -109,7 +109,7 @@ Flags:
 - `peek --json` — emit pending items as JSON (id, channel, payload, enqueued_at).
 - `peek --channel <name>` — filter to a single channel (e.g. `learning`).
 
-`status` takes no flags. `ack` takes exactly one argument — the item `id`. The mining step itself enqueues with the hidden `atl learnings _enqueue learning "<lesson>"` helper (the same one capture uses), so dedup lives in the queue.
+`status` takes one optional flag — `--json` emits the pending counts as JSON. `ack` takes exactly one argument — the item `id` (an unambiguous prefix of it also resolves). The mining step itself enqueues with the hidden `atl learnings _enqueue learning "<lesson>"` helper (the same one capture uses), so dedup lives in the queue.
 
 ### Channels
 

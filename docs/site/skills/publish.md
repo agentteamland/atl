@@ -27,7 +27,15 @@ Not every divergence belongs upstream. **Keep** gains that are *general* — a c
 
 ### 3a. Team you DON'T own → propose upstream
 
-The CLI does the mechanics (fork + branch + apply the kept gains + push + open a PR against the source repo). You write the **PR body**:
+The CLI does the mechanics (fork + branch + apply the kept gains + push + open a PR against the source repo). Drive the apply with:
+
+```bash
+atl publish <handle>/<team> --apply --body-file <file> --only <path> [--only <path> …]
+```
+
+`--only` restricts the apply to the subset your step-2 judgment kept — **without it every gain is published, including the ones you decided to drop**, so the keep/drop judgment must feed the `--only` list. `--body-file` hands the CLI your authored PR body; add `--dry-run` to preview the plan first.
+
+You write the **PR body**:
 
 - **What changed and WHY** — one short section per gain, leading with the reason.
 - Frame it as a best-effort contribution from real usage.
