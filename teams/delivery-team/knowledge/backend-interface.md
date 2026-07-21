@@ -52,6 +52,9 @@ agent role-craft.
 | 10 | **Query / idempotency substrate** | Check-first-by-key before every create (found→reuse+update, not-found→create-then-stamp); read the completed set for velocity; read the backlog. "List means all" — never silently truncate. | `wit_query_by_wiql` | **issue advanced search** (`gh`/GraphQL, server-side) + Projects GraphQL |
 | 11 | **PR + review + merge** | Open a PR to `dev`, review it, and **merge = the completion gate**; the merge must leave a real merge commit the engine's `MergedToBase` can verify. | `repo_*` (autoComplete + **NoFastForward**) | `gh` — open/review; **`gh pr merge --merge` only** (never squash/rebase); explicit `gh issue close` on merge-verify |
 | 12 | **Test-evidence attachment** | Attach verifiable evidence (screenshots/results) to a unit; read it back at review. A surface that can't be run is UNVERIFIED → block, never fake-green. | REST carve-out (`scripts/az-attach.sh`) + `wit_get_work_item_attachment` | comment image upload / repo-committed artifact (see backends/github) |
+| 13 | **Candidate / triage state** | A mid-project request captured as a *candidate* (pre-accept): visible on the board, distinguishable from real work-units, carrying a triage weight (`light`/`standard`/`heavy`), and **excluded from the ready-frontier query (#10)** until the PO accepts it — on accept it becomes normal backlog, on reject it is closed with reasoning, on defer it goes to backlog with a trigger. Used only by `/request`. | `candidate` + `triage:<tier>` in `System.Tags` on a New item (a flag, like `blocked` — no native candidate category) | issue with Projects v2 **Status = `candidate`** (a NEW Status option — board-setup, like Iteration/#213) + `candidate` + `triage:<tier>` labels |
+| 14 | **Intake provenance key** | A stable key identifying a candidate by `request-slug + initiator`, so re-running `/request` finds+updates the candidate instead of duplicating (`idempotent-writes`). A candidate has no parent/plan-ordinal, so it carries its OWN key, not `atl-key`; on accept the materialized PBIs get their own `atl-key`. | `atl-request:<slug>:<initiator>` in `System.Tags`; check-first WIQL on tag + title | `atl-request:<slug>:<initiator>` **label**; check-first `gh search issues` on the label (short slug — 50-char label limit) |
+| 15 | **Recommendation + PO-decision record** | The durable record of (a) the team's reasoned verdict (`YES`/`NO`/`DEFER`/`NEEDS-INFO` + the dialectic) and (b) the PO's decision (accept/reject/defer) with the convergence mechanism (concession / judgment-call standoff / human-authority lock) and the preserved team dissent — located by an exact first-line **sentinel** on the sentinel-comment channel (#3), never "the newest comment". | a single `wit_add_work_item_comment`, first line `**[Request Decision]**` | a single `gh issue comment`, first line `**[Request Decision]**` |
 
 ## Cross-cutting policies — provider-neutral, per-tool binding
 
@@ -88,6 +91,17 @@ adapter pack states it). Agent role-craft states the principle; the pack states 
 - **NEVER-merge carve-out (D3)** — the autonomous tech-lead **worker** merges the green PR to
   `dev` (the completion gate); the human PO reviews only at sprint review (`dev`→`release`). The
   carve-out is scoped to the machine, both backends.
+- **Candidate is pre-accept, not ready-frontier (`/request`).** A `/request` candidate (concept
+  #13) is a flag/state **excluded from the ready-to-pull / selection query (concept #10)** that
+  `/refine` and `/sprint-plan` run — until the PO accepts it. Otherwise the request is swept into
+  the backlog unexamined, the exact failure `/request` exists to prevent. Its idempotency key is
+  the intake-provenance key (#14, `atl-request:<slug>:<initiator>` — a sibling of
+  `atl-brainstorm:<slug>`, distinct from `atl-key`); its verdict + PO decision live as a
+  `**[Request Decision]**` sentinel on the sentinel-comment channel (#3). Accept drops the
+  `candidate` flag / flips the Status off `candidate` so the item enters the frontier; the
+  materialized PBIs then get their own `atl-key`. `/request` is **event-triggered** (not a
+  `methodology.cadence` slot) and **requires a live PO**, so — like `/kickoff` and `/sprint-review`
+  — it runs in-session and is **not** part of the headless `atl work dispatch` loop.
 
 ## Status
 

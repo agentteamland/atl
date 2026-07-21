@@ -38,7 +38,10 @@ role-craft lives in each role-agent's `children/`, cited per step.
   whenever the analyzed backlog needs grooming and Features need decomposing into plannable units —
   typically ahead of `/sprint-plan`, so the `project-manager` selects from refined, keyed units.
 - **Scope** — a Feature, a set of Features, an Epic's Features, or the top of the backlog. The
-  scope selects which analyzed items this run reads back, grooms, and decomposes.
+  scope selects which analyzed items this run reads back, grooms, and decomposes. When the scope is
+  "the top of the backlog", **exclude `/request` candidates** (concept #13 — the `candidate`
+  flag/Status): an un-accepted candidate is not yet backlog work and is decomposed only after
+  `/request`'s accept step drops its `candidate` flag.
 - **Re-run** — `/refine` is idempotent (see [Idempotent re-run](#idempotent-re-run)); re-running
   after a crash, a partial run, or an explicit re-plan **converges** the same units, never
   duplicating them.

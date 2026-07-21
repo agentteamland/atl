@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "name": "delivery-team",
-  "version": "0.5.3",
+  "version": "0.6.0",
   "description": "Work-item-driven, sprint-based autonomous software delivery on a pluggable backend (Azure DevOps or GitHub): role-agents + ceremony skills orchestrated by atl work dispatch over claude -p workers.",
   "author": {
     "name": "AgentTeamLand",
@@ -76,6 +76,10 @@
     {
       "name": "sprint-review",
       "description": "/sprint-review — sprint-end: compile the Sprint Review Report (completed, PRs, evidence, dev preview, velocity, findings) and run the PO Approve/Reject gate that alone triggers dev→release."
+    },
+    {
+      "name": "request",
+      "description": "/request — mid-project request intake: capture a PO- or team-raised request as a candidate, triage it, run feasibility, then gate it at an honest PO dialectic before it becomes backlog work."
     }
   ],
   "areas": [

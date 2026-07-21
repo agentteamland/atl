@@ -43,6 +43,7 @@ Sprint, her biri doğru rol olarak davranan, senin çağırdığın skill'lerle 
 /sprint-plan        # project-manager sprint'in birimlerini kapasiteye göre seçer
 /sprint-start       # iş-birimi DAG'ını materialize et → motora devret
 /sprint-review      # velocity, review sonucu wiki sayfası, sprint kapanışı
+/request            # (her an) proje-ortası istek → triyaj → fizibilite → dürüst PO kapısı → kabul/ertele/ret
 ```
 
 Metodoloji **kod değil, config'tir**: `methodology.json` (v1'de Scrum) seremonilerin okuduğu tempoyu
@@ -93,7 +94,7 @@ doğrudan backend'in PR'ı üzerinde koşar — Azure'da `repo_*` thread'leri ve
 
 ## Neler geliyor
 
-Tam rol-ajan organizasyonu, beş seremoni skill'i, `atl work dispatch` motoru, Azure DevOps ve GitHub
+Tam rol-ajan organizasyonu, altı seremoni skill'i, `atl work dispatch` motoru, Azure DevOps ve GitHub
 adaptör paketleriyle sağlayıcıdan-bağımsız backend arayüzü, bir Scrum `methodology.json`'ı ve dört-alanlı
 bir referans paketi (web / mobile / api / go-cli). Otonom developer→tester→tech-lead döngüsü, canlı bir
 Azure DevOps projesine karşı uçtan uca kanıtlanmıştır.

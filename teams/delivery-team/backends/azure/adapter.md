@@ -123,6 +123,15 @@ ledger — a lost/stale ledger silently reintroduces duplication).
   creating, it runs a second check-first WIQL on `atl-brainstorm:<slug>` for the in-scope item and, on
   a title match, **adopts** it — `wit_update_work_item` in place + stamp the computed `atl-key:<hash>`
   — instead of creating a duplicate. After adoption the item converges via the normal `atl-key` query.
+- **`/request` candidate items carry `atl-request:<slug>:<initiator>`, not `atl-key`** (concept #14).
+  `/request`'s capture step creates a candidate work-item with `atl-request:<request-slug>:<initiator>`
+  + `candidate` + `triage:<tier>` in `System.Tags` (its own provenance key — a candidate has no
+  parent/plan-ordinal, so no `atl-key`), and dedups its own re-runs by a check-first WIQL on that tag
+  plus the item title (found → `wit_update_work_item` in place, not-found → create-then-stamp). A
+  `candidate`-tagged item is **excluded from every ready-frontier / selection WIQL** (concept #13)
+  until the PO accepts it; on accept, `/request` drops the `candidate` tag (the item enters the
+  frontier) and `/refine` decomposes it into PBIs that get their own `atl-key:<hash>` via the normal
+  decomposition path.
 - **`wit_add_child_work_items` takes no tags/fields** — only `wit_create_work_item`
   accepts `System.Tags` inline. A child created with `wit_add_child_work_items` is
   stamped (`atl-key`/`atl-run`/`area:<name>`) by a **follow-up `wit_update_work_item`**;
@@ -153,6 +162,12 @@ write a literal `"Done"`/`"Active"` into a ceremony or worker prompt.
   `System.State` **unchanged**. Never resolve or invent a `Blocked` state to transition
   to; the "resolve at runtime" rule applies to real states (the Completed category), not
   to blocking, which is a flag on the item.
+- **"Candidate" is a FLAG too, not a state** (concept #13). A `/request` candidate is a New item
+  tagged `candidate` + `triage:<tier>` in `System.Tags` (zero-setup, template-agnostic, exactly like
+  `blocked`) — `System.State` stays New/Proposed. The ready-frontier / selection WIQLs (`/refine`,
+  `/sprint-plan`) **exclude the `candidate` tag** until the PO accepts; accept removes the tag. No
+  custom state or category is created — Azure needs no board-setup for this (unlike GitHub's
+  `candidate` Status option).
 - "Done" for velocity / completion = resolve the **Completed** state-category, not a
   literal string — different templates spell it differently.
 
@@ -182,11 +197,20 @@ guessing**:
   / `Conventions/` wiki paths for the task. Same placement discipline as the
   technical-analysis comment: one comment, sentinel line one, machine-locatable — it is
   a **work-item comment, never a wiki page**.
+- **Request decision** (`tech-lead` + PO, at `/request`'s gate) → a **single labeled comment** on
+  the candidate (`wit_add_work_item_comment`) whose first line is the exact sentinel
+  `**[Request Decision]**` (concept #15), then fixed H2s: `## Recommendation` (the reasoned
+  `YES`/`NO`/`DEFER`/`NEEDS-INFO` verdict), `## Deliberation` (the thesis, the team's anti-thesis /
+  refute-to-keep, the surviving position), `## PO Decision` (accept/reject/defer + the convergence
+  mechanism: (a) concession / (b) judgment-call standoff / (c) human-authority lock),
+  `## Dissent On Record` (the team's preserved dissent under (b)/(c); empty on an (a) merit-win). Same
+  one-comment,
+  sentinel-located discipline as the analysis/brief.
 - **Read-back** (at `/refine`, and by every spawned worker): `wit_get_work_item` (parse
   Description headings) + `wit_list_work_item_comments` filtered to the comment starting
   with its sentinel — `**[Technical Analysis]**` for the analysis, `**[Canonical Brief]**`
-  for the brief — a **sentinel match, not "the newest comment"**, so a later human comment
-  never shadows either. For a decomposed child unit with no `**[Technical Analysis]**` of its
+  for the brief, `**[Request Decision]**` for a candidate's verdict + PO decision — a **sentinel
+  match, not "the newest comment"**, so a later human comment never shadows any of them. For a decomposed child unit with no `**[Technical Analysis]**` of its
   own (only the tech-lead's `**[Canonical Brief]**`), read the analysis from its **nearest
   ancestor** Feature — traverse the parent via `wit_get_work_item` relations (the
   `System.LinkTypes.Hierarchy-Reverse` parent link), climbing parent links until you reach the
