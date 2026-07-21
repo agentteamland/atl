@@ -124,7 +124,11 @@ feasibility against the `Architecture/` durable-knowledge store before the assig
 - **Read the backlog completely** — the ordered-backlog read (concept #10, the priority-ordered
   backlog) and/or an exhaustive query (concept #10) filtered to the ready types and the
   **not-yet-Completed** state (resolve the Completed category at runtime, concept #7). Apply the
-  cap-is-truncation rule ("list means all").
+  cap-is-truncation rule ("list means all"). **Exclude `/request` candidates** (concept #13 — the
+  `candidate` flag / Status): a candidate is a mid-project request the PO has not yet accepted, so it
+  is **not** ready-frontier work — admitting it would sweep an unexamined request into a sprint, the
+  exact failure `/request` exists to prevent. A candidate enters this query only after `/request`'s
+  accept step drops its `candidate` flag.
 - **Choose the granularity** — the admitted set is homogeneous at **one** level of
   `artifactHierarchy` (`["Epic","Feature","Pbi","Task"]`): **ALL PBI-level OR ALL task-level, never
   a mix within a sprint** (#15 — no mixed granularity). Mixing a parent and its own child double-counts points

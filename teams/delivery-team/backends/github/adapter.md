@@ -96,6 +96,14 @@ truth (no local ledger).
   — `gh issue edit` in place + stamp the computed `atl-key:<hash>` label — instead of opening a
   duplicate. After adoption it converges via the normal `atl-key` search. (50-char label limit — use a
   short slug/digest, as with `atl-key`.)
+- **`/request` candidate issues carry `atl-request:<slug>:<initiator>`, not `atl-key`** (concept #14).
+  `/request`'s capture step opens a candidate issue with an `atl-request:<request-slug>:<initiator>`
+  label + `candidate` + `triage:<tier>` labels + Projects v2 **Status = `candidate`**, and dedups its
+  own re-runs by a check-first `gh search issues 'label:atl-request:<slug>' --repo <o>/<r> --state all`
+  plus the item title. A `candidate`-Status issue is **excluded from the ready-to-pull / selection
+  query** (concept #13) until the PO accepts it; on accept, `/request` flips the Status off `candidate`
+  (the issue enters the frontier) and `/refine` materializes PBIs with their own `atl-key`. (50-char
+  label limit — short slug/digest, as with `atl-key`.)
 
 ## 6. State & completion — one fixed model (no runtime template resolution)
 
@@ -109,6 +117,14 @@ has **one model**, so "resolution" collapses to it:
 - **"Blocked" is a FLAG, never a state:** add a `blocked` **label** + a diagnostic comment,
   leaving the issue open. Same discipline as the Azure `blocked` tag — never invent a blocked
   status to transition to.
+- **"Candidate" is a Projects v2 Status option (board-setup, NOT auto-created)** (concept #13). A
+  `/request` candidate sets **Status = `candidate`** on the issue's project item + a `candidate` label
+  + a `triage:<tier>` label. Projects v2 Status **options are not cleanly API-settable** (see
+  `/delivery-init` + the Iteration field), so the `candidate` option is added to the Status field **via
+  the Projects settings UI** (Projects v2 → ⚙ → Status → new option), exactly like Iteration. Until
+  accepted, a `candidate`-Status issue is **excluded from the ready-to-pull query** (§4 / concept #10);
+  accept flips the Status off `candidate` (e.g. to Todo). (Azure needs no such setup — its `candidate`
+  tag is zero-setup.)
 
 ## 7. Content-placement contract (deterministic read-back)
 
@@ -121,6 +137,12 @@ Identical discipline to the interface (#2/#3), GitHub binding:
 - **Canonical brief** (`tech-lead`) → a **single issue comment**, first line `**[Canonical
   Brief]**`, then `## Goal`, `## Area`, `## Load These Pages`, `## Depends On`, `## Evidence
   Before Review` — it names the area pack and embeds the exact `/docs` paths for the task.
+- **Request decision** (`/request` gate) → a **single issue comment** on the candidate, first line
+  `**[Request Decision]**` (concept #15), then `## Recommendation` (the `YES`/`NO`/`DEFER`/`NEEDS-INFO`
+  verdict), `## Deliberation` (thesis / the team's anti-thesis (refute-to-keep) / the surviving
+  position), `## PO Decision` (accept/reject/defer + the convergence mechanism: concession /
+  judgment-call standoff / human-authority lock), `## Dissent On Record` (the team's preserved dissent
+  under standoff/lock; empty on a merit-win).
 - **Area** → an `area:<name>` **label**, applied by the tech-lead at decomposition.
 - **Read-back** = `gh issue view` (parse body headings) + list comments filtered to the one
   starting with its sentinel — a **sentinel match, not "the newest comment"**, so a later human

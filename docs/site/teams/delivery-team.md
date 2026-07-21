@@ -43,6 +43,7 @@ The sprint runs through skills you invoke, each acting as the right role:
 /sprint-plan        # project-manager selects the sprint's units against capacity
 /sprint-start       # materialize the work-unit DAG → hand it to the engine
 /sprint-review      # velocity, the review outcome wiki page, sprint close
+/request            # (any time) mid-project request → triage → feasibility → honest PO gate → accept/defer/reject
 ```
 
 Methodology is **config, not code**: `methodology.json` (Scrum in v1) declares the cadence the
@@ -93,7 +94,7 @@ the platform's never-merge rule), and the Product Owner promotes an approved spr
 
 ## What ships
 
-The full role-agent org, the five ceremony skills, the `atl work dispatch` engine, the provider-neutral
+The full role-agent org, the six ceremony skills, the `atl work dispatch` engine, the provider-neutral
 backend interface with Azure DevOps and GitHub adapter packs, a Scrum `methodology.json`, and a
 four-area reference pack (web / mobile / api / go-cli).
 The autonomous developer→tester→tech-lead loop is proven end-to-end against a live Azure DevOps project.
