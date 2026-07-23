@@ -26,6 +26,13 @@ Sonra sitenin her bölümünü (`cli/`, `guide/`, `skills/`, `teams/`, …) tara
 
 Hayatta kalan düzeltmeler EN sayfaya uygulanır, TR aynası yeniden üretilir ve her şey, maintainer'ın incelemesi için bir **PR** olarak açılır — izin isteği değil, otonom taslak.
 
+### Daha geniş yüzeyler — org profili ve demo
+
+Docs sitesi ana hedeftir ama projenin yayımladığı tek yüzey değildir. Mevcut olduklarında tarama, aynı grep-temelli disiplinle şunları da denetler:
+
+- **Org profili** — yeni birinin ilk gördüğü açılış sayfası (`.github` deposunun `profile/README.md`'si, github.com/agentteamland'de): "yakında" diye gösterilen emekli takımlar ya da eksik olan shipped takımlar, arşivlenmiş bir siteye giden "full docs" linki, kaldırılmış kurulum kanalları, bayat komut örnekleri.
+- **Demo** — animasyonlu `assets/demo.gif`. Gerçek CLI çıktısını kaydeder, bu yüzden her sürümde bayatlar (sürüm dizesi, takımlar, komutlar); güncel sürümle uyuşmadığında işaretlenir ve **her sürümden sonra yeniden kaydedilir**.
+
 ### Denetimi kaydeder
 
 Bitince skill, denetim imlecini damgalar (`atl docs check --record-audit`); bu, runaway-guard'ı sıfırlar, böylece session-start ~1 gün boyunca tekrar sinyal vermez.
