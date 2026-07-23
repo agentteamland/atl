@@ -47,7 +47,13 @@ Birlikte çalışan iki parça:
   otoriterdir** — aynı sen, her sohbette ve her projede bilinen. Danışman senin hakkında kalıcı bir
   şey öğrendiğinde, bunu **o an** profiline yazar ve tek satırda teyit eder; böylece seni sadece bir
   sonraki değil, *bu* sohbetin geri kalanı için de daha iyi tanır. v1'de en önemli iki alanı —
-  **finansların** ve **ruh halin** — iyi bir dostun takip ettiği gibi proaktif olarak gözetir.
+  **finansların** ve **ruh halin** — iyi bir dostun takip ettiği gibi proaktif olarak gözetir. Ve
+  **dünyandaki kişileri, yerleri ve şeyleri** de profiller — aile, arkadaşlar, işvereni, memleketin,
+  bir evcil hayvan, değer verdiğin bir eşya — sessizce (sesli bir defter tutmadan); böylece sadece
+  seni değil, yanında taşıdığın herkesi ve her şeyi de tanır. Bunlar aynı
+  [profile-team](/tr/teams/profile-team) deposuna (`~/.atl/profiles/{people,orgs,places,…}/`)
+  **otomatik** akar; başka insanlar hakkındaki hassas bilgiler onların gerçeği olarak değil, **senin
+  algın** olarak tutulur.
 
 ## İki giriş yolu — hep-açık ev ya da her yerde `/advisor`
 
