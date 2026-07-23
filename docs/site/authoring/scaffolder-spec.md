@@ -6,6 +6,10 @@ A **scaffolder** is a team-scoped skill named `/create-new-project` that bootstr
 This page is the canonical version of the spec. (An earlier copy lived in the archived v1 `agentteamland/core` repo; it is historical only.)
 :::
 
+::: warning No team ships a scaffolder yet
+The v1 teams that shipped a `/create-new-project` scaffolder (and its `/verify-system` companion) were retired in July 2026, and no first-party team ships one today. This page is the **intended convention** for scaffolders on rebuilt teams — read `/verify-system` below as the *shape* of a team-defined end-to-end check, not a currently-shipping skill.
+:::
+
 ## Why a spec?
 
 Different teams will build very different scaffolders (a .NET + Docker stack vs. a Next.js + Sanity blog vs. a Python + Jupyter data project). But the **shape** of the UX should be consistent. Users who learn one team's scaffolder should feel at home using another.
@@ -81,7 +85,7 @@ Invoke `/verify-system` as a `Skill` tool call. **This is non-negotiable.**
 Skill(skill="verify-system")
 ```
 
-The same team ships its own `/verify-system` that knows how to test the stack end-to-end. The scaffolder must:
+By convention, the team provides its own `/verify-system` skill that knows how to test the stack end-to-end. The scaffolder must:
 
 1. Call the skill with the `Skill` tool (not inline bash).
 2. Block on the result.

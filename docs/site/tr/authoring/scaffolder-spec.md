@@ -6,6 +6,10 @@ Bir **iskele**, takımın yığınında yeni bir projeyi başlatan, `/create-new
 Bu sayfa, belirtimin kanonik sürümüdür. (Daha eski bir kopyası arşivlenmiş v1 `agentteamland/core` deposunda yaşıyordu; o kopya yalnızca tarihseldir.)
 :::
 
+::: warning Henüz hiçbir takım iskele getirmiyor
+Bir `/create-new-project` iskelesi (ve onun `/verify-system` eşlikçisi) getiren v1 takımları Temmuz 2026'da emekliye ayrıldı ve bugün birinci-taraf hiçbir takım bunu getirmiyor. Bu sayfa, yeniden inşa edilen takımlardaki iskeleler için **amaçlanan gelenektir** — aşağıdaki `/verify-system`'i, hâlihazırda yayımlanan bir beceri olarak değil, takımın tanımladığı uçtan-uca bir kontrolün *şekli* olarak oku.
+:::
+
 ## Neden bir belirtim?
 
 Farklı takımlar çok farklı iskeleler kuracaktır (.NET + Docker yığını ile Next.js + Sanity blog ile Python + Jupyter veri projesi karşılaştırılırsa). Ama UX'in **şekli** tutarlı olmalı. Bir takımın iskelesini öğrenen kullanıcı bir başkasını kullanırken kendini evinde hissetmeli.
@@ -81,7 +85,7 @@ Yalnızca şablon iskeleler için bu aşamayı atla.
 Skill(skill="verify-system")
 ```
 
-Aynı takım, yığını uçtan uca sınamayı bilen kendi `/verify-system` becerisini yayımlar. İskele şunları yapmalı:
+Gelenek gereği takım, yığını uçtan uca sınamayı bilen kendi `/verify-system` becerisini sağlar. İskele şunları yapmalı:
 
 1. Beceriyi `Skill` aracıyla çağırmalı (satır içi bash ile değil).
 2. Sonucu beklemeli.
