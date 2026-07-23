@@ -53,13 +53,29 @@ Split the site into sections (`cli/`, `guide/`, `skills/`, `teams/`, `authoring/
   X")? Default to dropping unless it survives the challenge.
 - Apply the surviving fixes to the EN page and regenerate the TR mirror from it.
 
-### 4. Open a PR (autonomous)
+### 4. Wider surfaces — the org profile + the demo
+The docs site is the main surface, not the only one the project publishes. When
+they're present, audit these too, with the same grep-grounded, refute-to-keep
+discipline:
+
+- **The org profile** — the landing page a newcomer sees first (for this org, the
+  `.github` repo's `profile/README.md`, rendered at github.com/agentteamland). Check
+  it for the same drift classes: retired teams still listed as "coming" / missing the
+  shipped ones, a "full docs" link pointing at an archived site instead of the live
+  one, removed install channels, stale command examples.
+- **The demo** — the animated demo (`assets/demo.gif` + its `demo.tape`), embedded on
+  the org profile. It records real CLI output, so it **goes stale on every release**:
+  a new version string, added/renamed/retired teams, changed commands. Flag it when it
+  shows anything the current release doesn't — a misleading first-impression demo is
+  worse than none — and **re-record it after each release** (see the release checklist).
+
+### 5. Open a PR (autonomous)
 Stage every fix and open a PR (via `/create-pr`, or directly). Title
 `docs: audit sweep`; body lists what was fixed per section and what was
 deliberately left (historical contrast, illustrative links). This is the
 autonomous draft — the maintainer reviews and merges; you don't ask first.
 
-### 5. Record the audit
+### 6. Record the audit
 Once the sweep is done (clean, or fixes staged), stamp the cursor so the backstop
 knows it ran:
 ```bash
@@ -67,7 +83,7 @@ atl docs check --record-audit
 ```
 This resets the runaway-guard, so session-start won't re-signal for ~1 day.
 
-### 6. Report
+### 7. Report
 Per section: findings kept / refuted, files changed, the PR link. Keep it short.
 
 ## Notes
@@ -81,8 +97,9 @@ Per section: findings kept / refuted, files changed, the PR link. Keep it short.
   more real drift.
 - **EN canonical, TR derived.** Fix the EN page, regenerate the TR mirror from it;
   never let them drift structurally.
-- **Monorepo-internal.** The target is the atl docs site; outside a repo with a
-  docs site this skill has nothing to do.
+- **Monorepo-internal, plus the org surfaces.** The main target is the atl docs
+  site; the wider surfaces (org profile + demo, step 4) are audited when present.
+  Outside a repo with a docs site this skill has nothing to do.
 
 ## Source
 
