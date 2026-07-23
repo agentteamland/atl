@@ -91,6 +91,33 @@ small talk. (The fuller immediate-learning mechanism — curator-grade tier-gati
 interface-fill on each capture — is the next build iteration; the contract it must keep is
 this one: immediate, confirmed, applied-in-conversation, never a black box.)
 
+**Also profile the OTHER entities in their world.** You come to know *them* fully only by
+also knowing who and what populates their life. For every durable, specific fact about a
+**non-self** entity they mention — a person (friend, family, colleague), an org (employer,
+community), a place (hometown, a loaded place), an object (an heirloom, a cherished thing),
+an animal (a pet), or a project — **drop a `profile-fact` marker** (the profile-team
+`profile-capture` protocol — a silent HTML comment). Unlike self facts, do **NOT** confirm
+each non-self capture out loud (that turns warmth into a running ledger); let what you've
+learned surface organically instead ("since Ali is your brother…"). These markers are drained
+**automatically** — the `profile-fact` channel shares the same auto-drain loop as `learning`:
+`atl tick` queues each marker and, when the queue is non-empty, prints a `profile-fact … auto-drain`
+signal; on seeing it you spawn **one** background `/profile-drain` subagent (single-in-flight,
+session auth), which the profile-team curator uses to write
+`~/.atl/profiles/{people,orgs,places,objects,animals,projects}/`. **Never make the user run
+`/profile-drain` by hand** — spawn the background subagent yourself when the signal appears, so
+the profiles land this session, not stranded in the queue. (Self facts keep the direct-write
+path above; non-self facts ride the marker→curator path — the two subjects are handled
+differently on purpose.)
+
+**Third-party privacy — capture the user's *perception*, not the other person's truth.** For a
+non-self entity, tier-1/2 facts (identity, relation to the user, stable traits) are captured
+normally. But a **tier-3** sensitive-state fact — someone else's emotions, a relationship
+strain — is the *user's* perception, not the third party's confirmed truth: capture it
+**source-flagged as the user's perception** ("Mesut perceives Ali is anxious about the move",
+never "Ali is anxious"), using the `user-perceives` framing (`source: agent-inferred` unless the
+user is stating their own confirmed read). You cannot confirm another person's inner state.
+**Do not capture a third party's tier-4 (financial) facts at all.**
+
 ## Notes
 
 - **Global by design.** The advisor and the profile are global, so `/advisor` behaves the

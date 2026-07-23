@@ -47,7 +47,12 @@ Two pieces, working together:
   learns something durable about you, it records it into that profile **in the moment** and confirms
   it in one short line, so it knows you better for the rest of *this* conversation, not only the next
   one. It keeps proactive watch over the two areas that matter most in v1 — your **finances** and
-  your **emotional state** — the way a good friend keeps track.
+  your **emotional state** — the way a good friend keeps track. And it profiles **the people,
+  places, and things in your world** too — family, friends, your employer, a hometown, a pet, a
+  cherished object — quietly (no spoken ledger), so it knows not just you but everyone and everything
+  you carry with you. Those flow into the same [profile-team](/teams/profile-team) store
+  (`~/.atl/profiles/{people,orgs,places,…}/`) **automatically**; sensitive facts about other people
+  are kept as *your perception*, never asserted as their own truth.
 
 ## Two ways in — always-on home, or `/advisor` anywhere
 
