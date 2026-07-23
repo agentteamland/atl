@@ -9,6 +9,8 @@
 package sweepstate
 
 import (
+	"crypto/sha1"
+	"encoding/hex"
 	"encoding/json"
 	"os"
 	"os/exec"
@@ -44,12 +46,28 @@ var (
 	Skills = Kind{filename: "skill-stocktake-state.json", scanPaths: []string{"core", "teams"}}
 	// Rules is the /rules-distill cursor (~/.atl/rules-distill-state.json).
 	Rules = Kind{filename: "rules-distill-state.json", scanPaths: []string{"core", "teams"}}
-	// Observe is the /observe cursor (~/.atl/observe-state.json). Its scope is the
-	// project's ATL decision + knowledge surface (.atl/ — brainstorms, docs, journal),
-	// which moves whenever work ships or a decision lands, so a proactive-observer sweep
-	// becomes due right when shipped-vs-designed drift is most likely.
+	// Observe is the /observe cursor. Its scope is the project's ATL decision +
+	// knowledge surface (.atl/ — brainstorms, docs, journal), which moves whenever work
+	// ships or a decision lands, so a proactive-observer sweep becomes due right when
+	// shipped-vs-designed drift is most likely. Unlike the three above, /observe fires
+	// in every project with an .atl/ surface (not just the monorepo), so its cursor is
+	// per-project — always used via ForProject(projectRoot), never the bare global Path.
 	Observe = Kind{filename: "observe-state.json", scanPaths: []string{".atl"}}
 )
+
+// ForProject returns a copy of this Kind whose cursor is namespaced by the given
+// project root — an independent per-project cadence instead of the single global
+// cursor the other kinds share. /observe needs this because, unlike the monorepo-only
+// docs/skills/rules sweeps (one venue per machine, so a global cursor never collides),
+// it fires in every project that has an .atl/ surface; a shared global cursor would let
+// whichever project is opened first suppress the daily signal in all the others.
+func (k Kind) ForProject(projectRoot string) Kind {
+	sum := sha1.Sum([]byte(filepath.Clean(projectRoot)))
+	base := strings.TrimSuffix(k.filename, ".json")
+	nk := k
+	nk.filename = filepath.Join(base, hex.EncodeToString(sum[:])[:16]+".json")
+	return nk
+}
 
 // Path returns ~/.atl/<kind>-state.json.
 func (k Kind) Path() (string, error) {

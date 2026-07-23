@@ -27,14 +27,18 @@ var observeCmd = &cobra.Command{
 			fmt.Println("atl observe: no .atl/ surface here — nothing to observe")
 			return nil
 		}
+		cursor := sweepstate.Observe.ForProject(root)
 		if record {
-			if sha := gitHEAD(root); sha != "" {
-				_ = sweepstate.Observe.Record(sha, time.Now())
+			sha := gitHEAD(root)
+			if sha == "" {
+				fmt.Println("atl observe: not a git repo here — nothing to record")
+				return nil
 			}
+			_ = cursor.Record(sha, time.Now())
 			fmt.Println("atl observe: recorded HEAD as the last observer sweep")
 			return nil
 		}
-		if sweepstate.Observe.Due(root) {
+		if cursor.Due(root) {
 			fmt.Println("atl observe: a proactive observer sweep is due — run /observe")
 		} else {
 			fmt.Println("atl observe: no sweep due right now")
@@ -77,7 +81,7 @@ func observeSessionSignal(projectRoot string) {
 	if fi, err := os.Stat(filepath.Join(projectRoot, ".atl")); err != nil || !fi.IsDir() {
 		return // no ATL decision surface here — the observer is dormant
 	}
-	if sweepstate.Observe.Due(projectRoot) {
+	if sweepstate.Observe.ForProject(projectRoot).Due(projectRoot) {
 		fmt.Println("atl: a proactive observer sweep is due — run /observe to surface ripe backlog triggers and latent gaps (shipped-vs-designed, growth/scale risks, unshipped decisions, your setup)")
 	}
 }
