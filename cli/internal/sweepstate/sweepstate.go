@@ -1,8 +1,8 @@
-// Package sweepstate persists the per-sweep cursor for ATL's three LLM-backstop
-// sweeps — /docs-audit, /skill-stocktake, /rules-distill — each recording the
-// commit last swept and when, under ~/.atl/<kind>-state.json. The deterministic CLI
-// halves (`atl docs check`, `atl skills check`, `atl rules scan`) are stateless; only
-// the LLM sweeps need a cursor. It also answers "is a full sweep due?": a ~1-day
+// Package sweepstate persists the per-sweep cursor for ATL's LLM-backstop sweeps —
+// /docs-audit, /skill-stocktake, /rules-distill, /observe — each recording the commit
+// last swept and when, under ~/.atl/<kind>-state.json. The deterministic CLI halves
+// (`atl docs check`, `atl skills check`, `atl rules scan`, `atl observe`) are stateless;
+// only the LLM sweeps need a cursor. It also answers "is a full sweep due?": a ~1-day
 // runaway-guard over any commit touching the kind's scanned paths since the last
 // recorded sweep. One generic cursor replaces the former docsstate/skillsstate/
 // rulesstate triple.
@@ -44,6 +44,11 @@ var (
 	Skills = Kind{filename: "skill-stocktake-state.json", scanPaths: []string{"core", "teams"}}
 	// Rules is the /rules-distill cursor (~/.atl/rules-distill-state.json).
 	Rules = Kind{filename: "rules-distill-state.json", scanPaths: []string{"core", "teams"}}
+	// Observe is the /observe cursor (~/.atl/observe-state.json). Its scope is the
+	// project's ATL decision + knowledge surface (.atl/ — brainstorms, docs, journal),
+	// which moves whenever work ships or a decision lands, so a proactive-observer sweep
+	// becomes due right when shipped-vs-designed drift is most likely.
+	Observe = Kind{filename: "observe-state.json", scanPaths: []string{".atl"}}
 )
 
 // Path returns ~/.atl/<kind>-state.json.

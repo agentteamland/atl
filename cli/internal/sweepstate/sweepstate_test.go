@@ -17,6 +17,7 @@ var allKinds = []struct {
 	{"docs", Docs, "docs-audit-state.json"},
 	{"skills", Skills, "skill-stocktake-state.json"},
 	{"rules", Rules, "rules-distill-state.json"},
+	{"observe", Observe, "observe-state.json"},
 }
 
 func TestLoadMissingIsEmpty(t *testing.T) {
