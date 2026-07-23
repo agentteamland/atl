@@ -17,6 +17,7 @@ var allKinds = []struct {
 	{"docs", Docs, "docs-audit-state.json"},
 	{"skills", Skills, "skill-stocktake-state.json"},
 	{"rules", Rules, "rules-distill-state.json"},
+	{"observe", Observe, "observe-state.json"},
 }
 
 func TestLoadMissingIsEmpty(t *testing.T) {
@@ -139,6 +140,46 @@ func TestDueRunawayGuard(t *testing.T) {
 	}
 	if Docs.Due(t.TempDir()) {
 		t.Error("a sweep recorded just now must not be due (runaway-guard)")
+	}
+}
+
+// TestForProjectIsPerProject guards the per-project observe cursor: recording a sweep
+// in one project must never suppress the signal in another. A single global cursor
+// (as the docs/skills/rules kinds use) would cross-suppress here, because /observe
+// fires in every .atl/ project, not just the one monorepo.
+func TestForProjectIsPerProject(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+
+	pa := Observe.ForProject("/projects/a")
+	pb := Observe.ForProject("/projects/b")
+
+	ppa, err := pa.Path()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ppb, err := pb.Path()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ppa == ppb {
+		t.Fatalf("per-project cursors must not collide: %q", ppa)
+	}
+	// Stable for the same root (idempotent key, not a per-run value).
+	if again, _ := Observe.ForProject("/projects/a").Path(); again != ppa {
+		t.Errorf("ForProject must be stable for the same root: %q vs %q", again, ppa)
+	}
+	// Recording project A must not populate project B's cursor.
+	if err := pa.Record("sha-a", time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	cb, err := pb.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cb.LastSHA != "" || cb.LastAt != "" {
+		t.Errorf("recording project A must not populate project B's cursor, got %+v", cb)
 	}
 }
 

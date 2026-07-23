@@ -125,6 +125,13 @@ var sessionStartCmd = &cobra.Command{
 		// agent the board-tracked-work rule is active here. Silent otherwise.
 		boardTrackedSignal(project)
 
+		// Proactive-observer signal — fires in ANY project with an ATL decision
+		// surface (a .atl/ directory), throttled to ~once/day and only when that
+		// surface moved since the last sweep: prompts a /observe pass to surface ripe
+		// backlog triggers and latent gaps before the user has to catch them. Silent
+		// in projects that don't use the knowledge layer.
+		observeSessionSignal(project)
+
 		// Binary self-update — once/24h, check for a newer stable release and, if
 		// there is one, spawn a detached `atl upgrade` so the download + swap runs
 		// independently and the next session runs the new binary. Bounded (short

@@ -1,14 +1,16 @@
-// Package sweepstate persists the per-sweep cursor for ATL's three LLM-backstop
-// sweeps — /docs-audit, /skill-stocktake, /rules-distill — each recording the
-// commit last swept and when, under ~/.atl/<kind>-state.json. The deterministic CLI
-// halves (`atl docs check`, `atl skills check`, `atl rules scan`) are stateless; only
-// the LLM sweeps need a cursor. It also answers "is a full sweep due?": a ~1-day
+// Package sweepstate persists the per-sweep cursor for ATL's LLM-backstop sweeps —
+// /docs-audit, /skill-stocktake, /rules-distill, /observe — each recording the commit
+// last swept and when, under ~/.atl/<kind>-state.json. The deterministic CLI halves
+// (`atl docs check`, `atl skills check`, `atl rules scan`, `atl observe`) are stateless;
+// only the LLM sweeps need a cursor. It also answers "is a full sweep due?": a ~1-day
 // runaway-guard over any commit touching the kind's scanned paths since the last
 // recorded sweep. One generic cursor replaces the former docsstate/skillsstate/
 // rulesstate triple.
 package sweepstate
 
 import (
+	"crypto/sha1"
+	"encoding/hex"
 	"encoding/json"
 	"os"
 	"os/exec"
@@ -44,7 +46,28 @@ var (
 	Skills = Kind{filename: "skill-stocktake-state.json", scanPaths: []string{"core", "teams"}}
 	// Rules is the /rules-distill cursor (~/.atl/rules-distill-state.json).
 	Rules = Kind{filename: "rules-distill-state.json", scanPaths: []string{"core", "teams"}}
+	// Observe is the /observe cursor. Its scope is the project's ATL decision +
+	// knowledge surface (.atl/ — brainstorms, docs, journal), which moves whenever work
+	// ships or a decision lands, so a proactive-observer sweep becomes due right when
+	// shipped-vs-designed drift is most likely. Unlike the three above, /observe fires
+	// in every project with an .atl/ surface (not just the monorepo), so its cursor is
+	// per-project — always used via ForProject(projectRoot), never the bare global Path.
+	Observe = Kind{filename: "observe-state.json", scanPaths: []string{".atl"}}
 )
+
+// ForProject returns a copy of this Kind whose cursor is namespaced by the given
+// project root — an independent per-project cadence instead of the single global
+// cursor the other kinds share. /observe needs this because, unlike the monorepo-only
+// docs/skills/rules sweeps (one venue per machine, so a global cursor never collides),
+// it fires in every project that has an .atl/ surface; a shared global cursor would let
+// whichever project is opened first suppress the daily signal in all the others.
+func (k Kind) ForProject(projectRoot string) Kind {
+	sum := sha1.Sum([]byte(filepath.Clean(projectRoot)))
+	base := strings.TrimSuffix(k.filename, ".json")
+	nk := k
+	nk.filename = filepath.Join(base, hex.EncodeToString(sum[:])[:16]+".json")
+	return nk
+}
 
 // Path returns ~/.atl/<kind>-state.json.
 func (k Kind) Path() (string, error) {
