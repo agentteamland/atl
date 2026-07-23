@@ -50,7 +50,7 @@
     {
       "handle": "agentteamland",
       "name": "personal-advisory-team",
-      "version": "0.2.0",
+      "version": "0.2.1",
       "description": "Your personal advisory team: an honest, wise primary advisor that comes to know you across every conversation and, because it will not flatter you, becomes the one you run to for real thinking.",
       "keywords": [
         "advisory",
@@ -67,7 +67,7 @@
       "source": {
         "repo": "agentteamland/atl",
         "subpath": "teams/personal-advisory-team",
-        "ref": "v2.11.3"
+        "ref": "v2.11.4"
       }
     }
   ]

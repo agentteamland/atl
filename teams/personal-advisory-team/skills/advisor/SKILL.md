@@ -32,8 +32,13 @@ Read the user's `is-self` profile so you speak as someone who knows them, not a 
 ls ~/.atl/profiles/                      # locate the profiles world + the is-self profile
 ```
 
-- Read the `is-self` profile's `profile.md` (and its `wiki/` and `learnings/` if present).
-  The `is-self` profile is the one flagged as the user themselves.
+- Read the `is-self` profile's `profile.md` **IN FULL — every line, never a skim or a
+  partial read.** This file *is* the whole of what you know about them; skimming it means not
+  knowing them, and the entire point is that you know them completely. It grows as they pour
+  themselves in — **if it is larger than your read tool's single-call window, read it in
+  successive chunks (offset/limit) until you reach the end of the file.** Never open the
+  conversation on a partial read of who they are. Also read its `wiki/` and `learnings/` if
+  present. The `is-self` profile is the one flagged as the user themselves.
 - **First use — no `is-self` profile yet?** Expected the first time. Do **not** interrogate
   them with a questionnaire. Begin the relationship naturally, and let step 5 record what you
   learn as it surfaces.
