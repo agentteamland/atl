@@ -3,6 +3,7 @@ package transcript
 import (
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -137,5 +138,118 @@ func TestFindIgnoresNonJsonl(t *testing.T) {
 	files, _ := Find(dir, time.Time{})
 	if len(files) != 1 {
 		t.Fatalf("want 1 jsonl, got %d", len(files))
+	}
+}
+
+// dryLine builds one JSONL transcript record for DryStretch tests.
+func dryLine(role, text string) string {
+	return `{"message":{"role":"` + role + `","content":[{"type":"text","text":` + strconv.Quote(text) + `}]}}` + "\n"
+}
+
+func TestDryStretch(t *testing.T) {
+	isMarker := func(s string) bool { return strings.Contains(s, "<!-- learning:") }
+	dir := t.TempDir()
+
+	write := func(name, body string) string {
+		p := filepath.Join(dir, name)
+		if err := os.WriteFile(p, []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+
+	// A marker-bearing turn resets the stretch: only what follows it counts.
+	p := write("a.jsonl",
+		dryLine("user", strings.Repeat("x", 500))+
+			dryLine("assistant", "reply one")+
+			dryLine("assistant", "tool-split continuation")+ // collapses into the same logical turn
+			dryLine("user", strings.Repeat("y", 700))+
+			dryLine("assistant", "noted <!-- learning: something -->")+
+			dryLine("user", strings.Repeat("z", 300))+
+			dryLine("assistant", "dry reply A")+
+			dryLine("user", strings.Repeat("w", 200))+
+			dryLine("assistant", "dry reply B"))
+	st, err := DryStretch(p, isMarker)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st.Turns != 2 {
+		t.Errorf("Turns = %d, want 2 (only turns after the marker)", st.Turns)
+	}
+	if st.Chars != 500 {
+		t.Errorf("Chars = %d, want 500 (300+200 after the marker)", st.Chars)
+	}
+	if st.Key != "a.jsonl:1" {
+		t.Errorf("Key = %q, want a.jsonl:1", st.Key)
+	}
+
+	// No marker at all: everything counts, ordinal 0.
+	p2 := write("b.jsonl",
+		dryLine("user", strings.Repeat("q", 1200))+
+			dryLine("assistant", "one")+
+			dryLine("user", "more")+
+			dryLine("assistant", "two"))
+	st2, err := DryStretch(p2, isMarker)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st2.Turns != 2 || st2.Chars != 1204 {
+		t.Errorf("no-marker stretch = %+v, want Turns=2 Chars=1204", st2)
+	}
+	if st2.Key != "b.jsonl:0" {
+		t.Errorf("Key = %q, want b.jsonl:0", st2.Key)
+	}
+
+	// Consecutive assistant records collapse: 3 records, 1 logical turn.
+	p3 := write("c.jsonl",
+		dryLine("user", "hi")+
+			dryLine("assistant", "part 1")+
+			dryLine("assistant", "part 2")+
+			dryLine("assistant", "part 3"))
+	st3, err := DryStretch(p3, isMarker)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st3.Turns != 1 {
+		t.Errorf("collapsed Turns = %d, want 1", st3.Turns)
+	}
+
+	// A marker in a tool-split continuation still ends the stretch (the collapse
+	// happens BEFORE marker detection, so the logical turn carries it).
+	p4 := write("d.jsonl",
+		dryLine("user", "start")+
+			dryLine("assistant", "plain part")+
+			dryLine("assistant", "tail part <!-- learning: split -->")+
+			dryLine("user", "after")+
+			dryLine("assistant", "dry"))
+	st4, err := DryStretch(p4, isMarker)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st4.Turns != 1 || st4.Chars != 5 || st4.Key != "d.jsonl:1" {
+		t.Errorf("split-marker stretch = %+v, want Turns=1 Chars=5 Key=d.jsonl:1", st4)
+	}
+
+	// Machine-injected user-role content must not count as user-authored chars:
+	// isMeta records (a skill's SKILL.md dump) are dropped from the flow, and
+	// tag-opening envelopes (task notifications, command wrappers) are skipped
+	// by the counter. Only the two genuinely typed 4-rune messages count — and
+	// as RUNES, not UTF-8 bytes (multi-byte input must not inflate the gate).
+	p5 := write("e.jsonl",
+		`{"isMeta":true,"message":{"role":"user","content":[{"type":"text","text":"`+strings.Repeat("m", 5000)+`"}]}}`+"\n"+
+			dryLine("user", "<task-notification>"+strings.Repeat("n", 3000)+"</task-notification>")+
+			dryLine("assistant", "reply one")+
+			dryLine("user", "café")+ // 4 runes, 5 bytes
+			dryLine("assistant", "reply two")+
+			dryLine("user", "déjà")) // 4 runes, 6 bytes
+	st5, err := DryStretch(p5, isMarker)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st5.Turns != 2 {
+		t.Errorf("machine-noise Turns = %d, want 2", st5.Turns)
+	}
+	if st5.Chars != 8 {
+		t.Errorf("machine-noise Chars = %d, want 8 (runes of the two typed messages only)", st5.Chars)
 	}
 }

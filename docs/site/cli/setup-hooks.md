@@ -51,7 +51,7 @@ Claude Code runs these automatically:
 Runs once when you open a new Claude Code session. `atl session-start` performs the boot-time work in order:
 
 1. **Reflect platform core** — refreshes the in-binary rules + skills into the global `~/.claude` layer so it stays in lockstep with the installed `atl` version, and reflects any rules you authored via `/rule` into the Claude load surface (`~/.claude/rules/`).
-2. **Drain the previous session** — discovers this project's transcripts modified since the last drain, extracts the assistant text, and transfers any inline `<!-- learning: ... -->` markers into the durable queue at `~/.atl/queue.db` (exactly once).
+2. **Drain the previous session** — discovers this project's transcripts modified since the last drain, extracts the assistant text, and transfers any inline `<!-- learning: ... -->` markers into the durable queue at `~/.atl/queue.db` (exactly once). The same pass runs the **capture watchdog**: if the newest session ended in a substantive marker-less stretch, it prints the one-line review nudge (see [`atl tick`](/cli/tick), step 5) — the catch-all for a session that closed before its stretch was noticed.
 3. **Doctor self-check** — runs the queue-health + asset-integrity checks and surfaces (or auto-heals) anything not OK.
 4. **Signal pending learnings** — if the queue holds unprocessed learnings, prints a one-line `atl: N learning(s) pending — auto-drain them now in a background subagent (per the learning-capture rule)`; Claude then spawns one background `/drain` subagent that folds them in automatically.
 5. **Auto-update, throttled (background)** — at most once a day, checks for a newer `atl` release and, if there is one, spawns a detached [`atl upgrade`](/cli/upgrade); and, once a day per project, spawns a detached [`atl update`](/cli/update) to pull newer *published* team versions. Both run in the background so they never block boot, and the next session runs on the fresh binary / teams. Set `ATL_NO_SELF_UPDATE` or `ATL_NO_TEAM_UPDATE` to opt out.
@@ -64,7 +64,7 @@ Runs once when you open a new Claude Code session. `atl session-start` performs 
 Runs before every message you send to Claude. `atl tick --throttle=10m` does the cheap work on every prompt and the heavier work at most once per throttle window:
 
 - **Fan-out** (every call, generation-guarded) — when the global layer changed since this project last fanned out, it pulls the updated assets down. Otherwise it's a single small file read, cheap enough to ride every prompt.
-- **Drain + doctor** (throttled) — re-scans this project's transcripts for new markers and runs the doctor self-check. Skipped if the last tick was within the throttle window, so the per-prompt cost stays a single file-stat call.
+- **Drain + doctor** (throttled) — re-scans this project's transcripts for new markers, runs the **capture watchdog** on the live session (a one-line nudge, once per marker-less dry stretch — see [`atl tick`](/cli/tick), step 5), and runs the doctor self-check. Skipped if the last tick was within the throttle window, so the per-prompt cost stays a single file-stat call.
 - **Promote gains** (throttled) — lifts this project's accumulated gains to the global layer (additive, conflict-archived, pinnable), so they circulate without waiting for a manual `atl promote`.
 
 When something surfaces, Claude sees the corresponding line in its context and can mention it. When nothing changed, you see nothing.

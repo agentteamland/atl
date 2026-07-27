@@ -17,8 +17,10 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 // SlugForPath converts an absolute project path to the Claude Code transcript
@@ -91,8 +93,11 @@ func Find(dir string, since time.Time) ([]File, error) {
 	return files, nil
 }
 
-// transcriptEvent is the subset of a JSONL record the drain reads.
+// transcriptEvent is the subset of a JSONL record the drain reads. IsMeta marks
+// harness-injected records (skill-content injections, command caveats) that carry
+// a user role but are not the user speaking.
 type transcriptEvent struct {
+	IsMeta  bool `json:"isMeta"`
 	Message struct {
 		Role    string          `json:"role"`
 		Content json.RawMessage `json:"content"`
@@ -167,6 +172,9 @@ func ExtractFlow(path string) ([]Turn, error) {
 		if err := json.Unmarshal(line, &ev); err != nil {
 			continue
 		}
+		if ev.IsMeta {
+			continue // harness-injected (a skill's SKILL.md dump, a command caveat) — user-role but not the user speaking; noise for mining and for the watchdog alike
+		}
 		role := ev.Message.Role
 		if role != "user" && role != "assistant" {
 			continue
@@ -208,4 +216,64 @@ func contentText(raw json.RawMessage) string {
 		return sb.String()
 	}
 	return ""
+}
+
+// Stretch measures the live session's capture "dry stretch": how much
+// conversation has accumulated since the last assistant turn that carried a
+// capture marker. The capture watchdog fires on it — the deterministic
+// detector for the pipeline's one non-deterministic link (a marker the agent
+// never wrote is invisible to everything downstream).
+type Stretch struct {
+	Turns int    // logical assistant turns since the last marker-bearing turn
+	Chars int    // user-authored chars since the last marker-bearing turn
+	Key   string // fire-once latch key: "<file-base>:<marker-turn-ordinal>"
+}
+
+// DryStretch reads a session transcript and measures its dry stretch. It is a
+// pure function of the file — no incremental counters to drift across re-scans
+// (tick re-reads whole files from a modtime cursor, so persisted counters would
+// double-count). Consecutive assistant messages (tool-use interleaving splits
+// one logical reply into several records) collapse into one logical turn. The
+// Key changes whenever a new marker-bearing turn appears or the session file
+// changes, which is exactly when a fired watchdog should re-arm.
+func DryStretch(path string, isMarker func(string) bool) (Stretch, error) {
+	turns, err := ExtractFlow(path)
+	if err != nil {
+		return Stretch{}, err
+	}
+	// Collapse consecutive same-role turns into logical turns.
+	var logical []Turn
+	for _, t := range turns {
+		if n := len(logical); n > 0 && logical[n-1].Role == t.Role {
+			logical[n-1].Text += "\n" + t.Text
+			continue
+		}
+		logical = append(logical, t)
+	}
+	markerTurns := 0 // ordinal count of marker-bearing assistant turns seen
+	st := Stretch{}
+	for _, t := range logical {
+		if t.Role == "assistant" {
+			if isMarker(t.Text) {
+				markerTurns++
+				st.Turns, st.Chars = 0, 0 // reset: the stretch restarts after a marker
+				continue
+			}
+			st.Turns++
+			continue
+		}
+		// Only count what the user actually authored. Machine-injected user-role
+		// records that survive the isMeta skip — task notifications, command
+		// wrappers, hook envelopes — all open with a tag; a person's typed message
+		// essentially never does. Without this, a couple of background-task
+		// notifications (~10k chars each) would satisfy the chars threshold on
+		// their own and the gate would degrade to turns-only. Runes, not bytes,
+		// so multi-byte text (Turkish input) doesn't inflate the count.
+		if strings.HasPrefix(t.Text, "<") {
+			continue
+		}
+		st.Chars += utf8.RuneCountInString(t.Text)
+	}
+	st.Key = filepath.Base(path) + ":" + strconv.Itoa(markerTurns)
+	return st, nil
 }

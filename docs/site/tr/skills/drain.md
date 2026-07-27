@@ -10,6 +10,7 @@ Bekleyen öğrenme kuyruğunu bilgi tabanına katar — her öğeyi wiki'ye, jou
 ## Ne zaman kullanılır?
 
 - `atl`, oturum başında **"N learning(s) pending"** raporladığında.
+- `atl`, **yakalama-bekçisi sinyalini** (`atl: capture-watchdog — no capture markers for N assistant turn(s) …`) ateşlediğinde: özlü bir seri hiç işaretçisiz geçti, dolayısıyla kuyruk **boş** olabilir — mining adımı çalıştırmanın amacıdır; işaretlenen seriyi tarar ve işaretlenmesi gerekeni kurtarır.
 - Öğrenme kuyruğunu elle işlemek istediğin her an.
 
 CLI yarısı [`atl learnings`](#cli-yarisi) tarafından sunulur: `status` bekleyen sayıları gösterir, `peek` bu becerinin tükettiği öğeleri listeler, `ack` ise işlenmiş bir öğeyi siler. Kuyruk mevcut proje dizinine göre anahtarlanır; bu yüzden beceriyi, öğrenmelerini boşaltmak istediğin projeden çalıştır.
