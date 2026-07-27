@@ -20,6 +20,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 // SlugForPath converts an absolute project path to the Claude Code transcript
@@ -92,8 +93,11 @@ func Find(dir string, since time.Time) ([]File, error) {
 	return files, nil
 }
 
-// transcriptEvent is the subset of a JSONL record the drain reads.
+// transcriptEvent is the subset of a JSONL record the drain reads. IsMeta marks
+// harness-injected records (skill-content injections, command caveats) that carry
+// a user role but are not the user speaking.
 type transcriptEvent struct {
+	IsMeta  bool `json:"isMeta"`
 	Message struct {
 		Role    string          `json:"role"`
 		Content json.RawMessage `json:"content"`
@@ -167,6 +171,9 @@ func ExtractFlow(path string) ([]Turn, error) {
 		var ev transcriptEvent
 		if err := json.Unmarshal(line, &ev); err != nil {
 			continue
+		}
+		if ev.IsMeta {
+			continue // harness-injected (a skill's SKILL.md dump, a command caveat) — user-role but not the user speaking; noise for mining and for the watchdog alike
 		}
 		role := ev.Message.Role
 		if role != "user" && role != "assistant" {
@@ -255,7 +262,17 @@ func DryStretch(path string, isMarker func(string) bool) (Stretch, error) {
 			st.Turns++
 			continue
 		}
-		st.Chars += len(t.Text)
+		// Only count what the user actually authored. Machine-injected user-role
+		// records that survive the isMeta skip — task notifications, command
+		// wrappers, hook envelopes — all open with a tag; a person's typed message
+		// essentially never does. Without this, a couple of background-task
+		// notifications (~10k chars each) would satisfy the chars threshold on
+		// their own and the gate would degrade to turns-only. Runes, not bytes,
+		// so multi-byte text (Turkish input) doesn't inflate the count.
+		if strings.HasPrefix(t.Text, "<") {
+			continue
+		}
+		st.Chars += utf8.RuneCountInString(t.Text)
 	}
 	st.Key = filepath.Base(path) + ":" + strconv.Itoa(markerTurns)
 	return st, nil

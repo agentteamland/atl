@@ -10,7 +10,7 @@ Fold the pending learning queue into the knowledge base — route each item to t
 ## When to use it
 
 - When `atl` reports **"N learning(s) pending"** at session start.
-- When `atl` fires the **capture-watchdog signal** (`atl: capture-watchdog — no capture markers for N turn(s) …`): a substantive stretch passed with no markers at all, so the queue may be **empty** — the mining step is the run's purpose; it sweeps the flagged stretch and recovers what should have been marked.
+- When `atl` fires the **capture-watchdog signal** (`atl: capture-watchdog — no capture markers for N assistant turn(s) …`): a substantive stretch passed with no markers at all, so the queue may be **empty** — the mining step is the run's purpose; it sweeps the flagged stretch and recovers what should have been marked.
 - Any time you want to process the learning queue manually.
 
 The CLI half is exposed by [`atl learnings`](#the-cli-half): `status` shows pending counts, `peek` lists the items this skill consumes, and `ack` deletes a processed item. The queue is keyed by the current project directory, so run the skill from the project whose learnings you want to drain.

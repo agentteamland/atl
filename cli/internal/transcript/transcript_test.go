@@ -1,9 +1,9 @@
 package transcript
 
 import (
-	"strconv"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -228,5 +228,28 @@ func TestDryStretch(t *testing.T) {
 	}
 	if st4.Turns != 1 || st4.Chars != 5 || st4.Key != "d.jsonl:1" {
 		t.Errorf("split-marker stretch = %+v, want Turns=1 Chars=5 Key=d.jsonl:1", st4)
+	}
+
+	// Machine-injected user-role content must not count as user-authored chars:
+	// isMeta records (a skill's SKILL.md dump) are dropped from the flow, and
+	// tag-opening envelopes (task notifications, command wrappers) are skipped
+	// by the counter. Only the two genuinely typed 4-rune messages count — and
+	// as RUNES, not UTF-8 bytes (multi-byte input must not inflate the gate).
+	p5 := write("e.jsonl",
+		`{"isMeta":true,"message":{"role":"user","content":[{"type":"text","text":"`+strings.Repeat("m", 5000)+`"}]}}`+"\n"+
+			dryLine("user", "<task-notification>"+strings.Repeat("n", 3000)+"</task-notification>")+
+			dryLine("assistant", "reply one")+
+			dryLine("user", "café")+ // 4 runes, 5 bytes
+			dryLine("assistant", "reply two")+
+			dryLine("user", "déjà")) // 4 runes, 6 bytes
+	st5, err := DryStretch(p5, isMarker)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st5.Turns != 2 {
+		t.Errorf("machine-noise Turns = %d, want 2", st5.Turns)
+	}
+	if st5.Chars != 8 {
+		t.Errorf("machine-noise Chars = %d, want 8 (runes of the two typed messages only)", st5.Chars)
 	}
 }

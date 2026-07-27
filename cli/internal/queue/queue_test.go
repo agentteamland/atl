@@ -218,29 +218,42 @@ func TestPendingOrdering(t *testing.T) {
 }
 
 // TestWatchdogLatch guards the fire-once contract: the latch round-trips per
-// project, and distinct projects never see each other's latch (a fire in one
-// project must not suppress the watchdog in another).
+// (project, session), distinct projects never see each other's latch, and —
+// the ping-pong regression — two concurrent sessions in ONE project each keep
+// their own latch, so alternating "newest transcript" between them can never
+// re-fire an already-fired stretch.
 func TestWatchdogLatch(t *testing.T) {
 	s := newTestStore(t)
 
-	if k, err := s.WatchdogLatch("/p/a"); err != nil || k != "" {
+	if k, err := s.WatchdogLatch("/p/a", "s1.jsonl"); err != nil || k != "" {
 		t.Fatalf("fresh latch = (%q, %v), want empty", k, err)
 	}
-	if err := s.SetWatchdogLatch("/p/a", "sess.jsonl:3"); err != nil {
+	if err := s.SetWatchdogLatch("/p/a", "s1.jsonl", "s1.jsonl:3"); err != nil {
 		t.Fatal(err)
 	}
-	if k, _ := s.WatchdogLatch("/p/a"); k != "sess.jsonl:3" {
-		t.Errorf("latch = %q, want sess.jsonl:3", k)
+	if k, _ := s.WatchdogLatch("/p/a", "s1.jsonl"); k != "s1.jsonl:3" {
+		t.Errorf("latch = %q, want s1.jsonl:3", k)
 	}
 	// Per-project isolation.
-	if k, _ := s.WatchdogLatch("/p/b"); k != "" {
+	if k, _ := s.WatchdogLatch("/p/b", "s1.jsonl"); k != "" {
 		t.Errorf("project b latch = %q, want empty (no cross-project bleed)", k)
 	}
-	// Overwrite = the new stretch replaces the old.
-	if err := s.SetWatchdogLatch("/p/a", "sess.jsonl:4"); err != nil {
+	// Ping-pong regression: a second live session in the SAME project fires for
+	// its own stretch without clobbering the first session's latch.
+	if err := s.SetWatchdogLatch("/p/a", "s2.jsonl", "s2.jsonl:0"); err != nil {
 		t.Fatal(err)
 	}
-	if k, _ := s.WatchdogLatch("/p/a"); k != "sess.jsonl:4" {
-		t.Errorf("latch = %q, want sess.jsonl:4", k)
+	if k, _ := s.WatchdogLatch("/p/a", "s1.jsonl"); k != "s1.jsonl:3" {
+		t.Errorf("s1 latch = %q after s2 fired — a per-project single slot would re-fire s1's stretch", k)
+	}
+	if k, _ := s.WatchdogLatch("/p/a", "s2.jsonl"); k != "s2.jsonl:0" {
+		t.Errorf("s2 latch = %q, want s2.jsonl:0", k)
+	}
+	// Overwrite = the new stretch replaces the old for that session.
+	if err := s.SetWatchdogLatch("/p/a", "s1.jsonl", "s1.jsonl:4"); err != nil {
+		t.Fatal(err)
+	}
+	if k, _ := s.WatchdogLatch("/p/a", "s1.jsonl"); k != "s1.jsonl:4" {
+		t.Errorf("latch = %q, want s1.jsonl:4", k)
 	}
 }

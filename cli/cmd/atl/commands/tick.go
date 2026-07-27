@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/agentteamland/atl/cli/internal/doctor"
@@ -215,7 +216,9 @@ const (
 // stretch, prints the review nudge. Every failure path is silent — a hook must
 // never block, and a nudge is never worth an error. The latch is persisted
 // BEFORE printing so a broken latch write can't turn into a nag loop; the cost
-// of that ordering is one lost nudge, not a repeated one (fail toward silence).
+// of that ordering is one lost nudge, not a repeated one (fail toward silence —
+// the same accepted trade-off means a manual out-of-session `atl tick` can
+// consume a stretch's one nudge where no agent reads it).
 func captureWatchdogNotice(st *queue.Store, project, path string) {
 	if path == "" || os.Getenv("ATL_NO_CAPTURE_WATCHDOG") != "" {
 		return
@@ -227,10 +230,11 @@ func captureWatchdogNotice(st *queue.Store, project, path string) {
 	if stx.Turns < watchdogMinTurns || stx.Chars < watchdogMinChars {
 		return
 	}
-	if last, lerr := st.WatchdogLatch(project); lerr != nil || last == stx.Key {
+	session := filepath.Base(path)
+	if last, lerr := st.WatchdogLatch(project, session); lerr != nil || last == stx.Key {
 		return // already fired for this stretch, or the latch is unreadable
 	}
-	if st.SetWatchdogLatch(project, stx.Key) != nil {
+	if st.SetWatchdogLatch(project, session, stx.Key) != nil {
 		return
 	}
 	fmt.Printf("atl: capture-watchdog — no capture markers for %d assistant turn(s) / ~%d chars of user input; review the recent turns for missed learnings or profile-facts and mark them, and spawn ONE background drain subagent to mine the stretch (per the learning-capture rule, valid even with an empty queue)\n",
