@@ -10,6 +10,7 @@ import (
 	"github.com/agentteamland/atl/cli/internal/doctor"
 	"github.com/agentteamland/atl/cli/internal/drain"
 	"github.com/agentteamland/atl/cli/internal/generation"
+	"github.com/agentteamland/atl/cli/internal/marker"
 	"github.com/agentteamland/atl/cli/internal/queue"
 	"github.com/agentteamland/atl/cli/internal/throttle"
 	"github.com/agentteamland/atl/cli/internal/transcript"
@@ -158,9 +159,11 @@ func drainProjectTranscripts(st *queue.Store, project string) (scanned, found, e
 		return 0, 0, 0, 0, fmt.Errorf("find transcripts: %w", err)
 	}
 	var newest time.Time
+	var newestPath string
 	for _, f := range files {
 		if f.ModTime.After(newest) {
 			newest = f.ModTime
+			newestPath = f.Path
 		}
 		text, e := transcript.ExtractText(f.Path)
 		if e != nil {
@@ -190,7 +193,48 @@ func drainProjectTranscripts(st *queue.Store, project string) (scanned, found, e
 	}
 	// Record that the maintenance pass ran, for doctor's tick-freshness check.
 	_ = st.SetLastTick(project, time.Now())
+
+	// Capture watchdog: the newest scanned transcript is the live main session
+	// (subagent transcripts live in per-session SUBDIRS, which Find never enters).
+	// A dry stretch there means markers may have been forgotten — the one
+	// non-deterministic link in the capture pipeline made detectable.
+	captureWatchdogNotice(st, project, newestPath)
 	return scanned, found, enqueued, skipped, nil
+}
+
+// Capture-watchdog thresholds: fire only when BOTH are exceeded — enough
+// assistant turns AND enough user-authored input that a substantive, markable
+// exchange plausibly happened. Fixed defaults until a v2 config layer exists;
+// ATL_NO_CAPTURE_WATCHDOG opts out entirely.
+const (
+	watchdogMinTurns = 2
+	watchdogMinChars = 1000
+)
+
+// captureWatchdogNotice measures the live session's dry stretch and, once per
+// stretch, prints the review nudge. Every failure path is silent — a hook must
+// never block, and a nudge is never worth an error. The latch is persisted
+// BEFORE printing so a broken latch write can't turn into a nag loop; the cost
+// of that ordering is one lost nudge, not a repeated one (fail toward silence).
+func captureWatchdogNotice(st *queue.Store, project, path string) {
+	if path == "" || os.Getenv("ATL_NO_CAPTURE_WATCHDOG") != "" {
+		return
+	}
+	stx, err := transcript.DryStretch(path, func(s string) bool { return len(marker.Parse(s)) > 0 })
+	if err != nil {
+		return
+	}
+	if stx.Turns < watchdogMinTurns || stx.Chars < watchdogMinChars {
+		return
+	}
+	if last, lerr := st.WatchdogLatch(project); lerr != nil || last == stx.Key {
+		return // already fired for this stretch, or the latch is unreadable
+	}
+	if st.SetWatchdogLatch(project, stx.Key) != nil {
+		return
+	}
+	fmt.Printf("atl: capture-watchdog — no capture markers for %d assistant turn(s) / ~%d chars of user input; review the recent turns for missed learnings or profile-facts and mark them, and spawn ONE background drain subagent to mine the stretch (per the learning-capture rule, valid even with an empty queue)\n",
+		stx.Turns, stx.Chars)
 }
 
 // projectStamp is a short, filesystem-safe token derived from a project path,

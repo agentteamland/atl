@@ -17,6 +17,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -208,4 +209,54 @@ func contentText(raw json.RawMessage) string {
 		return sb.String()
 	}
 	return ""
+}
+
+// Stretch measures the live session's capture "dry stretch": how much
+// conversation has accumulated since the last assistant turn that carried a
+// capture marker. The capture watchdog fires on it — the deterministic
+// detector for the pipeline's one non-deterministic link (a marker the agent
+// never wrote is invisible to everything downstream).
+type Stretch struct {
+	Turns int    // logical assistant turns since the last marker-bearing turn
+	Chars int    // user-authored chars since the last marker-bearing turn
+	Key   string // fire-once latch key: "<file-base>:<marker-turn-ordinal>"
+}
+
+// DryStretch reads a session transcript and measures its dry stretch. It is a
+// pure function of the file — no incremental counters to drift across re-scans
+// (tick re-reads whole files from a modtime cursor, so persisted counters would
+// double-count). Consecutive assistant messages (tool-use interleaving splits
+// one logical reply into several records) collapse into one logical turn. The
+// Key changes whenever a new marker-bearing turn appears or the session file
+// changes, which is exactly when a fired watchdog should re-arm.
+func DryStretch(path string, isMarker func(string) bool) (Stretch, error) {
+	turns, err := ExtractFlow(path)
+	if err != nil {
+		return Stretch{}, err
+	}
+	// Collapse consecutive same-role turns into logical turns.
+	var logical []Turn
+	for _, t := range turns {
+		if n := len(logical); n > 0 && logical[n-1].Role == t.Role {
+			logical[n-1].Text += "\n" + t.Text
+			continue
+		}
+		logical = append(logical, t)
+	}
+	markerTurns := 0 // ordinal count of marker-bearing assistant turns seen
+	st := Stretch{}
+	for _, t := range logical {
+		if t.Role == "assistant" {
+			if isMarker(t.Text) {
+				markerTurns++
+				st.Turns, st.Chars = 0, 0 // reset: the stretch restarts after a marker
+				continue
+			}
+			st.Turns++
+			continue
+		}
+		st.Chars += len(t.Text)
+	}
+	st.Key = filepath.Base(path) + ":" + strconv.Itoa(markerTurns)
+	return st, nil
 }

@@ -216,3 +216,31 @@ func TestPendingOrdering(t *testing.T) {
 		}
 	}
 }
+
+// TestWatchdogLatch guards the fire-once contract: the latch round-trips per
+// project, and distinct projects never see each other's latch (a fire in one
+// project must not suppress the watchdog in another).
+func TestWatchdogLatch(t *testing.T) {
+	s := newTestStore(t)
+
+	if k, err := s.WatchdogLatch("/p/a"); err != nil || k != "" {
+		t.Fatalf("fresh latch = (%q, %v), want empty", k, err)
+	}
+	if err := s.SetWatchdogLatch("/p/a", "sess.jsonl:3"); err != nil {
+		t.Fatal(err)
+	}
+	if k, _ := s.WatchdogLatch("/p/a"); k != "sess.jsonl:3" {
+		t.Errorf("latch = %q, want sess.jsonl:3", k)
+	}
+	// Per-project isolation.
+	if k, _ := s.WatchdogLatch("/p/b"); k != "" {
+		t.Errorf("project b latch = %q, want empty (no cross-project bleed)", k)
+	}
+	// Overwrite = the new stretch replaces the old.
+	if err := s.SetWatchdogLatch("/p/a", "sess.jsonl:4"); err != nil {
+		t.Fatal(err)
+	}
+	if k, _ := s.WatchdogLatch("/p/a"); k != "sess.jsonl:4" {
+		t.Errorf("latch = %q, want sess.jsonl:4", k)
+	}
+}

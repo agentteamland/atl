@@ -120,7 +120,8 @@ A tool call per learning would double token cost and slow the conversation. Inli
 - discovers this project's Claude Code transcripts modified since the last tick,
 - extracts the assistant text and parses `<!-- learning: ... -->` (and `<!-- profile-fact: ... -->`) hidden markers,
 - **enqueues each into the durable queue exactly once** — idempotency comes from the queue's content-hash dedup, so re-draining the same text enqueues nothing new,
-- reads the queue count and, when it's non-empty, prints the **auto-drain signal** into Claude's context (unthrottled, so it fires every turn there's pending work — the heavier capture pass is what the `--throttle` gates).
+- reads the queue count and, when it's non-empty, prints the **auto-drain signal** into Claude's context (unthrottled, so it fires every turn there's pending work — the heavier capture pass is what the `--throttle` gates),
+- runs the **capture watchdog** on the live session's transcript: if a substantive stretch has accumulated with **no markers at all** (≥2 assistant turns AND ≥1000 chars of user input since the last marker), it prints a one-line nudge — review the recent turns for missed learnings and spawn a background `/drain`, whose mining step sweeps the stretch even with an empty queue. Fires once per dry stretch (a new marker or session re-arms it). This closes the pipeline's one non-deterministic link: everything downstream of a marker is deterministic, but a marker the agent *never wrote* used to be invisible — now the omission itself is detected, and the worst case becomes "captured a turn or two late," never silent loss.
 
 `tick` only enqueues and signals. It never integrates — folding a learning into the knowledge base is LLM work, so it stays on the skill side of the CLI/Skill boundary.
 

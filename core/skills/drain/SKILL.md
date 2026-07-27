@@ -1,6 +1,6 @@
 ---
 name: drain
-description: Fold pending learning-queue items into the knowledge base — route each to the wiki (topic truth), the journal (history), or an agent's knowledge base, then ack it so it's deleted. Run when atl reports "N learning(s) pending", or to process the learning queue manually.
+description: Fold pending learning-queue items into the knowledge base — route each to the wiki (topic truth), the journal (history), or an agent's knowledge base, then ack it so it's deleted. Run when atl reports "N learning(s) pending" or fires the capture-watchdog signal (then the queue may be empty — the mining step recovers the marker-less stretch), or to process the queue manually.
 ---
 
 # /drain — fold the learning queue into the knowledge base
@@ -38,9 +38,16 @@ Scan it for **durable** learnings the agent never captured as a marker:
   ("no, use refresh tokens not sessions", "stop editing the config, fix the code").
 - **Reverts / do-overs** — an approach was tried, rejected, and replaced.
 - **Repeated mistakes** — the same class of error recurred across the session.
+- **Unmarked durable facts** — a real decision, discovery, or profile-worthy fact
+  the turns plainly contain but no marker ever recorded. This is the
+  **capture-watchdog case**: when the drain was triggered by an
+  `atl: capture-watchdog` signal (a marker-less dry stretch), the queue may be
+  **empty and that's expected** — this mining step IS the run's purpose; sweep the
+  flagged stretch and recover what should have been marked.
 
 For each one, write a one-line learning **stating the lesson, with the why**, and
-enqueue it exactly like a marker:
+enqueue it exactly like a marker (use the `profile-fact` channel for a durable
+non-self entity fact, per the profile-capture marker shape):
 
 ```
 atl learnings _enqueue learning "<the lesson, with its reason>"

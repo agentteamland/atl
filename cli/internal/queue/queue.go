@@ -310,3 +310,44 @@ func (s *Store) SetLastTick(project string, ts time.Time) error {
 	}
 	return nil
 }
+
+// watchdogBucket holds, per project, the dry-stretch key the capture watchdog
+// last fired for — the fire-once latch. The key encodes (session file, marker
+// ordinal), so a new marker or a new session naturally re-arms the watchdog
+// without any counter state.
+const watchdogBucket = "__watchdog__"
+
+// WatchdogLatch returns the dry-stretch key the capture watchdog last fired
+// for in project ("" if it never fired).
+func (s *Store) WatchdogLatch(project string) (string, error) {
+	var key string
+	err := s.db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(watchdogBucket))
+		if b == nil {
+			return nil
+		}
+		if v := b.Get([]byte(project)); v != nil {
+			key = string(v)
+		}
+		return nil
+	})
+	if err != nil {
+		return "", fmt.Errorf("watchdog latch: %w", err)
+	}
+	return key, nil
+}
+
+// SetWatchdogLatch records that the capture watchdog fired for stretch key.
+func (s *Store) SetWatchdogLatch(project, key string) error {
+	err := s.db.Update(func(tx *bolt.Tx) error {
+		b, err := tx.CreateBucketIfNotExists([]byte(watchdogBucket))
+		if err != nil {
+			return err
+		}
+		return b.Put([]byte(project), []byte(key))
+	})
+	if err != nil {
+		return fmt.Errorf("set watchdog latch: %w", err)
+	}
+	return nil
+}

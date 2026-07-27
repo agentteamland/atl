@@ -121,7 +121,8 @@ Her iki kanal da aynı şekilde auto-drain olur — `atl tick` her biri için si
 - bu projenin son tick'ten beri değişen Claude Code transkriptlerini keşfeder,
 - assistant metnini çıkarır ve `<!-- learning: ... -->` (ve `<!-- profile-fact: ... -->`) gizli işaretçilerini ayrıştırır,
 - **her birini kalıcı kuyruğa tam olarak bir kez sokar** — idempotenlik kuyruğun içerik-hash yineleme ayıklamasından gelir, dolayısıyla aynı metni yeniden drain etmek yeni hiçbir şey eklemez,
-- kuyruk sayısını okur ve boş olmadığında **otomatik-drain sinyalini** Claude'un bağlamına yazdırır (kısıtlamasız, dolayısıyla bekleyen iş olan her turda tetiklenir — `--throttle`'ın kapıladığı, daha ağır olan yakalama geçişidir).
+- kuyruk sayısını okur ve boş olmadığında **otomatik-drain sinyalini** Claude'un bağlamına yazdırır (kısıtlamasız, dolayısıyla bekleyen iş olan her turda tetiklenir — `--throttle`'ın kapıladığı, daha ağır olan yakalama geçişidir),
+- canlı oturumun transkripti üzerinde **yakalama bekçisini** (capture watchdog) çalıştırır: **hiç işaretçi içermeyen** özlü bir seri birikmişse (son işaretçiden bu yana ≥2 assistant turu VE kullanıcıdan ≥1000 karakter), tek satırlık bir dürtme yazdırır — son turları kaçırılmış learning'ler için gözden geçir ve mining adımı seriyi kuyruk boşken bile tarayan bir arka plan `/drain`'i başlat. Kuru seri başına bir kez ateşlenir (yeni bir işaretçi ya da oturum onu yeniden kurar). Bu, boru hattının tek deterministik-olmayan halkasını kapatır: bir işaretçinin akış aşağısındaki her şey deterministikti, ama ajanın *hiç yazmadığı* bir işaretçi görünmezdi — artık ihmalin kendisi tespit ediliyor ve en kötü durum sessiz kayıp değil, "bir-iki tur geç yakalandı" oluyor.
 
 `tick` yalnızca **kuyruğa sokar ve sinyal verir**. Asla entegre etmez — bir öğrenmeyi bilgi tabanına katlamak LLM işidir, bu yüzden CLI/Beceri sınırının beceri tarafında kalır.
 
