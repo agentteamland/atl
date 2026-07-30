@@ -97,7 +97,7 @@ cat > "$PROJ/.delivery/methodology.json" <<'EOF'
 EOF
 ok "seeded .delivery/config.json (github) + methodology.json"
 
-gturn() { ( cd "$PROJ" && claude -p "$1" --dangerously-skip-permissions --output-format json ) >>"$HOME/turns.log" 2>&1; }
+gturn() { claude_turn "$1"; }
 
 # ---- 1. /request — capture the candidate + triage + deliberate + verdict; STOP at the PO gate ----
 gturn "/request. You are ALSO acting as the human product owner for this headless run — supply the request from these facts, do not wait for interactive input. THE REQUEST (from the PO): 'Add a health-check endpoint that returns the app version, so ops can verify a deploy.' Run the ceremony: capture it as a CANDIDATE with a stable request-slug (kebab-case) and initiator 'po' — the fresh Project has NO 'candidate' Status option (Status options are board-setup / UI-only), so use the adapter's LABEL fallback: open the candidate issue with a 'candidate' label + an 'atl-request:<slug>:po' label + a 'triage:<tier>' label. Triage it (weight-proportional). Adopt business-analyst -> technical-analyst -> tech-lead sequentially IN THIS SHARED CONTEXT (not isolated workers) for feasibility, mount a genuine anti-thesis (refute-to-keep), and form a reasoned YES/NO/DEFER/NEEDS-INFO verdict. Record a comment on the candidate whose FIRST LINE is the exact sentinel '**[Request Decision]**' with H2s: ## Recommendation (the verdict), ## Deliberation (thesis / anti-thesis / surviving position), ## PO Decision (leave as 'pending — awaiting PO'), ## Dissent On Record. STOP at the PO gate — do NOT make the accept/reject decision yet; the PO decides in the next turn." || bad "request turn 1 errored"

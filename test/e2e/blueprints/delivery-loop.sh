@@ -98,7 +98,7 @@ cat > "$PROJ/mock-mcp.json" <<EOF
 EOF
 
 # a ceremony turn: real claude -p, ceremonies see the MOCK as their azureDevOps MCP.
-dturn() { ( cd "$PROJ" && claude -p "$1" --mcp-config "$PROJ/mock-mcp.json" --dangerously-skip-permissions --output-format json ) >>"$HOME/turns.log" 2>&1; }
+dturn() { claude_turn "$1" --mcp-config "$PROJ/mock-mcp.json"; }
 # a jq query over the mock store (empty if the store doesn't exist yet)
 q() { jq -r "$1" "$STORE" 2>/dev/null; }
 has() { q "$1" | grep -qE '^[1-9][0-9]*$'; }   # true if the count query returns >= 1

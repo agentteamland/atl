@@ -19,6 +19,31 @@ finish() {
   [ "$FAIL" -eq 0 ]
 }
 
+# claude_turn runs ONE headless `claude -p` turn, bounded by a wall-clock
+# timeout. Extra args (e.g. --mcp-config) are passed through after the prompt.
+#
+# Why the bound: `claude -p` has no per-turn timeout of its own, so an API stall
+# hangs the blueprint forever -- it dies with no FAIL line AND no "N passed, M
+# failed" summary, which makes a transient stall look like an unexplained crash.
+# On expiry the turn NAMES ITSELF on stdout and returns non-zero, so the caller's
+# `|| bad "..."` fires, finish() still prints the tally, and the blueprint FAILs
+# loudly instead of dying silently.
+#
+# CLAUDE_TURN_TIMEOUT (seconds) overrides the default. -k sends KILL if the turn
+# ignores TERM (a wedged MCP grandchild can hold the pipes open).
+CLAUDE_TURN_TIMEOUT="${CLAUDE_TURN_TIMEOUT:-900}"
+claude_turn() {
+  local prompt="$1"; shift
+  ( cd "$PROJ" && timeout -k 30s "$CLAUDE_TURN_TIMEOUT" \
+      claude -p "$prompt" "$@" --dangerously-skip-permissions --output-format json \
+  ) >>"$HOME/turns.log" 2>&1
+  local rc=$?
+  if [ "$rc" -eq 124 ] || [ "$rc" -eq 137 ]; then
+    echo "  turn timed out after ${CLAUDE_TURN_TIMEOUT}s (see turns.log)" | tee -a "$HOME/turns.log"
+  fi
+  return "$rc"
+}
+
 # fresh wipes the simulated user's machine for a clean install.
 fresh() {
   rm -rf "$HOME/.claude" "$HOME/.atl" "$PROJ"

@@ -123,7 +123,7 @@ ok "seeded .delivery/config.json (github) + methodology.json"
 
 # a ceremony turn: real claude -p; the delivery-team reaches GitHub through `gh` (which
 # reads GH_TOKEN from the env) — NO --mcp-config (github is gh-native, not an MCP).
-gturn() { ( cd "$PROJ" && claude -p "$1" --dangerously-skip-permissions --output-format json ) >>"$HOME/turns.log" 2>&1; }
+gturn() { claude_turn "$1"; }
 ic()    { gh issue list --repo "$REPO" "$@" --json number -q 'length' 2>/dev/null || echo 0; }
 
 # ---- 1. /kickoff — Epic + a DECOMPOSABLE Feature + [Technical Analysis] on the Feature

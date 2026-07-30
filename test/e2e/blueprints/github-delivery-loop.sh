@@ -103,7 +103,7 @@ EOF
 
 # a ceremony/worker turn: real claude -p; the delivery-team reaches GitHub through `gh`
 # (which reads GH_TOKEN from the env) — NO --mcp-config (github is gh-native, not an MCP).
-gturn() { ( cd "$PROJ" && claude -p "$1" --dangerously-skip-permissions --output-format json ) >>"$HOME/turns.log" 2>&1; }
+gturn() { claude_turn "$1"; }
 # issue-count with filters (>=1 -> the fact held); labels/comments queried inline below.
 ic()    { gh issue list --repo "$REPO" "$@" --json number -q 'length' 2>/dev/null || echo 0; }
 ge()    { [ "${1:-0}" -ge 1 ] 2>/dev/null; }   # "got at least one"

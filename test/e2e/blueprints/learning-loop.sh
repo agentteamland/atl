@@ -15,7 +15,6 @@ atl install --project agentteamland/atl-e2e-team >/dev/null || bad "install erro
 [ -f "$HOME/.claude/rules/learning-capture.md" ] && ok "learning-capture rule active" || bad "rule missing"
 [ -f "$HOME/.claude/skills/drain/SKILL.md" ]     && ok "drain skill active"           || bad "drain skill missing"
 
-claude_turn() { ( cd "$PROJ" && claude -p "$1" --dangerously-skip-permissions --output-format json ) >>"$HOME/turns.log" 2>&1; }
 
 MARKER='We just decided to cache user sessions in Redis with a 24-hour TTL, because most users return within a day and it sharply cuts database load. Please capture this as a learning using the inline marker format from the learning-capture rule — a single "<!-- learning: ... -->" HTML comment that includes the WHY.'
 claude_turn "$MARKER" || bad "capture turn errored (see turns.log)"
