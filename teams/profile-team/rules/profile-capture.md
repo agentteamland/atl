@@ -109,3 +109,22 @@ When a hook prints `atl: N profile-fact(s) pending — auto-drain …` into your
 
 This is the profile-fact sibling of the `learning-capture` auto-drain — the same signal
 shape and the same single-in-flight discipline, on a separate channel with its own skill.
+
+## The capture-watchdog signal — the second trigger
+
+`atl: capture-watchdog (profile-fact) — no profile-fact markers for N assistant turn(s) …`
+is the **second trigger for the same response**, and it covers the opposite failure: not a
+full queue, but a marker-less stretch — durable facts you may simply have forgotten to
+mark. Marking is the pipeline's one non-deterministic link, and this is what makes missing
+it detectable instead of silent.
+
+On seeing it: quickly review the flagged turns, mark anything durable you missed, and spawn
+the same ONE background `/profile-drain` subagent — **an empty queue is valid on this
+trigger**, because the skill's mining step sweeps the stretch and enqueues what it finds.
+Same single-in-flight discipline. If the stretch genuinely held no durable entity fact,
+there is nothing to mark and nothing to mine — a correct outcome, not a failure.
+
+The watchdog measures each capture channel separately, so this signal is yours alone: a
+`(learning)` signal is `learning-capture`'s and points at `/drain`. Both can appear on the
+same turn — they are different subagents running different skills, and a stretch that
+captured neither kind needs both recoveries.

@@ -70,7 +70,16 @@ yeniden kullanır — [öğrenme döngüsünün](/tr/guide/learning-marker-lifec
    **tek** bir `/profile-drain` subagent'ı başlatır (single-in-flight), böylece entegrasyon
    otomatiktir ve onu asla elle çalıştırmazsınız.
 
-4. **Drain.** `/profile-drain`, bekleyen bilgileri `profile-curator` ajanına devreder; ajan her
+   **İkinci** bir sinyal ters yöndeki hatayı kapatır: `capture-watchdog (profile-fact) — no
+   profile-fact markers for N assistant turn(s) …`, özlü bir seri hiç profil işaretçisi
+   olmadan geçtiğinde ateşler — hiç işaretlenmemiş bir bilgi aksi hâlde tüm boru hattına
+   görünmez olurdu. Aynı tek arka plan `/profile-drain`'ini tetikler ve bu tetikleyicide
+   **boş kuyruk geçerlidir**. Bekçi her yakalama kanalını ayrı ölçer; bir `(learning)`
+   sinyali `/drain`'e aittir ve ikisi aynı turda ateşleyebilir.
+
+4. **Drain.** `/profile-drain` önce konuşmayı, hiçbir işaretçinin kaydetmediği kalıcı varlık
+   bilgileri için **tarar** (unutulmuş bir işaretçiyi kurtaran geri-kazanım adımı), sonra
+   bekleyen bilgileri `profile-curator` ajanına devreder; ajan her
    birini doğru kişiye çözer, uygular (gizlilik-kapılı, kaynak-etiketli), şemayı evrimleştirir,
    `_index.md`'yi yeniden kurar ve onaylar (ack). **Yeni** bir kişi oluşturmadan önce bir
    **gerçeklik kapısı** uygular: capture taramasının süpürdüğü bir doküman örneği ya da format
