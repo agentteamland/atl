@@ -225,35 +225,55 @@ func TestPendingOrdering(t *testing.T) {
 func TestWatchdogLatch(t *testing.T) {
 	s := newTestStore(t)
 
-	if k, err := s.WatchdogLatch("/p/a", "s1.jsonl"); err != nil || k != "" {
+	const l, pf = "learning", "profile-fact"
+
+	if k, err := s.WatchdogLatch("/p/a", "s1.jsonl", l); err != nil || k != "" {
 		t.Fatalf("fresh latch = (%q, %v), want empty", k, err)
 	}
-	if err := s.SetWatchdogLatch("/p/a", "s1.jsonl", "s1.jsonl:3"); err != nil {
+	if err := s.SetWatchdogLatch("/p/a", "s1.jsonl", l, "s1.jsonl:3"); err != nil {
 		t.Fatal(err)
 	}
-	if k, _ := s.WatchdogLatch("/p/a", "s1.jsonl"); k != "s1.jsonl:3" {
+	if k, _ := s.WatchdogLatch("/p/a", "s1.jsonl", l); k != "s1.jsonl:3" {
 		t.Errorf("latch = %q, want s1.jsonl:3", k)
 	}
 	// Per-project isolation.
-	if k, _ := s.WatchdogLatch("/p/b", "s1.jsonl"); k != "" {
+	if k, _ := s.WatchdogLatch("/p/b", "s1.jsonl", l); k != "" {
 		t.Errorf("project b latch = %q, want empty (no cross-project bleed)", k)
 	}
 	// Ping-pong regression: a second live session in the SAME project fires for
 	// its own stretch without clobbering the first session's latch.
-	if err := s.SetWatchdogLatch("/p/a", "s2.jsonl", "s2.jsonl:0"); err != nil {
+	if err := s.SetWatchdogLatch("/p/a", "s2.jsonl", l, "s2.jsonl:0"); err != nil {
 		t.Fatal(err)
 	}
-	if k, _ := s.WatchdogLatch("/p/a", "s1.jsonl"); k != "s1.jsonl:3" {
+	if k, _ := s.WatchdogLatch("/p/a", "s1.jsonl", l); k != "s1.jsonl:3" {
 		t.Errorf("s1 latch = %q after s2 fired — a per-project single slot would re-fire s1's stretch", k)
 	}
-	if k, _ := s.WatchdogLatch("/p/a", "s2.jsonl"); k != "s2.jsonl:0" {
+	if k, _ := s.WatchdogLatch("/p/a", "s2.jsonl", l); k != "s2.jsonl:0" {
 		t.Errorf("s2 latch = %q, want s2.jsonl:0", k)
 	}
-	// Overwrite = the new stretch replaces the old for that session.
-	if err := s.SetWatchdogLatch("/p/a", "s1.jsonl", "s1.jsonl:4"); err != nil {
+	// Per-CHANNEL isolation — the same ping-pong one level down. The two channels
+	// measure separate stretches in the same session; a shared slot would let each
+	// firing clobber the other's latch and nag on every alternation.
+	if k, _ := s.WatchdogLatch("/p/a", "s1.jsonl", pf); k != "" {
+		t.Errorf("profile-fact latch = %q, want empty — the learning latch must not answer for it", k)
+	}
+	if err := s.SetWatchdogLatch("/p/a", "s1.jsonl", pf, "s1.jsonl:0"); err != nil {
 		t.Fatal(err)
 	}
-	if k, _ := s.WatchdogLatch("/p/a", "s1.jsonl"); k != "s1.jsonl:4" {
+	if k, _ := s.WatchdogLatch("/p/a", "s1.jsonl", l); k != "s1.jsonl:3" {
+		t.Errorf("learning latch = %q after profile-fact fired — a shared slot would re-fire an already-fired stretch", k)
+	}
+	if k, _ := s.WatchdogLatch("/p/a", "s1.jsonl", pf); k != "s1.jsonl:0" {
+		t.Errorf("profile-fact latch = %q, want s1.jsonl:0", k)
+	}
+	// Overwrite = the new stretch replaces the old for that session+channel.
+	if err := s.SetWatchdogLatch("/p/a", "s1.jsonl", l, "s1.jsonl:4"); err != nil {
+		t.Fatal(err)
+	}
+	if k, _ := s.WatchdogLatch("/p/a", "s1.jsonl", l); k != "s1.jsonl:4" {
 		t.Errorf("latch = %q, want s1.jsonl:4", k)
+	}
+	if k, _ := s.WatchdogLatch("/p/a", "s1.jsonl", pf); k != "s1.jsonl:0" {
+		t.Errorf("profile-fact latch = %q after learning overwrote — channels must not share a slot", k)
 	}
 }

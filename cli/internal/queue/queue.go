@@ -311,32 +311,36 @@ func (s *Store) SetLastTick(project string, ts time.Time) error {
 	return nil
 }
 
-// watchdogBucket holds, per (project, session transcript), the dry-stretch key
-// the capture watchdog last fired for — the fire-once latch. The key encodes
-// the marker ordinal, so a new marker naturally re-arms the watchdog without
-// any counter state. Keyed per session file — not per project — because two
-// concurrent sessions in one project alternate as the "newest" transcript; a
-// single project-wide slot would ping-pong and re-fire an already-fired stretch
-// on every alternation.
+// watchdogBucket holds, per (project, session transcript, channel), the
+// dry-stretch key the capture watchdog last fired for — the fire-once latch.
+// The key encodes the marker ordinal, so a new marker naturally re-arms the
+// watchdog without any counter state. Keyed per session file — not per project
+// — because two concurrent sessions in one project alternate as the "newest"
+// transcript; a single project-wide slot would ping-pong and re-fire an
+// already-fired stretch on every alternation. Keyed per channel for the same
+// reason one level down: the watchdog measures a separate stretch per capture
+// channel, and a shared slot would let the two overwrite each other's latch and
+// nag on every alternation.
 const watchdogBucket = "__watchdog__"
 
-// watchdogKey is the composite (project, session) latch key; NUL can't appear
-// in a path or a transcript basename, so keys never alias (same scheme as
-// processedKey).
-func watchdogKey(project, session string) []byte {
-	return []byte(project + "\x00" + session)
+// watchdogKey is the composite (project, session, channel) latch key; NUL can't
+// appear in a path, a transcript basename, or a channel name, so keys never
+// alias (same scheme as processedKey).
+func watchdogKey(project, session, channel string) []byte {
+	return []byte(project + "\x00" + session + "\x00" + channel)
 }
 
 // WatchdogLatch returns the dry-stretch key the capture watchdog last fired
-// for in (project, session) — "" if it never fired for that session.
-func (s *Store) WatchdogLatch(project, session string) (string, error) {
+// for in (project, session, channel) — "" if it never fired for that session's
+// channel.
+func (s *Store) WatchdogLatch(project, session, channel string) (string, error) {
 	var key string
 	err := s.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(watchdogBucket))
 		if b == nil {
 			return nil
 		}
-		if v := b.Get(watchdogKey(project, session)); v != nil {
+		if v := b.Get(watchdogKey(project, session, channel)); v != nil {
 			key = string(v)
 		}
 		return nil
@@ -348,14 +352,14 @@ func (s *Store) WatchdogLatch(project, session string) (string, error) {
 }
 
 // SetWatchdogLatch records that the capture watchdog fired for stretch key in
-// (project, session).
-func (s *Store) SetWatchdogLatch(project, session, key string) error {
+// (project, session, channel).
+func (s *Store) SetWatchdogLatch(project, session, channel, key string) error {
 	err := s.db.Update(func(tx *bolt.Tx) error {
 		b, err := tx.CreateBucketIfNotExists([]byte(watchdogBucket))
 		if err != nil {
 			return err
 		}
-		return b.Put(watchdogKey(project, session), []byte(key))
+		return b.Put(watchdogKey(project, session, channel), []byte(key))
 	})
 	if err != nil {
 		return fmt.Errorf("set watchdog latch: %w", err)

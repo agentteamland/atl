@@ -66,3 +66,36 @@ func TestParse(t *testing.T) {
 		})
 	}
 }
+
+// TestHasIsChannelScoped is the regression for the capture-watchdog's
+// channel-blindness: the watchdog used a channel-agnostic `len(Parse(s)) > 0`
+// predicate, so ANY marker reset its dry stretch. A session emitting learning
+// markers regularly could therefore never trip the watchdog for a missed
+// profile-fact — the exact omission it exists to detect, on one of the two
+// channels it protects.
+func TestHasIsChannelScoped(t *testing.T) {
+	learningOnly := "some reply\n<!-- learning: pools are shared, not per-request -->\nmore text"
+
+	// The old, channel-blind predicate is true here — which is the bug.
+	if len(Parse(learningOnly)) == 0 {
+		t.Fatal("fixture should carry a marker")
+	}
+	if !Has(learningOnly, "learning") {
+		t.Error("Has(learning) = false on text with a learning marker")
+	}
+	if Has(learningOnly, "profile-fact") {
+		t.Error("Has(profile-fact) = true on text with only a learning marker — a learning marker must not mask a missed profile-fact")
+	}
+
+	both := learningOnly + "\n<!-- profile-fact:\n  entity: ahmet\n  fields:\n    identity.name: Ahmet\n-->"
+	if !Has(both, "learning") || !Has(both, "profile-fact") {
+		t.Error("Has should report both channels when both are present")
+	}
+
+	if Has("plain text, no markers", "learning") {
+		t.Error("Has = true on text with no markers")
+	}
+	if Has("<!-- unknown-channel: body -->", "unknown-channel") {
+		t.Error("Has = true for an unrecognized channel — Parse must gate it")
+	}
+}

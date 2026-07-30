@@ -41,9 +41,11 @@ Scan it for **durable** learnings the agent never captured as a marker:
 - **Unmarked durable facts** — a real decision, discovery, or profile-worthy fact
   the turns plainly contain but no marker ever recorded. This is the
   **capture-watchdog case**: when the drain was triggered by an
-  `atl: capture-watchdog` signal (a marker-less dry stretch), the queue may be
-  **empty and that's expected** — this mining step IS the run's purpose; sweep the
-  flagged stretch and recover what should have been marked.
+  `atl: capture-watchdog (learning)` signal (a marker-less dry stretch), the queue
+  may be **empty and that's expected** — this mining step IS the run's purpose;
+  sweep the flagged stretch and recover what should have been marked. (The
+  watchdog measures each channel separately; a `(profile-fact)` signal is
+  `/profile-drain`'s trigger, not this skill's.)
 
 For each one, write a one-line learning **stating the lesson, with the why**, and
 enqueue it exactly like a marker (use the `profile-fact` channel for a durable

@@ -85,3 +85,18 @@ func Parse(text string) []Marker {
 	}
 	return out
 }
+
+// Has reports whether text carries at least one marker on the given channel.
+//
+// It exists because a channel-agnostic "any marker at all" test is the wrong
+// question for anything that watches ONE channel: a learning marker would
+// satisfy it and mask a missed profile-fact. The capture watchdog measures its
+// dry stretch per channel through this.
+func Has(text, channel string) bool {
+	for _, m := range Parse(text) {
+		if m.Channel == channel {
+			return true
+		}
+	}
+	return false
+}

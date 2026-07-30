@@ -212,33 +212,57 @@ const (
 	watchdogMinChars = 1000
 )
 
-// captureWatchdogNotice measures the live session's dry stretch and, once per
-// stretch, prints the review nudge. Every failure path is silent — a hook must
-// never block, and a nudge is never worth an error. The latch is persisted
-// BEFORE printing so a broken latch write can't turn into a nag loop; the cost
-// of that ordering is one lost nudge, not a repeated one (fail toward silence —
-// the same accepted trade-off means a manual out-of-session `atl tick` can
-// consume a stretch's one nudge where no agent reads it).
+// watchdogChannels are the capture channels the watchdog measures, each with
+// the wording its own nudge needs. Both can fire on the same turn by design: a
+// stretch that captured neither kind genuinely needs both recoveries, and they
+// are different subagents running different skills.
+var watchdogChannels = []struct {
+	channel string // the capture channel, and the marker prefix the agent writes
+	missed  string // what went unmarked, for "review the recent turns for missed …"
+	drain   string // the skill the background subagent should run
+	rule    string // the rule that owns the response
+}{
+	{string(queue.ChannelLearning), "learnings", "/drain", "learning-capture"},
+	{string(queue.ChannelProfileFact), "durable entity facts", "/profile-drain", "profile-capture"},
+}
+
+// captureWatchdogNotice measures the live session's dry stretch PER CHANNEL and,
+// once per stretch per channel, prints the review nudge. Per channel is
+// load-bearing, not a refinement: a channel-agnostic "any marker at all"
+// predicate lets one learning marker reset the counter that a missed
+// profile-fact was accumulating, so a session that captures learnings regularly
+// could never trip the watchdog for the profile channel — the exact omission the
+// watchdog exists to catch, on one of the two channels it protects.
+//
+// Every failure path is silent — a hook must never block, and a nudge is never
+// worth an error. The latch is persisted BEFORE printing so a broken latch write
+// can't turn into a nag loop; the cost of that ordering is one lost nudge, not a
+// repeated one (fail toward silence — the same accepted trade-off means a manual
+// out-of-session `atl tick` can consume a stretch's one nudge where no agent
+// reads it).
 func captureWatchdogNotice(st *queue.Store, project, path string) {
 	if path == "" || os.Getenv("ATL_NO_CAPTURE_WATCHDOG") != "" {
 		return
 	}
-	stx, err := transcript.DryStretch(path, func(s string) bool { return len(marker.Parse(s)) > 0 })
-	if err != nil {
-		return
-	}
-	if stx.Turns < watchdogMinTurns || stx.Chars < watchdogMinChars {
-		return
-	}
 	session := filepath.Base(path)
-	if last, lerr := st.WatchdogLatch(project, session); lerr != nil || last == stx.Key {
-		return // already fired for this stretch, or the latch is unreadable
+	for _, c := range watchdogChannels {
+		ch := c.channel
+		stx, err := transcript.DryStretch(path, func(s string) bool { return marker.Has(s, ch) })
+		if err != nil {
+			return // unreadable transcript: no channel can be measured
+		}
+		if stx.Turns < watchdogMinTurns || stx.Chars < watchdogMinChars {
+			continue
+		}
+		if last, lerr := st.WatchdogLatch(project, session, ch); lerr != nil || last == stx.Key {
+			continue // already fired for this stretch, or the latch is unreadable
+		}
+		if st.SetWatchdogLatch(project, session, ch, stx.Key) != nil {
+			continue
+		}
+		fmt.Printf("atl: capture-watchdog (%s) — no %s markers for %d assistant turn(s) / ~%d chars of user input; review the recent turns for missed %s and mark them, and spawn ONE background %s subagent to mine the stretch (per the %s rule, valid even with an empty queue)\n",
+			ch, ch, stx.Turns, stx.Chars, c.missed, c.drain, c.rule)
 	}
-	if st.SetWatchdogLatch(project, session, stx.Key) != nil {
-		return
-	}
-	fmt.Printf("atl: capture-watchdog — no capture markers for %d assistant turn(s) / ~%d chars of user input; review the recent turns for missed learnings or profile-facts and mark them, and spawn ONE background drain subagent to mine the stretch (per the learning-capture rule, valid even with an empty queue)\n",
-		stx.Turns, stx.Chars)
 }
 
 // projectStamp is a short, filesystem-safe token derived from a project path,
