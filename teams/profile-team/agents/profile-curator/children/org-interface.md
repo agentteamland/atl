@@ -86,7 +86,7 @@ change-policy:
   # default overwrite (decision D); history opt-in only where temporal evolution matters
   identity-extension.*: overwrite
   anchors.*: overwrite
-  state.standing: history-tracked
+  state.standing: history-tracked     # enum-constrained, so mutually exclusive — sound
   state.user-relationship-status: overwrite
   key-people.*: overwrite
 ---

@@ -44,8 +44,19 @@ drain report, and it is refinable). But silent ≠ careless:
      score against this type too, and it evolves like any other).
    - `fields` — **inherit the common core** (do not re-specify it); author a **small**
      extension (a handful of well-chosen fields), never a sprawling guess.
-   - `change-policy` — default `overwrite`; `history-tracked` only where temporal evolution
-     obviously matters.
+   - `change-policy` — default `overwrite`. Ask **two** questions, and **cardinality first**:
+     1. *Can several values be true of this field at once?* If yes, the field is
+        **list-valued** and takes `overwrite` with **merge** semantics. Never
+        `history-tracked` — that would file a standing value as *past* the moment an
+        unrelated one arrives, which is a silent deletion of something still true.
+     2. *Only if it is one-at-a-time:* does its past matter? Then `history-tracked`,
+        **and declare the paired `{ current, history[] }` shape** — the write pushes the old
+        value onto that array, so a bare scalar leaves it with no target.
+     The reliable tell: **`history-tracked` is sound on an enum-constrained field and
+     suspect on a free-text one.** An enum makes it structurally impossible to hold two
+     values at once, which answers question 1 for you. If you find yourself declaring
+     `history-tracked` on free text, say in a comment which single composite thing the
+     field holds — and if you cannot, it is concurrent and belongs in a list.
 3. **Tier conservatively (the load-bearing guardrail).** I do not know this type's privacy
    shape the way a hand-authored interface does, so I err safe: `identity` / `anchors` /
    `kind` / `role` → Tier 1; **anything that reads like a feeling, a private state, health,

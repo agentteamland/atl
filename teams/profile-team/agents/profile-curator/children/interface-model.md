@@ -69,12 +69,46 @@ is more important."* History is opt-in, and only on the fields PAT's temporal le
 
 | Field | Policy |
 |---|---|
-| `identity.*`, `anchors.*`, `relation-to-user.*`, `traits.*` | overwrite (latest wins) |
-| `state.emotional`, `state.goals`, `state.financial` | history-tracked (`current` moves; prior value appends to `history` with its date) |
+| `identity.*`, `anchors.*`, `relation-to-user.*` (scalars) | overwrite (latest wins) |
+| `traits.*` and every other **list-valued** field | overwrite with **merge** — an arriving value joins the set, it does not replace it |
+| `state.emotional`, `state.goals`, `state.financial`, and the enum `state.status` / `state.standing` fields | history-tracked (`current` moves; prior value appends to `history` with its date) |
 
 A history-tracked write pushes the old `current` (with its date) onto the `history` array
 and sets the new `current`. This is what lets a lens ask "they were low in March, better
 in June — is the pattern repeating?"
+
+**History-tracked is a supersession policy, so it is only sound where the values are
+mutually exclusive.** On a field that legitimately holds several values at once it does
+not merge — it files a still-true value as *past* because an unrelated one arrived, which
+is a silent deletion. The reliable tell is the type: every sound history-tracked field
+here is **enum-constrained** (a status, a standing), and the free-text ones
+(`state.emotional`, `state.financial`) are sound only under the composite-snapshot reading
+their field comments now state explicitly. Concurrent things — goals, motives, traits —
+are **list-valued and merged**, never versioned. See `interface-creation.md` for the
+cardinality-first authoring rule and `marker-drain.md` for the write semantics.
+
+A list merge defaults to **join**, and only the incoming fact itself may retire a standing
+entry. Join is the safe error: a wrong join is additive and visible, and the next
+confirmation corrects it; a wrong replace deletes something true and leaves no trace.
+
+### Known violations of this rule in the shipped interfaces
+
+Three shipped fields declare `history-tracked` on something that is **not** mutually
+exclusive, and two more declare it against a bare scalar with no `history` array to push
+onto. Correcting their *shape* is a type change — a **major** bump requiring a migration —
+so it is tracked separately and is not yet applied:
+
+| field | why it is wrong |
+|---|---|
+| `person.state.goals` | named plural, typed as one scalar; goals are concurrent across life domains |
+| `project.state.motivation` | motives stack — money, craft, obligation coexist |
+| `animal.state.status`, `object.state.status` | enum (so cardinality is fine) but declared as a **bare scalar**, leaving the history push with no target |
+
+Until those are re-shaped, the write rule in `marker-drain.md` is the guard: on a field
+that plainly holds several values at once, **merge instead of displacing, and report the
+interface as needing correction.** `person.state.emotional`, `person.state.financial` and
+`animal.state.health` are sound only under the composite-snapshot reading — one overall
+mood, one overall standing, one overall wellbeing note — not as itemised lists.
 
 ## Backwards compatibility (semver)
 

@@ -59,9 +59,22 @@ For every `field-path: value` in `fields`:
    - **Tier 4** (`state.financial`) → write **only if** `meta.consent.<field>: true`;
      otherwise skip + record.
 3. **Change-policy** (from the interface):
-   - `overwrite` → set the field to the new value.
-   - `history-tracked` (`state.emotional`/`goals`/`financial`) → push the old
-     `current` + its date onto `history`, then set the new `current`.
+   - `overwrite` on a **scalar** → set the field to the new value.
+   - `overwrite` on a **list-valued** field (`traits.*`, `state.goals`,
+     `project.state.motivation`, …) → **merge**: add what is new, keep what is standing.
+     An arriving value **joins** the set. Replace or drop a standing entry only when the
+     incoming fact itself says so — it corrects that entry, or reports it ended — never as
+     a silent default, and never because an unrelated value arrived.
+     *Join is the safe error:* a wrong join is additive and visible on the page, and the
+     next confirmation corrects it; a wrong replace deletes something true and leaves no
+     trace it was ever there. Defaulting to join also keeps a re-drain idempotent, which a
+     per-write judgement call would not be.
+   - `history-tracked` (`state.emotional`/`financial`, and the enum `state.status` /
+     `state.standing` fields) → push the old `current` + its date onto `history`, then set
+     the new `current`. **Only sound where the values are mutually exclusive** — see the
+     cardinality rule in `interface-creation.md`. If you meet `history-tracked` on a field
+     that plainly holds several values at once, do **not** displace: merge, and report the
+     interface as needing correction.
 4. **Source flag** — set `_sources.<field-path>` to the effective source
    (`user-confirmed` | `agent-inferred-<today>` | `lens-set`).
 5. Update `meta.last-updated` to today.
