@@ -70,7 +70,16 @@ channel, the sibling of the [learning loop](/guide/learning-marker-lifecycle):
    spawns **one** background `/profile-drain` subagent (single-in-flight), so integration is
    automatic and you never run it by hand.
 
-4. **Drain.** `/profile-drain` hands the pending facts to the `profile-curator` agent,
+   A **second** signal covers the opposite failure: `capture-watchdog (profile-fact) — no
+   profile-fact markers for N assistant turn(s) …` fires when a substantive stretch passes
+   with no profile markers at all — a fact never marked would otherwise be invisible to the
+   whole pipeline. It triggers the same one background `/profile-drain`, and an **empty
+   queue is valid** on it. The watchdog measures each capture channel separately, so a
+   `(learning)` signal belongs to `/drain` and both can fire on the same turn.
+
+4. **Drain.** `/profile-drain` first **mines** the conversation for durable entity facts no
+   marker recorded — the recovery pass that makes a forgotten marker survivable — and then
+   hands the pending facts to the `profile-curator` agent,
    which resolves each to the right person, applies it (privacy-gated, source-flagged),
    evolves the schema, rebuilds `_index.md`, and acks it. Before creating a **new** person
    it applies a **reality gate**: a documentation example or format placeholder swept up by
