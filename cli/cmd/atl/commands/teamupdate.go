@@ -50,7 +50,7 @@ func updateTeams(projectRoot string) (int, error) {
 				// successful migration stamps the new schema, so it never repeats),
 				// and don't count it as an advance, because no version advanced.
 				if m.SchemaVersion < manifest.SchemaVersion {
-					_ = migrateTeamManifest(m, layer)
+					_ = migrateTeamManifest(m, layer, source.Fetch)
 				}
 				continue
 			}
@@ -82,8 +82,8 @@ func updateTeams(projectRoot string) (int, error) {
 // Best-effort: a failed fetch leaves the manifest at the old schema, so the next
 // update simply tries again. Nothing downstream breaks in the meantime — an
 // unknown store is treated exactly like a team that declares none.
-func migrateTeamManifest(m *manifest.Manifest, layer string) error {
-	srcDir, err := source.Fetch(m.Source.Repo, m.Source.Subpath, m.Source.Ref)
+func migrateTeamManifest(m *manifest.Manifest, layer string, fetch fetchFunc) error {
+	srcDir, err := fetch(m.Source.Repo, m.Source.Subpath, m.Source.Ref)
 	if err != nil {
 		return err
 	}

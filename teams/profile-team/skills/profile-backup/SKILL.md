@@ -57,16 +57,16 @@ fi
 #    that contains a nested .git records a GITLINK instead of the files — it exits 0,
 #    the emptiness check below sees a change, and the user is told the backup
 #    succeeded while the snapshot holds no profile content at all.
+#    Copy everything, then remove the .git — rather than filtering during the copy.
+#    A glob-and-skip loop would be shell-dependent: zsh errors on an unmatched glob
+#    (its default `nomatch`), which aborts under `set -e` AFTER the rm -rf above, so
+#    the snapshot is wiped and no outcome marker is ever printed. This form runs the
+#    same under sh, bash and zsh, and it also preserves dangling symlinks.
 DEST="$REPO_ROOT/profile-backup"
 rm -rf "$DEST"
 mkdir -p "$DEST"
-#    (`case`, not `[ … ] && continue` — under `set -e` the false branch of a trailing
-#    `&&` is a non-zero status and would abort the whole script.)
-for entry in "$SRC"/* "$SRC"/.[!.]* "$SRC"/..?*; do
-  [ -e "$entry" ] || continue                  # an unmatched glob stays literal
-  case "${entry##*/}" in .git) continue ;; esac
-  cp -R "$entry" "$DEST/"
-done
+cp -R "$SRC/." "$DEST/"
+rm -rf "$DEST/.git"
 
 # 5. Version it with a dated commit. -f: profile-backup/ is this skill's own managed
 #    artifact, so stage it even if the repo gitignores it (a plain `add` would exit 1

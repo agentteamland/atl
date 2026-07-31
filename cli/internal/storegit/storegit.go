@@ -62,6 +62,11 @@ const commitMessage = "chore(store): snapshot"
 // user may consider theirs, so it needs the brake more than the others, not less.
 const disableEnv = "ATL_NO_STORE_GIT"
 
+// noHooks is a path that must not exist, used as core.hooksPath so git finds no
+// hook to run. Pointing at a nonexistent directory is the portable way to say
+// "no hooks"; an empty value is not.
+const noHooks = "/nonexistent/atl-no-hooks"
+
 // EnsureAll versions every declared store: it vets each path, de-duplicates, and
 // commits whatever changed. Returns how many stores produced a commit.
 //
@@ -80,11 +85,20 @@ func EnsureAll(dirs []string) int {
 		return 0
 	}
 	cwd, _ := os.Getwd()
+	// Resolve the reference points too, not just the declared path. Every check
+	// below is a lexical comparison, so mixing a resolved path with an unresolved
+	// home would reject a perfectly legitimate store the moment any component
+	// above it is a symlink — which is the normal state of /var and /tmp on macOS,
+	// and of a home directory that has been moved to another volume.
+	home, cwd = resolve(home), resolve(cwd)
+	if home == "" {
+		return 0
+	}
 
 	seen := map[string]bool{}
 	n := 0
 	for _, d := range dirs {
-		path := expand(d, home)
+		path := resolve(expand(d, home))
 		if path == "" || seen[path] || !acceptable(path, home, cwd) {
 			continue
 		}
@@ -144,7 +158,7 @@ func ensure(dir string) bool {
 		// A store nested INSIDE some other repo is left alone: initialising here
 		// would shadow the outer repo, and committing would be writing into a repo
 		// this package does not own.
-		if insideOtherRepo(ctx, dir) {
+		if insideOtherRepo(dir) {
 			return false
 		}
 		// init.templateDir is disabled explicitly: a globally configured template
@@ -155,6 +169,10 @@ func ensure(dir string) bool {
 			return false
 		}
 		if !claim(dir) {
+			// Leaving an unclaimed .git behind would be terminal: the next pass sees
+			// a repo it does not own and skips the store FOREVER, silently. Undo the
+			// init so the next pass gets a clean attempt.
+			_ = os.RemoveAll(filepath.Join(dir, ".git"))
 			return false
 		}
 	case !owned(dir):
@@ -208,6 +226,11 @@ func snapshot(ctx context.Context, dir string) bool {
 		if head, ok := git(ctx, dir, nil, "rev-parse", "-q", "--verify", "HEAD^{tree}"); ok && head == tree {
 			return false // nothing changed
 		}
+	} else if isEmptyTree(ctx, dir, tree) {
+		// An empty store has nothing to preserve. Committing here would create a
+		// repo and report "previous values stay recoverable" about a directory that
+		// has never held a value.
+		return false
 	}
 
 	args := []string{
@@ -231,8 +254,24 @@ func snapshot(ctx context.Context, dir string) bool {
 	if !hasParent {
 		expected = strings.Repeat("0", len(commit)) // the ref must not exist yet
 	}
-	_, ok = git(ctx, dir, nil, "update-ref", "HEAD", commit, expected)
-	return ok
+	if _, ok := git(ctx, dir, nil, "update-ref", "HEAD", commit, expected); !ok {
+		return false
+	}
+
+	// Bring the repo's REAL index up to the commit we just made. The snapshot was
+	// built in a throwaway index, so without this the repo's own index stays empty
+	// and `git status` reports every file as both staged-for-deletion and
+	// untracked — and `git checkout` refuses to move. The docs point users at this
+	// repo to recover an old value, so it has to be legible when they arrive.
+	// Safe by construction: this only ever runs in a repo this package created.
+	_, _ = git(ctx, dir, nil, "read-tree", tree)
+	return true
+}
+
+// isEmptyTree reports whether tree is git's canonical empty tree.
+func isEmptyTree(ctx context.Context, dir, tree string) bool {
+	empty, ok := git(ctx, dir, nil, "hash-object", "-t", "tree", "/dev/null")
+	return ok && empty == tree
 }
 
 // ownerMarker names the file that records "ATL created this repository". It
@@ -292,6 +331,26 @@ func expand(p, home string) string {
 	return filepath.Clean(p)
 }
 
+// resolve follows symlinks so vetting sees where the path actually LANDS. Every
+// check below is lexical, and the git work is not: a symlink at the declared
+// path would otherwise pass a check against its own harmless-looking name while
+// git initialises a repo over whatever it points at. A user symlinking their
+// store out to an external volume or a sync folder is ordinary, so this is a
+// realistic route, not a contrived one. An unresolvable path is dropped.
+func resolve(p string) string {
+	if p == "" {
+		return ""
+	}
+	real, err := filepath.EvalSymlinks(p)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return p // does not exist yet — ensure() will decline it anyway
+		}
+		return ""
+	}
+	return real
+}
+
 func hasGit() bool {
 	_, err := exec.LookPath("git")
 	return err == nil
@@ -305,28 +364,45 @@ func isRepoRoot(dir string) bool {
 }
 
 // insideOtherRepo reports whether dir sits within a git repo rooted above it.
-func insideOtherRepo(ctx context.Context, dir string) bool {
-	top, ok := git(ctx, dir, nil, "rev-parse", "--show-toplevel")
-	if !ok || top == "" {
-		return false
-	}
+//
+// This walks the filesystem rather than asking git, deliberately. `git rev-parse
+// --show-toplevel` reports failure identically for "not in a repo" and for every
+// other reason it can decline — a dubious-ownership refusal under a bind mount,
+// a ceiling-directory setting — and reading those as "not in a repo" fails OPEN,
+// into exactly the shadowing init this guard exists to prevent. A walk has one
+// meaning and no configuration.
+func insideOtherRepo(dir string) bool {
 	abs, err := filepath.Abs(dir)
 	if err != nil {
-		return false
+		return true // cannot tell — decline rather than risk shadowing
 	}
-	topAbs, err := filepath.Abs(top)
-	if err != nil {
-		return false
+	for cur := filepath.Dir(abs); ; cur = filepath.Dir(cur) {
+		if _, err := os.Stat(filepath.Join(cur, ".git")); err == nil {
+			return true
+		}
+		if parent := filepath.Dir(cur); parent == cur {
+			return false // reached the filesystem root
+		}
 	}
-	return topAbs != abs
 }
 
 // git runs one git command in dir and returns its trimmed stdout. Silent by
 // design: stderr is discarded and every failure is reported as ok=false, because
 // there is no caller that could act on the difference.
+//
+// Two settings are forced on every invocation. core.hooksPath is pointed at
+// nothing, because a hook belongs to the user's workflow and must never run on a
+// machine-written snapshot — commit-tree runs none, but update-ref fires
+// reference-transaction, which is enough for a configured hook to disable
+// retention permanently and silently. And WaitDelay bounds the wait after the
+// context expires: cancellation kills the direct child, but Output() blocks
+// until every holder of the inherited pipe closes it, so a backgrounded
+// grandchild would otherwise stall the user's prompt past the deadline — and
+// report success while doing it.
 func git(ctx context.Context, dir string, env []string, args ...string) (string, bool) {
-	cmd := exec.CommandContext(ctx, "git", args...)
+	cmd := exec.CommandContext(ctx, "git", append([]string{"-c", "core.hooksPath=" + noHooks}, args...)...)
 	cmd.Dir = dir
+	cmd.WaitDelay = time.Second
 	if env != nil {
 		cmd.Env = env
 	}

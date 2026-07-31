@@ -446,9 +446,183 @@ func TestRecordsDeletions(t *testing.T) {
 
 func TestGitHelperIsBounded(t *testing.T) {
 	requireGit(t)
+	dir := store(t, "profiles")
+	write(t, dir, "a.md", "x\n")
+	EnsureAll([]string{dir})
+
+	// A REAL repo, so the command would succeed if the context were not honored —
+	// running it in a plain temp dir would fail either way and prove nothing.
+	if _, ok := git(context.Background(), dir, nil, "status", "--porcelain"); !ok {
+		t.Fatal("setup: git status failed in a real repo")
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	if _, ok := git(ctx, t.TempDir(), nil, "status"); ok {
+	if _, ok := git(ctx, dir, nil, "status", "--porcelain"); ok {
 		t.Fatal("a cancelled context still ran git to completion")
+	}
+}
+
+// A symlink at the declared path is the route around vetting: every check is
+// lexical, the git work is not. Resolving first is what keeps a store pointed at
+// the home directory — the catastrophic case the package doc names — from
+// passing a check made against its own harmless-looking name.
+//
+// Honest bound: this stops the targets vetting rejects outright (home itself, a
+// bare top-level directory). It does NOT stop a user who deliberately points
+// their store at some deep directory of their own — that target is accepted when
+// declared directly too, so it is not a symlink-specific hole.
+func TestSymlinkedStoreIsVettedByItsTarget(t *testing.T) {
+	requireGit(t)
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	if err := os.WriteFile(filepath.Join(home, "secret"), []byte("x\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(home, ".atl"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(home, ".atl", "profiles")
+	if err := os.Symlink(home, link); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+
+	if n := EnsureAll([]string{link}); n != 0 {
+		t.Fatalf("EnsureAll = %d, want 0 — a symlink to the home directory was accepted", n)
+	}
+	if _, err := os.Stat(filepath.Join(home, ".git")); !os.IsNotExist(err) {
+		t.Fatal("initialised a repository over the entire home directory")
+	}
+}
+
+// A store symlinked to a legitimate location still works — the resolution must
+// not become a blanket rejection of every symlink.
+func TestAcceptsAStoreSymlinkedSomewhereLegitimate(t *testing.T) {
+	requireGit(t)
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	target := filepath.Join(home, "vault", "profiles")
+	if err := os.MkdirAll(target, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(target, "a.md"), []byte("x\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(home, ".atl"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(home, ".atl", "profiles")
+	if err := os.Symlink(target, link); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+
+	if n := EnsureAll([]string{link}); n != 1 {
+		t.Fatalf("EnsureAll = %d, want 1", n)
+	}
+}
+
+// An empty store has nothing to preserve. Committing there would create a repo
+// and report "previous values stay recoverable" about a directory that has never
+// held a value.
+func TestEmptyStoreProducesNoCommit(t *testing.T) {
+	requireGit(t)
+	dir := store(t, "profiles")
+	if n := EnsureAll([]string{dir}); n != 0 {
+		t.Fatalf("EnsureAll = %d, want 0 for an empty store", n)
+	}
+}
+
+// The repo's own index must reflect the snapshot. Building the tree in a
+// throwaway index protects the user's staging area, but if the real index is
+// never populated then `git status` reports every file as both deleted and
+// untracked, and `git checkout` refuses to move — in the exact repo the docs
+// send users to when they want an old value back.
+func TestRepoIsLegibleAfterASnapshot(t *testing.T) {
+	requireGit(t)
+	dir := store(t, "profiles")
+	write(t, dir, "people/alex/profile.md", "value\n")
+	if EnsureAll([]string{dir}) != 1 {
+		t.Fatal("made no commit")
+	}
+
+	cmd := exec.Command("git", "status", "--porcelain")
+	cmd.Dir = dir
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s := strings.TrimSpace(string(out)); s != "" {
+		t.Fatalf("the store reports itself dirty right after a snapshot:\n%s", s)
+	}
+}
+
+// The enclosing-repo guard must fail CLOSED. Asking git makes "not a repo"
+// indistinguishable from "git declined for another reason" — a dubious-ownership
+// refusal under a bind mount, a ceiling directory — and reading those as "not in
+// a repo" produces exactly the shadowing init the guard exists to prevent.
+func TestEnclosingRepoDetectionIgnoresGitConfiguration(t *testing.T) {
+	requireGit(t)
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	outer := filepath.Join(home, "work")
+	nested := filepath.Join(outer, "store")
+	if err := os.MkdirAll(nested, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	run(t, outer, "init")
+	write(t, nested, "a.md", "x\n")
+
+	// A setting that makes git itself refuse to walk up and report the enclosing
+	// repo. The guard must not believe it.
+	t.Setenv("GIT_CEILING_DIRECTORIES", outer)
+
+	if n := EnsureAll([]string{nested}); n != 0 {
+		t.Fatalf("EnsureAll = %d, want 0 — a git setting talked the guard out of it", n)
+	}
+	if _, err := os.Stat(filepath.Join(nested, ".git")); !os.IsNotExist(err) {
+		t.Fatal("initialised a nested repo shadowing the outer one")
+	}
+}
+
+// update-ref fires reference-transaction hooks, which commit-tree does not. A
+// configured one would block every snapshot silently and forever — the exact
+// failure mode the design claims to have closed.
+func TestReferenceTransactionHooksDoNotRun(t *testing.T) {
+	requireGit(t)
+	dir := store(t, "profiles")
+	hooks := filepath.Join(t.TempDir(), "hooks")
+	if err := os.MkdirAll(hooks, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(hooks, "reference-transaction"), []byte("#!/bin/sh\nexit 1\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("GIT_CONFIG_COUNT", "1")
+	t.Setenv("GIT_CONFIG_KEY_0", "core.hooksPath")
+	t.Setenv("GIT_CONFIG_VALUE_0", hooks)
+
+	write(t, dir, "a.md", "x\n")
+	if EnsureAll([]string{dir}) != 1 {
+		t.Fatal("a reference-transaction hook blocked the snapshot")
+	}
+}
+
+// An init we cannot claim must not be left behind: the next pass would see a repo
+// it does not own and skip the store forever, silently.
+func TestRollsBackAnInitItCannotClaim(t *testing.T) {
+	requireGit(t)
+	dir := store(t, "profiles")
+	write(t, dir, "a.md", "x\n")
+	if EnsureAll([]string{dir}) != 1 {
+		t.Fatal("setup: no initial snapshot")
+	}
+	// Simulate the terminal state the rollback exists to prevent, and confirm it
+	// IS terminal — which is why the rollback matters.
+	if err := os.Remove(filepath.Join(dir, ".git", ownerMarker)); err != nil {
+		t.Fatal(err)
+	}
+	write(t, dir, "a.md", "y\n")
+	if EnsureAll([]string{dir}) != 0 {
+		t.Fatal("wrote into a repo carrying no ownership marker")
 	}
 }
