@@ -5,8 +5,19 @@ import (
 	"time"
 
 	"github.com/agentteamland/atl/cli/internal/doctor"
+	"github.com/agentteamland/atl/cli/internal/queue"
 	"github.com/spf13/cobra"
 )
+
+// platformChecks is the one check set both surfaces run — `atl doctor` on demand
+// and the session-start hook automatically. Single-sourced on purpose: the set
+// was duplicated at the two call sites, so adding a check meant remembering to
+// wire it twice, and wiring it into only one surface compiles clean and passes
+// every test.
+func platformChecks(st *queue.Store, project string, now time.Time) []doctor.Check {
+	return append(doctor.QueueChecks(st, project, now),
+		integrityCheck(project), hooksCheck(), doctor.BrainstormPinCheck(project))
+}
 
 var doctorCmd = &cobra.Command{
 	Use:   "doctor",
@@ -28,7 +39,7 @@ var doctorCmd = &cobra.Command{
 		}
 		defer st.Close()
 
-		results := doctor.Run(append(doctor.QueueChecks(st, project, time.Now()), integrityCheck(project), hooksCheck()))
+		results := doctor.Run(platformChecks(st, project, time.Now()))
 		for _, r := range results {
 			healed := ""
 			if r.Healed {

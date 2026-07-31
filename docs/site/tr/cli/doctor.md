@@ -40,6 +40,16 @@ Bakım geçişinin en son ne zaman çalıştığına bakar (transcript yüksek-s
 
 v2'de otomasyon zorunludur, ama sıfırlanmış ya da elle düzenlenmiş bir `~/.claude/settings.json` ATL'nin hook'larını bağsız bırakabilir — bu da tüm döngüyü sessizce öldürür (drain, doctor ve guard tetiklenmez olur). Bu denetim settings dosyasını okur ve dört atl hook'undan (`SessionStart`, iki `UserPromptSubmit` girdisi — `atl tick` ve `atl retrieve` — ve `PreToolUse`) herhangi biri eksikse, senin kendi hook'larına asla dokunmayan aynı idempotent kurulumla onları **yeniden bağlar** — bir `(self-healed)` onarımı. Özelleştirdiğin bir tick throttle değeri (`atl setup-hooks --throttle=…`) korunur, asla varsayılana sıfırlanmaz. Okuyamadığı bir settings dosyası engelleyici değil, bir `WARN`'dır.
 
+### `brainstorm-pins` — pin bloğu hâlâ gerçeği yansıtıyor mu?
+
+Aktif olan her brainstorm, kendisini ilgili kapsamın `CLAUDE.md` dosyasındaki `<!-- brainstorm:active -->` bloğuna iğneler ve brainstorm kapandığında o maddeyi kaldırmak [`/brainstorm done`](/tr/skills/brainstorm)'un işidir. Bu adım bir becerinin içinde düz metin olduğu için atlanabiliyor — ve blok **her** oturumun bağlamına yüklendiğinden, geride kalan bir madde gelecekteki her oturuma kapanmış bir kararın hâlâ açık olduğunu söyler.
+
+Bu denetim, iğnelenmiş kümeyi her brainstorm'un frontmatter `status:` değeriyle karşılaştırır — hem projede (`<proje>/.atl/brain-storms` ↔ `<proje>/CLAUDE.md`) hem de global katmanda (`~/.atl/brain-storms` ↔ `~/.claude/CLAUDE.md`) — ve iki yönde birden `WARN` verir: **kapanmış ama hâlâ iğnelenmiş** bir brainstorm ve **aktif ama iğnesiz** bir brainstorm (brainstorm kuralının tarif ettiği kurtarma). Yalnızca frontmatter'ı okur, gövdeyi asla; böylece metninde `status: active` ifadesini alıntılayan kapanmış bir brainstorm işaretlenmez. Tanınmayan bir durum (elle yazılmış bir `paused`, frontmatter'ı olmayan bir dosya) raporlanmak yerine olduğu gibi bırakılır.
+
+Üçüncü bir durum: blok **açılmış ama hiç kapanmamışsa** — bitmemiş bir kapanışta son işaretçi düşmüşse — denetim bloğun nerede bittiğini tahmin etmek yerine tam olarak bunu söyler ve orada durur. Tahmin etmek, dosyanın aşağısındaki her brainstorm bağlantısını (örneğin bir "yerleşmiş kararlar" bölümünü) sahte bir bayat-iğne raporuna dönüştürürdü.
+
+**Raporlar, asla yeniden yazmaz.** Doctor'ın kendi kendini onaran adımları yalnızca ATL'ye ait dosyalara dokunur; `CLAUDE.md` senin her oturumda yüklenen kendi yönerge dosyandır ve eksik-iğne yönü konunun tek satırlık özetini gerektirir — mekanik bir düzeltme değil, muhakeme. `.atl/brain-storms` dizini olmayan bir projede sessizdir.
+
 ## CLI / Beceri ayrımı
 
 `atl doctor` yalnızca deterministik onarımlar yapar — eksik bir dosyayı yeniden çek, mekanik bir adımı yeniden dene. Bir LLM gerektiren her şey (kuyruğa alınmış bir öğrenimi bilgi tabanına işlemek) tasarım gereği kapsam dışıdır; doctor sayıyı su yüzüne çıkarır ve seni beceriye yönlendirir. İşte bu yüzden büyük bir biriken iş burada bir uyarı olarak görünür ama aslında [`/drain`](/tr/cli/learnings) çalıştırılarak temizlenir.
@@ -54,6 +64,7 @@ OK    queue-backlog — queue empty
 OK    tick-freshness — last tick 3m12s ago
 OK    asset-integrity — all installed files present
 OK    hooks-bound — all automation hooks bound
+OK    brainstorm-pins — pins agree with brainstorm frontmatter
 
 doctor: all healthy
 ```
@@ -66,6 +77,7 @@ WARN  queue-backlog — 63 pending items — a drain skill should process them
 OK    tick-freshness — last tick 8s ago
 OK    asset-integrity — restored 1 missing file(s) — `atl remove <handle>/<team>` removes a team for good (self-healed)
 OK    hooks-bound — all automation hooks bound
+WARN  brainstorm-pins — 1 closed brainstorm(s) still pinned in CLAUDE.md — every session is told the decision is open: docs-sync-v2.md (status: completed) — fix the `<!-- brainstorm:active -->` block (brainstorm rule)
 
 doctor: warnings above (not fatal)
 ```

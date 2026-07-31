@@ -40,6 +40,16 @@ Looks at how long it's been since the maintenance pass last ran (the wall-clock 
 
 Automation is mandatory in v2, but a reset or hand-edited `~/.claude/settings.json` can leave ATL's hooks unbound — silently killing the whole loop (drain, doctor, and guard stop firing). This check reads the settings file, and if any of the four atl hooks (`SessionStart`, the two `UserPromptSubmit` entries — `atl tick` and `atl retrieve` — and `PreToolUse`) is missing it **re-binds them** via the same idempotent install that never touches your own hooks — a `(self-healed)` repair. A tick throttle you customized (`atl setup-hooks --throttle=…`) is preserved, never reset to the default. A settings file it can't read is a `WARN`, not a blocker.
 
+### `brainstorm-pins` — does the pin block still match reality?
+
+Every active brainstorm pins itself into the scope's `CLAUDE.md` inside a `<!-- brainstorm:active -->` block, and [`/brainstorm done`](/skills/brainstorm) is supposed to remove that bullet when the brainstorm closes. That step is prose in a skill, so it gets skipped — and because the block is loaded into **every** session's context, a leftover bullet actively tells future sessions a closed decision is still open.
+
+This check compares the pinned set against each brainstorm's frontmatter `status:` — in the project (`<project>/.atl/brain-storms` ↔ `<project>/CLAUDE.md`) and in the global layer (`~/.atl/brain-storms` ↔ `~/.claude/CLAUDE.md`) — and `WARN`s in both directions: a **closed brainstorm still pinned**, and an **active brainstorm with no pin** (the recovery the brainstorm rule describes). It reads the frontmatter only, never the body, so a closed brainstorm quoting `status: active` in its prose is not flagged; an unrecognized status (a hand-written `paused`, a file with no frontmatter) is left alone rather than reported.
+
+A third case: if the block **opened but never closed** — a half-finished closure that dropped the end marker — the check says exactly that and stops there rather than guessing where the block ends. Guessing would turn every brainstorm link further down the file (a "settled decisions" section, say) into a bogus stale-pin report.
+
+It **reports, never rewrites**. The doctor's self-heals only touch ATL-owned artifacts; `CLAUDE.md` is your own always-loaded instruction file, and the missing-pin direction needs a one-line summary of the topic — judgment, not a mechanical fix. A project with no `.atl/brain-storms` directory is silent.
+
 ## The CLI / Skill split
 
 `atl doctor` only does deterministic repairs — re-fetch an absent file, retry a mechanical step. Anything that needs an LLM (processing a queued learning into the knowledge base) is out of scope by design; the doctor surfaces the count and points you at the skill. This is why a large backlog shows up as a warning here but is actually cleared by running [`/drain`](/cli/learnings).
@@ -54,6 +64,7 @@ OK    queue-backlog — queue empty
 OK    tick-freshness — last tick 3m12s ago
 OK    asset-integrity — all installed files present
 OK    hooks-bound — all automation hooks bound
+OK    brainstorm-pins — pins agree with brainstorm frontmatter
 
 doctor: all healthy
 ```
@@ -66,6 +77,7 @@ WARN  queue-backlog — 63 pending items — a drain skill should process them
 OK    tick-freshness — last tick 8s ago
 OK    asset-integrity — restored 1 missing file(s) — `atl remove <handle>/<team>` removes a team for good (self-healed)
 OK    hooks-bound — all automation hooks bound
+WARN  brainstorm-pins — 1 closed brainstorm(s) still pinned in CLAUDE.md — every session is told the decision is open: docs-sync-v2.md (status: completed) — fix the `<!-- brainstorm:active -->` block (brainstorm rule)
 
 doctor: warnings above (not fatal)
 ```
