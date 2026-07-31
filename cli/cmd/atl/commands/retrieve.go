@@ -350,8 +350,10 @@ func autoIndexRetrieval(project string) {
 }
 
 // corpusStale reports whether any corpus Markdown file is newer than the index
-// (or the index is missing) — and there is at least one file to index. A missing
-// index with a non-empty corpus is stale (build it); an empty corpus never is.
+// (or the index is missing), or the index holds a page that has since been
+// deleted — and there is at least one file to index. A missing index with a
+// non-empty corpus is stale (build it); an empty corpus never is (a rebuild would
+// have nothing to index).
 func corpusStale(dirs []string, idxPath string) bool {
 	var idxTime time.Time
 	if info, err := os.Stat(idxPath); err == nil {
@@ -370,7 +372,31 @@ func corpusStale(dirs []string, idxPath string) bool {
 			return nil
 		})
 	}
-	return any && newer
+	return any && (newer || indexHasDeletedPage(idxPath))
+}
+
+// indexHasDeletedPage reports whether the index holds a page whose file is gone.
+// A delete-only change makes nothing that survives newer, so modtimes alone never
+// see it — and the deleted page goes on being ranked (with a stale title and, the
+// only tell, no excerpt) while it evicts a live result from the fixed top-k
+// budget. Checked only after the cheap modtime pass says otherwise-fresh.
+func indexHasDeletedPage(idxPath string) bool {
+	ix, err := retrieve.Load(idxPath)
+	if err != nil || ix == nil {
+		// Nothing to compare against. A *missing* index is already caught by the
+		// modtime pass (nothing to stat -> zero time -> every page counts as
+		// newer); a present-but-unusable one — corrupt, or written by an older
+		// indexFormatVersion, both of which Load also reports as "no index" — is
+		// not, so over a quiet corpus it stays fresh here and never rebuilds.
+		// That gap predates this check; it is left as-is rather than widened in.
+		return false
+	}
+	for _, d := range ix.Docs {
+		if _, err := os.Stat(d.Path); os.IsNotExist(err) {
+			return true
+		}
+	}
+	return false
 }
 
 // inGitWorktree reports whether dir is inside a linked git worktree (as opposed
