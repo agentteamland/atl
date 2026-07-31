@@ -97,12 +97,22 @@ func Find(dir string, since time.Time) ([]File, error) {
 // harness-injected records (skill-content injections, command caveats) that carry
 // a user role but are not the user speaking.
 type transcriptEvent struct {
-	IsMeta  bool `json:"isMeta"`
-	Message struct {
+	IsMeta bool `json:"isMeta"`
+	// IsCompactSummary marks the recap the harness injects as a user-role message
+	// when it compacts a long session. It is machine-authored and enormous
+	// (14-18k chars observed), so counting it as user input is what turned the
+	// watchdog's char gate into a formality after any compaction.
+	IsCompactSummary bool `json:"isCompactSummary"`
+	Message          struct {
 		Role    string          `json:"role"`
 		Content json.RawMessage `json:"content"`
 	} `json:"message"`
 }
+
+// interruptMarker is the literal user-role string the harness writes when the
+// user cancels a turn. It carries no flag of its own — unlike a compact summary
+// — so it is matched by text.
+const interruptMarker = "[Request interrupted"
 
 // ExtractText reads a transcript file and returns the concatenated assistant
 // text content (the surface markers are emitted into). User messages, tool
@@ -172,8 +182,8 @@ func ExtractFlow(path string) ([]Turn, error) {
 		if err := json.Unmarshal(line, &ev); err != nil {
 			continue
 		}
-		if ev.IsMeta {
-			continue // harness-injected (a skill's SKILL.md dump, a command caveat) — user-role but not the user speaking; noise for mining and for the watchdog alike
+		if ev.IsMeta || ev.IsCompactSummary {
+			continue // harness-injected (a skill's SKILL.md dump, a command caveat, a compaction recap) — user-role but not the user speaking; noise for mining and for the watchdog alike
 		}
 		role := ev.Message.Role
 		if role != "user" && role != "assistant" {
@@ -182,6 +192,9 @@ func ExtractFlow(path string) ([]Turn, error) {
 		text := strings.TrimSpace(contentText(ev.Message.Content))
 		if text == "" {
 			continue
+		}
+		if role == "user" && strings.HasPrefix(text, interruptMarker) {
+			continue // the harness's own cancellation notice, not something the user typed
 		}
 		turns = append(turns, Turn{Role: role, Text: text})
 	}
