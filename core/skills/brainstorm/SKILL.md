@@ -109,8 +109,9 @@ These topics have an in-progress brainstorm — read the file before making any 
    over time, re-tighten it back to a pointer when you next touch the block — it
    is always loaded into context, so it must not balloon.
 3. **Relative path:** path relative to the file you're editing (e.g.,
-   `.atl/brain-storms/foo.md` from project `CLAUDE.md`; `brain-storms/foo.md`
-   from `~/.claude/CLAUDE.md`).
+   `.atl/brain-storms/foo.md` from project `CLAUDE.md`; `../.atl/brain-storms/foo.md`
+   from `~/.claude/CLAUDE.md` — the global pin lives in `~/.claude` while the
+   brainstorm it points at lives in `~/.atl`, so the path must climb out).
 4. **One-line summary:** distill from the brainstorm's H1 title or context —
    under ~80 chars.
 
