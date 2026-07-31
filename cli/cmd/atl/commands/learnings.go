@@ -187,7 +187,9 @@ var learningsTranscriptCmd = &cobra.Command{
 	Long: "Emit the recent user+assistant conversation flow for the current project so\n" +
 		"the /drain skill can mine user corrections, reverts, and repeated mistakes the\n" +
 		"agent never marked. Tool calls/results are dropped — prose only. --limit N reads\n" +
-		"the most recent N transcripts (default 2); --json emits role/text records.",
+		"the most recent N transcripts (default 2); --json emits role/text records. The\n" +
+		"flow is capped at the most recent 256 KB of prose — when older turns are cut,\n" +
+		"a note says so, so the mine can be reported as the partial sweep it was.",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		project, err := os.Getwd()
 		if err != nil {
@@ -206,12 +208,24 @@ var learningsTranscriptCmd = &cobra.Command{
 			files = files[len(files)-limit:] // Find returns oldest-first → keep the most recent N
 		}
 		var turns []transcript.Turn
+		var overLong int
 		for _, fl := range files {
-			t, err := transcript.ExtractFlow(fl.Path)
+			t, dropped, err := transcript.ExtractFlow(fl.Path)
+			overLong += dropped
 			if err != nil {
 				continue // a single unreadable transcript shouldn't fail the mine
 			}
 			turns = append(turns, t...)
+		}
+		turns, truncated := tailByBytes(turns, maxFlowBytes)
+		// Both notes go to stderr: --json must stay a parseable array (the whole
+		// point of the flag), and an agent's shell shows both streams anyway, so
+		// the skill still reads them and can report an honest partial sweep.
+		if truncated {
+			fmt.Fprintf(os.Stderr, "atl: flow truncated to the most recent %d KB of prose — older turns were not emitted; report this mine as a partial sweep\n", maxFlowBytes/1024)
+		}
+		if overLong > 0 {
+			fmt.Fprintf(os.Stderr, "atl: skipped %d over-long transcript record(s) — their turns are missing from this flow\n", overLong)
 		}
 		if jsonOut, _ := cmd.Flags().GetBool("json"); jsonOut {
 			b, err := json.MarshalIndent(turns, "", "  ")
@@ -230,6 +244,32 @@ var learningsTranscriptCmd = &cobra.Command{
 		}
 		return nil
 	},
+}
+
+// maxFlowBytes caps the prose `transcript` emits. Its only other bound is a file
+// count (--limit), and a file is not a size: five real sessions measured here
+// carried 131-633 KB of prose each, so the default two-file read can hand the
+// mining step ~900 KB — more than the subagent's whole context. Dilution is the
+// second cost: the step looks for what went UNMARKED, and a bigger haystack with
+// the same needle count makes it least reliable exactly when the session was long
+// enough to have forgotten something. 256 KB is ~64k tokens at ~4 bytes/token —
+// it kept 164-552 turns of those same sessions, leaving room for the skill's own
+// instructions. Fixed until a v2 config layer exists, like the watchdog thresholds.
+const maxFlowBytes = 256 * 1024
+
+// tailByBytes keeps the most recent turns that fit in maxBytes and reports
+// whether anything older was cut. Recent-first because an unmarked correction is
+// most likely in the stretch just gone by. The newest turn is always kept: one
+// oversized turn must not blank the mining input entirely.
+func tailByBytes(turns []transcript.Turn, maxBytes int) ([]transcript.Turn, bool) {
+	total := 0
+	for i := len(turns) - 1; i >= 0; i-- {
+		total += len(turns[i].Text)
+		if total > maxBytes && i < len(turns)-1 {
+			return turns[i+1:], true
+		}
+	}
+	return turns, false
 }
 
 // statusJSON marshals the per-channel pending counts to a stable JSON object

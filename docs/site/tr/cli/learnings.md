@@ -89,6 +89,8 @@ Mevcut proje için son **kullanıcı + asistan konuşma akışını** yazdırır
 | `--limit <n>` | int | `2` | Bu proje için en son N transkripti okur. |
 | `--json` | bool | `false` | Turları `[rol] metin` satırları yerine JSON olarak (`role`, `text`) verir. |
 
+Akış ayrıca **en son 256 KB düz metinle** sınırlanır — `--limit` kaç dosyanın okunacağını sınırlar, o dosyaların ne kadar metin taşıdığını değil; uzun bir oturumun yalnızca düz metni bile madenleme alt-ajanının tüm bağlamını aşabilir. Daha eski turlar kesildiğinde bunu bildiren bir not yazılır (stderr'e, böylece `--json` ayrıştırılabilir bir dizi olarak kalır) ve madenleme, olduğu gibi kısmi bir tarama olarak raporlanmalıdır. Aynı kanal, aşırı uzun olduğu için atlanan transkript kayıtlarını da bildirir; böylece akışta eksik kalan turlar hiçbir zaman sessiz kalmaz.
+
 İnsan-okunur çıktı, tur başına bir satırdır:
 
 ```
