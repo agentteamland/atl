@@ -253,3 +253,98 @@ func TestDryStretch(t *testing.T) {
 		t.Errorf("machine-noise Chars = %d, want 8 (runes of the two typed messages only)", st5.Chars)
 	}
 }
+
+// compactLine renders a compaction-summary record: user-role, machine-authored,
+// flagged with isCompactSummary.
+func compactLine(text string) string {
+	return `{"isCompactSummary":true,"message":{"role":"user","content":[{"type":"text","text":` + strconv.Quote(text) + `}]}}` + "\n"
+}
+
+// TestDryStretchSkipsMachineUserTurns is the regression for the watchdog's
+// char gate. `isMeta` and the `<`-prefix heuristic already covered two carriers
+// of machine-authored user-role content; two more slipped through and were
+// large enough to satisfy the 1000-char threshold on their own:
+//
+//   - the compaction recap the harness injects after compacting a long session
+//     (13,995-17,966 chars observed in real transcripts), and
+//   - the `[Request interrupted by user]` cancellation notice.
+//
+// Measured on one real project: 127,362 machine chars counted as user input
+// against 140,900 genuinely typed — so after any compaction the gate was a
+// formality and the watchdog degraded to turns-only.
+func TestDryStretchSkipsMachineUserTurns(t *testing.T) {
+	isMarker := func(s string) bool { return strings.Contains(s, "<!-- learning:") }
+	dir := t.TempDir()
+	write := func(name, body string) string {
+		p := filepath.Join(dir, name)
+		if err := os.WriteFile(p, []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+
+	// A dry stretch carrying 16k chars of machine-authored "user input" and only
+	// 40 chars the user actually typed. Before the fix the gate saw 16,040 and
+	// sailed past its 1000-char threshold on the recap alone.
+	p := write("machine.jsonl",
+		dryLine("assistant", "noted <!-- learning: something -->")+
+			dryLine("user", strings.Repeat("t", 40))+
+			dryLine("assistant", "dry reply A")+
+			compactLine(strings.Repeat("m", 16000))+
+			dryLine("user", "[Request interrupted by user]")+
+			dryLine("assistant", "dry reply B"))
+	st, err := DryStretch(p, isMarker)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st.Chars != 40 {
+		t.Errorf("Chars = %d, want 40 — a 16k compaction recap and an interrupt notice are not user input", st.Chars)
+	}
+	// Turns = 1: dropping the machine records leaves the two assistant replies
+	// adjacent, so the logical-turn collapse merges them. Accepted side effect —
+	// a skipped record is removed, not turned into a boundary — and it errs
+	// toward SILENCE (fewer counted turns is harder to trip), which is the
+	// watchdog's documented failure direction.
+	if st.Turns != 1 {
+		t.Errorf("Turns = %d, want 1 (the assistant replies collapse once the machine records between them are dropped)", st.Turns)
+	}
+
+	// Genuine input alongside the machine carriers is still counted, so the fix
+	// suppresses noise without blinding the gate.
+	p2 := write("mixed.jsonl",
+		dryLine("assistant", "noted <!-- learning: something -->")+
+			compactLine(strings.Repeat("m", 16000))+
+			dryLine("user", strings.Repeat("t", 640))+
+			dryLine("assistant", "dry reply"))
+	st2, err := DryStretch(p2, isMarker)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st2.Chars != 640 {
+		t.Errorf("Chars = %d, want 640 (only the typed turn)", st2.Chars)
+	}
+}
+
+// TestExtractFlowSkipsMachineUserTurns keeps the mining surface consistent with
+// the watchdog: a compaction recap is not conversation to mine either.
+func TestExtractFlowSkipsMachineUserTurns(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "t.jsonl")
+	body := dryLine("user", "real question") +
+		compactLine("This session is being continued from a previous conversation...") +
+		dryLine("user", "[Request interrupted by user]") +
+		dryLine("assistant", "real answer")
+	if err := os.WriteFile(p, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	turns, err := ExtractFlow(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(turns) != 2 {
+		t.Fatalf("got %d turns, want 2 (the two machine records must be skipped): %+v", len(turns), turns)
+	}
+	if turns[0].Text != "real question" || turns[1].Text != "real answer" {
+		t.Errorf("wrong turns survived: %+v", turns)
+	}
+}
