@@ -16,6 +16,15 @@ ajanını, `/profile-drain`, `/profile-backup` ve `/profile-restore` becerilerin
 `profile-capture` kuralını `~/.claude`'a yerleştirir, profilleri `~/.atl/profiles/` altında
 saklar.
 
+::: warning `/profile-backup` yalnızca özel bir depoya yazar
+Anlık görüntü, **hangi git deposundan çalıştırırsan** oraya gider ve `git add -f` ile eklenir —
+yani `.gitignore` onu tutmaz. Depo, hayatındaki insanlar hakkında söylediklerini ve tier-4
+bilgilerini taşıdığı için beceri, **hiçbir şey kopyalamadan önce** deponun görünürlüğünü
+denetler ve herkese açık bir depoda reddeder. Görünürlüğü doğrulayamadığında da (GitHub remote
+yoksa ya da `gh` kullanılamıyorsa) tahmin etmek yerine reddeder: yanlış bir ret bir komuta mal
+olur, yanlış bir yazma geri alınamaz.
+:::
+
 ## Profil dünyası
 
 Her şey global ATL katmanı altında `~/.atl/profiles/`'te yaşar:
