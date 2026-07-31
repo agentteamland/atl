@@ -125,20 +125,29 @@ akc=$(gh issue list --repo "$REPO" --state all --json labels -q '[.[].labels[].n
 ge "$akc" && ok "created issues carry an atl-key label (idempotency §5)" || note "no atl-key label this run (LLM-variable)"
 
 # ---- 2. /refine — decompose the Feature into keyed, area-labelled PBI issues -------
-gturn "/refine. Groom and decompose the analyzed Feature(s) into implementable work-units (PBIs) as GitHub issues under them (each nested via the sub_issues REST endpoint, adapter §1). Give each a Priority, record at least one dependency as a '## Depends On' line (#N) in the tech-lead's canonical-brief comment (adapter §8), and converge on existing items — do not duplicate the kickoff Epic/Feature. Label each work-unit 'area:web' (this is a web project) and stamp an 'atl-key:<shorthash>' label." || bad "refine turn errored"
+# The labelling instruction is deliberately UNAMBIGUOUS. An earlier version said
+# "label each work-unit 'area:web' (this is a web project)", which contradicts the
+# architecture doc /kickoff seeds one step earlier (a React frontend AND a Node
+# backend) — so the ceremony correctly stopped to ask which reading was meant, and
+# a headless run has nobody to answer. See atl#336.
+gturn "/refine. Groom and decompose the analyzed Feature(s) into implementable work-units (PBIs) as GitHub issues under them (each nested via the sub_issues REST endpoint, adapter §1). Give each a Priority, record at least one dependency as a '## Depends On' line (#N) in the tech-lead's canonical-brief comment (adapter §8), and converge on existing items — do not duplicate the kickoff Epic/Feature. Labelling, decided: split the work by real system shape and label each unit with the area that matches it — 'area:web' for user-facing/UI units, 'area:api' for backend units. Those two are the only areas in play here; never 'area:mobile' or 'area:go-cli'. At least one unit must be 'area:web'. This is a settled instruction from the product owner, so do not pause to confirm it. Stamp each unit with an 'atl-key:<shorthash>' label." || bad "refine turn errored"
 
 # refine is the less-deterministic ceremony -> NOTE, not fail:
 pbi=$(gh issue list --repo "$REPO" --state all --json labels -q '[.[] | select((.labels // []) | map(.name) | any(. == "area:web"))] | length' 2>/dev/null || echo 0)
 ge "$pbi" && ok "refine produced area:web work-units (PBIs)" || note "no area:web PBI this run (LLM-variable: refine is less-deterministic)"
 
 # ---- 3. /sprint-plan — velocity (cold-start), admit units onto the board ----------
-gturn "/sprint-plan. This is a cold-start project (no closed sprints), so use the po-seed velocity path. The candidate backlog is the open PBI issues (label area:web) not yet on the board. Select the top units and admit them to the current sprint by setting their Projects v2 Iteration field (add the issue to Project #$PROJNUM and set Iteration). Report the seed velocity used." || bad "sprint-plan turn errored"
+# The seed velocity is SUPPLIED here, as the PO. methodology.json carries
+# seedVelocity: null on purpose — this exercises the po-seed path, where the
+# ceremony must refuse to invent the number and wait for the human. A headless run
+# has to play that human, or the ceremony correctly pauses forever. See atl#336.
+gturn "/sprint-plan. You ARE the human product owner for this run. This is a cold-start project (no closed sprints), so use the po-seed velocity path — and here is the seed, decided by you: **8 story points** for Sprint 1. That is your number; take it and proceed, do not ask for it and do not invent a different one. The candidate backlog is the open PBI issues (labelled area:web or area:api) not yet on the board. Select the top units within that capacity and admit them to the current sprint by setting their Projects v2 Iteration field (add each issue to Project #$PROJNUM and set Iteration). Report the seed velocity used and which units you admitted." || bad "sprint-plan turn errored"
 
 items=$(gh project item-list "$PROJNUM" --owner "$OWNER" --format json -q '.items | length' 2>/dev/null || echo 0)
 ge "$items" && ok "sprint-plan added units to the Project board" || note "no board items this run (LLM-variable; sprint-start still derives the plan below)"
 
 # ---- 4. /sprint-start — build the DAG + materialize plan.json (NO dispatch) --------
-gturn "/sprint-start. Read the sprint's admitted work-units (the area:web PBIs; if none are on the board yet, use the open area:web PBIs), read each unit's '## Depends On' lines to build the dependency DAG, validate it is acyclic, and materialize .delivery/plan.json in the exact dispatch.Plan schema (sprintSlug, granularity, units[] with id/title/predecessors/stackRank). This is a ceremony test: STOP after writing plan.json — do NOT run 'atl work dispatch'. There are no mobile-tagged units, so skip the emulator preflight." || bad "sprint-start turn errored"
+gturn "/sprint-start. Read the sprint's admitted work-units (the area:web and area:api PBIs; if none are on the board yet, use the open ones), read each unit's '## Depends On' lines to build the dependency DAG, validate it is acyclic, and materialize .delivery/plan.json in the exact dispatch.Plan schema (sprintSlug, granularity, units[] with id/title/predecessors/stackRank). This is a ceremony test: STOP after writing plan.json — do NOT run 'atl work dispatch'. There are no mobile-tagged units, so skip the emulator preflight." || bad "sprint-start turn errored"
 
 if [ -f "$PROJ/.delivery/plan.json" ] && jq -e '.' "$PROJ/.delivery/plan.json" >/dev/null 2>&1; then
   ok "sprint-start materialized a valid .delivery/plan.json"
@@ -181,8 +190,13 @@ gturn "/sprint-review. You ARE the human product owner for this run — the real
 # CORE: a NEW dev->release promotion PR opened this run
 rel=$(gh pr list --repo "$REPO" --base release --state all --limit 400 --json number -q 'length' 2>/dev/null || echo 0)
 { [ "$rel" -gt "$prev_rel" ]; } 2>/dev/null && ok "PO-approved dev->release promotion PR opened this run (§10)" || bad "no NEW dev->release PR opened"
-# NOTE: the sprint-review page written to docs/sprints/
-if gh api "repos/$REPO/contents/docs/sprints/sprint-1-review.md" >/dev/null 2>&1; then ok "sprint-review upserted a docs/sprints review page (§9)"; else note "no docs/sprints review page this run (LLM-variable)"; fi
+# NOTE: the sprint-review page written to docs/sprints/.
+# ?ref=dev is load-bearing: the ceremony works on the dev branch, but `contents`
+# without a ref resolves against the DEFAULT branch, so this could never find the
+# page and reported "LLM-variable" on every run — a deterministic false negative
+# wearing the label we use for genuine model variance. Its tier stays NOTE only
+# until we have real data: before this fix it was never actually observed. (atl#336)
+if gh api "repos/$REPO/contents/docs/sprints/sprint-1-review.md?ref=dev" >/dev/null 2>&1; then ok "sprint-review upserted a docs/sprints review page (§9)"; else note "no docs/sprints review page this run"; fi
 
 # ---- on failure, surface what the torn-down container would otherwise lose ---------
 if [ "$FAIL" -gt 0 ]; then
