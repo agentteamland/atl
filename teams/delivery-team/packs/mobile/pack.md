@@ -26,6 +26,7 @@ in the tech-lead's canonical brief.
 - [widget-and-state.md](widget-and-state.md) — widget structure, state management (Riverpod / Provider), and navigation.
 - [project-and-deps.md](project-and-deps.md) — Flutter/Dart project layout, `pub` dependencies, and platform channels.
 - [testing.md](testing.md) — unit + widget tests, `integration_test` on a booted emulator/simulator, and the lease / evidence discipline.
+- [production-unit.md](production-unit.md) — the lifecycle for this pack's production unit, a screen: decide → scaffold → **register in the route table** → **verify by entering through it on a booted device** → pitfalls → hand-off.
 
 ## Test commands
 
@@ -40,6 +41,7 @@ in the tech-lead's canonical brief.
 - **`const` every constructor that can be.** A `const` widget subtree is skipped on rebuild. Reason: it is the cheapest, most mechanical rebuild-cost win, and the analyzer flags the misses.
 - **Never block the UI isolate.** Keep heavy CPU work off the main isolate (`compute` / an isolate); `await` I/O, don't spin. Reason: Flutter renders on one isolate at 60/120fps — a synchronous stall is a visible jank or freeze.
 - **A mobile acceptance criterion is proven on a booted device, never in logic alone.** A screen/interaction/navigation criterion is verified through `integration_test` on a preflighted emulator; if the device did not boot, the criterion is **unverified**, not passed (block-never-silently-pass, mirrors the tester). Reason: logic tests can't observe the rendered device behavior the criterion is actually about.
+- **A new screen is not done until it is registered in the route table AND observed being entered through it.** `flutter test` and `dart analyze` are green on a screen no route points at — a widget test constructs it directly by design, and an unreferenced screen class is not an analyzer finding — and even an `integration_test` that pumps the screen itself passes on a real device with the route missing. Reason: only entering by the named route, against the app's real root, proves the screen is reachable at all; a screenshot proves it renders, which is a different claim. See [production-unit.md](production-unit.md).
 
 ## Dependency baseline
 

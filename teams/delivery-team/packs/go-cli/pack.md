@@ -30,6 +30,9 @@ See [`knowledge/pack-format.md`](../../knowledge/pack-format.md) for the three-l
   package layout, and the embedded-asset re-sync gate.
 - [testing.md](testing.md) — the table test over the extracted pure helper (the wide base of the
   pyramid), what is and isn't unit-testable in a cobra command, and the code-surface gate commands.
+- [production-unit.md](production-unit.md) — the lifecycle for this pack's production unit, a
+  command: decide → scaffold → **register on its parent** → **verify by running the binary** →
+  pitfalls → hand-off.
 
 ## Test commands
 
@@ -68,9 +71,15 @@ run a docs gate too (e.g. `atl docs check`) — the brief names it when it appli
 - **Validate flags/args up front, fail loudly on contradictions.** Mutually exclusive modes are
   rejected with a clear error before any work — not silently precedence-ordered (especially when one
   branch is irreversible). See [command-conventions.md](command-conventions.md).
-- **The code surface is the whole gate.** `go build ./... && go vet ./... && go test ./...` all green
-  is the developer's Level-1 self-test; the tester's Level-2 pass gates the green. Evidence (the
-  run output) attaches to the work-item.
+- **A new command is not done until it is registered AND observed in the binary.** Mount it on its
+  parent in the same `init()` as its siblings, then build the tool and confirm it appears in
+  `--help`. A command that is written but never mounted compiles, vets and tests **fully green** and
+  is unreachable — no test drives the composed command tree, so the binary is the only place the
+  omission shows. See [production-unit.md](production-unit.md).
+- **The code surface is the whole gate — except for the line above.** `go build ./... && go vet ./...
+  && go test ./...` all green is the developer's Level-1 self-test; the tester's Level-2 pass gates
+  the green. Evidence (the run output) attaches to the work-item. For a new command or flag, the
+  evidence is the **help output**, not the test summary.
 
 ## Dependency baseline
 

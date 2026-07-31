@@ -35,7 +35,8 @@ A pack is a directory `packs/<area>/` containing a manifest plus topic files:
 ```
 packs/<area>/
 ├── pack.md            ← the manifest (self-describing header) — required
-└── <topic>.md ...     ← how-to / conventions / blueprints for this stack — one or more
+├── production-unit.md ← the blueprint for what this pack builds repeatedly
+└── <topic>.md ...     ← how-to / conventions for this stack — one or more
 ```
 
 - **`pack.md`** is the manifest and the **only** required file. The `developer` reads
@@ -46,6 +47,49 @@ packs/<area>/
   prose (a short intro + the WHY + worked patterns), but they are **pack content, not
   agent children** — so they need **no frontmatter** (`pack.md`'s `## Topics` list is
   the index, not an auto-rebuilt KB section).
+- **`production-unit.md`** is the one topic every pack should carry — see below.
+
+### `production-unit.md` — the blueprint for what this pack builds repeatedly
+
+Every stack has a **production unit**: the thing a developer creates over and over —
+an endpoint, a screen, a component, a command. The core `agent-structure` rule already
+requires a blueprint for it, and names the lifecycle: *"the template (code scaffold), a
+completion checklist, naming conventions, and the creation → **registration** → test
+lifecycle."*
+
+The registration half is what makes this its own topic rather than a paragraph
+somewhere. **The characteristic failure of a scaffolded unit is not a bad body — it is
+a correct body that nothing calls.** An endpoint whose route is never mounted, a screen
+absent from the navigator, a migration never applied, a command never added to its
+parent: each one compiles, passes its own unit tests, and is unreachable. Every gate the
+pack names goes green.
+
+So the blueprint has six parts, and parts 3 and 4 are the reason it exists:
+
+1. **Decide before you write** — location, category, name. Settled first, because
+   renaming later touches the file, the registration, the tests and the docs.
+2. **Scaffold** — the code template, with the stack's idioms already in it.
+3. **Register** — wire the unit into the composition root, *matching how its siblings
+   are wired*. A registration that looks unlike its neighbours is the one a reviewer
+   skims past.
+4. **Verify the durable effect** — observe the unit where a user or the system would
+   find it (the route table, the rendered screen, the migration history, the binary's
+   help), **and name the false green out loud**: exactly which passing gate fails to
+   catch the omission, so the worker knows why "tests are green" is not the answer here.
+5. **Common pitfalls** — the mistakes this stack actually produces.
+6. **Hand-off** — what must be attached for the tester, and an explicit statement of
+   what was *observed* versus *assumed*.
+
+Where a pack's prescribed tests already drive the composed root — an in-process HTTP
+integration test, an on-device navigation by named route, a rendered preview — part 4
+is making an existing guarantee explicit. Where they do not, part 4 is the only thing
+standing between the worker and a silent false green.
+
+**Copy the shape, not the rows.** The composition-root path, the decision table's
+options, the domain categories are project-specific and belong in the project's durable
+knowledge (`Conventions/`, `Architecture/`), layered atop the pack by the three-layer
+read contract below. The pack teaches *that* you must register and verify, and *how* to
+verify on this stack; the project says *where*.
 
 ### The `pack.md` manifest schema
 
