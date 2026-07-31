@@ -74,7 +74,11 @@ Bunun bilinçli olarak **yapmadıkları**:
 - **Git durumunuzu asla bozmaz.** Anlık görüntü, tek kullanımlık bir index üzerinde plumbing komutlarıyla yazılır; staging alanınıza dokunulmaz ve hiçbir hook çalışmaz. Merge, rebase veya cherry-pick ortasındaki bir repo, o durumdan çıkana kadar atlanır.
 - **Kimseye erişim vermez.** ATL bildirilen *yolu* yalnızca bu tek mekanik amaç için okur. Bir depoyu kimin okuyup yazabileceği, platformun henüz uygulamadığı ayrı bir sözleşmedir.
 
-Bildirilen yollar bunların hiçbiri çalışmadan önce denetlenir: önce sembolik bağlar çözülür, ardından hedefin ev dizininizin en az iki seviye altında olması ve içinde bulunduğunuz çalışma dizinini kapsamaması aranır. Yani `~`, en üst seviyedeki tek bir dizin veya üzerinde çalıştığınız projenin kendisi repo'ya çevrilmez, reddedilir. Bu bir kum havuzu (sandbox) değildir — bilerek kendi başka bir dizininize yönlendirdiğiniz bir yol kabul edilir, çünkü bu bir takımın deposunu meşru şekilde orada tutmasından ayırt edilemez. Tüm geçişi kapatmak için `ATL_NO_STORE_GIT=1`.
+Bildirilen yollar bunların hiçbiri çalışmadan önce denetlenir: önce sembolik bağlar çözülür, ardından hedefin ev dizininizin en az iki seviye altında olması ve içinde bulunduğunuz çalışma dizinini kapsamaması aranır. Yani `~`, en üst seviyedeki tek bir dizin, ev dizininizin tamamen dışındaki bir yer veya üzerinde çalıştığınız projenin kendisi repo'ya çevrilmez, reddedilir — sessizce, hiçbir uyarı olmadan. Bu bir kum havuzu (sandbox) değildir: bu kuralları sağlayan bir dizin, içeriği ne olursa olsun kabul edilir; çünkü deposunu meşru şekilde orada tutan bir takım da tam olarak böyle görünür. Tüm geçişi kapatmak için `ATL_NO_STORE_GIT=1`.
+
+::: warning Ev dizininizin dışındaki bir depo sürümlenmez
+Depoyu harici bir diskte veya bir senkronizasyon klasöründe tutuyorsanız — doğrudan bildirilmiş ya da sembolik bağla ulaşılıyor olsun — denetlenen bölgenin dışında kalır ve hiç sürümlenmez. Bugün bunun için bir uyarı yok.
+:::
 
 Bilinen bir sınır: depo kendi içinde bir git repo'su barındırıyorsa, o alt ağaç gitlink olarak kaydedilir ve içeriği anlık görüntüye girmez. Bir depo makine tarafından yazılan veridir, dolayısıyla pratikte bu durum oluşmaz — ama oluşursa sessizdir.
 

@@ -24,7 +24,11 @@ three conditions — not a git repo, **a repo that isn't demonstrably private**,
 empty/absent profile store — and reports which of the six outcomes happened:
 
 ```bash
-set -euo pipefail
+# `set -eu`, not `-euo pipefail`: this script contains no pipes, and `-o pipefail`
+# is the one non-POSIX construct here — under dash (Debian's /bin/sh) it aborts on
+# line 1 with "Illegal option -o pipefail". The body is pasted into whatever shell
+# the agent runs, so it has to be portable.
+set -eu
 
 # 1. Must be inside a git repo — the snapshot has nowhere to live otherwise.
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || { echo "not-a-git-repo"; exit 1; }

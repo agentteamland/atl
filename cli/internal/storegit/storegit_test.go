@@ -5,8 +5,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
+	"time"
 )
 
 func requireGit(t *testing.T) {
@@ -324,14 +326,29 @@ func TestNeverAddsARemote(t *testing.T) {
 	}
 }
 
-// Two teams naming the same store is legitimate (a provider and its consumer);
-// it must not produce two commits.
-func TestEnsureAllDeduplicates(t *testing.T) {
+// Two teams naming the same store is legitimate (a provider and its consumer),
+// and they will not spell the path the same way — team.json writes tilde form,
+// and the path may be reached through a symlink. So the dedup key has to be the
+// NORMALIZED path, not the literal string.
+//
+// The count alone cannot prove this: a redundant second pass finds nothing
+// changed and returns false anyway, so dedup is invisible from the outside. The
+// honest assertion is on the key itself.
+func TestEnsureAllTreatsDifferentSpellingsAsOneStore(t *testing.T) {
 	requireGit(t)
 	dir := store(t, "profiles")
+	home := os.Getenv("HOME")
 	write(t, dir, "a.md", "x\n")
 
-	if n := EnsureAll([]string{dir, dir, "", dir}); n != 1 {
+	tilde := expand("~/.atl/profiles", home)
+	absolute := filepath.Join(home, ".atl", "profiles")
+	messy := filepath.Join(home, ".atl", "notes", "..", "profiles")
+	if resolve(tilde) != resolve(absolute) || resolve(messy) != resolve(absolute) {
+		t.Fatalf("spellings normalize differently:\n  ~ form: %q\n  absolute: %q\n  unclean: %q",
+			resolve(tilde), resolve(absolute), resolve(messy))
+	}
+
+	if n := EnsureAll([]string{"~/.atl/profiles", dir, "", messy}); n != 1 {
 		t.Fatalf("EnsureAll = %d, want 1", n)
 	}
 	if n := len(logSubjects(t, dir)); n != 1 {
@@ -607,22 +624,111 @@ func TestReferenceTransactionHooksDoNotRun(t *testing.T) {
 	}
 }
 
-// An init we cannot claim must not be left behind: the next pass would see a repo
-// it does not own and skip the store forever, silently.
-func TestRollsBackAnInitItCannotClaim(t *testing.T) {
+// The empty-store skip has to happen BEFORE the repo is created. A lone .git
+// makes the directory non-empty, and a consumer that tests emptiness to decide
+// whether there is anything to work with — /profile-backup does exactly that —
+// then reports on a store that holds nothing.
+func TestEmptyStoreGetsNoRepository(t *testing.T) {
 	requireGit(t)
 	dir := store(t, "profiles")
-	write(t, dir, "a.md", "x\n")
+	if n := EnsureAll([]string{dir}); n != 0 {
+		t.Fatalf("EnsureAll = %d, want 0 for an empty store", n)
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("an empty store was left holding %d entry/entries", len(entries))
+	}
+}
+
+// Syncing the repo's real index makes it legible, but "we created this repo" is
+// not "nobody has state in it": a half-staged `git add -p` lives in the index,
+// and overwriting it destroys exactly the intermediate state this package claims
+// to leave alone. A store with staged work stays slightly untidy instead.
+func TestStagedWorkIsNotOverwritten(t *testing.T) {
+	requireGit(t)
+	dir := store(t, "profiles")
+	write(t, dir, "a.md", "one\n")
 	if EnsureAll([]string{dir}) != 1 {
 		t.Fatal("setup: no initial snapshot")
 	}
-	// Simulate the terminal state the rollback exists to prevent, and confirm it
-	// IS terminal — which is why the rollback matters.
-	if err := os.Remove(filepath.Join(dir, ".git", ownerMarker)); err != nil {
+
+	// Somebody stages an intermediate version, then edits further in the worktree.
+	write(t, dir, "a.md", "STAGED\n")
+	run(t, dir, "add", "a.md")
+	write(t, dir, "a.md", "WORKTREE\n")
+
+	if EnsureAll([]string{dir}) != 1 {
+		t.Fatal("no snapshot commit")
+	}
+
+	cmd := exec.Command("git", "show", ":a.md")
+	cmd.Dir = dir
+	out, err := cmd.Output()
+	if err != nil {
 		t.Fatal(err)
 	}
-	write(t, dir, "a.md", "y\n")
-	if EnsureAll([]string{dir}) != 0 {
-		t.Fatal("wrote into a repo carrying no ownership marker")
+	if got := strings.TrimSpace(string(out)); got != "STAGED" {
+		t.Fatalf("the staged version was destroyed: index holds %q, want \"STAGED\"", got)
+	}
+}
+
+// The symlink fix has two halves — resolving the declared path, and resolving the
+// comparison anchors. Only the first is exercised on a filesystem where /tmp is a
+// real directory, so this builds the symlinked home explicitly rather than
+// relying on the platform to provide one.
+func TestResolvesTheHomeAnchorNotJustTheStorePath(t *testing.T) {
+	requireGit(t)
+	root := t.TempDir()
+	realHome := filepath.Join(root, "real-home")
+	if err := os.MkdirAll(filepath.Join(realHome, ".atl", "profiles"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	linkedHome := filepath.Join(root, "home-link")
+	if err := os.Symlink(realHome, linkedHome); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+	t.Setenv("HOME", linkedHome)
+
+	dir := filepath.Join(linkedHome, ".atl", "profiles")
+	write(t, dir, "a.md", "x\n")
+
+	// The declared path resolves to real-home/... while HOME is home-link/... —
+	// leaving the anchor unresolved makes filepath.Rel return a "../.." path and
+	// rejects a perfectly ordinary store.
+	if n := EnsureAll([]string{dir}); n != 1 {
+		t.Fatalf("EnsureAll = %d, want 1 — a symlinked home rejected a legitimate store", n)
+	}
+}
+
+// The context deadline kills the direct child, but Output() waits for every
+// holder of the inherited pipe to close it — so a git that leaves a background
+// process behind would stall the user's prompt long past the budget, and report
+// success while doing it.
+func TestGitDoesNotWaitOnABackgroundedGrandchild(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell stub is unix-only")
+	}
+	bin := t.TempDir()
+	stub := "#!/bin/sh\nsleep 60 &\necho ok\nexit 0\n"
+	if err := os.WriteFile(filepath.Join(bin, "git"), []byte(stub), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		git(ctx, t.TempDir(), nil, "status")
+	}()
+	select {
+	case <-done:
+	case <-time.After(10 * time.Second):
+		t.Fatal("git waited on a backgrounded grandchild well past its deadline")
 	}
 }

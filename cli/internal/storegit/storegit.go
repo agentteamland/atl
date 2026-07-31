@@ -150,6 +150,14 @@ func ensure(dir string) bool {
 	if !hasGit() {
 		return false
 	}
+	if isEmptyDir(dir) {
+		// Nothing to preserve yet. Checked BEFORE `git init` rather than after the
+		// tree is built, because leaving a lone .git behind is not harmless: it
+		// makes the directory non-empty, and a consumer that tests emptiness to
+		// decide whether there is anything to work with — /profile-backup does
+		// exactly that — then reports on a store that holds nothing.
+		return false
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), budget)
 	defer cancel()
 
@@ -233,6 +241,14 @@ func snapshot(ctx context.Context, dir string) bool {
 		return false
 	}
 
+	// Read this BEFORE update-ref moves HEAD — afterwards the comparison would be
+	// against the commit we are about to make, which tells us nothing about what
+	// the user had staged.
+	indexWasClean := !hasParent
+	if hasParent {
+		_, indexWasClean = git(ctx, dir, nil, "diff-index", "--cached", "--quiet", "HEAD")
+	}
+
 	args := []string{
 		"-c", "user.name=atl",
 		"-c", "user.email=atl@localhost",
@@ -258,20 +274,47 @@ func snapshot(ctx context.Context, dir string) bool {
 		return false
 	}
 
-	// Bring the repo's REAL index up to the commit we just made. The snapshot was
-	// built in a throwaway index, so without this the repo's own index stays empty
-	// and `git status` reports every file as both staged-for-deletion and
-	// untracked — and `git checkout` refuses to move. The docs point users at this
-	// repo to recover an old value, so it has to be legible when they arrive.
-	// Safe by construction: this only ever runs in a repo this package created.
-	_, _ = git(ctx, dir, nil, "read-tree", tree)
+	// Bring the repo's REAL index up to the commit we just made — but only when it
+	// is not carrying somebody's intent.
+	//
+	// Without this, the repo's own index stays empty, `git status` reports every
+	// file as both staged-for-deletion and untracked, and `git checkout` refuses to
+	// move. The docs send users here to recover an old value, so it has to be
+	// legible when they arrive.
+	//
+	// The guard matters because "we created this repo" is not "nobody has state in
+	// it": a half-staged `git add -p` lives in the index, and overwriting it would
+	// destroy exactly the intermediate state this package claims to leave alone.
+	// So the sync runs only when the index already agrees with the old HEAD (or
+	// there was no HEAD at all) — i.e. when nothing is staged. A repo with staged
+	// work stays slightly untidy, which is the right way to lose that trade.
+	if indexWasClean {
+		_, _ = git(ctx, dir, nil, "read-tree", tree)
+	}
 	return true
 }
 
-// isEmptyTree reports whether tree is git's canonical empty tree.
+// isEmptyTree reports whether tree is git's canonical empty tree. This still
+// matters after the isEmptyDir check above: a store holding only empty
+// directories, or only ignored files, is non-empty on disk and empty to git.
 func isEmptyTree(ctx context.Context, dir, tree string) bool {
-	empty, ok := git(ctx, dir, nil, "hash-object", "-t", "tree", "/dev/null")
+	// --stdin with no input rather than reading /dev/null as a file: exec gives a
+	// nil Stdin on every platform, where /dev/null is a unix path.
+	empty, ok := git(ctx, dir, nil, "hash-object", "-t", "tree", "--stdin")
 	return ok && empty == tree
+}
+
+// isEmptyDir reports whether dir holds no entries at all. A store git already
+// owns is never empty (it has .git), so this only ever fires before the first
+// snapshot.
+func isEmptyDir(dir string) bool {
+	f, err := os.Open(dir)
+	if err != nil {
+		return false // unreadable: let the normal path decline it
+	}
+	defer f.Close()
+	names, err := f.Readdirnames(1)
+	return err != nil && len(names) == 0
 }
 
 // ownerMarker names the file that records "ATL created this repository". It

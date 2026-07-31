@@ -74,7 +74,11 @@ What this deliberately does **not** do:
 - **It never disturbs your git state.** The snapshot is written with plumbing against a throwaway index, so your staging area is untouched and no hooks run. A repo in the middle of a merge, rebase or cherry-pick is skipped until it is out of that state.
 - **It grants nobody access.** ATL reads the declared *path* for this one mechanical purpose. Who may read or write a store is a separate contract that the platform does not yet enforce.
 
-Declared paths are vetted before any of this runs: symlinks are resolved first, and the destination must be at least two levels below your home directory and must not contain your current working directory. So a declaration of `~`, of a bare top-level directory, or of the project you are working in is refused rather than turned into a repository. It is not a sandbox — a path you deliberately point at some other directory of your own is accepted, because that is indistinguishable from a team legitimately keeping its store there. Set `ATL_NO_STORE_GIT=1` to switch the whole pass off.
+Declared paths are vetted before any of this runs: symlinks are resolved first, and the destination must be at least two levels below your home directory and must not contain your current working directory. So a declaration of `~`, of a bare top-level directory, of anywhere outside your home, or of the project you are working in is refused rather than turned into a repository — silently, with no diagnostic. It is not a sandbox: a directory that satisfies those rules is accepted whatever it holds, because a team legitimately keeping its store there looks exactly the same. Set `ATL_NO_STORE_GIT=1` to switch the whole pass off.
+
+::: warning A store outside your home is not versioned
+If you keep the store on an external volume or a sync folder — declared directly, or reached through a symlink — it falls outside the vetted region and simply never gets versioned. There is no warning today.
+:::
 
 One known limit: if the store itself contains a nested git repository, that subtree is recorded as a gitlink and its contents are not captured in the snapshot. A store is machine-written data, so this does not arise in practice — but it is silent if it does.
 
