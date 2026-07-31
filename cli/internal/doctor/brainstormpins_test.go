@@ -120,8 +120,8 @@ func TestScanPinsReadsFrontmatterNotBody(t *testing.T) {
 // every one of their pins as missing.
 func TestScanPinsParagraphBlockFormat(t *testing.T) {
 	claudeMD, dir := newPinFixture(t,
-		"**Aktif brainstorm:** [Rota tabanlı sipariş](.atl/brain-storms/routes.md) — uzun bir özet.\n\n"+
-			"**Aktif brainstorm:** [Video teslimi](.atl/brain-storms/video.md) (2026-06-02) — ikinci konu.",
+		"**Active brainstorm:** [Route-based ordering](.atl/brain-storms/routes.md) — a long summary.\n\n"+
+			"**Active brainstorm:** [Video delivery](.atl/brain-storms/video.md) (2026-06-02) — a second topic.",
 		map[string]string{
 			"routes.md": brainstorm("active", "body"),
 			"video.md":  brainstorm("active", "body"),

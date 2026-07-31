@@ -47,7 +47,13 @@ exclude_path() {
 if [ "$MODE" = "staged" ]; then
   files=$(git diff --cached --name-only --diff-filter=ACM -- "${GLOBS[@]}" 2>/dev/null || true)
 else
-  files=$(git ls-files -- "${GLOBS[@]}" 2>/dev/null || true)
+  # Tracked AND untracked-but-not-ignored. `git ls-files` alone lists only
+  # tracked files, so a NEW file — precisely the one a commit is about to
+  # introduce — is invisible to a pre-commit run while CI, which scans after the
+  # add, fails on it. That gap is not theoretical: it let a Turkish test fixture
+  # through a clean local scan and into a red CI run. A check that cannot see the
+  # change you are making is not checking that change.
+  files=$( { git ls-files -- "${GLOBS[@]}"; git ls-files --others --exclude-standard -- "${GLOBS[@]}"; } 2>/dev/null | sort -u || true)
 fi
 
 violations=0
