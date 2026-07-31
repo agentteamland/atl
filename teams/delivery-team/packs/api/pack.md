@@ -30,6 +30,9 @@ bridge).
   migrations, and transaction boundaries.
 - [testing.md](testing.md) — unit tests + HTTP integration tests via supertest, the CI commands
   that constitute the code-surface gate, and how evidence attaches to the work-item.
+- [production-unit.md](production-unit.md) — the lifecycle for this pack's production unit, an
+  endpoint: decide → scaffold → **register on its router AND in the composition root** → **verify on
+  the composed app** → pitfalls → hand-off.
 
 ## Test commands
 
@@ -57,6 +60,12 @@ There is no web or mobile surface command — an `api` unit is verified on the *
 - **The database is reached through one data-access layer**, never ad-hoc from a route. Schema
   changes ship as **forward-only migrations**; multi-write invariants run inside a **transaction**.
   See [data-and-persistence.md](data-and-persistence.md).
+- **An endpoint is not done until it is registered AND observed on the composed app.** Registration is
+  two wirings — the route on its resource's router, and (for a new router) `app.use(prefix, router)` in
+  the composition root, positioned in the middleware chain. The prescribed supertest test catches a
+  never-mounted route *only if it imports the real `app`*; a test that assembles its own app passes
+  every gate while the route is absent from the running service. See
+  [production-unit.md](production-unit.md).
 - **The code surface is the whole gate for `api` units.** `npm run typecheck && npm run lint &&
   npm test` all green is the developer's Level-1 self-test; the tester's Level-2 pass gates the
   green. Evidence (the test-run output) attaches to the work-item.

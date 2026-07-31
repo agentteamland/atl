@@ -19,6 +19,7 @@ contract, `knowledge/pack-format.md`).
 - [component-conventions.md](component-conventions.md) — component structure, naming, TS prop/state typing, folder layout.
 - [state-and-data.md](state-and-data.md) — local vs shared state, when to reach for a store, server-state via a data-fetching library, forms.
 - [testing.md](testing.md) — unit/component tests (Vitest + React Testing Library) + the web-surface e2e (preview/chrome-devtools MCP) + evidence via `scripts/az-attach.sh`.
+- [production-unit.md](production-unit.md) — the lifecycle for this pack's production unit, a component (and a page/route): decide → scaffold → register it in the composed tree → verify it in the running app → pitfalls → hand-off.
 
 ## Test commands
 - unit / component: `npm run test` (Vitest, headless; `npm run test -- --run` for a single non-watch pass in a worker)
@@ -30,6 +31,7 @@ contract, `knowledge/pack-format.md`).
 - **Function components + hooks only.** No class components, no lifecycle methods — the whole ecosystem (this pack included) assumes the hooks model; mixing paradigms fractures the shared craft.
 - **Presentational vs container split by data-ownership, not by folder dogma.** A component that fetches/owns state is a container; one that only renders props is presentational. Keeping the fetch out of the leaf is what makes the leaf testable in isolation ([testing.md](testing.md)).
 - **Server state is not client state.** Data from the API is cache, not local state — it is fetched, cached, and invalidated by a data-fetching layer, never hand-mirrored into `useState` ([state-and-data.md](state-and-data.md)). Conflating the two is the single most common source of stale-UI bugs.
+- **A component is not done until it is registered AND observed in the running app.** Something the app root reaches must render it — a parent's JSX for a component, the route table for a page — and you then look at it through the web surface. A component that is written but never imported passes `npm run lint`, `npm run typecheck` and the whole Vitest suite green: its colocated test renders it in a composed tree of one, so "it renders" is proven while "the app renders it" is never tested ([production-unit.md](production-unit.md)).
 - **The self-test drives the loaded pack, on the right surface.** Logic → Vitest/RTL (parallel); a criterion that only manifests in the rendered UI → the web MCP surface. An un-run surface is unverified, never a green (aligned with the `tester`'s Level-2 discipline; [testing.md](testing.md)).
 
 ## Dependency baseline
