@@ -24,7 +24,11 @@ three conditions — not a git repo, **a repo that isn't demonstrably private**,
 empty/absent profile store — and reports which of the six outcomes happened:
 
 ```bash
-set -euo pipefail
+# `set -eu`, not `-euo pipefail`: this script contains no pipes, and `-o pipefail`
+# is the one non-POSIX construct here — under dash (Debian's /bin/sh) it aborts on
+# line 1 with "Illegal option -o pipefail". The body is pasted into whatever shell
+# the agent runs, so it has to be portable.
+set -eu
 
 # 1. Must be inside a git repo — the snapshot has nowhere to live otherwise.
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || { echo "not-a-git-repo"; exit 1; }
@@ -52,10 +56,21 @@ fi
 
 # 4. Snapshot global → repo. Clear then copy, so the backup is a true mirror
 #    (a profile deleted in global disappears from the snapshot too).
+#    The store is itself a git repo (ATL versions it locally so an overwritten value
+#    stays recoverable), and its .git MUST NOT be copied: `git add` on a directory
+#    that contains a nested .git records a GITLINK instead of the files — it exits 0,
+#    the emptiness check below sees a change, and the user is told the backup
+#    succeeded while the snapshot holds no profile content at all.
+#    Copy everything, then remove the .git — rather than filtering during the copy.
+#    A glob-and-skip loop would be shell-dependent: zsh errors on an unmatched glob
+#    (its default `nomatch`), which aborts under `set -e` AFTER the rm -rf above, so
+#    the snapshot is wiped and no outcome marker is ever printed. This form runs the
+#    same under sh, bash and zsh, and it also preserves dangling symlinks.
 DEST="$REPO_ROOT/profile-backup"
 rm -rf "$DEST"
 mkdir -p "$DEST"
 cp -R "$SRC/." "$DEST/"
+rm -rf "$DEST/.git"
 
 # 5. Version it with a dated commit. -f: profile-backup/ is this skill's own managed
 #    artifact, so stage it even if the repo gitignores it (a plain `add` would exit 1

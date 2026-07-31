@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/agentteamland/atl/cli/internal/fanout"
@@ -36,7 +37,7 @@ import (
 var AssetDirs = []string{"agents", "skills", "rules", "knowledge", "backends", "scripts", "packs"}
 
 // TeamManifest is the subset of team.json install needs. Extra v1 fields
-// (agents[], capabilities, extends, ...) are tolerated and ignored.
+// (agents[], extends, ...) are tolerated and ignored.
 type TeamManifest struct {
 	SchemaVersion int    `json:"schemaVersion"`
 	Name          string `json:"name"`
@@ -47,6 +48,49 @@ type TeamManifest struct {
 	// "core" is the platform core (always present) and is skipped by install;
 	// every other entry is resolved from the index and installed transitively.
 	Dependencies map[string]string `json:"dependencies"`
+	// Capabilities is read ONLY to learn where a team keeps a durable store it
+	// wants versioned (see DeclaredStores). Everything else under it — role,
+	// curator, reads/writes access lists — is still tolerated and ignored here;
+	// enforcing the access contract is a separate, deferred concern (#167).
+	// Values are kept raw because the shape varies across capabilities (an
+	// object for `profile`, a bare string for `review`).
+	Capabilities map[string]json.RawMessage `json:"capabilities"`
+}
+
+// DeclaredStores returns the durable-store paths this team declares under
+// `capabilities.<name>.store`, in sorted capability order.
+//
+// A team that keeps state outside the reflected `.claude` tree — profile-team's
+// `~/.atl/profiles` is the first — declares it here so the platform can version
+// it without knowing which team it belongs to. Core stays team-agnostic: it
+// honors a generic declaration, it does not learn a team name.
+//
+// Capability values whose shape carries no `store` (a bare string, an object
+// without the field) are skipped rather than treated as an error — the same
+// tolerance the rest of this struct applies to unknown fields.
+func (t *TeamManifest) DeclaredStores() []string {
+	var out []string
+	for _, name := range sortedKeys(t.Capabilities) {
+		var cap struct {
+			Store string `json:"store"`
+		}
+		if err := json.Unmarshal(t.Capabilities[name], &cap); err != nil {
+			continue // not an object, or otherwise unreadable — tolerate it
+		}
+		if s := strings.TrimSpace(cap.Store); s != "" {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+func sortedKeys(m map[string]json.RawMessage) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 // ReadManifest loads and minimally validates team.json from a fetched team dir.

@@ -79,6 +79,15 @@ var sessionStartCmd = &cobra.Command{
 		// 1s open timeout while this one runs unrelated work.
 		st.Close()
 
+		// Retention floor for team-declared durable stores: bring each under local
+		// git and commit whatever changed since the last session, so a store whose
+		// write policy is last-write-wins can still surrender its previous value.
+		// Placed after the queue lock is released — it touches no queue state, and a
+		// git commit is slow enough to be worth keeping out of that window.
+		if n := versionDeclaredStores(project); n > 0 {
+			fmt.Printf("atl: snapshotted %d durable store(s) to local git — previous values stay recoverable\n", n)
+		}
+
 		// Reclamation awareness — surface only high-signal orphans (gains/edits
 		// beside an installed unit), not wholly-unowned dirs (usually the user's own
 		// non-ATL Claude Code assets — noise). Awareness only; `atl gc` is the action.

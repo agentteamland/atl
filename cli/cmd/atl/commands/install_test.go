@@ -97,6 +97,37 @@ func TestInstallAtReinstallPreservesEdits(t *testing.T) {
 	}
 }
 
+// A team's declared durable stores are recorded into the install manifest, so
+// the platform can keep them versioned without knowing which team owns them.
+// Both write paths must record it — the fresh install and the re-install — or a
+// re-install would silently drop the declaration and the store would stop being
+// snapshotted.
+func TestInstallAtRecordsDeclaredStores(t *testing.T) {
+	src := makeSrc(t)
+	// Re-declare with a store (makeSrc's team declares none).
+	if err := os.WriteFile(filepath.Join(src, "team.json"),
+		[]byte(`{"name":"demo","version":"2.0.0","scope":"project","capabilities":{"profile":{"store":"~/.atl/profiles"}}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	tm, err := teampkg.ReadManifest(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := t.TempDir()
+	for _, pass := range []string{"fresh install", "re-install"} {
+		if err := installAt(scope.Project, root, "acme", "demo", demoEntry(), tm, src); err != nil {
+			t.Fatalf("%s: installAt: %v", pass, err)
+		}
+		m, err := manifest.Read(filepath.Join(root, ".atl"), "acme", "demo")
+		if err != nil {
+			t.Fatalf("%s: manifest.Read: %v", pass, err)
+		}
+		if len(m.Stores) != 1 || m.Stores[0] != "~/.atl/profiles" {
+			t.Fatalf("%s: manifest stores = %v, want [~/.atl/profiles]", pass, m.Stores)
+		}
+	}
+}
+
 func TestInstallAtGlobal(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)

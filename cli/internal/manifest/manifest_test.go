@@ -1,7 +1,9 @@
 package manifest
 
 import (
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -89,6 +91,51 @@ func TestInstalledAtPreserved(t *testing.T) {
 	got, _ := Read(layer, "a", "one")
 	if !got.InstalledAt.Equal(ts) {
 		t.Errorf("installedAt = %v, want %v", got.InstalledAt, ts)
+	}
+}
+
+// Write must NOT advance the schema of an existing manifest. Several paths read
+// a manifest, mutate one field and write it back (fan-out and promote rewrite
+// only Files); if those claimed the current schema they would assert a shape
+// they never produced, and the one-time migration that fills the rest would be
+// skipped forever — silently, since the record looks current.
+func TestWriteDoesNotAdvanceAnExistingSchemaVersion(t *testing.T) {
+	layer := t.TempDir()
+	mustWrite(t, layer, &Manifest{SchemaVersion: 1, Handle: "a", Name: "one", Files: map[string]string{}})
+	got, err := Read(layer, "a", "one")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.SchemaVersion != 1 {
+		t.Fatalf("schemaVersion = %d, want 1 — a partial rewrite claimed the current schema", got.SchemaVersion)
+	}
+}
+
+// A manifest built from scratch has no schema yet, and gets the current one.
+func TestWriteFillsAnUnsetSchemaVersion(t *testing.T) {
+	layer := t.TempDir()
+	mustWrite(t, layer, &Manifest{Handle: "a", Name: "one", Files: map[string]string{}})
+	got, err := Read(layer, "a", "one")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.SchemaVersion != SchemaVersion {
+		t.Fatalf("schemaVersion = %d, want %d", got.SchemaVersion, SchemaVersion)
+	}
+}
+
+// A team that declares no store must not carry an empty `stores` key — the
+// manifest is read by eye during debugging, and a field that is always present
+// but usually empty is noise.
+func TestStoresOmittedWhenNoneDeclared(t *testing.T) {
+	layer := t.TempDir()
+	mustWrite(t, layer, &Manifest{Handle: "a", Name: "one", Files: map[string]string{}})
+	b, err := os.ReadFile(Path(layer, "a", "one"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(b), "stores") {
+		t.Fatalf("manifest carries an empty stores key:\n%s", b)
 	}
 }
 

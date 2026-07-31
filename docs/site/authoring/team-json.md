@@ -38,12 +38,51 @@ That's enough to install. The CLI parses the manifest, copies `agents/web-agent.
 | `scope` | string | — | Publisher-default install layer: `"project"`, `"global"`, or `"both"`. Defaults to `"project"`. The user can always override at install time with `--global` / `--project`. |
 | `dependencies` | object | — | Map of `team-name → version-constraint` for other teams the CLI installs alongside this one. |
 | `requires.atl` | string | — | Declared minimum `atl` version, e.g. `">=2.0.0"`. Conventional metadata — the install parser does not currently enforce it. |
-| `capabilities` | object | — | Optional contracts the platform's skills (not the install parser) read. `capabilities.review: "<agent>"` names the agent [`/create-pr`](/skills/create-pr) spawns as this team's specialist reviewer; `capabilities.profile` declares the profile-layer provider/consumer role (see [profile-team](/teams/profile-team)). |
+| `capabilities` | object | — | Optional contracts, mostly read by the platform's skills rather than the install parser. `capabilities.review: "<agent>"` names the agent [`/create-pr`](/skills/create-pr) spawns as this team's specialist reviewer; `capabilities.profile` declares the profile-layer provider/consumer role (see [profile-team](/teams/profile-team)). The one key the **CLI** reads is `store` — see below. |
 | `backends` | string[] | — | For teams shipping per-backend adapter packs under `backends/<name>/` (e.g. the delivery-team's `["azure", "github"]`): declares which backends the team supports. Informational today — the install parser does not read it. |
 
 ::: tip Keep the description short
 `description` is rendered as a single line in `atl search` output, so a long one wraps awkwardly. Aim for one tight sentence — it's a pitch, not a paragraph.
 :::
+
+## Declaring a durable store
+
+Most teams keep everything inside the reflected `.claude` tree, which ATL already tracks. A team that instead keeps its own long-lived data somewhere else — profile-team's `~/.atl/profiles/` is the first — declares that location:
+
+```json
+{
+  "capabilities": {
+    "profile": { "role": "provider", "store": "~/.atl/profiles" }
+  }
+}
+```
+
+`store` may sit under any capability name, holds one path, and may use `~` for the home directory. `atl install` records every declared store into the install manifest, and from then on **session-start and `atl tick` keep that directory under local git** — once per session and once per tick throttle window — committing whatever changed since the last pass.
+
+The point is recoverability. A store whose write policy is last-write-wins loses the previous value on every overwrite: an inferred placeholder replaced by a confirmed answer leaves no trace of what it replaced. With the directory versioned, the old value is one `git show HEAD~1` away.
+
+::: tip Already installed before this shipped?
+The declaration is read at install time, so an install that predates the `stores` field carries no record of it. `atl update` backfills that once, by re-fetching the pinned source — and it runs on its own, so this resolves without you doing anything. Until it does, the store simply is not versioned yet.
+:::
+
+What this deliberately does **not** do:
+
+- **It never creates the directory.** An absent store means the feature is not in use on this machine; creating it would litter the disk and misreport the feature as active.
+- **It never configures a remote and never pushes.** A store tends to hold a user's most sensitive data; carrying a copy off the machine is a separate act that the user has to ask for (profile-team's [`/profile-backup`](/teams/profile-team) is one such path, and it refuses to write into a public repo).
+- **It only ever writes to a repo it created itself.** If you already keep the store under your own version control, ATL leaves it strictly alone — you have met the goal yourself, and advancing your branch would move `HEAD` under your in-flight work. ATL marks its own repos with a file at `.git/atl-store`; delete that file and it stops committing to that store.
+- **It never touches a store nested inside another repo.** Initialising there would shadow the outer repository.
+- **It never disturbs your git state.** The snapshot is written with plumbing against a throwaway index, so your staging area is untouched and no hooks run. A repo in the middle of a merge, rebase or cherry-pick is skipped until it is out of that state.
+- **It grants nobody access.** ATL reads the declared *path* for this one mechanical purpose. Who may read or write a store is a separate contract that the platform does not yet enforce.
+
+Declared paths are vetted before any of this runs: symlinks are resolved first, and the destination must be at least two levels below your home directory and must not contain your current working directory. So a declaration of `~`, of a bare top-level directory, of anywhere outside your home, or of the project you are working in is refused rather than turned into a repository — silently, with no diagnostic. It is not a sandbox: a directory that satisfies those rules is accepted whatever it holds, because a team legitimately keeping its store there looks exactly the same. Set `ATL_NO_STORE_GIT=1` to switch the whole pass off.
+
+::: warning A store outside your home is not versioned
+If you keep the store on an external volume or a sync folder — declared directly, or reached through a symlink — it falls outside the vetted region and simply never gets versioned. There is no warning today.
+:::
+
+One known limit: if the store itself contains a nested git repository, that subtree is recorded as a gitlink and its contents are not captured in the snapshot. A store is machine-written data, so this does not arise in practice — but it is silent if it does.
+
+The CLI learns nothing about your team from this — no name, no meaning, no knowledge of what the directory holds. It honors a declaration, which is why any future team gets the same treatment for free.
 
 ## Version constraints
 
