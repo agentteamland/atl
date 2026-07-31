@@ -116,8 +116,12 @@ Non-structural writes are **silent** (no confirmation needed):
   merge/replace the stale part — don't blindly append. Topic = filename.
 - **Journal** (`<proj>/.atl/journal/<YYYY-MM-DD>.md`): append a dated bullet
   (`- <topic>: <body, with the why>`). Create with a `# <date>` heading if new.
-- **Agent KB**: write `children/<topic>.md` with the required frontmatter, then
-  rebuild the agent's summary section (see below).
+- **Agent KB**: write `children/<topic>.md`. The `knowledge-base-summary`
+  frontmatter is **not optional** — the `## Knowledge Base` section is derived
+  *from* it, so a child written without one leaves the next rebuild nothing to
+  derive its entry from. Write it even when the sibling children around it have
+  none (an older, pre-migration KB is not the convention to match). Then rebuild
+  the agent's summary section (see below).
 
 After each item is integrated, ack it so it leaves the queue:
 
@@ -172,6 +176,16 @@ This section is derived, not hand-edited — replace it wholesale each run; the
 source of truth is each child's frontmatter. (A skill-targeted learning has no
 skill-side store in v2 — skills are procedures, not knowledge bases; route it to
 the wiki, or propose an edit to the skill itself via the structural path.)
+
+**A wholesale rebuild must never drop a child that exists.** An older KB can hold
+children written before the frontmatter was mandatory; rebuilding "from the
+frontmatter" over one of those deletes its hand-written entry and hides the file.
+So when a sibling child carries no `knowledge-base-summary`, backfill one from
+that child's own content as part of the rebuild — the invariant is that every
+existing child ends the run with an entry. (On a large legacy KB, carrying its
+existing entry over verbatim is an acceptable floor; dropping it is not.)
+`atl session-start` warns when an installed layer holds such children, so the
+condition is visible before a rebuild reaches it.
 
 ## Wiki index rebuild (the `<!-- wiki:index -->` contract)
 

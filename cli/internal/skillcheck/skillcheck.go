@@ -4,8 +4,12 @@
 // docscheck validates the docs *site* against the code (docs-drift); skillcheck
 // validates the *assets themselves*: does every skill/agent carry a valid
 // frontmatter, does each team.json match what's on disk, does every agent-KB
-// child declare its summary. Every check is LLM-free and zero-false-positive by
-// construction. The judgment half — obedience, redundancy, principle-worthiness —
+// child declare its summary, and does any skill's executable shell body carry
+// one of two known shell-fragile constructs. Every check is LLM-free. The three
+// structural checks are zero-false-positive by construction — the finding is a
+// fact about the file; the shell check is a deliberately narrow pattern match
+// over named constructs, so see ShellBodies for what it does and does NOT cover.
+// The judgment half — obedience, redundancy, principle-worthiness —
 // lives in the /skill-stocktake skill (the CLI/Skill boundary), not here.
 package skillcheck
 
@@ -26,7 +30,7 @@ const (
 
 // Finding is a single content-quality problem.
 type Finding struct {
-	Check    string // "frontmatter" | "manifest" | "children"
+	Check    string // "frontmatter" | "manifest" | "children" | "shell"
 	Severity Severity
 	Path     string // asset path relative to the repo root
 	Detail   string
@@ -44,6 +48,7 @@ func RunAll(in Input) []Finding {
 	f = append(f, Frontmatter(in.CoreDir, in.TeamsDir)...)
 	f = append(f, TeamManifest(in.TeamsDir)...)
 	f = append(f, Children(in.TeamsDir)...)
+	f = append(f, ShellBodies(in.CoreDir, in.TeamsDir)...)
 	return f
 }
 
@@ -185,21 +190,64 @@ func Children(teamsDir string) []Finding {
 	for _, team := range teamNames(teamsDir) {
 		agentsDir := filepath.Join(teamsDir, team, "agents")
 		for _, agent := range subdirs(agentsDir) {
-			childrenDir := filepath.Join(agentsDir, agent, "children")
-			kids, err := os.ReadDir(childrenDir)
-			if err != nil {
-				continue
-			}
-			for _, k := range kids {
-				if k.IsDir() || !strings.HasSuffix(k.Name(), ".md") {
-					continue
-				}
-				rel := filepath.ToSlash(filepath.Join("teams", team, "agents", agent, "children", k.Name()))
-				kv, ok := frontmatter(filepath.Join(childrenDir, k.Name()))
-				if !ok || strings.TrimSpace(kv["knowledge-base-summary"]) == "" {
-					f = append(f, Finding{"children", Fail, rel, "agent-KB child is missing its `knowledge-base-summary` frontmatter"})
-				}
-			}
+			rel := filepath.Join("teams", team, "agents", agent, "children")
+			f = append(f, checkChildren(filepath.Join(agentsDir, agent, "children"), rel, Fail)...)
+		}
+	}
+	return f
+}
+
+// InstalledChildren applies the same knowledge-base-summary contract to an
+// INSTALLED layer — a .claude dir, ~/.claude or <project>/.claude.
+//
+// Children above walks the monorepo's authored copies, which arrive in a PR and
+// are gated by CI. /drain writes only here, into
+// <scope>/.claude/agents/<agent>/children/, so until this walk existed not one
+// file the learning loop created was validated by anything.
+//
+// Warn-level, and deliberately NOT part of RunAll: `atl skills check` is the CI
+// gate, and CI has no installed layer — gating on it would gate on something the
+// runner cannot see. The one caller is the session-start signal.
+//
+// The honest limit: this REPORTS a child written without its summary; it cannot
+// make /drain write one. The contract still lives in the skill's prose — this
+// only stops a breach from being silent.
+func InstalledChildren(claudeDir string) []Finding {
+	if claudeDir == "" {
+		return nil
+	}
+	var f []Finding
+	agentsDir := filepath.Join(claudeDir, "agents")
+	for _, agent := range subdirs(agentsDir) {
+		// An ATL agent knowledge base is agent.md + children/. Requiring the
+		// agent.md keeps a directory that merely happens to be named children/
+		// from being read as one.
+		if _, err := os.Stat(filepath.Join(agentsDir, agent, "agent.md")); err != nil {
+			continue
+		}
+		rel := filepath.Join("agents", agent, "children")
+		f = append(f, checkChildren(filepath.Join(agentsDir, agent, "children"), rel, Warn)...)
+	}
+	return f
+}
+
+// checkChildren validates one agents/<x>/children dir. rel is the reported path
+// prefix; sev differs by surface — a shipped child fails the gate, an installed
+// one only warns.
+func checkChildren(childrenDir, rel string, sev Severity) []Finding {
+	kids, err := os.ReadDir(childrenDir)
+	if err != nil {
+		return nil
+	}
+	var f []Finding
+	for _, k := range kids {
+		if k.IsDir() || !strings.HasSuffix(k.Name(), ".md") {
+			continue
+		}
+		kv, ok := frontmatter(filepath.Join(childrenDir, k.Name()))
+		if !ok || strings.TrimSpace(kv["knowledge-base-summary"]) == "" {
+			path := filepath.ToSlash(filepath.Join(rel, k.Name()))
+			f = append(f, Finding{"children", sev, path, "agent-KB child is missing its `knowledge-base-summary` frontmatter"})
 		}
 	}
 	return f

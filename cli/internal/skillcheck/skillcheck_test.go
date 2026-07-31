@@ -107,3 +107,44 @@ func TestChildMissingSummary(t *testing.T) {
 		t.Fatalf("expected one children finding, got %+v", f)
 	}
 }
+
+// The installed layer is the surface /drain actually writes to, and the one the
+// teams/ walk structurally cannot see.
+func TestInstalledChildMissingSummary(t *testing.T) {
+	claude := filepath.Join(t.TempDir(), ".claude")
+	write(t, filepath.Join(claude, "agents/api/agent.md"), "---\nname: api\ndescription: \"x\"\n---\n")
+	write(t, filepath.Join(claude, "agents/api/children/good.md"), "---\nknowledge-base-summary: \"a summary\"\n---\n# Good\n")
+	write(t, filepath.Join(claude, "agents/api/children/bad.md"), "# no frontmatter here\n")
+
+	f := InstalledChildren(claude)
+	if len(f) != 1 || f[0].Path != "agents/api/children/bad.md" {
+		t.Fatalf("expected only bad.md flagged, got %+v", f)
+	}
+	// Warn, never Fail: this layer is invisible to CI, so it must not gate it.
+	if f[0].Severity != Warn {
+		t.Fatalf("installed-layer findings must be Warn, got %q", f[0].Severity)
+	}
+}
+
+// A children/ dir with no agent.md beside it is not an ATL agent knowledge base —
+// the false-positive guard that keeps the walk off unrelated content.
+func TestInstalledChildrenSkipsDirWithoutAgentMd(t *testing.T) {
+	claude := filepath.Join(t.TempDir(), ".claude")
+	write(t, filepath.Join(claude, "agents/notanagent/children/bad.md"), "# no frontmatter here\n")
+
+	if f := InstalledChildren(claude); len(f) != 0 {
+		t.Fatalf("a children/ dir without agent.md must be ignored, got %+v", f)
+	}
+}
+
+// The installed layer must stay out of the CI gate — RunAll walks the repo only.
+func TestRunAllIgnoresInstalledLayer(t *testing.T) {
+	root := t.TempDir()
+	claude := filepath.Join(root, ".claude")
+	write(t, filepath.Join(claude, "agents/api/agent.md"), "---\nname: api\ndescription: \"x\"\n---\n")
+	write(t, filepath.Join(claude, "agents/api/children/bad.md"), "# no frontmatter here\n")
+
+	if f := RunAll(Input{CoreDir: filepath.Join(root, "core"), TeamsDir: filepath.Join(root, "teams")}); len(f) != 0 {
+		t.Fatalf("RunAll must not reach the installed layer, got %+v", f)
+	}
+}
