@@ -1,9 +1,11 @@
 package commands
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/agentteamland/atl/cli/internal/queue"
+	"github.com/agentteamland/atl/cli/internal/transcript"
 )
 
 func TestFirstLine(t *testing.T) {
@@ -46,6 +48,50 @@ func TestStatusJSON(t *testing.T) {
 				t.Errorf("statusJSON(%v) = %q, want %q", tc.counts, got, tc.want)
 			}
 		})
+	}
+}
+
+// TestTailByBytes guards the mining surface's only size bound. Before it, the
+// command's sole limit was a file COUNT, so the default two-transcript read could
+// hand the drain ~900 KB of prose — past a subagent's context, and diluting the
+// step exactly when the session was long enough to have forgotten something.
+func TestTailByBytes(t *testing.T) {
+	turn := func(n int) transcript.Turn { return transcript.Turn{Role: "user", Text: strings.Repeat("x", n)} }
+
+	// Under the cap: everything is emitted, and nothing is claimed to be cut.
+	all := []transcript.Turn{turn(10), turn(10)}
+	if kept, truncated := tailByBytes(all, 100); len(kept) != 2 || truncated {
+		t.Errorf("under cap: kept %d truncated=%v, want 2 false", len(kept), truncated)
+	}
+
+	// Over the cap: the OLDEST turns are the ones dropped — a correction the agent
+	// missed is most likely in the stretch just gone by.
+	five := []transcript.Turn{turn(10), turn(10), turn(10), turn(10), turn(10)}
+	kept, truncated := tailByBytes(five, 25)
+	if !truncated {
+		t.Error("over cap: truncation must be reported so the mine is honest about being partial")
+	}
+	if len(kept) != 2 {
+		t.Fatalf("over cap: kept %d turns, want 2 (25-byte budget, 10 bytes each)", len(kept))
+	}
+	total := 0
+	for _, k := range kept {
+		total += len(k.Text)
+	}
+	if total > 25 {
+		t.Errorf("kept %d bytes, over the 25-byte budget", total)
+	}
+
+	// A single turn bigger than the whole budget is still emitted: blanking the
+	// mining input is worse than overshooting. Nothing older was cut, so this is
+	// honestly not a truncation.
+	if kept, truncated := tailByBytes([]transcript.Turn{turn(500)}, 25); len(kept) != 1 || truncated {
+		t.Errorf("oversized lone turn: kept %d truncated=%v, want 1 false", len(kept), truncated)
+	}
+
+	// No turns at all (a project with no transcripts) must not report truncation.
+	if kept, truncated := tailByBytes(nil, 25); len(kept) != 0 || truncated {
+		t.Errorf("empty: kept %d truncated=%v, want 0 false", len(kept), truncated)
 	}
 }
 

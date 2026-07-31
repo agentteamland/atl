@@ -89,6 +89,8 @@ Prints the recent **user + assistant conversation flow** for the current project
 | `--limit <n>` | int | `2` | Read the most recent N transcripts for this project. |
 | `--json` | bool | `false` | Emit the turns as JSON (`role`, `text`) instead of `[role] text` lines. |
 
+The flow is also capped at the **most recent 256 KB of prose** — `--limit` bounds how many files are read, not how much text they hold, and a long session's prose alone can exceed the mining subagent's whole context. When older turns are cut, a note says so (on stderr, so `--json` stays a parseable array), and the mine should be reported as the partial sweep it was. The same channel reports any transcript record skipped for being over-long, so turns missing from the flow are never silent.
+
 Human-readable output is one line per turn:
 
 ```
