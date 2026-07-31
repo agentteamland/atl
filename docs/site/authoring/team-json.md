@@ -57,16 +57,24 @@ Most teams keep everything inside the reflected `.claude` tree, which ATL alread
 }
 ```
 
-`store` may sit under any capability name, holds one path, and may use `~` for the home directory. `atl install` records every declared store into the install manifest, and from then on **session-start and the per-turn tick keep that directory under local git**, committing whatever changed since the last pass.
+`store` may sit under any capability name, holds one path, and may use `~` for the home directory. `atl install` records every declared store into the install manifest, and from then on **session-start and `atl tick` keep that directory under local git** — once per session and once per tick throttle window — committing whatever changed since the last pass.
 
 The point is recoverability. A store whose write policy is last-write-wins loses the previous value on every overwrite: an inferred placeholder replaced by a confirmed answer leaves no trace of what it replaced. With the directory versioned, the old value is one `git show HEAD~1` away.
+
+::: tip Already installed before this shipped?
+The declaration is read at install time, so an install that predates the `stores` field carries no record of it. `atl update` backfills that once, by re-fetching the pinned source — and it runs on its own, so this resolves without you doing anything. Until it does, the store simply is not versioned yet.
+:::
 
 What this deliberately does **not** do:
 
 - **It never creates the directory.** An absent store means the feature is not in use on this machine; creating it would litter the disk and misreport the feature as active.
 - **It never configures a remote and never pushes.** A store tends to hold a user's most sensitive data; carrying a copy off the machine is a separate act that the user has to ask for (profile-team's [`/profile-backup`](/teams/profile-team) is one such path, and it refuses to write into a public repo).
+- **It only ever writes to a repo it created itself.** If you already keep the store under your own version control, ATL leaves it strictly alone — you have met the goal yourself, and advancing your branch would move `HEAD` under your in-flight work. ATL marks its own repos with a file at `.git/atl-store`; delete that file and it stops committing to that store.
 - **It never touches a store nested inside another repo.** Initialising there would shadow the outer repository.
+- **It never disturbs your git state.** The snapshot is written with plumbing against a throwaway index, so your staging area is untouched and no hooks run. A repo in the middle of a merge, rebase or cherry-pick is skipped until it is out of that state.
 - **It grants nobody access.** ATL reads the declared *path* for this one mechanical purpose. Who may read or write a store is a separate contract that the platform does not yet enforce.
+
+Declared paths are vetted before any of this runs — a store must be at least two levels below your home directory and must not contain your current working directory, so a malformed or hostile declaration cannot turn `~` or a project checkout into a repository. Set `ATL_NO_STORE_GIT=1` to switch the whole pass off.
 
 The CLI learns nothing about your team from this — no name, no meaning, no knowledge of what the directory holds. It honors a declaration, which is why any future team gets the same treatment for free.
 

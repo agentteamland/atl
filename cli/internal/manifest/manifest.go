@@ -66,12 +66,19 @@ func Path(layerDir, handle, name string) string {
 	return filepath.Join(layerDir, dirName, fileName(handle, name))
 }
 
-// Write atomically writes m under layerDir, stamping the current schema version
-// — every write path produces the current shape, so the file describes itself
-// honestly and a one-time migration can tell "already handled" from "not yet".
-// InstalledAt is filled if unset.
+// Write atomically writes m under layerDir. InstalledAt is filled if unset, and
+// SchemaVersion only when it is zero.
+//
+// Write deliberately does NOT stamp the current schema onto an existing
+// manifest. Several paths read a manifest, mutate one field, and write it back —
+// fan-out and promote both rewrite only Files — and if those advanced the schema
+// they would claim a shape they never produced, permanently skipping the
+// one-time migration meant to fill the rest. Claiming the current schema belongs
+// to the paths that build the whole record: install and update.
 func (m *Manifest) Write(layerDir string) error {
-	m.SchemaVersion = SchemaVersion
+	if m.SchemaVersion == 0 {
+		m.SchemaVersion = SchemaVersion
+	}
 	if m.InstalledAt.IsZero() {
 		m.InstalledAt = time.Now().UTC()
 	}

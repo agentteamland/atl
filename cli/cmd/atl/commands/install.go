@@ -246,6 +246,8 @@ func installAt(target scope.Scope, projectRoot, handle, name string, entry *inde
 		existing.Source = src
 		existing.Files = files
 		existing.Stores = tm.DeclaredStores()
+		// This path rebuilds the whole record, so it may claim the current schema.
+		existing.SchemaVersion = manifest.SchemaVersion
 		return existing.Write(layerDir)
 	}
 
@@ -254,13 +256,14 @@ func installAt(target scope.Scope, projectRoot, handle, name string, entry *inde
 		return err
 	}
 	m := &manifest.Manifest{
-		Handle:  handle,
-		Name:    name,
-		Version: version,
-		Scope:   target.String(),
-		Source:  src,
-		Files:   files,
-		Stores:  tm.DeclaredStores(),
+		SchemaVersion: manifest.SchemaVersion,
+		Handle:        handle,
+		Name:          name,
+		Version:       version,
+		Scope:         target.String(),
+		Source:        src,
+		Files:         files,
+		Stores:        tm.DeclaredStores(),
 	}
 	return m.Write(layerDir)
 }

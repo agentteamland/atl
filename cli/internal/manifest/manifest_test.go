@@ -94,13 +94,27 @@ func TestInstalledAtPreserved(t *testing.T) {
 	}
 }
 
-// Every write produces the current shape, so it must claim the current schema —
-// including a re-write of a manifest loaded from an older one. This is what lets
-// a one-time migration tell "already brought forward" from "not yet", instead of
-// re-running on every update forever.
-func TestWriteStampsCurrentSchemaVersion(t *testing.T) {
+// Write must NOT advance the schema of an existing manifest. Several paths read
+// a manifest, mutate one field and write it back (fan-out and promote rewrite
+// only Files); if those claimed the current schema they would assert a shape
+// they never produced, and the one-time migration that fills the rest would be
+// skipped forever — silently, since the record looks current.
+func TestWriteDoesNotAdvanceAnExistingSchemaVersion(t *testing.T) {
 	layer := t.TempDir()
 	mustWrite(t, layer, &Manifest{SchemaVersion: 1, Handle: "a", Name: "one", Files: map[string]string{}})
+	got, err := Read(layer, "a", "one")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.SchemaVersion != 1 {
+		t.Fatalf("schemaVersion = %d, want 1 — a partial rewrite claimed the current schema", got.SchemaVersion)
+	}
+}
+
+// A manifest built from scratch has no schema yet, and gets the current one.
+func TestWriteFillsAnUnsetSchemaVersion(t *testing.T) {
+	layer := t.TempDir()
+	mustWrite(t, layer, &Manifest{Handle: "a", Name: "one", Files: map[string]string{}})
 	got, err := Read(layer, "a", "one")
 	if err != nil {
 		t.Fatal(err)

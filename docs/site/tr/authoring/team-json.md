@@ -57,16 +57,24 @@ Bu kadarı kuruluma yeter. CLI manifest dosyasını çözümler, `agents/web-age
 }
 ```
 
-`store` herhangi bir yetenek adının altında yer alabilir, tek bir yol tutar ve ev dizini için `~` kullanabilir. `atl install` bildirilen her depoyu kurulum manifest'ine kaydeder; bundan sonra **oturum başlangıcı ve tur başına çalışan tick, o dizini yerel git altında tutar** ve son geçişten bu yana değişen ne varsa commit'ler.
+`store` herhangi bir yetenek adının altında yer alabilir, tek bir yol tutar ve ev dizini için `~` kullanabilir. `atl install` bildirilen her depoyu kurulum manifest'ine kaydeder; bundan sonra **oturum başlangıcı ve `atl tick`, o dizini yerel git altında tutar** — oturum başına bir kez ve tick'in throttle penceresi başına bir kez — ve son geçişten bu yana değişen ne varsa commit'ler.
 
 Amaç geri getirilebilirliktir. Yazma politikası "son yazan kazanır" olan bir depo, her üzerine yazmada önceki değeri kaybeder: çıkarımla konmuş bir geçici değerin yerine doğrulanmış bir yanıt geldiğinde, yerine geçtiği şeyden hiçbir iz kalmaz. Dizin sürümlendiğinde eski değer bir `git show HEAD~1` uzaklıktadır.
+
+::: tip Bu özellik gelmeden önce mi kurmuştunuz?
+Bildirim kurulum anında okunur, dolayısıyla `stores` alanından önceki bir kurulumda bu kayıt yoktur. `atl update` bunu bir kez geri doldurur — sabitlenmiş kaynağı yeniden çekerek — ve kendiliğinden çalıştığı için sizin bir şey yapmanız gerekmez. O çalışana kadar depo henüz sürümlenmiyor demektir.
+:::
 
 Bunun bilinçli olarak **yapmadıkları**:
 
 - **Dizini asla oluşturmaz.** Olmayan bir depo, özelliğin bu makinede kullanılmadığı anlamına gelir; onu oluşturmak hem diski kirletir hem de özelliği etkinmiş gibi gösterir.
 - **Asla remote tanımlamaz ve asla push etmez.** Bir depo genellikle kullanıcının en hassas verisini tutar; bir kopyayı makinenin dışına taşımak, kullanıcının ayrıca istemesi gereken ayrı bir eylemdir (profile-team'in [`/profile-backup`](/tr/teams/profile-team)'ı böyle bir yoldur ve herkese açık bir depoya yazmayı reddeder).
+- **Yalnızca kendi oluşturduğu repo'ya yazar.** Depoyu zaten kendi sürüm kontrolünüzde tutuyorsanız ATL ona hiç dokunmaz — amacı siz zaten karşılamışsınızdır ve dalınızı ilerletmek, devam eden çalışmanızın altından `HEAD`'i kaydırırdı. ATL kendi oluşturduğu repo'ları `.git/atl-store` dosyasıyla işaretler; o dosyayı silerseniz o depoya commit'lemeyi bırakır.
 - **Başka bir repo'nun içinde duran bir depoya asla dokunmaz.** Orada `git init` yapmak dıştaki repo'yu gölgelerdi.
+- **Git durumunuzu asla bozmaz.** Anlık görüntü, tek kullanımlık bir index üzerinde plumbing komutlarıyla yazılır; staging alanınıza dokunulmaz ve hiçbir hook çalışmaz. Merge, rebase veya cherry-pick ortasındaki bir repo, o durumdan çıkana kadar atlanır.
 - **Kimseye erişim vermez.** ATL bildirilen *yolu* yalnızca bu tek mekanik amaç için okur. Bir depoyu kimin okuyup yazabileceği, platformun henüz uygulamadığı ayrı bir sözleşmedir.
+
+Bildirilen yollar bunların hiçbiri çalışmadan önce denetlenir — bir depo ev dizininizin en az iki seviye altında olmalı ve içinde bulunduğunuz çalışma dizinini kapsamamalıdır; böylece hatalı ya da kötü niyetli bir bildirim `~`'ı veya bir proje checkout'unu repo'ya çeviremez. Tüm geçişi kapatmak için `ATL_NO_STORE_GIT=1`.
 
 CLI bundan takımın hakkında hiçbir şey öğrenmez — ne ad, ne anlam, ne de dizinin ne tuttuğu bilgisi. Bir bildirime uyar; gelecekteki herhangi bir takımın aynı davranışı bedava almasının nedeni budur.
 

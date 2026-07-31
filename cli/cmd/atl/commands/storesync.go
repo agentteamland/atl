@@ -24,8 +24,8 @@ import (
 //
 // Never fails. Returns how many stores produced a commit, so the caller decides
 // whether to say anything: session-start reports it (a real event — values just
-// became recoverable), the per-turn tick stays silent (it runs far too often for
-// a notice to be signal).
+// became recoverable), while the tick stays silent, since it runs once per
+// throttle window and a recurring notice would be noise rather than signal.
 func versionDeclaredStores(projectRoot string) int {
 	layers := []scope.Scope{scope.Global}
 	if projectRoot != "" {

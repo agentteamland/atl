@@ -1,6 +1,7 @@
 package storegit
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -15,7 +16,21 @@ func requireGit(t *testing.T) {
 	}
 }
 
-// write puts a file in dir, creating parents.
+// store creates a directory two levels under a temporary HOME, the shape a real
+// declared store has (~/.atl/profiles), and returns its path. Setting HOME is
+// what lets EnsureAll's path vetting run for real in tests instead of being
+// bypassed.
+func store(t *testing.T, name string) string {
+	t.Helper()
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	dir := filepath.Join(home, ".atl", name)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return dir
+}
+
 func write(t *testing.T, dir, rel, body string) {
 	t.Helper()
 	p := filepath.Join(dir, rel)
@@ -27,8 +42,21 @@ func write(t *testing.T, dir, rel, body string) {
 	}
 }
 
-// log returns the repo's commit subjects, newest first.
-func log(t *testing.T, dir string) []string {
+// run executes a git command in dir for test setup, failing the test on error.
+func run(t *testing.T, dir string, args ...string) string {
+	t.Helper()
+	cmd := exec.Command("git", append([]string{
+		"-c", "user.name=test", "-c", "user.email=test@localhost", "-c", "commit.gpgsign=false",
+	}, args...)...)
+	cmd.Dir = dir
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git %v: %v\n%s", args, err, out)
+	}
+	return strings.TrimSpace(string(out))
+}
+
+func logSubjects(t *testing.T, dir string) []string {
 	t.Helper()
 	cmd := exec.Command("git", "log", "--format=%s")
 	cmd.Dir = dir
@@ -43,7 +71,6 @@ func log(t *testing.T, dir string) []string {
 	return strings.Split(s, "\n")
 }
 
-// show returns a file's content at HEAD~n.
 func show(t *testing.T, dir, rev, rel string) string {
 	t.Helper()
 	cmd := exec.Command("git", "show", rev+":"+rel)
@@ -55,32 +82,19 @@ func show(t *testing.T, dir, rev, rel string) string {
 	return string(out)
 }
 
-// An absent store means the owning feature simply is not in use on this machine.
-// Creating it would litter the filesystem AND misreport the feature as active.
-func TestEnsureDoesNotCreateAnAbsentStore(t *testing.T) {
-	requireGit(t)
-	dir := filepath.Join(t.TempDir(), "never-existed")
-	if Ensure(dir) {
-		t.Fatal("reported a commit for a directory that does not exist")
-	}
-	if _, err := os.Stat(dir); !os.IsNotExist(err) {
-		t.Fatalf("the store directory was created; it must not be: %v", err)
-	}
-}
-
 // The load-bearing guarantee: after an overwrite, the PREVIOUS value is still
 // retrievable. This is the whole reason the package exists.
 func TestOverwrittenValueSurvivesInHistory(t *testing.T) {
 	requireGit(t)
-	dir := t.TempDir()
+	dir := store(t, "profiles")
 	write(t, dir, "people/alex/profile.md", "state.emotional: unknown\n")
-	if !Ensure(dir) {
+	if EnsureAll([]string{dir}) != 1 {
 		t.Fatal("first pass made no commit")
 	}
 
 	// The store's write policy is last-write-wins: the file is replaced wholesale.
 	write(t, dir, "people/alex/profile.md", "state.emotional: settled\n")
-	if !Ensure(dir) {
+	if EnsureAll([]string{dir}) != 1 {
 		t.Fatal("second pass made no commit after the overwrite")
 	}
 
@@ -92,80 +106,212 @@ func TestOverwrittenValueSurvivesInHistory(t *testing.T) {
 	}
 }
 
-func TestEnsureIsQuietWhenNothingChanged(t *testing.T) {
+// An absent store means the owning feature is not in use on this machine.
+// Creating it would litter the disk AND misreport the feature as active.
+func TestDoesNotCreateAnAbsentStore(t *testing.T) {
 	requireGit(t)
-	dir := t.TempDir()
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	dir := filepath.Join(home, ".atl", "never-existed")
+
+	if EnsureAll([]string{dir}) != 0 {
+		t.Fatal("reported a commit for a directory that does not exist")
+	}
+	if _, err := os.Stat(dir); !os.IsNotExist(err) {
+		t.Fatalf("the store directory was created; it must not be: %v", err)
+	}
+}
+
+func TestQuietWhenNothingChanged(t *testing.T) {
+	requireGit(t)
+	dir := store(t, "profiles")
 	write(t, dir, "a.md", "x\n")
-	if !Ensure(dir) {
+	if EnsureAll([]string{dir}) != 1 {
 		t.Fatal("first pass made no commit")
 	}
-	if Ensure(dir) {
+	if EnsureAll([]string{dir}) != 0 {
 		t.Fatal("a clean store produced a second commit")
 	}
-	if n := len(log(t, dir)); n != 1 {
+	if n := len(logSubjects(t, dir)); n != 1 {
 		t.Fatalf("commit count = %d, want 1", n)
 	}
 }
 
 // A store that lives inside some OTHER repository is left completely alone:
-// initialising there would shadow the outer repo, and committing would be
-// writing into a repo this package does not own.
-func TestEnsureLeavesAStoreNestedInAnotherRepoAlone(t *testing.T) {
+// initialising there would shadow the outer repo.
+func TestLeavesAStoreNestedInAnotherRepoAlone(t *testing.T) {
 	requireGit(t)
-	outer := t.TempDir()
-	if !run(outer, "init") {
-		t.Fatal("could not init the outer repo")
-	}
-	store := filepath.Join(outer, "nested-store")
-	if err := os.MkdirAll(store, 0o755); err != nil {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	outer := filepath.Join(home, "work", "outer")
+	if err := os.MkdirAll(outer, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	write(t, store, "a.md", "x\n")
+	run(t, outer, "init")
+	nested := filepath.Join(outer, "nested-store")
+	if err := os.MkdirAll(nested, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	write(t, nested, "a.md", "x\n")
 
-	if Ensure(store) {
+	if EnsureAll([]string{nested}) != 0 {
 		t.Fatal("committed inside a repo it does not own")
 	}
-	if _, err := os.Stat(filepath.Join(store, ".git")); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(nested, ".git")); !os.IsNotExist(err) {
 		t.Fatal("initialised a nested repo that would shadow the outer one")
 	}
-	if n := len(log(t, outer)); n != 0 {
+	if n := len(logSubjects(t, outer)); n != 0 {
 		t.Fatalf("wrote %d commit(s) into the outer repo", n)
 	}
 }
 
-// An existing repo is adopted rather than re-initialised — the user may already
-// keep the store under their own version control.
-func TestEnsureAdoptsAnExistingRepo(t *testing.T) {
+// A repo somebody else created in the store is theirs, and is left completely
+// alone. They have already met the retention goal by versioning it themselves;
+// committing there would advance their branch, move HEAD under their in-flight
+// work, and change what `git status` reports about their staged set.
+func TestLeavesAUserCreatedRepoAlone(t *testing.T) {
 	requireGit(t)
-	dir := t.TempDir()
-	if !run(dir, "init") {
-		t.Fatal("could not init")
+	dir := store(t, "profiles")
+	run(t, dir, "init")
+	write(t, dir, "tracked.md", "one\n")
+	run(t, dir, "add", "-A")
+	run(t, dir, "commit", "-m", "the user's own commit")
+
+	// The user is mid-workflow: one change staged, one not — a `git add -p` shape.
+	write(t, dir, "tracked.md", "two\n")
+	run(t, dir, "add", "tracked.md")
+	write(t, dir, "other.md", "unstaged\n")
+
+	if n := EnsureAll([]string{dir}); n != 0 {
+		t.Fatalf("EnsureAll = %d, want 0 — it wrote into a repo it did not create", n)
 	}
+	if entries := logSubjects(t, dir); len(entries) != 1 || entries[0] != "the user's own commit" {
+		t.Fatalf("the user's history changed: %v", entries)
+	}
+	cmd := exec.Command("git", "diff", "--cached", "--name-only")
+	cmd.Dir = dir
+	out, _ := cmd.Output()
+	if staged := strings.TrimSpace(string(out)); staged != "tracked.md" {
+		t.Fatalf("the user's staged set changed: got %q, want \"tracked.md\"", staged)
+	}
+}
+
+// Deleting the ownership marker is the per-store opt-out: ATL stops writing.
+func TestStopsWhenTheOwnershipMarkerIsRemoved(t *testing.T) {
+	requireGit(t)
+	dir := store(t, "profiles")
 	write(t, dir, "a.md", "x\n")
-	if !run(dir, "add", "-A") || !run(dir, "commit", "-m", "the user's own commit") {
-		t.Fatal("could not seed a user commit")
+	if EnsureAll([]string{dir}) != 1 {
+		t.Fatal("first pass made no commit")
+	}
+	if err := os.Remove(filepath.Join(dir, ".git", ownerMarker)); err != nil {
+		t.Fatal(err)
 	}
 
 	write(t, dir, "a.md", "y\n")
-	if !Ensure(dir) {
-		t.Fatal("made no commit in an adopted repo")
+	if n := EnsureAll([]string{dir}); n != 0 {
+		t.Fatalf("EnsureAll = %d, want 0 after the marker was removed", n)
 	}
-	entries := log(t, dir)
-	if len(entries) != 2 {
-		t.Fatalf("commit count = %d, want 2", len(entries))
+	if n := len(logSubjects(t, dir)); n != 1 {
+		t.Fatalf("commit count = %d, want 1", n)
 	}
-	if entries[1] != "the user's own commit" {
-		t.Fatalf("the user's own commit was disturbed: %q", entries[1])
+}
+
+// The marker lives inside .git, so it must never show up as a file to commit.
+func TestOwnershipMarkerIsNotCommitted(t *testing.T) {
+	requireGit(t)
+	dir := store(t, "profiles")
+	write(t, dir, "a.md", "x\n")
+	EnsureAll([]string{dir})
+
+	cmd := exec.Command("git", "ls-tree", "-r", "--name-only", "HEAD")
+	cmd.Dir = dir
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(out), ownerMarker) {
+		t.Fatalf("the ownership marker was committed:\n%s", out)
+	}
+}
+
+// A globally configured hook must not run: it belongs to the user's workflow,
+// and a failing one would silently disable retention entirely.
+func TestUserHooksDoNotRun(t *testing.T) {
+	requireGit(t)
+	dir := store(t, "profiles")
+	hooks := filepath.Join(t.TempDir(), "hooks")
+	if err := os.MkdirAll(hooks, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// A hook that always fails — a plain `git commit` would abort on it.
+	if err := os.WriteFile(filepath.Join(hooks, "pre-commit"), []byte("#!/bin/sh\nexit 1\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("GIT_CONFIG_COUNT", "1")
+	t.Setenv("GIT_CONFIG_KEY_0", "core.hooksPath")
+	t.Setenv("GIT_CONFIG_VALUE_0", hooks)
+
+	write(t, dir, "a.md", "x\n")
+	if EnsureAll([]string{dir}) != 1 {
+		t.Fatal("a user pre-commit hook blocked the snapshot")
+	}
+}
+
+// A repo mid-rebase is the user's work in progress. Committing there would fold
+// conflict markers in as content and leave the rebase broken.
+func TestSkipsARepoMidOperation(t *testing.T) {
+	requireGit(t)
+	dir := store(t, "profiles")
+	write(t, dir, "a.md", "base\n")
+	if EnsureAll([]string{dir}) != 1 {
+		t.Fatal("setup: no initial snapshot")
+	}
+	// Fabricate the marker rather than staging a real conflict — the guard is a
+	// state check, and a real rebase conflict is slow and platform-sensitive.
+	if err := os.WriteFile(filepath.Join(dir, ".git", "MERGE_HEAD"), []byte("deadbeef\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	write(t, dir, "a.md", "changed\n")
+	if EnsureAll([]string{dir}) != 0 {
+		t.Fatal("committed into a repo in the middle of a merge")
+	}
+	if n := len(logSubjects(t, dir)); n != 1 {
+		t.Fatalf("commit count = %d, want 1 (the snapshot must not have landed)", n)
+	}
+}
+
+// The user's global gitignore must not carve files out of the store: the
+// retention promise is unconditional, and a silently-skipped file would break it
+// with no symptom.
+func TestGlobalExcludesDoNotSkipStoreFiles(t *testing.T) {
+	requireGit(t)
+	dir := store(t, "profiles")
+	excludes := filepath.Join(t.TempDir(), "globalignore")
+	if err := os.WriteFile(excludes, []byte("*.md\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("GIT_CONFIG_COUNT", "1")
+	t.Setenv("GIT_CONFIG_KEY_0", "core.excludesFile")
+	t.Setenv("GIT_CONFIG_VALUE_0", excludes)
+
+	write(t, dir, "people/alex/profile.md", "value\n")
+	if EnsureAll([]string{dir}) != 1 {
+		t.Fatal("made no commit")
+	}
+	if got := show(t, dir, "HEAD", "people/alex/profile.md"); !strings.Contains(got, "value") {
+		t.Fatalf("the store file was excluded by the user's global gitignore: %q", got)
 	}
 }
 
 // A store must never gain a remote: it holds the user's most sensitive data, and
 // carrying a copy off the machine is a separate, explicitly-consented act.
-func TestEnsureNeverAddsARemote(t *testing.T) {
+func TestNeverAddsARemote(t *testing.T) {
 	requireGit(t)
-	dir := t.TempDir()
+	dir := store(t, "profiles")
 	write(t, dir, "a.md", "x\n")
-	Ensure(dir)
+	EnsureAll([]string{dir})
 
 	cmd := exec.Command("git", "remote")
 	cmd.Dir = dir
@@ -179,49 +325,130 @@ func TestEnsureNeverAddsARemote(t *testing.T) {
 }
 
 // Two teams naming the same store is legitimate (a provider and its consumer);
-// it must not produce two commits, or a second empty one.
+// it must not produce two commits.
 func TestEnsureAllDeduplicates(t *testing.T) {
 	requireGit(t)
-	dir := t.TempDir()
+	dir := store(t, "profiles")
 	write(t, dir, "a.md", "x\n")
 
 	if n := EnsureAll([]string{dir, dir, "", dir}); n != 1 {
 		t.Fatalf("EnsureAll = %d, want 1", n)
 	}
-	if n := len(log(t, dir)); n != 1 {
+	if n := len(logSubjects(t, dir)); n != 1 {
 		t.Fatalf("commit count = %d, want 1", n)
 	}
 }
 
-// Store paths are recorded verbatim from team.json, which writes them in tilde
-// form — so the tilde has to resolve, and dedup has to see two spellings of one
-// path as one path.
-func TestExpandResolvesTilde(t *testing.T) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		t.Skip("no home directory")
+func TestEnsureAllRespectsTheDisableBrake(t *testing.T) {
+	requireGit(t)
+	dir := store(t, "profiles")
+	write(t, dir, "a.md", "x\n")
+	t.Setenv(disableEnv, "1")
+
+	if n := EnsureAll([]string{dir}); n != 0 {
+		t.Fatalf("EnsureAll = %d, want 0 with the brake set", n)
 	}
-	if got, want := expand("~/.atl/profiles"), filepath.Join(home, ".atl", "profiles"); got != want {
-		t.Fatalf("expand = %q, want %q", got, want)
-	}
-	if got, want := expand("  /abs/path  "), "/abs/path"; got != want {
-		t.Fatalf("expand = %q, want %q", got, want)
-	}
-	if got := expand(""); got != "" {
-		t.Fatalf("expand(empty) = %q, want empty", got)
+	if _, err := os.Stat(filepath.Join(dir, ".git")); !os.IsNotExist(err) {
+		t.Fatal("initialised a repo despite the brake")
 	}
 }
 
-// A file is not a store. Guarding on IsDir keeps a stray file at the declared
-// path from being treated as one.
-func TestEnsureIgnoresAFileAtTheStorePath(t *testing.T) {
+// The declared path arrives from a team.json — third-party content. An unvetted
+// one reaching `git init` plus a full-tree add is how "~" becomes a repo over the
+// entire home directory.
+func TestAcceptableRejectsDangerousDeclarations(t *testing.T) {
+	home := "/home/u"
+	cwd := "/home/u/projects/app"
+
+	for _, tc := range []struct {
+		name string
+		path string
+		want bool
+	}{
+		{"the home directory itself", "/home/u", false},
+		{"a bare top-level directory under home", "/home/u/Documents", false},
+		{"outside home entirely", "/etc", false},
+		{"a parent of the working directory", "/home/u/projects", false},
+		{"the working directory itself", "/home/u/projects/app", false},
+		{"a relative path", ".atl/profiles", false},
+		{"an unclean path", "/home/u/.atl/../.atl/profiles", false},
+		{"empty", "", false},
+		{"the shape teams actually use", "/home/u/.atl/profiles", true},
+		{"deeper still", "/home/u/.config/team/store", true},
+	} {
+		if got := acceptable(tc.path, home, cwd); got != tc.want {
+			t.Errorf("acceptable(%q) = %v, want %v — %s", tc.path, got, tc.want, tc.name)
+		}
+	}
+}
+
+func TestExpandResolvesTilde(t *testing.T) {
+	home := "/home/u"
+	if got, want := expand("~/.atl/profiles", home), filepath.Join(home, ".atl", "profiles"); got != want {
+		t.Errorf("expand = %q, want %q", got, want)
+	}
+	if got, want := expand("  /abs/path  ", home), "/abs/path"; got != want {
+		t.Errorf("expand = %q, want %q", got, want)
+	}
+	if got := expand("", home); got != "" {
+		t.Errorf("expand(empty) = %q, want empty", got)
+	}
+	// "~" alone must resolve to home and then be REJECTED by acceptable, not
+	// silently treated as some other directory.
+	if got := expand("~", home); got != home {
+		t.Errorf("expand(~) = %q, want %q", got, home)
+	}
+	if acceptable(expand("~", home), home, "") {
+		t.Error("a store declared as ~ was accepted")
+	}
+}
+
+// A file is not a store.
+func TestIgnoresAFileAtTheStorePath(t *testing.T) {
 	requireGit(t)
-	dir := t.TempDir()
-	p := filepath.Join(dir, "not-a-dir")
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	p := filepath.Join(home, ".atl", "not-a-dir")
+	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+		t.Fatal(err)
+	}
 	if err := os.WriteFile(p, []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if Ensure(p) {
+	if EnsureAll([]string{p}) != 0 {
 		t.Fatal("treated a file as a store")
+	}
+}
+
+// A deletion is a change like any other: the snapshot must record it, and the
+// deleted content must still be reachable in history.
+func TestRecordsDeletions(t *testing.T) {
+	requireGit(t)
+	dir := store(t, "profiles")
+	write(t, dir, "people/alex/profile.md", "value\n")
+	EnsureAll([]string{dir})
+
+	if err := os.RemoveAll(filepath.Join(dir, "people")); err != nil {
+		t.Fatal(err)
+	}
+	if EnsureAll([]string{dir}) != 1 {
+		t.Fatal("a deletion produced no commit")
+	}
+	if got := show(t, dir, "HEAD~1", "people/alex/profile.md"); !strings.Contains(got, "value") {
+		t.Fatalf("the deleted content is not recoverable: %q", got)
+	}
+	cmd := exec.Command("git", "show", "HEAD:people/alex/profile.md")
+	cmd.Dir = dir
+	if err := cmd.Run(); err == nil {
+		t.Fatal("HEAD still carries the deleted file")
+	}
+}
+
+func TestGitHelperIsBounded(t *testing.T) {
+	requireGit(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, ok := git(ctx, t.TempDir(), nil, "status"); ok {
+		t.Fatal("a cancelled context still ran git to completion")
 	}
 }

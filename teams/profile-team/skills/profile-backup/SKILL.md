@@ -52,10 +52,21 @@ fi
 
 # 4. Snapshot global → repo. Clear then copy, so the backup is a true mirror
 #    (a profile deleted in global disappears from the snapshot too).
+#    The store is itself a git repo (ATL versions it locally so an overwritten value
+#    stays recoverable), and its .git MUST NOT be copied: `git add` on a directory
+#    that contains a nested .git records a GITLINK instead of the files — it exits 0,
+#    the emptiness check below sees a change, and the user is told the backup
+#    succeeded while the snapshot holds no profile content at all.
 DEST="$REPO_ROOT/profile-backup"
 rm -rf "$DEST"
 mkdir -p "$DEST"
-cp -R "$SRC/." "$DEST/"
+#    (`case`, not `[ … ] && continue` — under `set -e` the false branch of a trailing
+#    `&&` is a non-zero status and would abort the whole script.)
+for entry in "$SRC"/* "$SRC"/.[!.]* "$SRC"/..?*; do
+  [ -e "$entry" ] || continue                  # an unmatched glob stays literal
+  case "${entry##*/}" in .git) continue ;; esac
+  cp -R "$entry" "$DEST/"
+done
 
 # 5. Version it with a dated commit. -f: profile-backup/ is this skill's own managed
 #    artifact, so stage it even if the repo gitignores it (a plain `add` would exit 1
