@@ -16,6 +16,15 @@ It installs globally by default (its `team.json` declares `scope: global`), land
 skills, and the `profile-capture` rule in `~/.claude`, with profiles stored under
 `~/.atl/profiles/`.
 
+::: warning `/profile-backup` only writes to a private repo
+The snapshot goes into **whichever git repo you run it from**, staged with `git add -f` — so a
+`.gitignore` will not hold it back. Because the store carries what you have said about the
+people in your life and your tier-4 facts, the skill checks the repo's visibility **before it
+copies anything** and refuses on a public repo. It also refuses when it cannot confirm
+visibility (no GitHub remote, or `gh` unavailable) rather than guessing: a wrong refusal costs
+one command, a wrong write is irreversible.
+:::
+
 ## The profile world
 
 Everything lives under the global ATL layer at `~/.atl/profiles/`:
