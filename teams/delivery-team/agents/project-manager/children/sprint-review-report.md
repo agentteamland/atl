@@ -87,10 +87,10 @@ to the durable-knowledge store — the two-layer split (brief §5).
 The outcome of `/sprint-review`'s **commit-bound** PO gate (concept #16), written back onto this
 same page once the gate has run: which commit the PO approved, who set that approval and when, the
 promotion PR, and whether that exact commit was promoted to `release` or the gate **held** — with
-the reason (no approval record, a record I could not read a commit id from, an approval naming a
-commit other than the PR's current head, or a head-commit read that failed or is not bound on this
-backend). Until the gate runs, this section reads **pending**: a compiled report is not yet a
-decision. I record the outcome; I never decide it and I never promote.
+the reason **as `atl work promote` reported it** (`no-record`, `unparseable-record`, `superseded`,
+`read-failed`, `no-open-pr`, `backend-unbound`), not a reason I derived myself. Until the gate runs,
+this section reads **pending**: a compiled report is not yet a decision. I record the outcome; I
+never decide it and I never promote.
 Naming the exact promoted commit is what makes the promotion auditable afterwards — "the PO
 approved" alone does not say *what* was approved.
 

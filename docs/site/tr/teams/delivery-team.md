@@ -88,9 +88,9 @@ ve repo-içi `docs/` deposu). İçerik **makine-bulunabilir sentinel'lerle** yer
 
 İş **`dev`**'e entegre olur (tech-lead her birimin PR'ını yeşilde tamamlar — platformun never-merge
 kuralının kapsamlı istisnası) ve Product Owner onaylanmış bir sprint'i `dev`'den **`release`**'e promote
-eder — asla sohbette verilen bir onayla değil, backend'den geri okunan commit'e bağlı bir onay kaydıyla
-(aşağıdaki kapı; v1 onu **GitHub**'da bağlar, Azure'da ise eksik okuma bağlanana kadar promote'u
-**bekletir**). Review **delivery-native**'dir:
+eder — asla sohbette verilen bir onayla değil, `atl work promote`'un backend'den geri okuyup karşısında
+merge ettiği, commit'e bağlı bir onay kaydıyla (aşağıdaki kapı; v1 onu **GitHub**'da bağlar, Azure'da ise
+eksik okuma bağlanana kadar promote'u **bekletir**). Review **delivery-native**'dir:
 tech-lead adversarial review desenini (evidence gate + refute-to-keep) doğrudan backend'in PR'ı üzerinde
 koşar — Azure'da `repo_*` thread'leri ve vote, GitHub'da `gh pr comment` / `gh pr review` — `/create-pr`
 değil.
@@ -98,10 +98,18 @@ değil.
 ## Promote kapısı — commit'e bağlı onay
 
 `dev` → `release`, geri alınamaz tek adımdır; bu yüzden sohbette verilmez. `/sprint-review` raporu derler,
-`dev` → `release` **promote PR'ını** açar (ya da bulur) ve sonra backend'den kalıcı bir **onay kaydını**
-geri okur. O PR'ı açmak artık promote etmek değildir — **promote etmek onu merge etmektir**. v1'de bu
-kapı yalnız **GitHub** backend'inde bağlıdır — Azure'da hâlâ neyin eksik olduğu için bu bölümün
-sonundaki **v1'de yalnızca GitHub** bloğuna bak.
+`dev` → `release` **promote PR'ını** açar (ya da bulur) ve kararı **`atl work promote`**'a devreder —
+backend'den kalıcı bir **onay kaydını** geri okuyan, onu PR'ın güncel head'iyle karşılaştıran ve yalnız
+birebir eşleşmede merge eden deterministik bir komut. O PR'ı açmak artık promote etmek değildir —
+**promote etmek onu merge etmektir**. v1'de bu kapı yalnız **GitHub** backend'inde bağlıdır — Azure'da
+hâlâ neyin eksik olduğu için bu bölümün sonundaki **v1'de yalnızca GitHub** bloğuna bak.
+
+**Bu kontrol seremoni talimatı değil, koddur — ve asıl mesele budur.** İlk sürümünde kontrol
+`/sprint-review` becerisinin içine yazılmış bir prosedürdü ve gerçek bir koşuda aynı seremoni onu bir turda
+uygulayıp bir sonraki turda sessizce atladı: sohbette "Approve or Reject?" diye sormaya, yani tasarımın
+ortadan kaldırdığı kapıya geri döndü. Hatırlanmaya bağlı bir adım er geç hatırlanmaz ve bu sessizce olur.
+Bu yüzden komut **doğrulamayı ve merge'ü tek çağrıda** yapar: bir seremoninin kontrolü atlayarak
+ulaşabileceği ayrı bir merge adımı yoktur; seremoninin işi komutu çalıştırıp verdiği kararı aktarmaya iner.
 
 Onaylamak için Product Owner, promote PR'ına, **ilk satırı tam olarak** `**[Promotion Approval]**` olan ve
 onaylanan commit'i adıyla veren bir yorum ekler:
@@ -126,27 +134,30 @@ ya da CLI'dan gönder:
 gh pr comment <PR#> --repo <owner>/<repo> --body-file approval.md
 ```
 
-Seremoni ardından kayıtta adı geçen commit'i promote PR'ının **güncel head**'iyle karşılaştırır ve yalnız
-birebir eşleşmede merge eder — SHA'ya sabitlenmiş biçimde
+PO'nun işi bundan ibarettir. `atl work promote` ardından PR'ın head'ini ve üzerindeki her kaydı tek
+çağrıda okur ve yalnız bir kayıt tam olarak o head'i verdiğinde merge eder — SHA'ya sabitlenmiş biçimde
 (`gh pr merge --merge --match-head-commit <onaylanan-commit>`), yani head arada oynadıysa merge'ü
 sağlayıcının kendisi reddeder. Sonuç, sprint'in review sayfasına `## Promotion decision` başlığı altında
 yazılır: onaylanan commit, onaylayan, zaman damgası, PR bağlantısı. Diğer her sonuç bir **HOLD**'dur —
-hiçbir şey merge olmaz, hiçbir iş-öğesi durum değiştirmez ve seremoni tam olarak neyi set etmen
-gerektiğini yazar:
+komut sıfırdan farklı bir kodla çıkar, hiçbir şey merge olmaz, hiçbir iş-öğesi durum değiştirmez ve mesaj
+tam olarak neyi set etmen gerektiğini yazar:
 
-| Seremoni ne geri okur | Ne yapar |
+| Kapı ne bulur | Ne yapar (`reason`) |
 |---|---|
-| PR'da `**[Promotion Approval]**` kaydı yok | Bekletir; PR bağlantısını + onaylanacak head commit'i yazar. |
-| Kayıt var ama `## Approved Commit` altında 40-hex id yok | Bekletir; güncel head'i veren yeni bir kayıt ister. |
-| Kayıt, PR'ın head'i olmayan bir commit'i veriyor | Bekletir — onaylanan durum, teslim edilecek durum değildir. |
-| Kayıt okunamadı | Bekletir. Doğrulanmamış, onaylanmış değildir. |
+| PR'da `**[Promotion Approval]**` kaydı yok | Bekletir; PR bağlantısını + onaylanacak head commit'i yazar (`no-record`). |
+| Kayıt var ama `## Approved Commit` altında 40-hex id yok | Bekletir; güncel head'i veren yeni bir kayıt ister (`unparseable-record`). |
+| Kayıt, PR'ın head'i olmayan bir commit'i veriyor | Bekletir — onaylanan durum, teslim edilecek durum değildir (`superseded`). |
+| Kayıt okunamadı | Bekletir. Doğrulanmamış, onaylanmış değildir (`read-failed`). |
+| Kayıt eşleşti ama GitHub SHA'ya sabitlenmiş merge'ü reddetti | Bekletir (`merge-refused`) — kontrol ile merge arasında `dev` ilerlediği için sağlayıcı reddetti. Hiçbir şey promote edilmedi; yeni head'i onayla. |
+| Üzerinde çalışılacak açık bir `dev` → `release` PR'ı yok | Bekletir — önce onu aç (`no-open-pr`). Zaten promote edilmiş bir sprint de böyle yakınsar: yeniden koşu hiçbir şeyi merge etmez. |
+| Backend head-commit okumasını bağlamıyor | Bekletir (`backend-unbound`) — aşağıdaki **v1'de yalnızca GitHub** bloğuna bak. |
 
 HOLD bir ret değildir: hiçbir şey kapatılmaz, hiçbir şeye carryover etiketi konmaz ve kayıt olduğu yerde
 bırakılır. Açık bir **ret** sohbette kalır ve mevcut carryover yolunu işletir — kapı yalnız geri alınamaz
 yönü korur; bir promote'u geri çevirmek fazladan bir şey teslim edemez.
 
-**`dev`, onaydan sonra ilerlediyse onay da onunla birlikte geçersizleşir.** Seremoni onaylanan commit'i,
-güncel head'i ve `dev`'in ne kadar ilerlediğini bildirir ve onayı ileriye **taşımaz**. Güncel durumu promote
+**`dev`, onaydan sonra ilerlediyse onay da onunla birlikte geçersizleşir.** Kapı onaylanan commit'i ve
+güncel head'i bildirir ve onayı ileriye **taşımaz**. Güncel durumu promote
 etmek için tazelenmiş raporu yeniden oku ve yeni head için yeni bir kayıt ekle; tam olarak onayladığın şeyi
 promote etmek için önce `dev`'i o commit'e geri al. Eski kayıt denetim tarihçesi olarak yerinde kalır —
 kanal ekle-ve-geçersiz-kıl (append-and-supersede) biçiminde çalışır ve yeni kayıt, daha yeni bir commit'i
@@ -165,9 +176,10 @@ ama head-commit okuması bağlı değildir: branch okumasında (`repo_branch`, `
 taşıyan yanıt alanı canlı bir sunucuya karşı çözümlenmedi ve takım, kanıtlayamadığı bir alan adını asla
 yazmaz. **Dolayısıyla commit'e bağlı kapı Azure backend'inde henüz çalışmıyor.**
 
-Bu bir **HOLD'dur, bir geri-dönüş (fallback) değil** — çözülemeyen bir head okuma hatasıdır, yani
-yukarıdaki tablonun son satırı: Azure'da `/sprint-review` raporu derler, promote PR'ını açar (ya da bulur)
-ve sonra bekletir; sohbette verilen bir onayla promote etmeye **geri dönmez**. Okuma bağlanana kadar bu
+Bu bir **HOLD'dur, bir geri-dönüş (fallback) değil** — çözülemeyen bir head okuma hatasıdır: Azure'da
+`/sprint-review` raporu derler, promote PR'ını açar (ya da bulur) ve sonra bekletir; `atl work promote`
+`backend-unbound` bildirir, hiçbir Azure yüzeyini çağırmaz ve hiçbir şeyi merge etmez. Sohbette verilen
+bir onayla promote etmeye **geri dönmez**. Okuma bağlanana kadar bu
 sürümdeki bir Azure projesi, promote'u o PR'ı Azure DevOps üzerinde kendisi tamamlayarak yapar. O alanı
 canlı sunucuya karşı çözümleyip bağlamak, adı konmuş bir sonraki adımdır.
 

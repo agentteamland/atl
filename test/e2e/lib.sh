@@ -31,13 +31,27 @@ finish() {
 #
 # CLAUDE_TURN_TIMEOUT (seconds) overrides the default. -k sends KILL if the turn
 # ignores TERM (a wedged MCP grandchild can hold the pipes open).
+#
+# What lands in turns.log, and why it is written in three parts: `--output-format
+# json` prints ONE envelope, and only when the turn COMPLETES. So a turn killed by
+# the timeout above contributes NOTHING -- the log reads as though that turn never
+# ran, which is exactly when the failure debug needs it most. And the envelope's
+# human-readable half is `.result` alone, one JSON-escaped field on a very long
+# line, so a `tail` of it is unreadable and a grep matches escaping rather than
+# what the model said. Hence: a header BEFORE the turn (lands whatever happens, so
+# every turn is attributable), the raw envelope (machine detail), then `.result`
+# as plain text (readable + greppable).
 CLAUDE_TURN_TIMEOUT="${CLAUDE_TURN_TIMEOUT:-900}"
 claude_turn() {
   local prompt="$1"; shift
+  local raw="$HOME/.turn.json"
+  printf '===== turn: %.120s\n' "$prompt" >>"$HOME/turns.log"
   ( cd "$PROJ" && timeout -k 30s "$CLAUDE_TURN_TIMEOUT" \
       claude -p "$prompt" "$@" --dangerously-skip-permissions --output-format json \
-  ) >>"$HOME/turns.log" 2>&1
+  ) >"$raw" 2>&1
   local rc=$?
+  cat "$raw" >>"$HOME/turns.log"
+  jq -r '.result // empty' "$raw" >>"$HOME/turns.log" 2>/dev/null
   if [ "$rc" -eq 124 ] || [ "$rc" -eq 137 ]; then
     echo "  turn timed out after ${CLAUDE_TURN_TIMEOUT}s (see turns.log)" | tee -a "$HOME/turns.log"
   fi

@@ -17,6 +17,7 @@ import (
 type DeliveryConfig struct {
 	Org        string `json:"org"`
 	Project    string `json:"project"`
+	Owner      string `json:"owner"` // github backend: the repo owner (org or user) — the coordinate Azure spells org/project
 	Repo       string `json:"repo"`
 	Backend    string `json:"backend"` // "azure" (default) | "github" — the backend adapter the team runs on (D1/D4)
 	BranchPair struct {
@@ -42,9 +43,19 @@ func (c *DeliveryConfig) DevBranch() string {
 	return "dev"
 }
 
-// activeBackend is which provider backend the team runs on — config.backend,
+// ReleaseBranch is the branch a sprint is promoted INTO — config.branchPair.release,
+// defaulting to "release" (matching /delivery-init and the docs). The promotion gate
+// reads it to find the dev→release PR, so a renamed pair isn't silently missed.
+func (c *DeliveryConfig) ReleaseBranch() string {
+	if c != nil && c.BranchPair.Release != "" {
+		return c.BranchPair.Release
+	}
+	return "release"
+}
+
+// ActiveBackend is which provider backend the team runs on — config.backend,
 // defaulting to "azure" so a config that predates the field keeps Azure behavior (D8 BC).
-func (c *DeliveryConfig) activeBackend() string {
+func (c *DeliveryConfig) ActiveBackend() string {
 	if c != nil && c.Backend != "" {
 		return c.Backend
 	}
@@ -136,7 +147,7 @@ func deliveryWorkerEnv(cfg *DeliveryConfig) []string {
 	if cfg == nil {
 		return nil
 	}
-	if cfg.activeBackend() == "github" {
+	if cfg.ActiveBackend() == "github" {
 		// GitHub backend (D3): the worker drives `gh`, which reads GH_TOKEN from its
 		// env — no Azure org/PAT and no azureDevOps MCP (the scheduler skips
 		// writeMCPConfig for github). The token is read from the engine's own env under

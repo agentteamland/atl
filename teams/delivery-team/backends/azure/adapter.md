@@ -53,6 +53,7 @@ rules below or is escalated, not guessed.
 | **Promotion approval record (#16)** | write: `repo_pull_request_thread_write` (action `create`, `content` = the record) · read: `repo_pull_request_thread` (action `list`), sentinel-matched (§7) |
 | List a project's repos (discovery, e.g. `/delivery-init`) | `repo_list_repos_by_project` |
 | **Read a branch (its head commit id, #16)** | `repo_branch` (action `get`, `branchName`) — ⚠ the response field carrying the commit id is **UNRESOLVED**; see §10 |
+| **Verify the promotion approval + merge `dev`→`release` (#16)** | **not bound** — `atl work promote` holds with `backend-unbound` here (§10); no Azure surface is called |
 | Read repo/file | `repo_get_repo_by_name_or_id` / `repo_get_file_content` |
 | Read / upsert / list wiki pages | `wiki_get_page_content` / `wiki_create_or_update_page` / `wiki_list_pages` / `wiki_get_wiki` / `wiki_list_wikis` |
 | Discovery search | `search_workitem` / `search_wiki` / `search_code` |
@@ -344,10 +345,19 @@ reader must not take this section as "the gate is live on Azure"**.
 
 **What that means operationally is a HOLD, not a fallback.** An unresolvable head is a **read
 failure**, and #16 fails closed on a read failure exactly as it does on a missing or mismatched
-record: until the read is bound, `/sprint-review` **holds** the `dev`→`release` promotion on this
-backend and reports why. It does **not** revert to promoting on a conversational PO decision —
-that is precisely the weakness #16 exists to remove, and reintroducing it as a fallback would give
-this backend the worst of both. Unverified is never approved.
+record: until the read is bound, the `dev`→`release` promotion **holds** on this backend and reports
+why. It does **not** revert to promoting on a conversational PO decision — that is precisely the
+weakness #16 exists to remove, and reintroducing it as a fallback would give this backend the worst
+of both. Unverified is never approved.
+
+**The promotion operation is `atl work promote`** — the deterministic gate that verifies the record
+against the PR's head and merges in the same call (the GitHub adapter §10 binds it; `/sprint-review`
+step 6b runs it). On this backend it resolves the configured `backend` and, finding the head-commit
+read unbound, returns the hold **`"reason": "backend-unbound"`** — it makes **no** call to any Azure
+surface, merges nothing, and leaves the promotion PR and any approval record untouched. That is the
+whole Azure binding of #16's compare-and-merge leg today: a refusal that names itself. Binding the
+read below is what makes this backend's promotion live; nothing in this file authorizes promoting
+around it.
 
 **The named next step:** resolve the response of `repo_branch` (action `get`) against a live Azure
 DevOps server, record the commit-id field here verbatim, then bind the branch row in §2 and lift

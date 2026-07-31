@@ -10,9 +10,10 @@ outcome-of-record — the **Sprint Review Report** — and then putting it in fr
 **product-owner** for the single decision only they can make: promote this sprint's integrated work
 from `dev` to `release`, or hold it. The report is assembled read-only; the promotion PR is opened
 **before** the gate and merges only on a **commit-bound** PO approval (concept #16) — a durable
-record on that PR naming the exact commit it would promote, read back from the backend and matched
-against the PR's current head. Absent, unreadable, or naming a different commit ⇒ the ceremony
-**holds**. It reads a settled `.delivery/` config (written once by
+record on that PR naming the exact commit it would promote, matched against the PR's current head.
+Absent, unreadable, or naming a different commit ⇒ the ceremony **holds**. That comparison **and**
+the merge are performed by `atl work promote` (step 6b), not by this ceremony reading the record
+itself. It reads a settled `.delivery/` config (written once by
 [`delivery-init`](../delivery-init/SKILL.md)) and, like every ceremony, reaches the backend only
 through the active backend's adapter.
 
@@ -23,7 +24,7 @@ through the active backend's adapter.
 | `dev` HEAD + its green CI run + preview URL | read | read the `dev` branch state via the active adapter (concept #16 — the head-commit read leg) + pipeline/build status |
 | Sprint Review Report | write (idempotent upsert) | the durable-knowledge store `Sprints/Sprint-<n>-Review` (concept #9) |
 | dev→release promotion PR | write (open-or-find, **before** the gate) | open the promotion PR — or reuse the one already open — per the active adapter (concept #11); **merged only on a verified approval** |
-| Promotion approval record + the promotion PR's current head commit | read | the `**[Promotion Approval]**` record on that PR, located by its first-line sentinel, + that PR's head commit (concept #16) |
+| Promotion approval record + the promotion PR's current head commit | read + merge | **`atl work promote`** — it reads the `**[Promotion Approval]**` record and the PR's head, compares them, and merges on an exact match (concept #16). The ceremony runs the command and relays its verdict; it does not read the record itself |
 | Rejected PBI (on PO Reject only) | write (idempotent tag + field + comment) | tag `carryover` (concept #4 — the carry-forward signal `/sprint-plan` admits first), set the runtime-resolved rework state (concept #7), comment the reason (concept #3); **iteration left in place** (the #9 resolution — reuse, don't file a parallel item) |
 | Blocked-unit reports (dispatch engine) | read + clear | `<projectRoot>/.delivery/blocked/*.json` |
 | Blocked reflection on each report's work-item | write (idempotent tag + comment) | resolve the completion/state model (concept #7) → update the work-item (merge the `blocked` tag, concept #4; completion-state + iteration untouched) + add the diagnostic comment (concept #3) |
@@ -184,20 +185,32 @@ here before the gate.
 
 Ask the **product-owner** (the user) an explicit Approve/Reject question on this sprint's integrated
 `dev` state — the scoped carve-out of the platform's NEVER-merge rule, legitimate **because** the PO
-decides it. That answer **routes** this step (approve → 6b–6d, reject → the reject block); it is not
-by itself the merge trigger — the commit-bound approval record below is. Do not proceed on
+decides it. That answer **routes** this step (approve → 6b, reject → the reject block); it is not
+by itself the merge trigger — the commit-bound approval record is. Do not proceed on
 inference; wait for the explicit decision before running 6b.
 
 **The structural rule this whole step rests on: the promotion PR is opened *before* the gate, and
 opening it is no longer the promotion — *merging* it is.** The PO's conversational "approve" here is
 the **input** to the approval, never a substitute for it: the merge fires only on a **commit-bound
-approval record** (concept #16) read back from the backend and matched against the exact commit the
-PR would promote. **A promotion is verified, not asserted.**
+approval record** (concept #16) matched against the exact commit the PR would promote. **A promotion
+is verified, not asserted.**
+
+**This ceremony no longer performs that verification — `atl work promote` does, and the same call
+performs the merge.** Why the decision moved out of this file: it first shipped here as prose, and a
+real run proved prose is followed inconsistently — one turn read the record, saw it named a
+superseded commit, and correctly held; **the very next turn, same skill, same PR, never mentioned
+the record at all** and fell back to asking the human "Approve or Reject?", the exact conversational
+gate this design exists to remove. Whatever depends on remembering gets forgotten, and the failure
+is silent — so the check lives in code, where it cannot be skipped. Verify and merge are **one**
+call for the same reason: a gate that only returned a verdict would leave a separate merge step this
+ceremony could reach without ever running the check.
+
+**So: do not re-implement the comparison here, and do not second-guess the verdict.** Reading the
+record yourself to "confirm" the command is how the prose path grows back.
 
 **Run 6a first, whatever the answer is** — the approval record lives *on* the promotion PR, so that
 PR must exist before the PO can set one; opening it promotes nothing. Then, **on APPROVE**, run
-6b→6d in order: every outcome that is not an exact commit match is a **HOLD**. **On REJECT**, skip
-to the reject block below — the PR stays open and unmerged.
+6b→6c. **On REJECT**, skip to the reject block below — the PR stays open and unmerged.
 
 #### 6a. Open-or-find the promotion PR
 
@@ -208,89 +221,70 @@ adapter's PR surface exposes an auto-complete / auto-merge field, **do not set i
 to auto-complete would merge on its own policy checks before this gate ever runs. Record the PR's
 number and print its link for the PO.
 
-#### 6b. Resolve the two commit ids
+**Opening is the only half of this step still yours.** `atl work promote` resolves the open
+`dev`→`release` PR itself (and holds with `no-open-pr` when there is none), so once the PR exists,
+hand off — do not re-find it and do not pass its number to the command. (`--pr <n>` exists to name a
+specific PR; this ceremony uses the default resolve.)
 
-- **`CURRENT_SHA`** — the promotion PR's **current head commit**, read through the active adapter
-  (concept #16, the head-commit read leg). Always through the adapter — never a local `git` read.
-  If that read **fails**, or the active backend does not bind it at all, `CURRENT_SHA` is
-  **unresolved** — never zero, never assumed, never improvised from another source: an unresolved
-  head is a read failure and 6c **holds** on it (see the table's read-failure row and the
-  backend-scope note below).
-- **`APPROVED_SHA`** — read **every** `**[Promotion Approval]**` record on that PR (concept #16, the
-  record leg — located by its exact first-line sentinel, never "the newest comment", concept #3),
-  each with its author and timestamp, and take the first 40-character lowercase hex id on a line
-  after that record's `## Approved Commit` heading. Anything else in the body is audit context.
+#### 6b. Run the gate — `atl work promote`
 
-The channel is **append-and-supersede**, so selection is **by commit id, never by recency**: an
-approval naming a different commit than the one about to merge is not an approval for it.
-
-#### 6c. Verify — fail CLOSED
-
-Promote only if **exactly one** condition holds: some sentinel record parses cleanly **and** its
-`## Approved Commit` equals `CURRENT_SHA`. Every other outcome is a **HOLD** — no PR merge, no
-auto-complete, no carryover writes, no state change on any work-item. **A hold is not a reject:**
-nothing is tagged `carryover`, no rejection reason is filed, and the gate simply waits for a valid
-record.
-
-| Outcome | Message to the PO |
-|---|---|
-| **No record** | `HOLD — no promotion approval on record. Sprint <n>'s promotion PR is <link>, head commit <CURRENT_SHA>. To approve, add a comment to that PR whose first line is exactly **[Promotion Approval]**, followed by a "## Approved Commit" heading and <CURRENT_SHA>. I will verify it and merge. I will not promote on a conversational approval.` |
-| **Record present, no 40-hex id under `## Approved Commit`** | `HOLD — a **[Promotion Approval]** record exists on PR <link> (by <author>, <ts>) but I cannot read a commit id from it. Expected a 40-character lowercase hex id on a line after "## Approved Commit". Re-post the record for <CURRENT_SHA>.` |
-| **SHA mismatch** | see below |
-| **Two records naming the same SHA** | not an error — converge on it, note the duplicate in the report's `## Promotion decision` section. |
-| **Read failed / unreachable** (either leg — the approval record **or** the head commit) | `HOLD — could not read <the approval record / the promotion PR's current head commit> (<error>). Unverified is not approved.` Retry per the resilience policy, then hold. |
-
-**When `dev` has advanced since the approval** — the case this gate exists for. It resolves to
-**HOLD, never auto-carry**:
+From the project root, run:
 
 ```
-HOLD — the approval on record is for commit <APPROVED_SHA>
-(set by <author> at <ts>), but the promotion PR's head is now <CURRENT_SHA>.
-`dev` has advanced by <N> commit(s) since that approval, so the approved state is
-not the state that would be promoted. I have NOT promoted anything and I have NOT
-carried the approval forward.
-To promote the current state, re-read the refreshed report above and add a new
-**[Promotion Approval]** record for <CURRENT_SHA>. To promote exactly what you
-approved, reset `dev` to <APPROVED_SHA> first.
+atl work promote --json
 ```
 
-The ceremony does not close the PR, does not delete or edit the stale record (the channel is
-append-only on both bindings), and does not tag anything `carryover`. The stale record stays as
-audit history; the next approval supersedes it by naming the newer commit.
+A single read returns the promotion PR's current head **and** every `**[Promotion Approval]**`
+record on it — one snapshot, so a comment posted mid-check cannot make the comparison lie — and the
+PR is merged, pinned to that commit, only when a record names that exact head. Read the verdict, not
+the record:
 
-**Backend scope in v1 — the commit-bound gate operates on the GitHub backend only.** It needs both
-legs of concept #16, and on the **Azure** backend only the *record* leg is bound today: the
-head-commit read is **unresolved** (`backends/azure/adapter.md` states it), so `CURRENT_SHA` cannot
-be resolved and there is nothing to compare an approved commit against. **Unverified is never
-approved**, so on Azure this gate **holds** — it does not promote, it does not fall back to a
-conversational approval, and it does not substitute a local `git` read for the adapter. Report it
-plainly:
+- **Exit 0** (`"verdict": "promoted"`) — the promotion landed. `approved` is the merged commit, `pr`
+  the promotion PR, and the matching entry in `records` carries the approver and their timestamp.
+- **Non-zero exit with a verdict** (`"verdict": "hold"`) — **nothing was merged**: no auto-complete
+  was set, no work-item state changed, no `carryover` was written. **A hold is not a reject** — no
+  rejection reason is filed and the gate simply waits for a valid record. `reason` is the
+  machine-readable cause: `no-open-pr` · `no-record` · `unparseable-record` · `superseded` ·
+  `read-failed` · `merge-refused` · `backend-unbound`.
+- **Non-zero exit with NO JSON on stdout** — a setup error, not a verdict: the project has no
+  `.delivery/config.json`, or its GitHub coordinates are incomplete. The single line on stderr says
+  which. Nothing was merged here either, so the promotion still **holds** — surface the setup error
+  as-is and fix the config; do not treat a missing verdict as permission to promote by hand.
 
-```
-HOLD — on this backend I cannot read the promotion PR's current head commit, so I
-cannot verify that your approval names the commit that would be promoted. I have NOT
-promoted anything; unverified is not approved. The promotion PR is <link> and its
-approval record (if any) is preserved. Unblocking this needs the head-commit read
-bound in the Azure adapter — resolve the branch read's response field against a live
-server, then bind it.
-```
+**Whatever the exit code, the promotion happened only if the command says `promoted`.** Never merge
+the promotion PR yourself — not with `gh`, not through the adapter, not "because the record is
+obviously fine". The command is the only path that merges, and it merges only what it verified.
 
-#### 6d. On a verified match — promote
+**Relay `message` to the PO verbatim.** It is already written for them — where the gate knows the
+PR and the head it names both, and on a missing record it spells out the exact comment to post. Do
+not paraphrase it, do not soften it into a question, and never ask for a conversational approval in
+its place. Then **stop**: a hold ends the promotion for this run. The retry is the PO posting a
+record and the ceremony being re-run.
 
-- **Merge the PO-approved promotion PR per the active backend's adapter (concept #11), pinned to the
-  approved commit.** Where the adapter's merge surface exposes a head-commit guard, pass
-  `APPROVED_SHA` so the provider itself refuses to merge anything else; where it does not, **re-read
-  the head and re-compare immediately before the merge**, and any difference sends this back to a
-  HOLD. Never squash or rebase — the engine's `MergedToBase` needs a real merge commit (concept
-  #11). Where the backend cannot merge non-interactively, hand the PO the PR link to complete it
-  there. This ceremony **never fabricates a merge mechanism and never merges outside the verified,
-  PO-approved PR.**
+`superseded` is the case this gate exists for — `dev` advanced past the approved commit, so the
+approved state is not the state that would be promoted. It **holds, never auto-carries**: the
+approval is not carried forward to the newer commit, and the stale record is left untouched as audit
+history for the next one to supersede.
+
+**Backend scope in v1 — the gate operates on the GitHub backend only.** It needs both legs of
+concept #16, and on **Azure** only the *record* leg is bound: the head-commit read is **unresolved**
+(`backends/azure/adapter.md` §10), so there is nothing to compare an approved commit against.
+**Unverified is never approved** — the command reports this itself as `"reason":
+"backend-unbound"`; relay it like any other hold. Azure does **not** fall back to a conversational
+approval, and this ceremony never substitutes a local `git` read for the adapter.
+
+#### 6c. Record the outcome
+
 - **Record the decision on the review page** in its `## Promotion decision` section (idempotent
-  upsert, step 5): the approved commit, the approver, the record's timestamp, the promotion PR link,
-  and the merge result. The merged promotion PR plus the `Sprints/Sprint-<n>-Review` page ARE the
-  sprint's durable review record — there is no separate "iteration reviewed" state to set (a sprint
-  is concept #6, not a work-item with a completion state; concept #7 governs work-item units, not
-  iterations).
+  upsert, step 5), from the command's own verdict: on a promote, `approved` (the commit that was
+  merged), the approver + timestamp from the matching `records` entry, the promotion PR, and the
+  merge result; on a hold, the `reason` and the `message` as relayed. The merged promotion PR plus
+  the `Sprints/Sprint-<n>-Review` page ARE the sprint's durable review record — there is no separate
+  "iteration reviewed" state to set (a sprint is concept #6, not a work-item with a completion
+  state; concept #7 governs work-item units, not iterations).
+- **On a hold, nothing else happens.** The ceremony does not close the PR, does not edit or delete
+  any approval record (the channel is append-only on both bindings), and does not tag anything
+  `carryover`.
 
 **On REJECT — the release STAYS PUT (forward-fix, never a revert):**
 
@@ -335,11 +329,12 @@ local ledger):
   existing item, never surfaced.
 - **The dev→release promotion** is keyed to a **merged** PR **and** the commit it promoted — never to
   the mere existence of a PR. Step 6a reuses an already-**open**
-  `branchPair.dev`→`branchPair.release` PR (a re-run never opens a second one), and the gate then
-  re-reads the head + the approval record and re-verifies. A PR already **merged** for the
-  currently-approved commit means this promotion has landed: converge on it, report it, do not merge
-  again. A PR merged for an *earlier* commit does **not** block a later legitimate promotion — `dev`
-  has since advanced, and the gate simply runs again against the new head.
+  `branchPair.dev`→`branchPair.release` PR (a re-run never opens a second one), and `atl work
+  promote` then re-reads the head + the approval record and re-verifies from scratch. Once the
+  promotion has landed there is no open PR left to resolve, so a re-run holds with `no-open-pr` and
+  merges nothing — report it and move on. A PR merged for an *earlier* commit does **not** block a
+  later legitimate promotion: `dev` has since advanced, 6a opens the next PR, and the gate runs
+  again against the new head.
 
 All backend access is through the active backend's adapter; the credential is referenced by name
 (`config.pat.ref` on Azure, `config.credential.ref` on GitHub) and never read or written as a literal.
