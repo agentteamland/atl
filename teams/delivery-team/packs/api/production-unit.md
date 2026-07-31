@@ -64,6 +64,11 @@ ordersRouter.post("/:id/archive", requireAuth, postArchiveOrder);
 The controller never hand-formats an error and never hand-writes an `if (!req.body.x)` check: the
 schema *is* the input contract, and the one central error handler owns every failure response.
 
+One version caveat on that `throws → central handler` comment: a rejection from an `async` handler
+reaches the error middleware natively on express `^5.x` **but not on `^4.x`**, which the dependency
+baseline still pins by default. On a `^4.x` project, wrap the handler exactly the way its existing
+handlers are wrapped — see the pitfall in step 5.
+
 ## 3. Register it — two wirings, not one
 
 An endpoint is reachable only after **both** of these are true, and only one of them is in the file
@@ -108,30 +113,46 @@ performing doubt.
 assembles its own app.**
 
 ```typescript
-import { app } from "../src/app";                  // ✅ the app the process actually serves
-const app = express().use(json()).use(ordersRouter); // ❌ *a* composed root — not *the* one
+// ✅ the app the process actually serves
+import { app } from "../src/app";
+
+// ❌ *a* composed root, not *the* one — and it can mirror the prefix, so the test URL is identical
+const app = express().use(express.json()).use("/v1/orders", ordersRouter);
 ```
 
-The second line is a completely fictional guarantee, and **every gate goes green over it**:
+The second one is a completely fictional guarantee, and **every gate goes green over it**:
 `npm run typecheck` compiles it, `npm run lint` likes it, `npm test` passes it — the suite exercises
 routing, validation and the envelope, all against an app that exists only inside the test file, while
-`src/app.ts` never mounts the router. No gate in this pack can tell the two imports apart. The
-difference is one import line, so **check it by eye**, then observe the endpoint outside the suite:
+`src/app.ts` never mounts the router. No gate in this pack can tell the two apps apart.
+
+This is measured, not assumed. Against a composition root that builds the router and never mounts it,
+the *same* request URL gives:
+
+```
+prescribed test, imports the real app  →  404   test FAILS, omission caught
+test assembles its own app             →  200   test PASSES, endpoint unreachable in production
+```
+
+The difference is one line at the top of the test file, so **check it by eye**, then observe the
+endpoint outside the suite:
 
 ```bash
 npm ci && npm run typecheck && npm run lint && npm test   # necessary — not sufficient here
 
-grep -rn "src/app" test/<resource>.test.ts                # the test imports the REAL app
+grep -n "src/app" <the endpoint's test file>              # the test imports the REAL app
 
 # The composed app's route table — this stack's equivalent of a CLI's `--help`.
 # Run it against the build output with plain node; no new dependency is needed.
 node -e '
   const { app } = require("<build-output>/app");
-  const stack = (app.router ?? app._router).stack;   // express 5: app.router · express 4: app._router
-  for (const l of stack) {
+  const router = app._router ?? app.router;   // check _router FIRST: on express 4 `.router` THROWS
+  const mount = (l) => l.regexp               // express 5 layers no longer carry `.regexp`
+    ? l.regexp.source.replace(/\\\//g, "/").replace(/^\^/, "").replace(/\/\?\(\?=\/\|\$\)$/, "")
+    : "?";
+  for (const l of router.stack) {
     if (l.route) console.log(Object.keys(l.route.methods).join("|").toUpperCase(), l.route.path);
     else if (l.handle?.stack) for (const s of l.handle.stack)
-      if (s.route) console.log(Object.keys(s.route.methods).join("|").toUpperCase(), l.regexp.source, s.route.path);
+      if (s.route) console.log(Object.keys(s.route.methods).join("|").toUpperCase(), mount(l) + s.route.path);
   }'
 
 # And once through a real socket, success AND failure:
@@ -140,10 +161,14 @@ curl -s -i -X POST localhost:<port>/<prefix>/<path> -H 'content-type: applicatio
 ```
 
 The route table earns its place: a test asserts the path *the developer believed in*, while the table
-shows the path **as a caller sees it, next to its siblings** — so a doubled prefix, or a route sitting
-under `/orders` while every neighbour is under `/v1/orders`, is visible at a glance and invisible to a
-test written from the same wrong assumption. The port, prefix and start command are project truths —
-take them from the durable-knowledge pages the brief names, not from this pack.
+prints **every mounted route next to its siblings** — so a doubled prefix
+(`POST /v1/orders/v1/orders/:id`), or a route sitting under `/orders` while every neighbour is under
+`/v1/orders`, is visible at a glance and invisible to a test written from the same wrong assumption.
+Mind the version: on express `^4.x` the mount resolves and each line *is* the caller-visible path; on
+`^5.x` the layer no longer exposes its mount, so the prefix prints as `?` and only the
+router-relative half shows — a duplicated segment still stands out, but there the **live call is what
+proves the caller-visible path**. The port, prefix and start command are project truths — take them
+from the durable-knowledge pages the brief names, not from this pack.
 
 Two more durable effects to observe when they apply:
 
