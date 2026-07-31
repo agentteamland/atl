@@ -157,7 +157,11 @@ reset_delivery_repo() {
     git add -A
     git -c user.email=e2e@atl.local -c user.name=atl-e2e commit -q -m "reset: e2e baseline" --allow-empty
     # rebuild the two-branch delivery flow off the fresh main (deleting a PR's head
-    # branch below auto-closes any open PR, so no separate pr-close pass is needed)
+    # branch below auto-closes any open FEATURE-branch PR, so no separate pr-close pass
+    # is needed for those). A dev->release promotion PR is the exception: its head is
+    # `dev`, which is never deleted, so one left open by a failed run survives the reset
+    # — harmless, because /sprint-review's step 6a is open-or-find and reuses it, and the
+    # force-push gives it a fresh head that no prior approval record can match.
     git push -q -f origin HEAD:main    || exit 1
     git push -q -f origin HEAD:dev     || exit 1
     git push -q -f origin HEAD:release || exit 1

@@ -15,11 +15,12 @@
 # Two assertion tiers (the deterministic-mock / non-deterministic-driver split):
 #   * CORE (ok/bad) — the reliable e2e PLUMBING: install + asset reflection (incl. the
 #     backends/ per-backend adapters), kickoff's Epic/Feature + the [Technical Analysis]
-#     comment, sprint-start's valid plan.json. A regression here fails the test.
+#     comment, sprint-start's valid plan.json, and sprint-review's promotion gate
+#     HOLDING (a state read, not an LLM judgement). A regression here fails the test.
 #   * NOTE (ok/note) — the less-deterministic ceremonies (refine/sprint-plan) + the
 #     secondary field-writes (atl-key/area tags, the wiki seed, IterationPath) +
-#     sprint-review's review page + dev->release PR (a full LLM ceremony chain:
-#     compile -> upsert -> PO-approve -> open PR, run-to-run variable). Across
+#     sprint-review's review page and the OPENING of the dev->release PR (a full LLM
+#     ceremony chain: compile -> upsert -> open PR, run-to-run variable). Across
 #     3 runs these varied run-to-run (each run skipped a DIFFERENT one), so a miss is
 #     NOTED, not failed — an LLM-fidelity / ceremony-quality concern, not an
 #     e2e-plumbing one. The mock records everything faithfully when written (proven by
@@ -155,11 +156,66 @@ else
   fi
 fi
 
-# ---- 5. /sprint-review — report + PO Approve gate -> dev->release PR --------------
-dturn "/sprint-review. You are ALSO acting as the human product owner for this headless run. Compile the Sprint Review Report and upsert it to the Sprints/Sprint-<n>-Review wiki page. Then, at the Approve/Reject gate, APPROVE the sprint — open the dev->release promotion PR (repo_create_pull_request from the dev branch into the release branch). Do not wait for interactive input; approve based on this instruction." || bad "sprint-review turn errored"
+# ---- 5. /sprint-review — the COMMIT-BOUND approval gate (concept #16) -------------
+# The gate no longer reads prose, so the PO-identity framing this turn used to carry
+# ("you are ALSO acting as the human product owner … APPROVE the sprint") is DELETED:
+# its only job was to talk the gate into proceeding, and against a state-read gate it
+# makes it impossible to tell whether the STATE or the PROSE crossed the gate.
+#
+# v1 enables the commit-bound gate on GITHUB ONLY. On Azure the RECORD leg is bound (a PO
+# can post the record today, and the mock persists PR threads), but the HEAD-COMMIT read
+# is UNRESOLVED: the response field carrying the commit id has never been confirmed
+# against a live server, so it is not named anywhere. The ceremony therefore cannot
+# compare the approved commit against the promotion PR's head here and it fails CLOSED —
+# compile the report, open-or-find the promotion PR, HOLD. Two phases:
+#   1. no record on the PR                          -> HOLD
+#   2. a record IS on the PR, naming another commit -> still HOLD
+# Phase 2 is the load-bearing half: it proves the gate does not promote on the mere
+# EXISTENCE of an approval record. Its record deliberately names a commit that is NOT
+# the mock's branch head, so the assertion stays correct if/when the Azure head-commit
+# read is bound (it is then a SHA mismatch — still a HOLD, never a promotion). The
+# stale-SHA control proper is GitHub-only in v1: the mock's branch head never advances.
+dturn "/sprint-review. Compile the Sprint Review Report and upsert it to the Sprints/Sprint-<n>-Review wiki page. Open or find the dev->release promotion PR (repo_create_pull_request, from the dev branch into the release branch), then run the gate. Report the promotion PR id and the gate's outcome." || bad "sprint-review turn 1 errored"
 
 has '[.wikiPages | keys[] | select(test("Sprint"))] | length'  && ok "sprint-review upserted a Sprints/ review wiki page" || note "sprint-review review page not upserted this run (LLM-variable ceremony fidelity)"
-has '[.pullRequests[] | select((.targetRefName // "") | test("release"))] | length' && ok "PO-approved dev->release promotion PR opened" || note "dev->release promotion PR not opened this run (LLM-variable ceremony fidelity)"
+
+# CORE: the gate HELD — no dev->release PR was COMPLETED (completion is the promotion
+# on Azure: repo_update_pull_request with autoComplete).
+COMPLETED_PROMOTION='[.pullRequests[] | select(((.targetRefName // "") | test("release")) and (.status == "completed"))] | length'
+if has "$COMPLETED_PROMOTION"; then bad "a dev->release PR was COMPLETED with no approval record (#16 fail-closed)"; else ok "gate HELD with no approval record — no dev->release completion (#16 fail-closed)"; fi
+# liveness (NOTE — opening the PR is the LLM-variable half on this blueprint): did the
+# ceremony reach the gate at all? Deliberately NOT promoted to CORE, which means the hold
+# assertion above CAN pass vacuously on a run that never opened a promotion PR. Accepted
+# here: the non-vacuous CORE liveness lives on the github blueprint, where opening the PR
+# is deterministic; this blueprint's PR-open step has documented run-to-run variance.
+PRID=$(q '[.pullRequests[] | select((.targetRefName // "") | test("release"))] | .[0].pullRequestId // empty')
+[ -n "$PRID" ] && ok "promotion PR opened before the gate (step 6a)" || note "no dev->release promotion PR this run (LLM-variable ceremony fidelity)"
+
+if [ -n "$PRID" ]; then
+  # --- the PO sets the record OUT OF BAND, straight into the mock store -------------
+  # The human's own write (on a live backend: the PR comment box, or the adapter's
+  # thread-write tool) with no LLM in the loop: first line EXACTLY the sentinel, a 40-hex
+  # commit id under the fixed '## Approved Commit' H2 — the #16 record shape, identical
+  # on both backends. Written straight into the store rather than through a mock tool:
+  # the mock still carries the PRE-consolidation thread tool names the curated map lists
+  # (repo_create_pull_request_thread / repo_list_pull_request_threads) while the shipped
+  # MCP consolidates them (backends/azure/adapter.md §2 records the resolved names) —
+  # re-syncing the mock's surface is a separate pass, and a store write is name-agnostic.
+  RECORD_SHA=2a7d4e9b1c6f8035d2e4a6b8c0d1e3f5a7b9c1d3
+  APPROVAL=$(printf '**[Promotion Approval]**\n\n## Approved Commit\n%s\n\n## Sprint\nSprint 4\n\n## Decision\nAPPROVE\n' "$RECORD_SHA")
+  if jq --arg pr "$PRID" --arg body "$APPROVAL" '.pullRequests[$pr].threads |= (. + [{id: (length + 1), content: $body, comments: [{content: $body}]}])' "$STORE" > "$STORE.tmp" 2>/dev/null && mv "$STORE.tmp" "$STORE"; then
+    ok "seeded a **[Promotion Approval]** record onto the promotion PR (out of band)"
+  else
+    rm -f "$STORE.tmp"
+    bad "could not seed the approval record into the mock store"
+  fi
+
+  dturn "/sprint-review. Re-run the gate on the existing dev->release promotion PR." || bad "sprint-review turn 2 errored"
+  # CORE: a record the ceremony cannot match against the PR's head is NOT an approval.
+  if has "$COMPLETED_PROMOTION"; then bad "an unmatched approval record COMPLETED the promotion (#16 must fail closed)"; else ok "an approval record the gate could not verify did NOT promote (#16 fail-closed)"; fi
+else
+  note "approval-record phase skipped — no promotion PR to attach the record to"
+fi
 
 # ---- on failure, surface what the torn-down container would otherwise lose --------
 if [ "$FAIL" -gt 0 ]; then
@@ -168,7 +224,7 @@ if [ "$FAIL" -gt 0 ]; then
   echo "--- turns.log (tail) ---"; tail -80 "$HOME/turns.log" 2>/dev/null
   echo "--- .delivery/ tree ---"; find "$PROJ/.delivery" 2>/dev/null
   echo "--- mock store (summary) ---"
-  jq '{workItems: [.workItems[] | {id, type: .fields."System.WorkItemType", state: .fields."System.State", tags: .fields."System.Tags", iter: .fields."System.IterationPath"}], wiki: (.wikiPages|keys), prs: [.pullRequests[] | {id: .pullRequestId, src: .sourceRefName, tgt: .targetRefName, status}]}' "$STORE" 2>/dev/null
+  jq '{workItems: [.workItems[] | {id, type: .fields."System.WorkItemType", state: .fields."System.State", tags: .fields."System.Tags", iter: .fields."System.IterationPath"}], wiki: (.wikiPages|keys), prs: [.pullRequests[] | {id: .pullRequestId, src: .sourceRefName, tgt: .targetRefName, status, threads: ((.threads // []) | map(.content))}]}' "$STORE" 2>/dev/null
   echo "--- plan.json ---"; cat "$PROJ/.delivery/plan.json" 2>/dev/null
   echo "========================================"
 fi
