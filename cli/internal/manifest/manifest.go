@@ -22,7 +22,12 @@ import (
 )
 
 // SchemaVersion is the current install-manifest schema.
-const SchemaVersion = 1
+//
+//	1 — the original: source pin + files baseline.
+//	2 — adds `stores`, the durable-store paths the team declared. An install
+//	    written at v1 predates the field, so its stores are unknown rather than
+//	    absent — update backfills those once and stamps v2.
+const SchemaVersion = 2
 
 // Source mirrors the index source an install resolved from, pinned to the ref
 // actually fetched, so doctor/update can re-fetch the exact same bytes.
@@ -42,6 +47,12 @@ type Manifest struct {
 	Source        Source            `json:"source"`
 	InstalledAt   time.Time         `json:"installedAt"`
 	Files         map[string]string `json:"files"` // path relative to the .claude dir -> SHA-256 at install
+	// Stores are the durable-store paths this team declared under
+	// `capabilities.<name>.store` in its team.json, verbatim (still tilde-form).
+	// Recorded so the platform can keep them versioned without knowing which
+	// team owns them — core honors the declaration, it does not learn the team.
+	// Omitted for teams that declare none.
+	Stores []string `json:"stores,omitempty"`
 }
 
 // dirName is the installed-manifests directory under a layer root.
@@ -55,12 +66,12 @@ func Path(layerDir, handle, name string) string {
 	return filepath.Join(layerDir, dirName, fileName(handle, name))
 }
 
-// Write atomically writes m under layerDir. SchemaVersion and InstalledAt are
-// filled if unset.
+// Write atomically writes m under layerDir, stamping the current schema version
+// — every write path produces the current shape, so the file describes itself
+// honestly and a one-time migration can tell "already handled" from "not yet".
+// InstalledAt is filled if unset.
 func (m *Manifest) Write(layerDir string) error {
-	if m.SchemaVersion == 0 {
-		m.SchemaVersion = SchemaVersion
-	}
+	m.SchemaVersion = SchemaVersion
 	if m.InstalledAt.IsZero() {
 		m.InstalledAt = time.Now().UTC()
 	}

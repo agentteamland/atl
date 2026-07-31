@@ -45,7 +45,14 @@ func updateTeams(projectRoot string) (int, error) {
 				continue // not in the index (e.g. a local-only team) — nothing to pull
 			}
 			if !semver.Less(m.Version, entry.Version) {
-				continue // already current
+				// Already current — but an install written under an older manifest
+				// schema is still out of date in SHAPE. Bring it forward once (the
+				// write stamps the current schema, so this never runs twice), and
+				// don't count it as an advance, because no version advanced.
+				if m.SchemaVersion < manifest.SchemaVersion {
+					_ = migrateTeamManifest(m, entry, layer)
+				}
+				continue
 			}
 			if err := upgradeTeam(m, entry, layer, claude); err != nil {
 				return advanced, err
@@ -58,6 +65,33 @@ func updateTeams(projectRoot string) (int, error) {
 		}
 	}
 	return advanced, nil
+}
+
+// migrateTeamManifest brings an already-current install forward to the current
+// manifest schema, without touching a single reflected file.
+//
+// Schema v2 added `stores` — the durable-store paths the team declared. That
+// value lives in the team's own team.json, which install does not reflect onto
+// disk, so the only way to learn it is to re-fetch the pinned source. This runs
+// at most once per install (the write stamps the new schema version), and only
+// for installs that predate the field.
+//
+// Best-effort: a failed fetch leaves the manifest at the old schema, so the next
+// update simply tries again. Nothing downstream breaks in the meantime — an
+// unknown store is treated exactly like a team that declares none.
+func migrateTeamManifest(m *manifest.Manifest, entry *index.Entry, layer string) error {
+	srcDir, err := source.Fetch(entry.Source.Repo, entry.Source.Subpath, m.Source.Ref)
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(srcDir)
+
+	tm, err := teampkg.ReadManifest(srcDir)
+	if err != nil {
+		return err
+	}
+	m.Stores = tm.DeclaredStores()
+	return m.Write(layer)
 }
 
 // upgradeTeam fetches entry's source and reflects it onto installed team m,
@@ -76,6 +110,13 @@ func upgradeTeam(m *manifest.Manifest, entry *index.Entry, layer, claude string)
 	m.Version = entry.Version
 	m.Source = manifest.Source{Repo: entry.Source.Repo, Subpath: entry.Source.Subpath, Ref: entry.Source.Ref}
 	m.Files = files
+	// Re-read the declared stores from the version just fetched: a team may add,
+	// move, or drop a store between releases, and the manifest must track the
+	// version actually on disk. A team.json we cannot read leaves the previous
+	// value alone rather than silently clearing it.
+	if tm, terr := teampkg.ReadManifest(srcDir); terr == nil {
+		m.Stores = tm.DeclaredStores()
+	}
 	return m.Write(layer)
 }
 

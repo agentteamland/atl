@@ -38,12 +38,37 @@ Bu kadarı kuruluma yeter. CLI manifest dosyasını çözümler, `agents/web-age
 | `scope` | dize | — | Yayıncı varsayılan kurulum katmanı: `"project"`, `"global"` ya da `"both"`. Varsayılan `"project"`. Kullanıcı kurulum sırasında `--global` / `--project` ile her zaman geçersiz kılabilir. |
 | `dependencies` | nesne | — | CLI'nin bu takımın yanına kurması gereken diğer takımlar için `team-name → version-constraint` eşlemesi. |
 | `requires.atl` | dize | — | Bildirilen en düşük `atl` sürümü. Örneğin `">=2.0.0"`. Geleneksel üst veri — kurulum ayrıştırıcısı şu an bunu dayatmaz. |
-| `capabilities` | nesne | — | Platformun becerilerinin (kurulum ayrıştırıcısının değil) okuduğu isteğe bağlı sözleşmeler. `capabilities.review: "<agent>"`, [`/create-pr`](/tr/skills/create-pr)'in bu takımın uzman gözden geçireni olarak başlattığı ajanı adlandırır; `capabilities.profile`, profil katmanı sağlayıcı/tüketici rolünü bildirir ([profile-team](/tr/teams/profile-team)'e bakın). |
+| `capabilities` | nesne | — | Çoğunlukla kurulum ayrıştırıcısının değil, platformun becerilerinin okuduğu isteğe bağlı sözleşmeler. `capabilities.review: "<agent>"`, [`/create-pr`](/tr/skills/create-pr)'in bu takımın uzman gözden geçireni olarak başlattığı ajanı adlandırır; `capabilities.profile`, profil katmanı sağlayıcı/tüketici rolünü bildirir ([profile-team](/tr/teams/profile-team)'e bakın). **CLI**'ın okuduğu tek anahtar `store` — aşağıya bakın. |
 | `backends` | dize[] | — | `backends/<name>/` altında arka uca özel bağdaştırıcı paketleri gönderen takımlar için (ör. delivery-team'in `["azure", "github"]` değeri): takımın hangi arka uçları desteklediğini bildirir. Bugün yalnızca bilgilendirme amaçlıdır — kurulum ayrıştırıcısı bunu okumaz. |
 
 ::: tip Açıklamayı kısa tut
 `description`, `atl search` çıktısında tek satır olarak gösterilir; uzun bir açıklama garip biçimde kırılır. Bir tanıtım cümlesini hedefle — paragraf değil.
 :::
+
+## Kalıcı depo bildirmek {#kalici-depo-bildirmek}
+
+Çoğu takım her şeyi, ATL'nin zaten izlediği yansıtılmış `.claude` ağacının içinde tutar. Kendi uzun ömürlü verisini bunun dışında bir yerde tutan bir takım — ilki profile-team'in `~/.atl/profiles/`'i — o konumu bildirir:
+
+```json
+{
+  "capabilities": {
+    "profile": { "role": "provider", "store": "~/.atl/profiles" }
+  }
+}
+```
+
+`store` herhangi bir yetenek adının altında yer alabilir, tek bir yol tutar ve ev dizini için `~` kullanabilir. `atl install` bildirilen her depoyu kurulum manifest'ine kaydeder; bundan sonra **oturum başlangıcı ve tur başına çalışan tick, o dizini yerel git altında tutar** ve son geçişten bu yana değişen ne varsa commit'ler.
+
+Amaç geri getirilebilirliktir. Yazma politikası "son yazan kazanır" olan bir depo, her üzerine yazmada önceki değeri kaybeder: çıkarımla konmuş bir geçici değerin yerine doğrulanmış bir yanıt geldiğinde, yerine geçtiği şeyden hiçbir iz kalmaz. Dizin sürümlendiğinde eski değer bir `git show HEAD~1` uzaklıktadır.
+
+Bunun bilinçli olarak **yapmadıkları**:
+
+- **Dizini asla oluşturmaz.** Olmayan bir depo, özelliğin bu makinede kullanılmadığı anlamına gelir; onu oluşturmak hem diski kirletir hem de özelliği etkinmiş gibi gösterir.
+- **Asla remote tanımlamaz ve asla push etmez.** Bir depo genellikle kullanıcının en hassas verisini tutar; bir kopyayı makinenin dışına taşımak, kullanıcının ayrıca istemesi gereken ayrı bir eylemdir (profile-team'in [`/profile-backup`](/tr/teams/profile-team)'ı böyle bir yoldur ve herkese açık bir depoya yazmayı reddeder).
+- **Başka bir repo'nun içinde duran bir depoya asla dokunmaz.** Orada `git init` yapmak dıştaki repo'yu gölgelerdi.
+- **Kimseye erişim vermez.** ATL bildirilen *yolu* yalnızca bu tek mekanik amaç için okur. Bir depoyu kimin okuyup yazabileceği, platformun henüz uygulamadığı ayrı bir sözleşmedir.
+
+CLI bundan takımın hakkında hiçbir şey öğrenmez — ne ad, ne anlam, ne de dizinin ne tuttuğu bilgisi. Bir bildirime uyar; gelecekteki herhangi bir takımın aynı davranışı bedava almasının nedeni budur.
 
 ## Sürüm kısıtları {#version-constraints}
 

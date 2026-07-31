@@ -245,6 +245,7 @@ func installAt(target scope.Scope, projectRoot, handle, name string, entry *inde
 		existing.Scope = target.String()
 		existing.Source = src
 		existing.Files = files
+		existing.Stores = tm.DeclaredStores()
 		return existing.Write(layerDir)
 	}
 
@@ -259,6 +260,7 @@ func installAt(target scope.Scope, projectRoot, handle, name string, entry *inde
 		Scope:   target.String(),
 		Source:  src,
 		Files:   files,
+		Stores:  tm.DeclaredStores(),
 	}
 	return m.Write(layerDir)
 }

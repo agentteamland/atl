@@ -124,6 +124,13 @@ var tickCmd = &cobra.Command{
 			fmt.Printf("tick: %s\n", pr.String())
 		}
 
+		// Retention floor for team-declared durable stores — the within-session half
+		// of the session-start pass. A long session can overwrite the same field
+		// twice, and a snapshot taken only at session boundaries would keep the value
+		// from before the first write while losing the one between them. Silent: this
+		// runs every throttle window, so a notice would be noise, not signal.
+		versionDeclaredStores(project)
+
 		if throttleDur > 0 {
 			_ = throttle.Touch(stamp)
 		}

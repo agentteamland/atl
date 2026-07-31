@@ -1,7 +1,9 @@
 package manifest
 
 import (
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -89,6 +91,37 @@ func TestInstalledAtPreserved(t *testing.T) {
 	got, _ := Read(layer, "a", "one")
 	if !got.InstalledAt.Equal(ts) {
 		t.Errorf("installedAt = %v, want %v", got.InstalledAt, ts)
+	}
+}
+
+// Every write produces the current shape, so it must claim the current schema —
+// including a re-write of a manifest loaded from an older one. This is what lets
+// a one-time migration tell "already brought forward" from "not yet", instead of
+// re-running on every update forever.
+func TestWriteStampsCurrentSchemaVersion(t *testing.T) {
+	layer := t.TempDir()
+	mustWrite(t, layer, &Manifest{SchemaVersion: 1, Handle: "a", Name: "one", Files: map[string]string{}})
+	got, err := Read(layer, "a", "one")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.SchemaVersion != SchemaVersion {
+		t.Fatalf("schemaVersion = %d, want %d", got.SchemaVersion, SchemaVersion)
+	}
+}
+
+// A team that declares no store must not carry an empty `stores` key — the
+// manifest is read by eye during debugging, and a field that is always present
+// but usually empty is noise.
+func TestStoresOmittedWhenNoneDeclared(t *testing.T) {
+	layer := t.TempDir()
+	mustWrite(t, layer, &Manifest{Handle: "a", Name: "one", Files: map[string]string{}})
+	b, err := os.ReadFile(Path(layer, "a", "one"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(b), "stores") {
+		t.Fatalf("manifest carries an empty stores key:\n%s", b)
 	}
 }
 

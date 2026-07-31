@@ -29,6 +29,52 @@ func TestReadManifest(t *testing.T) {
 	}
 }
 
+// A team declares where it keeps durable state; the platform reads the
+// declaration so it can version that state without knowing which team owns it.
+func TestDeclaredStores(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "team.json"), `{
+	  "schemaVersion": 1, "name": "x", "version": "1.0.0", "scope": "global",
+	  "capabilities": {
+	    "review": "a bare string — an older capability shape",
+	    "profile": {"provider": true, "store": "~/.atl/profiles"},
+	    "archive": {"store": "  "},
+	    "notes":   {"store": "~/.atl/notes"}
+	  }
+	}`)
+	tm, err := ReadManifest(dir)
+	if err != nil {
+		t.Fatalf("ReadManifest: %v", err)
+	}
+	got := tm.DeclaredStores()
+	// Sorted by capability name ("notes" < "profile"), so a re-install produces a
+	// byte-identical manifest instead of churning on Go's map iteration order.
+	want := []string{"~/.atl/notes", "~/.atl/profiles"}
+	if len(got) != len(want) {
+		t.Fatalf("DeclaredStores = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("DeclaredStores = %v, want %v", got, want)
+		}
+	}
+}
+
+// The common case, and the one that must not error: a team with no durable store
+// of its own.
+func TestDeclaredStoresEmptyWhenNoneDeclared(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "team.json"),
+		`{"schemaVersion":1,"name":"x","version":"1.0.0","scope":"global","capabilities":{"review":"r"}}`)
+	tm, err := ReadManifest(dir)
+	if err != nil {
+		t.Fatalf("ReadManifest: %v", err)
+	}
+	if got := tm.DeclaredStores(); len(got) != 0 {
+		t.Fatalf("DeclaredStores = %v, want none", got)
+	}
+}
+
 func TestReadManifestMissingName(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, filepath.Join(dir, "team.json"), `{"version":"1.0.0"}`)

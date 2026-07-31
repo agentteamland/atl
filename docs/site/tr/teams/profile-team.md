@@ -43,6 +43,16 @@ Her şey global ATL katmanı altında `~/.atl/profiles/`'te yaşar:
         └── learnings/            # örüntü-organizasyonlu, KB'den yeniden derlenen
 ```
 
+::: tip Depo yerelde sürümlenir
+profile-team bu dizini kalıcı deposu olarak bildirir (`team.json`'ındaki
+`capabilities.profile.store`), bu yüzden ATL onu **yerel git** altında tutar ve değişen ne
+varsa oturum başında ve tick başına bir kez commit'ler. Profiller yerinde üzerine yazılır —
+bugün değiştirilen bir değer, yoksa yarın hiçbir yerde bulunmazdı — ve öncekini
+`git -C ~/.atl/profiles log` / `show` ile geri getirilebilir kılan budur. Yalnızca yereldir:
+hiçbir zaman bir remote tanımlanmaz ve hiçbir şey push edilmez. Bkz. [kalıcı depo
+bildirmek](/tr/authoring/team-json#kalici-depo-bildirmek).
+:::
+
 Bu dünya **varlık-organizasyonludur** ve bir projenin **konu-organizasyonlu** `.atl/wiki/` ve
 `.atl/journal/`'ından bilinçli olarak ayrıdır. İkisi yalnızca serbest göreli markdown
 bağlantılarıyla birbirine referans verir. Profiller global olduğundan asla bir projenin içinde

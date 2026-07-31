@@ -43,6 +43,16 @@ Everything lives under the global ATL layer at `~/.atl/profiles/`:
         └── learnings/            # pattern-organized, KB-rebuilt
 ```
 
+::: tip The store is versioned locally
+profile-team declares this directory as its durable store (`capabilities.profile.store` in
+its `team.json`), so ATL keeps it under **local git** and commits anything that changed at
+session start and once per tick. Profiles are overwritten in place — a value replaced today
+would otherwise exist nowhere by tomorrow — and this is what makes the previous one
+recoverable with `git -C ~/.atl/profiles log` / `show`. It is local only: no remote is ever
+configured and nothing is ever pushed. See [declaring a durable
+store](/authoring/team-json#declaring-a-durable-store).
+:::
+
 This world is **entity-organized** and deliberately separate from a project's
 **topic-organized** `.atl/wiki/` and `.atl/journal/`. The two cross-reference by free
 relative markdown links only. Because profiles are global, they never live inside a
