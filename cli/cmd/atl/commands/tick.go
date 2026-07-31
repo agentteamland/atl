@@ -97,12 +97,15 @@ var tickCmd = &cobra.Command{
 			}
 		}
 
-		scanned, found, enqueued, skipped, err := drainProjectTranscripts(st, project)
+		scanned, found, enqueued, skipped, overLong, err := drainProjectTranscripts(st, project)
 		if err != nil {
 			return err
 		}
 		if skipped > 0 {
 			fmt.Printf("tick: skipped %d unreadable transcript(s) this pass\n", skipped)
+		}
+		if overLong > 0 {
+			fmt.Printf("tick: skipped %d over-long transcript record(s) this pass — any markers they carried were not captured\n", overLong)
 		}
 
 		// Doctor self-check (queue health + asset integrity + hook binding), same
@@ -153,19 +156,21 @@ var tickCmd = &cobra.Command{
 // as skipped), never aborting the batch — otherwise a single poison file wedges
 // the project's entire capture pipeline forever (the cursor never advances, so
 // every later transcript is re-blocked). Queue dedup makes any re-scan a no-op,
-// so advancing past a skipped file is safe.
-func drainProjectTranscripts(st *queue.Store, project string) (scanned, found, enqueued, skipped int, err error) {
+// so advancing past a skipped file is safe. overLong counts the individual
+// records dropped for exceeding the record cap — a within-file loss the file
+// count can't express, reported so it can't disappear quietly.
+func drainProjectTranscripts(st *queue.Store, project string) (scanned, found, enqueued, skipped, overLong int, err error) {
 	dir, err := transcript.ProjectDir(project)
 	if err != nil {
-		return 0, 0, 0, 0, err
+		return 0, 0, 0, 0, 0, err
 	}
 	since, err := st.Cursor(project)
 	if err != nil {
-		return 0, 0, 0, 0, err
+		return 0, 0, 0, 0, 0, err
 	}
 	files, err := transcript.Find(dir, since)
 	if err != nil {
-		return 0, 0, 0, 0, fmt.Errorf("find transcripts: %w", err)
+		return 0, 0, 0, 0, 0, fmt.Errorf("find transcripts: %w", err)
 	}
 	var newest time.Time
 	var newestPath string
@@ -174,7 +179,8 @@ func drainProjectTranscripts(st *queue.Store, project string) (scanned, found, e
 			newest = f.ModTime
 			newestPath = f.Path
 		}
-		text, e := transcript.ExtractText(f.Path)
+		text, dropped, e := transcript.ExtractText(f.Path)
+		overLong += dropped
 		if e != nil {
 			skipped++
 			continue
@@ -197,7 +203,7 @@ func drainProjectTranscripts(st *queue.Store, project string) (scanned, found, e
 			newest = now
 		}
 		if e := st.SetCursor(project, newest.Add(-time.Second)); e != nil {
-			return scanned, found, enqueued, skipped, fmt.Errorf("advance cursor: %w", e)
+			return scanned, found, enqueued, skipped, overLong, fmt.Errorf("advance cursor: %w", e)
 		}
 	}
 	// Record that the maintenance pass ran, for doctor's tick-freshness check.
@@ -208,7 +214,7 @@ func drainProjectTranscripts(st *queue.Store, project string) (scanned, found, e
 	// A dry stretch there means markers may have been forgotten — the one
 	// non-deterministic link in the capture pipeline made detectable.
 	captureWatchdogNotice(st, project, newestPath)
-	return scanned, found, enqueued, skipped, nil
+	return scanned, found, enqueued, skipped, overLong, nil
 }
 
 // Capture-watchdog thresholds: fire only when BOTH are exceeded — enough

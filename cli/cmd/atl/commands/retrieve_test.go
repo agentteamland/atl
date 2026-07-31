@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -94,6 +95,62 @@ func TestCorpusStale(t *testing.T) {
 
 	if corpusStale([]string{filepath.Join(dir, "does-not-exist")}, idx) {
 		t.Error("an empty corpus should never be stale")
+	}
+}
+
+// TestCorpusStaleDetectsDeletedPage guards atl#328: a delete-only change leaves
+// nothing that survives newer than the index, so the modtime pass alone never
+// marks it stale and the deleted page keeps being served — silently, since it
+// renders like any other hit and only its excerpt (read live from disk) is empty.
+func TestCorpusStaleDetectsDeletedPage(t *testing.T) {
+	dir := t.TempDir()
+	wiki := filepath.Join(dir, "wiki")
+	if err := os.MkdirAll(wiki, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	kept := filepath.Join(wiki, "kept.md")
+	gone := filepath.Join(wiki, "gone.md")
+	if err := os.WriteFile(kept, []byte("# Kept\nbanana bread with ripe bananas"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(gone, []byte("# Gone\nzeppelin mooring masts"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	docs, err := retrieve.WalkCorpus([]string{wiki})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ix, err := retrieve.Build(context.Background(), docs, nil) // lexical-only: no model needed
+	if err != nil {
+		t.Fatal(err)
+	}
+	idx := filepath.Join(dir, "index.gob")
+	if err := ix.Save(idx); err != nil {
+		t.Fatal(err)
+	}
+
+	// Delete one page and age the survivor: nothing left on disk is newer than the
+	// index, which is exactly what makes the deletion invisible to modtimes.
+	if err := os.Remove(gone); err != nil {
+		t.Fatal(err)
+	}
+	past := time.Now().Add(-time.Hour)
+	if err := os.Chtimes(kept, past, past); err != nil {
+		t.Fatal(err)
+	}
+
+	// The symptom, until the index is rebuilt: the phantom still ranks, and its
+	// missing excerpt is the only tell.
+	res, err := ix.Query(context.Background(), "zeppelin", nil, retrieveTopK)
+	if err != nil || len(res) == 0 || res[0].Path != gone {
+		t.Fatalf("stale index should still rank the deleted page, got %+v (%v)", res, err)
+	}
+	if ex := excerpt(gone); ex != "" {
+		t.Fatalf("a deleted page has no excerpt, got %q", ex)
+	}
+
+	if !corpusStale([]string{wiki}, idx) {
+		t.Error("an indexed page that no longer exists must mark the index stale")
 	}
 }
 

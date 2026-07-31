@@ -55,7 +55,7 @@ var sessionStartCmd = &cobra.Command{
 		}
 
 		// Drain the previous session's transcripts (no throttle at session start).
-		if _, _, enqueued, _, derr := drainProjectTranscripts(st, project); derr == nil && enqueued > 0 {
+		if _, _, enqueued, _, _, derr := drainProjectTranscripts(st, project); derr == nil && enqueued > 0 {
 			fmt.Printf("atl: captured %d new learning(s) from the previous session\n", enqueued)
 		}
 
