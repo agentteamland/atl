@@ -1,6 +1,6 @@
 ---
 name: sprint-review
-description: /sprint-review — the delivery-team's sprint-end ceremony: compiles the Sprint Review Report (completed vs carryover, per-PBI PR links, test evidence, the deployable dev preview, actual velocity, and cross-unit integration findings) as the tech-lead + project-manager subagents in shared context, upserts it to the Sprints/Sprint-<n>-Review page in the durable-knowledge store, and runs the human product-owner's Approve/Reject gate — the ONLY trigger for the scoped dev→release promotion, and commit-bound: the promotion PR merges only when a durable approval record on it names that PR's current head commit. Runs at each sprint end (methodology.cadence.reviewCeremony).
+description: /sprint-review — the delivery-team's sprint-end ceremony: compiles the Sprint Review Report (completed vs carryover, per-PBI PR links, test evidence, the deployable dev preview, actual velocity, and cross-unit integration findings) as the tech-lead + project-manager subagents in shared context, upserts it to the Sprints/Sprint-<n>-Review page in the durable-knowledge store, and runs the commit-bound promotion gate — `atl work promote` merges the dev→release PR only when a durable approval record posted by the human product-owner names that PR's current head commit. The record IS the PO's decision; the ceremony never asks for a conversational approval and never waits for one. Runs at each sprint end (methodology.cadence.reviewCeremony).
 ---
 
 # /sprint-review — deliverable + PO dev→release gate
@@ -54,7 +54,7 @@ session context** (per `methodology.roles[].dispatch === "subagent"`): first the
 compiles the report, then the `tech-lead` runs the integration checkpoint building on the PM's
 compiled set — the second role sees the first's output in-context, which is the point of the
 subagent (not isolated-worker) dispatch. The `product-owner` is the **human** (the user), consulted
-only at the Approve/Reject gate. No `developer`/`tester` worker is spawned here (that is
+only at the promotion gate. No `developer`/`tester` worker is spawned here (that is
 `atl work dispatch`'s job, only from `/sprint-start`).
 
 ### 1. Load config and resolve the closed sprint's runtime facts
@@ -181,36 +181,50 @@ project (a durable-knowledge store listing, concept #9); read the store's locato
 (Azure: `wikiId`, never re-resolved; GitHub: the in-repo `/docs` path — no locator). Also surface the full report **in-session** so the PO reads it
 here before the gate.
 
-### 6. Run the PO Approve/Reject gate — the `product-owner` (human) decides
+### 6. Run the promotion gate — the PO's decision IS the approval record
 
-Ask the **product-owner** (the user) an explicit Approve/Reject question on this sprint's integrated
-`dev` state — the scoped carve-out of the platform's NEVER-merge rule, legitimate **because** the PO
-decides it. That answer **routes** this step (approve → 6b, reject → the reject block); it is not
-by itself the merge trigger — the commit-bound approval record is. Do not proceed on
-inference; wait for the explicit decision before running 6b.
+**Do not ask a blocking Approve/Reject question, and do not wait for a conversational answer.**
 
-**The structural rule this whole step rests on: the promotion PR is opened *before* the gate, and
-opening it is no longer the promotion — *merging* it is.** The PO's conversational "approve" here is
-the **input** to the approval, never a substitute for it: the merge fires only on a **commit-bound
-approval record** (concept #16) matched against the exact commit the PR would promote. **A promotion
-is verified, not asserted.**
+That instruction used to live here, and it is what broke this step twice. A real run: the ceremony
+found the PR, compiled the report, did the analysis — and then asked *"Approve or Reject? Which do
+you want?"* and stopped. It never reached the command. It was not disobeying; it was obeying a
+blocking ask placed in front of the check. **A gate whose first step is "wait for a human sentence"
+cannot run without a human sentence** — and in an autonomous or headless run there is not one.
 
-**This ceremony no longer performs that verification — `atl work promote` does, and the same call
-performs the merge.** Why the decision moved out of this file: it first shipped here as prose, and a
-real run proved prose is followed inconsistently — one turn read the record, saw it named a
-superseded commit, and correctly held; **the very next turn, same skill, same PR, never mentioned
-the record at all** and fell back to asking the human "Approve or Reject?", the exact conversational
-gate this design exists to remove. Whatever depends on remembering gets forgotten, and the failure
-is silent — so the check lives in code, where it cannot be skipped. Verify and merge are **one**
-call for the same reason: a gate that only returned a verdict would leave a separate merge step this
-ceremony could reach without ever running the check.
+So the sequence inverts. **The approval record is not the *consequence* of the PO's decision — it
+IS the decision**, in a form the platform can verify. The PO makes it by posting a
+`**[Promotion Approval]**` record naming the commit; asking for it is what the gate's own hold
+message does, far better than a conversational question, because it names the exact commit and the
+exact shape.
+
+**The structural rule this rests on: the promotion PR is opened *before* the gate, and opening it is
+no longer the promotion — *merging* it is.** A promotion is **verified, not asserted**.
+
+**This ceremony performs no verification of its own — `atl work promote` does, and the same call
+performs the merge.** Why the decision lives in code: it first shipped here as prose, and a real run
+proved prose is followed inconsistently — one turn read the record, saw it named a superseded
+commit, and correctly held; **the very next turn, same skill, same PR, never mentioned the record at
+all.** Whatever depends on remembering gets forgotten, and the failure is silent. Verify and merge
+are **one** call for the same reason: a gate that only returned a verdict would leave a separate
+merge step reachable without ever running the check.
 
 **So: do not re-implement the comparison here, and do not second-guess the verdict.** Reading the
 record yourself to "confirm" the command is how the prose path grows back.
 
-**Run 6a first, whatever the answer is** — the approval record lives *on* the promotion PR, so that
-PR must exist before the PO can set one; opening it promotes nothing. Then, **on APPROVE**, run
-6b→6c. **On REJECT**, skip to the reject block below — the PR stays open and unmerged.
+**The order is fixed and unconditional: 6a, then 6b.** Open-or-find the PR, then run the command —
+every run, with no question in between. The command's verdict routes what happens next:
+
+| verdict | what it means | what you do |
+|---|---|---|
+| `promoted` | a record named the current head; the merge is done | record the decision (6c) |
+| `no-record` | **the PO has not decided yet** | relay the hold verbatim — it tells them exactly what to post. Offer Reject as the alternative. Then stop; this run is over. |
+| `superseded` | they approved an earlier commit and `dev` has moved | relay it; the PO re-approves the current head or resets `dev`. Then stop. |
+| any other hold | see 6b's table | relay it verbatim. Then stop. |
+
+**A Reject is still conversational, and deliberately so.** The gate protects the *irreversible*
+direction only: refusing to promote cannot over-promote, so requiring a durable artifact to decline
+would add friction to the safe path. If the PO says reject — unprompted, or in answer to the hold
+message you relayed — skip to the reject block below. The PR stays open and unmerged.
 
 #### 6a. Open-or-find the promotion PR
 
