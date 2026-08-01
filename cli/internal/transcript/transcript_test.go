@@ -41,9 +41,12 @@ not even json
 	if err := os.WriteFile(path, []byte(lines), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	text, err := ExtractText(path)
+	text, skipped, err := ExtractText(path)
 	if err != nil {
 		t.Fatalf("extract: %v", err)
+	}
+	if skipped != 0 {
+		t.Errorf("skipped = %d, want 0 (no over-long records here)", skipped)
 	}
 	if !strings.Contains(text, "<!-- learning: A -->") {
 		t.Error("missing assistant array-content marker")
@@ -69,9 +72,12 @@ not even json
 	if err := os.WriteFile(path, []byte(lines), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	turns, err := ExtractFlow(path)
+	turns, skipped, err := ExtractFlow(path)
 	if err != nil {
 		t.Fatalf("flow: %v", err)
+	}
+	if skipped != 0 {
+		t.Errorf("skipped = %d, want 0 (no over-long records here)", skipped)
 	}
 	// Expected: user "do the auth thing", assistant "on it", user "no, use…",
 	// assistant "fixed". The tool_result-only user message yields no text → dropped.
@@ -325,6 +331,138 @@ func TestDryStretchSkipsMachineUserTurns(t *testing.T) {
 	}
 }
 
+// TestSkipsOverLongRecord is the regression for the whole-file abort. A record
+// past the size cap put bufio.Scanner into a permanent error state, and both
+// readers turned that into a failed read of the ENTIRE file — so one pathological
+// line (a pasted blob, a base64 payload, a tool result echoing a big file) cost
+// the whole session: the mining input, and via DryStretch the capture watchdog,
+// which swallows a read error silently. The record is skipped and counted now.
+func TestSkipsOverLongRecord(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "t.jsonl")
+	overLong := `{"message":{"role":"assistant","content":"OVERLONG` +
+		strings.Repeat("x", maxRecordBytes) + `"}}` + "\n"
+	body := dryLine("user", "before the blob") +
+		dryLine("assistant", "reply one <!-- learning: A -->") +
+		overLong +
+		dryLine("user", "after the blob") +
+		dryLine("assistant", "reply two <!-- learning: B -->")
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	text, skipped, err := ExtractText(path)
+	if err != nil {
+		t.Fatalf("one over-long record must not fail the file: %v", err)
+	}
+	if skipped != 1 {
+		t.Errorf("ExtractText skipped = %d, want 1", skipped)
+	}
+	if !strings.Contains(text, "<!-- learning: A -->") || !strings.Contains(text, "<!-- learning: B -->") {
+		t.Error("markers on BOTH sides of the over-long record must survive")
+	}
+	if strings.Contains(text, "OVERLONG") {
+		t.Error("the over-long record must be skipped, not read into the text")
+	}
+
+	turns, skipped, err := ExtractFlow(path)
+	if err != nil {
+		t.Fatalf("one over-long record must not fail the flow: %v", err)
+	}
+	if skipped != 1 {
+		t.Errorf("ExtractFlow skipped = %d, want 1", skipped)
+	}
+	if len(turns) != 4 {
+		t.Fatalf("want the 4 prose turns around the blob, got %d: %+v", len(turns), turns)
+	}
+	if turns[3].Text != "reply two <!-- learning: B -->" {
+		t.Errorf("turns after the over-long record must survive: %+v", turns[3])
+	}
+
+	// The watchdog's input is the same read, so it keeps measuring the session
+	// instead of going quiet: both marker-bearing turns are seen (ordinal 2).
+	st, err := DryStretch(path, func(s string) bool { return strings.Contains(s, "<!-- learning:") })
+	if err != nil {
+		t.Fatalf("watchdog must still measure the session: %v", err)
+	}
+	if st.Key != "t.jsonl:2" {
+		t.Errorf("Key = %q, want t.jsonl:2", st.Key)
+	}
+
+	// The EOF flush has to count as well as emit: an over-long record that ENDS
+	// the file with no trailing newline, on a read-window boundary, never gets a
+	// terminator and arrives only as a bare EOF. Skipping it there keeps the count
+	// honest — dropping it would be a loss that not even `skipped` records.
+	u := filepath.Join(dir, "u.jsonl")
+	blob := strings.Repeat("x", 129*readBufBytes) // over the cap AND window-aligned
+	if err := os.WriteFile(u, []byte(dryLine("user", "before the blob")+blob), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	turns, skipped, err = ExtractFlow(u)
+	if err != nil || skipped != 1 || len(turns) != 1 {
+		t.Errorf("unterminated over-long tail: turns=%d skipped=%d err=%v, want 1 1 <nil>", len(turns), skipped, err)
+	}
+}
+
+// TestFinalRecordWithoutTrailingNewline pins the EOF contract the bufio.Scanner
+// replacement has to preserve. A transcript's last record can arrive without its
+// newline — the file is still being appended to, or a write was cut short — and
+// Scanner emitted that record anyway. bufio.Reader.ReadLine does not hand it over
+// the same way: a record whose length lands exactly on the read-window boundary
+// ends on an isPrefix chunk with no terminator, and the NEXT call returns only
+// io.EOF, so a reader that returns there drops the buffered record with no error
+// and no skipped count. That is the same silent loss this whole fix exists to
+// remove, so the tail has to be flushed at EOF.
+func TestFinalRecordWithoutTrailingNewline(t *testing.T) {
+	// sized builds a valid record of exactly n bytes (no newline), so the last
+	// one can be placed on the read-window boundary.
+	sized := func(role string, n int) string {
+		base := len(strings.TrimSuffix(dryLine(role, ""), "\n"))
+		if n < base {
+			t.Fatalf("cannot build a %d-byte record (minimum %d)", n, base)
+		}
+		rec := strings.TrimSuffix(dryLine(role, strings.Repeat("x", n-base)), "\n")
+		if len(rec) != n {
+			t.Fatalf("built a %d-byte record, want %d", len(rec), n)
+		}
+		return rec
+	}
+
+	for _, tc := range []struct {
+		name string
+		last string
+	}{
+		{"short", strings.TrimSuffix(dryLine("assistant", "last word <!-- learning: Z -->"), "\n")},
+		{"exactly one read window", sized("assistant", readBufBytes)},
+		{"exactly two read windows", sized("assistant", 2*readBufBytes)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "t.jsonl")
+			body := dryLine("user", "first") + tc.last // deliberately no trailing newline
+			if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			turns, skipped, err := ExtractFlow(path)
+			if err != nil {
+				t.Fatalf("flow: %v", err)
+			}
+			if skipped != 0 {
+				t.Errorf("skipped = %d, want 0 (nothing here is over-long)", skipped)
+			}
+			if len(turns) != 2 {
+				t.Fatalf("got %d turns, want 2 — the newline-less final record was dropped", len(turns))
+			}
+			text, _, err := ExtractText(path)
+			if err != nil {
+				t.Fatalf("text: %v", err)
+			}
+			if strings.TrimSpace(text) == "" {
+				t.Error("the final assistant record carried no text into ExtractText")
+			}
+		})
+	}
+}
+
 // TestExtractFlowSkipsMachineUserTurns keeps the mining surface consistent with
 // the watchdog: a compaction recap is not conversation to mine either.
 func TestExtractFlowSkipsMachineUserTurns(t *testing.T) {
@@ -337,7 +475,7 @@ func TestExtractFlowSkipsMachineUserTurns(t *testing.T) {
 	if err := os.WriteFile(p, []byte(body), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	turns, err := ExtractFlow(p)
+	turns, _, err := ExtractFlow(p)
 	if err != nil {
 		t.Fatal(err)
 	}

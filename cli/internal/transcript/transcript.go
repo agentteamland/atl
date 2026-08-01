@@ -14,6 +14,7 @@ package transcript
 import (
 	"bufio"
 	"encoding/json"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -114,39 +115,101 @@ type transcriptEvent struct {
 // — so it is matched by text.
 const interruptMarker = "[Request interrupted"
 
+const (
+	// maxRecordBytes caps one JSONL record. Records genuinely run large (a tool
+	// result echoing a file — 1.2 MB observed in a real transcript), so this is a
+	// memory bound on a pathological line (a pasted blob, a base64 payload), not
+	// a limit anything normal approaches.
+	maxRecordBytes = 8 * 1024 * 1024
+	// readBufBytes is the read-ahead window; a record larger than it is assembled
+	// across several reads.
+	readBufBytes = 64 * 1024
+)
+
+// scanLines calls fn for each non-empty newline-delimited record in r, and
+// returns how many records were skipped for exceeding maxRecordBytes.
+//
+// Skipping is the point. An over-long record used to abort the whole file
+// (bufio.Scanner cannot resume after a too-long token), which took out the
+// mining input AND the capture watchdog for that entire session — and the
+// watchdog swallows a read error, so the loss was silent: exactly the failure
+// shape the watchdog exists to remove, one layer down. One pathological line
+// costs that one record instead, and the count makes the loss reportable.
+//
+// The slice passed to fn is only valid until the next record (the same contract
+// bufio.Scanner's Bytes had); callers unmarshal it immediately.
+func scanLines(r io.Reader, fn func(record []byte)) (int, error) {
+	br := bufio.NewReaderSize(r, readBufBytes)
+	var rec []byte
+	over := false // this record is already past the cap: consume it, don't buffer it
+	skipped := 0
+	for {
+		chunk, isPrefix, err := br.ReadLine()
+		if err == io.EOF {
+			// Flush the tail. A last record with no trailing newline — the file is
+			// still being appended to, or a write was cut short — is handed over in
+			// full only if it ends inside a read window; one whose length lands
+			// exactly on the boundary ends on an isPrefix chunk and its terminator
+			// never comes, so the record arrives here instead. Returning without
+			// flushing would drop it with no error and no count, which is the silent
+			// loss this reader exists to remove (bufio.Scanner emitted it).
+			if over {
+				skipped++
+			} else if len(rec) > 0 {
+				fn(rec)
+			}
+			return skipped, nil
+		}
+		if err != nil {
+			return skipped, err
+		}
+		if !over && len(rec)+len(chunk) > maxRecordBytes {
+			over, rec = true, nil
+		}
+		if !over {
+			rec = append(rec, chunk...)
+		}
+		if isPrefix {
+			continue // the record continues past the read window
+		}
+		if over {
+			skipped++
+			over = false
+		} else if len(rec) > 0 {
+			fn(rec)
+		}
+		rec = rec[:0]
+	}
+}
+
 // ExtractText reads a transcript file and returns the concatenated assistant
-// text content (the surface markers are emitted into). User messages, tool
-// calls, and tool results are ignored. Malformed lines are skipped rather than
+// text content (the surface markers are emitted into) plus the number of
+// over-long records skipped. User messages, tool calls, and tool results are
+// ignored. Malformed lines — and over-long ones — are skipped rather than
 // failing the whole drain.
-func ExtractText(path string) (string, error) {
+func ExtractText(path string) (string, int, error) {
 	f, err := os.Open(path)
 	if err != nil {
-		return "", err
+		return "", 0, err
 	}
 	defer f.Close()
 
 	var sb strings.Builder
-	sc := bufio.NewScanner(f)
-	sc.Buffer(make([]byte, 0, 64*1024), 8*1024*1024) // allow long transcript lines
-	for sc.Scan() {
-		line := sc.Bytes()
-		if len(line) == 0 {
-			continue
-		}
+	skipped, err := scanLines(f, func(record []byte) {
 		var ev transcriptEvent
-		if err := json.Unmarshal(line, &ev); err != nil {
-			continue
+		if err := json.Unmarshal(record, &ev); err != nil {
+			return
 		}
 		if ev.Message.Role != "assistant" {
-			continue
+			return
 		}
 		sb.WriteString(contentText(ev.Message.Content))
 		sb.WriteByte('\n')
+	})
+	if err != nil {
+		return "", skipped, err
 	}
-	if err := sc.Err(); err != nil {
-		return "", err
-	}
-	return sb.String(), nil
+	return sb.String(), skipped, nil
 }
 
 // Turn is one conversational turn — user or assistant prose — for the /drain
@@ -158,50 +221,45 @@ type Turn struct {
 
 // ExtractFlow reads a transcript and returns the ordered user + assistant prose
 // turns (only type:"text" content contributes, so tool calls and tool results
-// are dropped — they're noise for correction-mining). Where ExtractText sees
-// only the assistant surface (where markers live), this sees the back-and-forth
-// the drain mines for user corrections, reverts, and repeated mistakes the agent
-// never marked. Empty turns are skipped; malformed lines are skipped rather than
-// failing the whole read.
-func ExtractFlow(path string) ([]Turn, error) {
+// are dropped — they're noise for correction-mining) plus the number of
+// over-long records skipped. Where ExtractText sees only the assistant surface
+// (where markers live), this sees the back-and-forth the drain mines for user
+// corrections, reverts, and repeated mistakes the agent never marked. Empty
+// turns are skipped; malformed lines — and over-long ones — are skipped rather
+// than failing the whole read.
+func ExtractFlow(path string) ([]Turn, int, error) {
 	f, err := os.Open(path)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	defer f.Close()
 
 	var turns []Turn
-	sc := bufio.NewScanner(f)
-	sc.Buffer(make([]byte, 0, 64*1024), 8*1024*1024) // allow long transcript lines
-	for sc.Scan() {
-		line := sc.Bytes()
-		if len(line) == 0 {
-			continue
-		}
+	skipped, err := scanLines(f, func(record []byte) {
 		var ev transcriptEvent
-		if err := json.Unmarshal(line, &ev); err != nil {
-			continue
+		if err := json.Unmarshal(record, &ev); err != nil {
+			return
 		}
 		if ev.IsMeta || ev.IsCompactSummary {
-			continue // harness-injected (a skill's SKILL.md dump, a command caveat, a compaction recap) — user-role but not the user speaking; noise for mining and for the watchdog alike
+			return // harness-injected (a skill's SKILL.md dump, a command caveat, a compaction recap) — user-role but not the user speaking; noise for mining and for the watchdog alike
 		}
 		role := ev.Message.Role
 		if role != "user" && role != "assistant" {
-			continue
+			return
 		}
 		text := strings.TrimSpace(contentText(ev.Message.Content))
 		if text == "" {
-			continue
+			return
 		}
 		if role == "user" && strings.HasPrefix(text, interruptMarker) {
-			continue // the harness's own cancellation notice, not something the user typed
+			return // the harness's own cancellation notice, not something the user typed
 		}
 		turns = append(turns, Turn{Role: role, Text: text})
+	})
+	if err != nil {
+		return nil, skipped, err
 	}
-	if err := sc.Err(); err != nil {
-		return nil, err
-	}
-	return turns, nil
+	return turns, skipped, nil
 }
 
 // contentText extracts text from a message content field, which may be a plain
@@ -250,7 +308,10 @@ type Stretch struct {
 // Key changes whenever a new marker-bearing turn appears or the session file
 // changes, which is exactly when a fired watchdog should re-arm.
 func DryStretch(path string, isMarker func(string) bool) (Stretch, error) {
-	turns, err := ExtractFlow(path)
+	// A skipped over-long record simply isn't measured: the stretch is a
+	// heuristic, and reporting the skip belongs to the two read surfaces that
+	// print (tick's drain pass and `atl learnings transcript`), not to a nudge.
+	turns, _, err := ExtractFlow(path)
 	if err != nil {
 		return Stretch{}, err
 	}

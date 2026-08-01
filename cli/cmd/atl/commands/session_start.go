@@ -55,13 +55,12 @@ var sessionStartCmd = &cobra.Command{
 		}
 
 		// Drain the previous session's transcripts (no throttle at session start).
-		if _, _, enqueued, _, derr := drainProjectTranscripts(st, project); derr == nil && enqueued > 0 {
+		if _, _, enqueued, _, _, derr := drainProjectTranscripts(st, project); derr == nil && enqueued > 0 {
 			fmt.Printf("atl: captured %d new learning(s) from the previous session\n", enqueued)
 		}
 
 		// Doctor self-check + asset integrity restore — surface non-OK / healed.
-		checks := append(doctor.QueueChecks(st, project, time.Now()), integrityCheck(project), hooksCheck())
-		for _, r := range doctor.Run(checks) {
+		for _, r := range doctor.Run(platformChecks(st, project, time.Now())) {
 			if r.Status != doctor.OK || r.Healed {
 				fmt.Printf("atl doctor: %s — %s\n", r.Status, r.Detail)
 			}
@@ -125,6 +124,11 @@ var sessionStartCmd = &cobra.Command{
 
 		// Skill/asset content-quality signal — monorepo-internal, same as docs.
 		skillsSessionSignal()
+
+		// The installed-layer half of the same contract: agent-KB children /drain
+		// wrote here, which the monorepo-gated check above structurally cannot see.
+		// Fires in ANY project, like boardTrackedSignal.
+		installedChildrenSignal(project)
 
 		// Rules-distill "distill due" signal — monorepo-internal, same shape.
 		rulesSessionSignal()

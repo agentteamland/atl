@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/agentteamland/atl/cli/internal/scope"
 	"github.com/agentteamland/atl/cli/internal/skillcheck"
 	"github.com/agentteamland/atl/cli/internal/sweepstate"
 	"github.com/spf13/cobra"
@@ -22,10 +23,11 @@ var skillsCmd = &cobra.Command{
 
 var skillsCheckCmd = &cobra.Command{
 	Use:   "check",
-	Short: "Validate skill/agent frontmatter, team.json consistency, and agent-KB children",
+	Short: "Validate skill/agent frontmatter, team.json consistency, agent-KB children, and skill shell bodies",
 	Long: "Check the repo's assets for content-quality drift: every skill/agent carries a\n" +
 		"name + description frontmatter, each team.json matches its on-disk agents and\n" +
-		"skills (both directions), and every agent-KB child declares its summary. Exits\n" +
+		"skills (both directions), every agent-KB child declares its summary, and no\n" +
+		"skill's fenced shell body uses a construct that aborts under zsh. Exits\n" +
 		"non-zero on any failure (warnings never fail). Outside the monorepo it does\n" +
 		"nothing and exits 0 (the pre-flight skip).",
 	Args: cobra.NoArgs,
@@ -120,6 +122,40 @@ func skillsSessionSignal() {
 	}
 	if sweepstate.Skills.Due(root) {
 		fmt.Println("atl skills: a stocktake is due — run /skill-stocktake to sweep skills for obedience + redundancy")
+	}
+}
+
+// installedChildrenSignal warns when an agent-KB child in an INSTALLED layer
+// (~/.claude or <project>/.claude) carries no knowledge-base-summary.
+//
+// Unlike the docs/skills/rules signals above this is deliberately NOT
+// monorepo-gated: /drain writes agent-KB children in any project, and that
+// surface is precisely the one `atl skills check` cannot see — it walks the
+// shipped teams/ copies, and CI has no installed layer to gate on. Warn-only:
+// the frontmatter is missing, which is silent, not dangerous. Best-effort; a
+// hook must never block.
+func installedChildrenSignal(projectRoot string) {
+	n := 0
+	seen := map[string]bool{}
+	for _, sc := range []scope.Scope{scope.Global, scope.Project} {
+		if sc == scope.Project && projectRoot == "" {
+			continue
+		}
+		dir, err := scope.ClaudeDir(sc, projectRoot)
+		if err != nil {
+			continue
+		}
+		// The project root is the session's cwd, so a session started in $HOME
+		// resolves BOTH layers to ~/.claude — count that dir once, or every
+		// finding there is reported twice.
+		if seen[dir] {
+			continue
+		}
+		seen[dir] = true
+		n += len(skillcheck.InstalledChildren(dir))
+	}
+	if n > 0 {
+		fmt.Printf("atl: %d agent-KB child(ren) under .claude/agents/*/children/ carry no `knowledge-base-summary` — an agent's `## Knowledge Base` section is derived from that frontmatter, so there is nothing to rebuild their entries from; add it\n", n)
 	}
 }
 
