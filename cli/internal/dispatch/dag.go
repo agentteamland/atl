@@ -2,17 +2,63 @@ package dispatch
 
 import (
 	"fmt"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
 )
 
-// Validate checks the plan's dependency DAG is well-formed before any worker is
-// spawned: no duplicate ids, no self-loop, every predecessor references a real
-// unit, and the graph is acyclic. A cycle or a dangling predecessor is a
-// planning error the tech-lead/PM must fix — the scheduler REFUSES to start and
-// surfaces it rather than silently breaking a link (#15 step 2, fail-fast).
+// slugRe is the shape a sprint slug must have to be safe as BOTH a path
+// component and a git ref component: it starts alphanumeric and carries only
+// alphanumerics, dot, dash and underscore. Deliberately narrower than either
+// rule alone — one expression is easier to hold than two, and nothing needs
+// the extra characters.
+var slugRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`)
+
+// Validate checks the plan is well-formed before any worker is spawned: the
+// plan's own fields, then its dependency DAG — no duplicate ids, no self-loop,
+// every predecessor references a real unit, and the graph is acyclic. A cycle or
+// a dangling predecessor is a planning error the tech-lead/PM must fix — the
+// scheduler REFUSES to start and surfaces it rather than silently breaking a
+// link (#15 step 2, fail-fast).
+//
+// The field checks exist because plan.json is written by an LLM ceremony
+// (/sprint-start), so every value in it is model-authored input, not a
+// programmer's literal. SprintSlug is the sharp one: it reaches
+// filepath.Join(worktreeRoot, slug, id) and BranchName's delivery/<slug>/<id>
+// unvalidated, so a slug of "../escape" placed worktrees outside the root and a
+// slug with a space produced an unusable ref. Everything else here is a plan
+// that would fail confusingly deep in a run instead of loudly before it: a
+// zero-unit plan dispatches nothing and reports success, a zero id collides
+// with Go's zero value for "absent", and an empty title reaches all three
+// worker prompts (developer, tester, tech-lead) as a blank.
 func Validate(plan *Plan) error {
+	if plan == nil {
+		return fmt.Errorf("no plan")
+	}
+	if strings.TrimSpace(plan.SprintSlug) == "" {
+		return fmt.Errorf("plan has no sprintSlug (it names the worktree directory and the delivery/<slug>/<id> branch)")
+	}
+	if !slugRe.MatchString(plan.SprintSlug) {
+		return fmt.Errorf("sprintSlug %q is not path- and ref-safe: use letters, digits, dot, dash or underscore, starting alphanumeric", plan.SprintSlug)
+	}
+	switch plan.Granularity {
+	case GranularityPBI, GranularityTask:
+	default:
+		return fmt.Errorf("granularity %q is neither %q nor %q (a sprint is all-PBI or all-task, never mixed)", plan.Granularity, GranularityPBI, GranularityTask)
+	}
+	if len(plan.Units) == 0 {
+		return fmt.Errorf("plan has no units — a degenerate sprint dispatches nothing and would report success")
+	}
+	for _, u := range plan.Units {
+		if u.ID <= 0 {
+			return fmt.Errorf("work-unit id %d is not a positive work-item id", u.ID)
+		}
+		if strings.TrimSpace(u.Title) == "" {
+			return fmt.Errorf("work-unit %d has an empty title (it is interpolated into every worker prompt)", u.ID)
+		}
+	}
+
 	byID := make(map[int]WorkUnit, len(plan.Units))
 	for _, u := range plan.Units {
 		if _, dup := byID[u.ID]; dup {
