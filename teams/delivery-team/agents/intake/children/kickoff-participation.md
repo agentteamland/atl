@@ -39,7 +39,8 @@ precedes it, and headless analysis follows it:
    store's `Domain/` namespace; the TA adds its labelled `**[Technical Analysis]**` comment.
 5. **Decomposition setup** — the `tech-lead` applies `area:<name>` tags and begins
    decomposition; the `project-manager` handles selection later at sprint-plan (against a capacity
-   ceiling under `mode: "scrum"`, by priority + DAG readiness under `mode: "flow"`).
+   ceiling under `mode: "scrum"`, by priority with the admitted set kept **DAG-closed** under
+   `mode: "flow"` — [`../../../knowledge/config-and-methodology.md`](../../../knowledge/config-and-methodology.md) §1.1.1).
 
 My output (phase 3) is the *input* to phase 4. If my framing is thin, the analysts analyze
 the wrong thing thoroughly — which is why the handoff checklist

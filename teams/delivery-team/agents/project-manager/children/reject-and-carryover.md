@@ -1,5 +1,5 @@
 ---
-knowledge-base-summary: "Never silently drop work, and never abandon started work for something new. An unfinished item leaving a sprint (PO-rejected OR carried-over incomplete) is carried to the next sprint as TOP PRIORITY, admitted FIRST ahead of all new work — unfinished committed work outranks new work. Blocked-split: out-of-time / review-not-passed / rejected are workable → top-priority guaranteed; a blocked unit is carried + surfaced but is NOT admitted to the next sprint's workable set — no top slot, and no capacity consumed under the scrum mode — until it unblocks (so a blocked item can't freeze the sprint). The discipline is mode-independent, the mechanics are mode-selected: /sprint-review leaves the sprint carrier in place and the NEXT /sprint-plan moves it — an iteration field set under scrum, a label SWAP under flow that removes whichever sprint: label the unit actually carries and adds the one that plan resolved (never two sprint: labels on one unit). The reason always travels with the item; nothing is lost or bumped by newer work."
+knowledge-base-summary: "Never silently drop work, and never abandon started work for something new. An unfinished item leaving a sprint (PO-rejected OR carried-over incomplete) is carried to the next sprint as TOP PRIORITY, admitted FIRST ahead of all new work — unfinished committed work outranks new work. Blocked-split: out-of-time / review-not-passed / rejected are workable → top-priority guaranteed; a blocked unit is carried + surfaced but is NOT admitted to the next sprint's workable set — no top slot, and no capacity consumed under the scrum mode — until it unblocks (so a blocked item can't freeze the sprint). Blocked means a predecessor that stays OUTSIDE the sprint and incomplete: one admitted alongside the unit is an ordinary in-sprint wait, not a block. The discipline is mode-independent, the mechanics are mode-selected: /sprint-review leaves the sprint carrier in place and the NEXT /sprint-plan moves it — an iteration field set under scrum, a label SWAP under flow that removes whichever sprint: label the unit actually carries and adds the one that plan resolved (never two sprint: labels on one unit). The reason always travels with the item; nothing is lost or bumped by newer work."
 ---
 
 # Reject & Carryover
@@ -48,9 +48,10 @@ work was done but doesn't meet acceptance. The resolution (#9):
    up knows *why* it came back — the PO's acceptance gap prevents re-delivering the same miss.
 4. At the **next `/sprint-plan`** the item is admitted **FIRST, ahead of all new backlog work** — a
    rejected item is unfinished committed work (the acceptance gap isn't closed). There is still no
-   special "rejected" *pipeline*: it re-enters the one admission algorithm (DAG-and-capacity under
-   `mode: "scrum"`, DAG readiness + priority under `mode: "flow"`), but at the front of the priority
-   order — it does not compete on stackRank with new candidates.
+   special "rejected" *pipeline*: it re-enters the one admission algorithm (priority-and-capacity
+   under `mode: "scrum"`, priority with a DAG-closed admitted set under `mode: "flow"` —
+   [`config-and-methodology.md`](../../../knowledge/config-and-methodology.md) §1.1.1), but at the
+   front of the priority order — it does not compete on stackRank with new candidates.
 
 > **WHY the carrier move waits for `/sprint-plan`.** The carrier is written by the admission step
 > and read by everyone else. Moving it at review time would pull the item out of the sprint the
@@ -79,12 +80,16 @@ An item I admitted this sprint may not reach the Completed category by sprint en
 - **Review not passed** (workable) — the micro-loop's `green = (tests) ∧ (review passed)` never went
   green (the `tech-lead`'s review found blocking issues). The item stays open, carries with the
   review thread as context, and is **top-priority, guaranteed** next sprint.
-- **Blocked** (NOT workable) — a dependency (in- or out-of-sprint) wasn't satisfied in time. A blocked
-  unit **carries + is surfaced** in `## Carryover` (never dropped), but it does **NOT** consume the
-  next sprint's workable capacity or occupy a top-priority slot — it *can't* be worked until its
-  predecessor clears, so privileging it would only freeze the sprint on un-workable work. Under
-  `mode: "flow"` there is no capacity for it to consume, and the exclusion still binds — flow admits
-  on **priority + DAG readiness**, and a blocked unit is by definition not ready. Its
+- **Blocked** (NOT workable) — a dependency wasn't satisfied in time, and stays unsatisfiable next
+  sprint. Read that precisely, in either mode: what makes a unit *blocked* is a predecessor that
+  remains **outside** the next sprint and incomplete. A predecessor admitted *alongside* it does not
+  block it — the unit comes in with the predecessor (the admitted set is DAG-closed,
+  [`config-and-methodology.md`](../../../knowledge/config-and-methodology.md) §1.1.1) and waits
+  behind it in-sprint, which is an ordinary edge, not a block. A genuinely blocked unit **carries +
+  is surfaced** in `## Carryover` (never dropped), but it does **NOT** consume the next sprint's
+  workable capacity or occupy a top-priority slot — it *can't* be worked until its predecessor
+  clears, so privileging it would only freeze the sprint on un-workable work. Under `mode: "flow"`
+  there is no capacity for it to consume, and the exclusion binds unchanged. Its
   dependency edge stays in the DAG; the moment it unblocks (predecessor Done) it becomes
   workable-carryover and takes top priority like the others.
 
@@ -114,7 +119,8 @@ Carryover handling:
    the unit, not assumed to be the immediately-preceding ordinal) **swapped** for the one that plan
    resolved under `mode: "flow"` (concept #4; remove-and-add in one step — two `sprint:` labels on
    one unit is a corrupt state, because "which sprint is this in?" stops having an answer) — with its
-   `carryover` tag cleared as it re-enters; a *blocked* one stays `carryover`-tagged + surfaced but
+   `carryover` tag cleared as it re-enters; a *blocked* one — blocked meaning a predecessor that
+   stays **outside** this sprint and incomplete — stays `carryover`-tagged + surfaced but
    is **not** admitted to the workable set until its predecessor clears, so it keeps the sprint
    carrier it already has. Never left silently pinned to a closed sprint with no signal, never
    dropped. Idempotent tag/field update (a re-run re-tags / re-admits to the same state).

@@ -38,8 +38,8 @@ complete read. I read their PRs/threads on the active backend's PR surface (conc
 
 Nothing else in this checkpoint moves with the mode. Coherence is a property of the code the sprint
 produced, not of how the sprint was scheduled — the seams, the area composition, the architecture
-boundaries and the Acceptance Criteria read exactly the same whether the sprint was capped by a
-velocity budget or by readiness.
+boundaries and the Acceptance Criteria read exactly the same whether admission was bounded by a
+velocity budget under `scrum` or by nothing at all under `flow`.
 
 ## Surfacing integration findings and filing forward-fixes
 

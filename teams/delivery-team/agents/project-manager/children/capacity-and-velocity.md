@@ -8,9 +8,11 @@ knowledge-base-summary: "SCRUM-MODE ONLY (methodology.json mode scrum) — under
 > a capacity ceiling derived from proven velocity. Under `mode: "flow"` the descriptor carries **no
 > `capacityModel`** ([`config-and-methodology.md`](../../../knowledge/config-and-methodology.md)
 > §1.1), and none of it runs: no velocity to compute, no availability factor to apply, no seed to
-> ask the PO for. **What replaces it:** nothing — the ceiling is simply absent. Admission becomes
-> priority + DAG readiness bounded only by the ~4–6 concurrency cap
-> ([sprint-planning-blueprint.md](sprint-planning-blueprint.md) §4), and `/sprint-review` reports no
+> ask the PO for. **What replaces it:** nothing — the ceiling is simply absent, and nothing else
+> bounds admission in its place (the ~4–6 concurrency cap bounds *execution*, not membership).
+> Admission becomes priority, with the admitted set kept DAG-closed
+> ([`config-and-methodology.md`](../../../knowledge/config-and-methodology.md) §1.1.1,
+> [sprint-planning-blueprint.md](sprint-planning-blueprint.md) §4), and `/sprint-review` reports no
 > velocity. Read `mode` before you reach for anything here; if it is `flow`, **skip this page** —
 > do not compute a ceiling nobody asked for, and above all do not prompt the PO for a
 > `seedVelocity` (see the cold-start section's flow note).

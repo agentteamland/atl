@@ -1,12 +1,13 @@
 ---
-knowledge-base-summary: "My primary production unit: the /sprint-plan contribution. Build the dependency DAG from dependency links (concept #8), validate acyclicity (refuse + surface the cycle, never plan around it), compute the ready-queue, cap-admit ~4-6 unblocked items — by story points ≤ capacity under the scrum mode, by DAG readiness alone with no point budget under the flow mode — priority tie-break, refill-on-Done, enforce the all-PBI-or-all-task granularity rule, and stamp the sprint carrier idempotently (the iteration field under scrum, the sprint:<slug> label under flow, swapped on re-admission). Full checklist."
+knowledge-base-summary: "My primary production unit: the /sprint-plan contribution. Build the dependency DAG from dependency links (concept #8), validate acyclicity (refuse + surface the cycle, never plan around it), compute the ready-queue (the dispatch frontier — NOT the admission filter), then admit by priority: cap-admit ~4-6 items by story points ≤ capacity under the scrum mode, and under the flow mode admit with no ceiling of any kind while keeping the admitted set DAG-CLOSED — every admitted unit's incomplete predecessors admitted with it, so the sprint carries real dependency edges (config-and-methodology.md §1.1.1). Priority tie-break, refill-on-Done, enforce the all-PBI-or-all-task granularity rule, and stamp the sprint carrier idempotently (the iteration field under scrum, the sprint:<slug> label under flow, swapped on re-admission). Full checklist."
 ---
 
 # Sprint Planning (blueprint)
 
 This is my primary production unit. When the `/sprint-plan` ceremony spawns me as a subagent, I
-turn the refined backlog into a committed sprint: a set of unblocked work-items stamped with this
-sprint's **carrier**, in an order the dependency DAG (directed acyclic graph
+turn the refined backlog into a committed sprint: a set of work-items — none of them waiting on
+anything left *outside* the sprint (§3), though plenty of them wait on each other *inside* it —
+stamped with this sprint's **carrier**, in an order the dependency DAG (directed acyclic graph
 — tasks pointing at what must come first) permits the `atl work dispatch` engine to schedule. I
 own **how much fits** and **which items this sprint**. The `tech-lead` owns the *shape* of the
 work (decomposition + architecture + the dependency ordering by design); I consume that ordering,
@@ -19,13 +20,14 @@ exactly two things in this blueprint, both of them in §4 and §7:
 
 | | `mode: "scrum"` | `mode: "flow"` |
 |---|---|---|
-| The ceiling I admit against (§4) | the **story-point capacity** from [capacity-and-velocity.md](capacity-and-velocity.md), *and* the ~4–6 concurrency cap — whichever binds first | the ~4–6 concurrency cap **only**; there is no point budget, so "how much fits" is a runtime question, not a commitment |
+| What bounds admission (§4) | the **story-point capacity** from [capacity-and-velocity.md](capacity-and-velocity.md), *and* the ~4–6 concurrency cap — whichever binds first | **nothing at all** — there is no point budget, and the ~4–6 cap bounds *execution*, never membership. Admission is by priority with the admitted set kept **DAG-closed** ([`config-and-methodology.md`](../../../knowledge/config-and-methodology.md) §1.1.1), so "how much fits" is a runtime question, not a commitment |
 | The carrier I stamp (§7) | the **iteration field** (concept #6) | the **`sprint:<slug>` label** (concept #4), swapped on re-admission |
 
 Everything else below — the DAG (§1), the acyclicity refusal (§2), the ready-queue (§3), the
 priority tie-break (§5), the reason refill exists (§6), and the granularity rule that shares §7 —
 is **mode-independent craft** and reads the same on either kind of project. Where §5 and §6 speak
-of capacity, they mean whichever ceiling §4 established.
+of capacity, they mean the ceiling §4 establishes under `scrum`; under `flow` §4 establishes none,
+and each of those sections says what that changes.
 
 Every clause below is a role-craft rule that travels to any project. Concrete work-item ids,
 domains, and sprint numbers are runtime values I read from the active backend — never facts I bake
@@ -91,66 +93,94 @@ On a cycle, I:
 
 From the acyclic DAG, the **ready-queue** is the set of candidates whose predecessors are all
 satisfied — i.e. every incoming edge points at an item already Done (resolve Completed at runtime,
-concept #7) or from a prior sprint. These are the only items *eligible* to be admitted this sprint.
+concept #7) or from a prior sprint. This is the **dispatch frontier**: what can *start* now, and the
+single thing `DAG-ready` means anywhere in this file.
 
-- An item with an unsatisfied in-sprint predecessor is **not ready yet** — it becomes ready when
-  its predecessor completes (§6, refill-on-Done).
-- An item whose predecessor is an **out-of-sprint, not-yet-Done** item is **blocked**: I do not
+> **The ready-queue is NOT the admission filter.** Admission (§4) answers a different question —
+> *does this unit belong to this sprint?* — and answers it by **priority**, never by "could it start
+> today" ([`config-and-methodology.md`](../../../knowledge/config-and-methodology.md) §1.1.1).
+> Filtering admission down to this frontier would leave the sprint with no dependency **edge** at
+> all, which is the one thing the DAG exists to give the engine. This step tells §4 and §6 what is
+> runnable *first*; it does not tell them what may be admitted.
+
+- An item with an unsatisfied **in-sprint** predecessor is **not ready yet, but it is perfectly
+  admissible** — it waits behind its predecessor inside the sprint and reaches the frontier when
+  that predecessor completes (§6, refill-on-Done). That waiting edge *is* the DAG the engine orders.
+- An item whose predecessor is an **out-of-sprint, not-yet-Done** item is **blocked** — unless the
+  predecessor is admitted here too (§4's closure rule), which makes it the ordinary in-sprint case
+  above. If the predecessor stays outside and incomplete: I do not
   admit it and I note why (its predecessor isn't scheduled). I never silently drop it — it **carries
   + is surfaced** but is not admitted to the workable set until its predecessor clears, then becomes
   top-priority workable-carryover (see [reject-and-carryover.md](reject-and-carryover.md) for the
   blocked-split + "never silently drop work" discipline).
 
-### 4. Cap-admit ~4–6 unblocked items against capacity (keystone #4)
+### 4. Admit — by priority, against capacity under `scrum`, DAG-closed under `flow` (keystone #4)
 
-Admit from the ready-queue until either the **story-point capacity** is reached **or** the
-**concurrency cap** of ~4–6 items is hit — whichever binds first. **Under `mode: "flow"` only the
-second ceiling exists** — see the flow clause at the end of this step.
+Under `mode: "scrum"`, admit in priority order until either the **story-point capacity** is reached
+**or** the **concurrency cap** of ~4–6 items is hit — whichever binds first. **Under `mode: "flow"`
+neither ceiling bounds admission** — see the flow clause at the end of this step.
 
 - **Carryover FIRST — workable carryover ahead of all new work.** Before selecting any new backlog
   unit, admit the prior sprint's **workable carryover**: the `carryover`-tagged, not-yet-Completed
-  units whose predecessors are all Done (DAG-ready; a still-un-Done-predecessor carryover stays
-  blocked and waits — workability is DAG-derived, not the persistent `blocked` surfacing label),
+  units. A carryover is *workable* when nothing **outside** this sprint still blocks it — its
+  predecessors are Done, **or** they are admitted here alongside it; only a carryover whose
+  predecessor stays outside the sprint and incomplete stays blocked and waits (workability is
+  DAG-derived, not the persistent `blocked` surfacing label),
   regardless of stackRank. Committed work is never dropped — it consumes capacity first, in full even
   if it alone reaches the ceiling; only the capacity that *remains* is offered to the new candidates
-  below (see [reject-and-carryover.md](reject-and-carryover.md)). Under `flow`, read *capacity* here
-  as the concurrency cap — the only ceiling there is; the carryover-first **ordering** is
-  mode-independent.
+  below (see [reject-and-carryover.md](reject-and-carryover.md)). Under `flow` there is no capacity
+  for carryover to consume and no ceiling for it to reach — nothing bounds admission there at all
+  (the ~4–6 cap bounds execution, not membership); what carries over is the carryover-**first**
+  ordering, and that ordering is mode-independent.
 - The concurrency cap ~4–6 mirrors `atl work dispatch`'s parallel-worker budget (keystone #4). It
   is a **concurrency** ceiling, not a total-work ceiling: it bounds how many work-units are
   in-flight at once, which is what keeps backend rate-limits (429s) and worktree contention
   manageable (the resilience policy). A sprint can *complete* many more than 6 items across its
-  length — the cap governs how many are admitted-and-eligible at any moment, and refill-on-Done
+  length — the cap governs how many are **in flight** at any moment, and refill-on-Done
   (§6) keeps the pipeline full as items finish.
 - The **capacity number** (story points) is the other ceiling **under `mode: "scrum"`**: I sum the
   admitted items' story points (the story-points field) and stop before the sum exceeds capacity.
   An item with no estimate is a planning gap — I surface it, I don't admit an unestimated item
   silently (its point cost is unknown, so it corrupts the capacity math).
-- **Under `mode: "flow"` that second ceiling is absent** — there is no capacity number, so **only
-  the ~4–6 concurrency cap binds**. Carryover still comes first, for the same reason; the new units
-  then follow in priority order, and admission stops at the cap rather than at a budget. Two
-  consequences I must not get wrong: an **unestimated unit is not a planning gap** here (nothing
+- **Under `mode: "flow"` neither ceiling bounds admission.** There is no capacity number, and the
+  ~4–6 concurrency cap bounds **execution** — how many units the engine keeps in flight — never
+  **membership**. Admission is **by priority**, and the admitted set must be **DAG-CLOSED**: whenever
+  I admit a unit, every predecessor it depends on is admitted with it or is already complete,
+  whatever that predecessor's own priority. If a predecessor cannot be admitted, neither is the unit
+  — both surfaced, neither dropped. The rule is stated canonically in
+  [`config-and-methodology.md`](../../../knowledge/config-and-methodology.md) §1.1.1; read it there
+  rather than reconstructing it. Carryover still comes first, for the same reason. Three consequences
+  I must not get wrong: an **unestimated unit is not a planning gap** here (nothing
   reads an estimate, and a flow project need not carry a story-points field at all — I neither
-  surface it nor withhold the unit), and **nothing "doesn't fit"** — a unit I don't admit is one
-  that is not yet DAG-ready or one the cap deferred to the next refill, never one priced out.
+  surface it nor withhold the unit); **nothing "doesn't fit"** — a unit I don't admit is one whose
+  predecessors cannot be brought into this sprint, never one priced out or cap-deferred; and I never
+  **filter down to what could start today** — a unit waiting on an in-sprint predecessor is exactly
+  the edge `/sprint-start` puts in the DAG.
 
-> **WHY both ceilings, not one — and why flow keeps only the second.** Capacity (points) answers
-> *"how much work fits in the time box?"*; the ~4–6 cap answers *"how much can run at once without
-> thrashing the engine and backend?"* A sprint that fits 30 points but tries to start 20 items
+> **WHY both ceilings, not one — and why flow keeps only the second, and only at run time.**
+> Capacity (points) answers *"how much work fits in the time box?"*; the ~4–6 cap answers
+> *"how much can run at once without thrashing the engine and backend?"*
+> A sprint that fits 30 points but tries to start 20 items
 > simultaneously would blow the parallel-worker budget. Admitting against the *tighter* of the two
 > keeps both the time-box and the runtime healthy. Under `flow` the first question has no honest
 > answer — there is no time box to fit work into, and a velocity mean over a team with no stable
 > capacity predicts nothing — so it is not asked. The second question is about the runtime, not the
-> methodology, so it survives the mode change untouched.
+> methodology, so it survives the mode change untouched — but *as a runtime ceiling*: it bounds what
+> runs at once, never what the sprint may hold. Promoting it to an admission ceiling, or admitting
+> only what could start today, leaves the sprint with no dependency edge, a single-node `plan.json`,
+> and nothing for the engine's ordering or its parallel `--cap N` to do (§1.1.1 records the real
+> occurrence).
 
 ### 5. Priority tie-break
 
-When two ready items compete for the same remaining slot — a capacity slot under `scrum`, a
-concurrency slot under `flow` — the **lower priority value
-wins** (concept #5 — the board orders ascending, so lower = higher priority). The DAG has already
-filtered to the possible; priority chooses *which of the possible* the PO wants first. If priority
-is equal or absent, fall back to backlog order as returned by the backend's ordered-backlog read
-(concept #10, which is itself priority-ordered) — a stable, PO-owned order, never my invention.
+When two items compete for the same remaining capacity slot under `mode: "scrum"`, the **lower
+priority value wins** (concept #5 — the board orders ascending, so lower = higher priority). Under
+`mode: "flow"` nothing competes for an admission slot — there is none to compete for — so the same
+rule instead fixes the *order* units are admitted and worked in. The DAG has already bounded what
+is admissible (§3's blocked case); priority chooses *which of the admissible* the PO wants first.
+If priority is equal or absent, fall back to backlog order as returned by the backend's
+ordered-backlog read (concept #10, which is itself priority-ordered) — a stable, PO-owned order,
+never my invention.
 
 ### 6. Refill-on-Done
 
@@ -167,7 +197,11 @@ carrier (§7).
   sprint's committed points would exceed capacity, even if the concurrency cap has room. The
   time-box is the hard limit.
 - **Under `mode: "flow"` there is no ceiling for refill to respect** — a freed slot is filled from
-  the ready-queue for as long as ready work exists. So nothing *ends* a flow sprint by exhaustion:
+  the ready-queue for as long as ready work exists. Most of that refilling is the engine simply
+  advancing to the next unit *already admitted* (nothing bounded admission, so the sprint's later
+  units are in it from the start, waiting behind their predecessors); a genuinely new backlog unit
+  joins the same way admission always works — by priority, with its predecessors (§4). So nothing
+  *ends* a flow sprint by exhaustion:
   it ends when `/sprint-review` reviews it (the review page's existence is what makes it closed —
   [`config-and-methodology.md`](../../../knowledge/config-and-methodology.md) §1.2), which is the PO's
   call, not a budget's.
@@ -224,11 +258,11 @@ Story points: `A=3 B=5 C=8 D=2 E=5 F=3 G=8`. Capacity = 18. Concurrency cap = 5.
 1. **DAG** — nodes `A…G`, edges as above. `G` is isolated (no edges).
 2. **Acyclic?** Kahn's removes `A,B,D,G` (no predecessors), then `C,F`, then `E`. All nodes
    removed → acyclic. Proceed.
-3. **Ready-queue** — items with all predecessors satisfied: `A, B, D, G` (`C` waits on `A`+`B`;
-   `E` waits on `C`; `F` waits on `D`).
-4. **Cap-admit** against capacity 18, cap 5, by priority order (assume priority = `A<B<D<G<…`):
-   admit `A(3)`, `B(5)`, `D(2)`, `G(8)` → sum 18, four items ≤ cap. `E`/`F`/`C` aren't ready;
-   admission stops at capacity anyway.
+3. **Ready-queue** (the dispatch frontier) — items with all predecessors satisfied: `A, B, D, G`
+   (`C` waits on `A`+`B`; `E` waits on `C`; `F` waits on `D`).
+4. **Admit** against capacity 18, cap 5, by priority order (assume priority = `A<B<D<G<…`):
+   admit `A(3)`, `B(5)`, `D(2)`, `G(8)` → sum 18, four items ≤ cap. `C`/`E`/`F` don't come in
+   because the **budget** is exhausted, not because they are off the frontier.
 5. **Assign** `A B D G` to this sprint's iteration (idempotent field update).
 6. **During the sprint**, `A` and `B` complete → `C` becomes ready. A slot is free (2 items done,
    3 in-flight ≤ cap) but committed points are already 18 = capacity → **do not** refill `C`; it
@@ -247,15 +281,19 @@ being planned resolves to `sprint:4` (the highest `sprint:*` ordinal on the boar
 Steps 1–3 are **identical** — the DAG, the acyclicity check, and the ready-queue `A, B, D, G` are
 mode-independent. From there:
 
-4. **Cap-admit** against the cap alone, by priority order: admit `A`, `B`, `D`, `G` — four items,
-   under the cap of 5, and no budget to check them against. (Had there been a fifth ready unit `H`,
-   it would have been admitted too, up to the cap.)
-5. **Stamp** `A B D G` with `sprint:4` (idempotent label add).
-6. **During the sprint**, `A` and `B` complete → `C` becomes ready and a slot is free → **refill
-   `C`** and stamp it `sprint:4`. This is where the modes visibly diverge: under `scrum` the same
-   `C` was priced out at 18 = capacity and carried to the next sprint; here nothing prices it out,
-   so it runs now. Had `C` instead carried over from `sprint:3`, admitting it would **swap** its
-   label — remove `sprint:3`, add `sprint:4`, one step — never leave both.
+4. **Admit** by priority with the admitted set kept **DAG-closed**, against no ceiling at all:
+   `A B C D E F G` — **all seven**. `C` comes in because its predecessors `A`+`B` come in with it,
+   `E` because `C` does, `F` because `D` does. The cap of 5 does not bound this; it bounds how many
+   of them run at once.
+5. **Stamp** all seven with `sprint:4` (idempotent label add).
+6. **During the sprint** the engine works the dispatch frontier first — `A, B, D, G` (four, under
+   the cap of 5). When `A` and `B` complete, `C` reaches the frontier and takes a freed slot; `E`
+   follows when `C` completes, `F` when `D` does. This is where the modes visibly diverge: under
+   `scrum` the same `C` was priced out at 18 = capacity and carried to the next sprint; here nothing
+   prices it out — and, the point of the whole mode, the sprint carries real dependency **edges**
+   for `atl work dispatch` to order rather than four isolated nodes. Had `C` instead carried over
+   from `sprint:3`, admitting it would **swap** its label — remove `sprint:3`, add `sprint:4`, one
+   step — never leave both.
 
 ## Completion checklist
 
@@ -272,7 +310,10 @@ mode-independent. From there:
       surfaced, not silently admitted. *(`flow`: skipped — nothing reads an estimate; do not
       surface a missing one.)*
 - [ ] Admission stops at the tighter of capacity (points) and the ~4–6 concurrency cap — *(`flow`:
-      at the concurrency cap alone; there is no capacity to compare it against.)*
+      it stops at nothing; there is no admission ceiling, and the cap bounds execution only.)*
+- [ ] *(`flow`)* The admitted set is **DAG-closed** — every admitted unit's incomplete predecessors
+      are admitted with it; no unit was withheld merely for having an open predecessor
+      ([`config-and-methodology.md`](../../../knowledge/config-and-methodology.md) §1.1.1).
 - [ ] Priority tie-break applied (lower value wins; equal/absent → backlog order).
 - [ ] Granularity homogeneous — all PBI or all task, per `artifactHierarchy`; never a mix.
 - [ ] Sprint carrier stamped idempotently: *(`scrum`)* the iteration as a **field update** (concept
@@ -282,5 +323,6 @@ mode-independent. From there:
 - [ ] Refill-on-Done left live for the sprint (re-run §3–§5 as items complete; *(`scrum`)* respect
       the capacity ceiling — *(`flow`)* there is none, so refill runs while ready work remains).
 - [ ] Nothing silently dropped — blocked/over-capacity items stay on the backlog for the next
-      `/sprint-plan` *(under `flow`, nothing is over-capacity; what stays back is not-yet-ready or
-      cap-deferred)*.
+      `/sprint-plan` *(under `flow`, nothing is over-capacity and nothing is cap-deferred; what
+      stays back is what cannot be made DAG-closed — a unit some predecessor of which is not
+      admissible here — surfaced with its reason)*.

@@ -1,25 +1,27 @@
 ---
 name: sprint-plan
-description: /sprint-plan — sprint selection for the delivery-team, mode-aware. Under the scrum mode it computes the sprint's capacity ceiling from the mean story points of the last N=3 CLOSED sprints (with a cold-start po-seed decay for the first N) and selects up to that ceiling; under the flow mode there is no ceiling and no seed — it admits the DAG-ready units in priority order. Either way, acting as the project-manager (with the tech-lead for feasibility) it selects at a single granularity and stamps each unit's sprint carrier — the iteration field under scrum, the sprint:<slug> label under flow. Reads methodology.mode + methodology.capacityModel (scrum only) + prior closed iterations (scrum only) + backlog priority order + Architecture/ durable-knowledge pages; writes only the idempotent carrier. A recurring planning ceremony (methodology.cadence.planningCeremonies); velocity is read-only.
+description: /sprint-plan — sprint selection for the delivery-team, mode-aware. Under the scrum mode it computes the sprint's capacity ceiling from the mean story points of the last N=3 CLOSED sprints (with a cold-start po-seed decay for the first N) and selects up to that ceiling; under the flow mode there is no ceiling and no seed — it admits by priority and keeps the admitted set DAG-closed, pulling each admitted unit's incomplete predecessors in with it so the sprint carries real dependency edges. Either way, acting as the project-manager (with the tech-lead for feasibility) it selects at a single granularity and stamps each unit's sprint carrier — the iteration field under scrum, the sprint:<slug> label under flow. Reads methodology.mode + methodology.capacityModel (scrum only) + prior closed iterations (scrum only) + backlog priority order + the units' dependency links + Architecture/ durable-knowledge pages; writes only the idempotent carrier. A recurring planning ceremony (methodology.cadence.planningCeremonies); velocity is read-only.
 ---
 
-# /sprint-plan — sprint selection (velocity-driven under scrum, priority + DAG readiness under flow)
+# /sprint-plan — sprint selection (velocity-driven under scrum, priority + DAG closure under flow)
 
 This is the delivery-team's **planning** ceremony: it decides **which** backlog units go into the
 coming sprint (priority order, at one granularity level) and — under `mode: "scrum"` — **how much**
 it can hold (a capacity ceiling derived from proven velocity), then commits the choice by stamping
 each selected unit's **sprint carrier**. Under `mode: "flow"` there is no ceiling to compute:
-nothing derives a budget, and admission is priority + DAG readiness. It runs **in-session** and adopts the
+nothing derives a budget, and admission is **priority**, with the admitted set kept **DAG-closed** —
+a unit's incomplete predecessors are admitted with it, never left outside
+([`config-and-methodology.md`](../../knowledge/config-and-methodology.md) §1.1.1). It runs **in-session** and adopts the
 `project-manager` (with the `tech-lead` for feasibility) as sequential subagents in its own
 shared context. It is the first of the two planning ceremonies; `/sprint-start` follows to hand
 the committed sprint to `atl work dispatch`.
 
 | It reads | It writes |
 |---|---|
-| `.delivery/methodology.json` (`mode`, `artifactHierarchy`, `cadence`, and `capacityModel` — **`scrum` only**); under `scrum`, the last `velocityWindowN` **CLOSED** iterations; the backlog priority order; `Architecture/` durable-knowledge pages for feasibility | **only** the sprint carrier on the selected units — the iteration field under `scrum`, the `sprint:<slug>` label under `flow`; both are idempotent. **Velocity is read-only** (and not computed at all under `flow`). |
+| `.delivery/methodology.json` (`mode`, `artifactHierarchy`, `cadence`, and `capacityModel` — **`scrum` only**); under `scrum`, the last `velocityWindowN` **CLOSED** iterations; the backlog priority order; the candidate units' **dependency links** (concept #8 — required under `flow` to close the admitted set over its predecessors, §1.1.1); `Architecture/` durable-knowledge pages for feasibility | **only** the sprint carrier on the selected units — the iteration field under `scrum`, the `sprint:<slug>` label under `flow`; both are idempotent. **Velocity is read-only** (and not computed at all under `flow`). |
 
 Field semantics live in [`config-and-methodology.md`](../../knowledge/config-and-methodology.md)
-(`mode` in its §1.1, the sprint carrier in its §1.2);
+(`mode` in its §1.1, **admission vs dispatch readiness in its §1.1.1**, the sprint carrier in its §1.2);
 the provider-neutral operation concepts — the tool map, idempotency, pagination, and runtime
 type/state resolution — live in [the backend interface](../../knowledge/backend-interface.md), which
 the **active backend's adapter** (`backends/<backend>/adapter.md`, selected once at `/delivery-init`
@@ -86,7 +88,10 @@ how this sprint is identified, and which steps run:
 > compute velocity, do not apply an availability factor, and do not prompt the PO for a
 > `seedVelocity`.** A cold-start seed is a *scrum* concept — it seeds a **velocity**, and flow
 > measures none — so asking for it stalls a headless run on a number the ceremony would then use
-> for nothing. Go straight to Step 4, where admission is priority + DAG readiness.
+> for nothing. Go straight to Step 4, where admission is **priority + DAG closure** — and note
+> that `flow` has **no admission ceiling of any kind**: the ~4–6 concurrency cap bounds how many
+> units the engine runs at once, never how many this ceremony may admit
+> ([`config-and-methodology.md`](../../knowledge/config-and-methodology.md) §1.1.1).
 
 ### 1. Compute velocity from the last N=3 CLOSED sprints (`scrum` only)
 
@@ -151,8 +156,9 @@ capacity = floor( velocity × availabilityFactor )
 
 ### 4. Select backlog units by priority, at ONE granularity, and stamp the sprint carrier
 
-As the `project-manager`, read the refined backlog and select — against the ceiling under `scrum`,
-against DAG readiness alone under `flow`; then, **as the
+As the `project-manager`, read the refined backlog and select — against the capacity ceiling under
+`scrum`, and under `flow` by priority with **no ceiling at all**, keeping the admitted set
+**DAG-closed**; then, **as the
 `tech-lead` building on that selection in the same context** (read
 [`../../agents/tech-lead/agent.md`](../../agents/tech-lead/agent.md) + its `children/`), sanity-check
 feasibility against the `Architecture/` durable-knowledge store before the assignment is committed.
@@ -173,12 +179,17 @@ feasibility against the `Architecture/` durable-knowledge store before the assig
 - **Carryover FIRST, then new work by priority up to capacity (`scrum`)** — admit the **workable
   carryover**
   returning from the prior sprint — found by the **`carryover` tag** (concept #4) set at
-  `/sprint-review`, still not-Completed and **DAG-ready** (all predecessors Done — a `carryover` unit
-  whose predecessor is still not-Done stays blocked and waits; workability is **DAG-derived**, and
-  `blocked` is only a surfacing label, not the admission gate, since nothing clears it when the block
-  lifts)
-  ([`../../agents/project-manager/children/reject-and-carryover.md`](../../agents/project-manager/children/reject-and-carryover.md))
-  — **ahead of all new candidates, regardless of any new unit's priority**: unfinished committed work
+  `/sprint-review`, still not-Completed and **workable** — nothing *outside* this sprint still
+  blocks it: its predecessors are Done, **or** they are admitted here alongside it, in which case it
+  waits behind them in-sprint, which is an ordinary edge and not a block
+  ([`config-and-methodology.md`](../../knowledge/config-and-methodology.md) §1.1.1 — this reading of
+  *blocked* is mode-independent, and
+  [`reject-and-carryover.md`](../../agents/project-manager/children/reject-and-carryover.md) states
+  it the same way). Only a `carryover` unit whose predecessor stays **outside** this sprint and
+  incomplete stays blocked and waits; workability is **DAG-derived**, and `blocked` is only a
+  surfacing label, not the admission gate, since nothing clears it when the block lifts.
+  Admit that workable carryover **ahead of all new candidates, regardless of any new unit's
+  priority**: unfinished committed work
   outranks new work, so it takes the front of the admission and is admitted in full even if it alone
   meets or exceeds `capacity` (the team over-committed last sprint — an honest signal, not a reason to
   drop committed work). **Then** take the remaining **new** units in ascending priority order (concept
@@ -188,19 +199,50 @@ feasibility against the `Architecture/` durable-knowledge store before the assig
   be worked yet). An item with no estimate is a planning gap — surface it, never admit an unestimated
   unit (its point cost is unknown and corrupts the capacity math). Equal/absent priority among the new
   units falls back to the stable backlog order returned by the ordered-backlog read (concept #10).
-- **Carryover FIRST, then new work by priority + DAG readiness (`flow`)** — the same order with the
-  budget removed. Admit the workable carryover exactly as above (`carryover`-tagged, still
-  not-Completed, all predecessors Done; a *blocked* carryover is surfaced, not admitted) — committed
-  work still outranks new work, and for the same reason. **Then** take the **DAG-ready** new units in
-  ascending priority order (concept #5), with **no point budget to exhaust**: readiness is the gate,
-  priority is the order, and the **one remaining ceiling is the `project-manager`'s ~4–6 concurrency
-  cap — admission stops there**, with refill-on-Done admitting the next ready unit as an admitted one
-  completes
-  ([`../../agents/project-manager/children/sprint-planning-blueprint.md`](../../agents/project-manager/children/sprint-planning-blueprint.md)
-  §4 + §6). That cap is a runtime bound on the engine and the backend, not a commitment budget. **An
-  unestimated unit is not a planning gap here**: nothing under `flow` reads an estimate, and a flow
-  project need not carry a story-points field at all — so do not surface one and do not withhold a
-  unit for missing points. Equal/absent priority falls back to the same stable backlog order.
+- **Carryover FIRST, then new work by priority — with the admitted set kept DAG-CLOSED (`flow`)** —
+  the same order with the budget removed, and admission gated by **closure**, never by dispatch
+  readiness. The rule in full, so this step is decidable without opening another file:
+
+  > **Under `mode: "flow"`, `/sprint-plan` admits by PRIORITY, and the admitted set must be
+  > DAG-CLOSED: whenever a unit is admitted, every predecessor it depends on is admitted with it, or
+  > is already complete. Never admit a unit whose predecessor stays *outside* the sprint and
+  > incomplete — that unit could never start, and that is the only "readiness" admission cares
+  > about. A unit blocked by another unit *in the same sprint* is entirely normal: that is precisely
+  > the edge `/sprint-start` puts in the DAG and the engine orders.**
+
+  Concretely:
+  - **Admit the workable carryover first** — same ordering as under `scrum`, and for the same
+    reason (committed work outranks new work), but with workability judged by **closure** rather
+    than by the dispatch frontier. A carryover unit whose predecessor is **also admitted into
+    this sprint** comes in **with** it (that is the closure rule, and the edge is what the engine
+    orders). A carryover unit whose predecessor stays **outside** this sprint and incomplete is
+    **blocked**: carried and surfaced with its reason, not admitted
+    ([`../../agents/project-manager/children/reject-and-carryover.md`](../../agents/project-manager/children/reject-and-carryover.md)).
+  - **Then take the new units in ascending priority order** (concept #5) and, before admitting each
+    one, **walk its predecessor edges** (concept #8 — the dependency links `/refine` wrote). Every
+    **incomplete** predecessor is admitted **with** it, regardless of that predecessor's own
+    priority. If a predecessor genuinely cannot be admitted — not yet refined, at a different
+    granularity than this sprint's, or itself blocked outside the sprint — then **the unit is not
+    admitted either**, and both are surfaced with the reason. Never admit a unit while leaving one
+    of its incomplete predecessors outside the sprint.
+  - **There is no admission ceiling under `flow`** — no point budget, and the `project-manager`'s
+    ~4–6 concurrency cap is **not** one either: it bounds how many units `atl work dispatch` keeps
+    **in flight at once**, with refill-on-Done starting the next ready unit as an admitted one
+    completes
+    ([`../../agents/project-manager/children/sprint-planning-blueprint.md`](../../agents/project-manager/children/sprint-planning-blueprint.md)
+    §6). A flow sprint routinely holds more units than that cap; the cap is a runtime bound on the
+    engine and the backend, never a limit on membership.
+  - **Do not filter the admitted set down to what could start today.** Admitting only units whose
+    predecessors are all Done (**`DAG-ready`** — the *dispatch-frontier* sense, which belongs to the
+    engine, not to this step) leaves a sprint with **no dependency edge at all**: `/sprint-start`
+    then writes a single-node `plan.json`, and the engine's dependency ordering and parallel
+    `--cap N` dispatch never run. That is the exact failure this rule exists to prevent
+    ([`config-and-methodology.md`](../../knowledge/config-and-methodology.md) §1.1.1 records the
+    real occurrence).
+  - **An unestimated unit is not a planning gap here**: nothing under `flow` reads an estimate, and
+    a flow project need not carry a story-points field at all — so do not surface one and do not
+    withhold a unit for missing points. Equal/absent priority falls back to the same stable backlog
+    order.
 - **Feasibility pass (as the `tech-lead`)** — read the relevant `Architecture/` durable-knowledge
   pages (concept #9; search the store for discovery) and flag any selected unit whose approach
   is infeasible or mis-scoped for this sprint; hand any such flag back to the PM step to drop or
@@ -229,8 +271,10 @@ Nothing is silently dropped. Under `scrum`, **new** units that don't fit this sp
 capacity, or are held back for feasibility, stay on the backlog for the next `/sprint-plan`;
 carryover is never bumped by a capacity shortfall — it is committed work, admitted first, and only
 new work is subject to the capacity that remains after it. Under `flow` there is no capacity
-shortfall to bump anything: what stays on the backlog is what is **not yet DAG-ready** or what the
-feasibility pass held back, and both are surfaced rather than dropped.
+shortfall to bump anything, and **nothing is held back merely for having an open predecessor**:
+what stays on the backlog is what **cannot be made DAG-closed** — a unit some predecessor of which
+is not admissible into this sprint — or what the feasibility pass held back. Both are surfaced with
+their reason rather than dropped.
 
 ## Idempotent re-run
 

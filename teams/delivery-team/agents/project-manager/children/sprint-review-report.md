@@ -94,7 +94,7 @@ traceable to concrete closed sprints, not a hidden running total.
 zero, not a substitute metric (a unit count, a cycle time) — the H2 is simply not written.
 
 > **WHY I omit it rather than fill it in.** The number exists to feed a ceiling, and under `flow`
-> there is no ceiling: `/sprint-plan` admits by priority + DAG readiness, and there is no time-box
+> there is no ceiling: `/sprint-plan` admits by priority (`config-and-methodology.md` §1.1.1), and there is no time-box
 > to divide a point total by, so the arithmetic has no meaning to carry. A "0 points" or "n/a" line
 > is worse than no line — it reads as missing data and invites the next plan to budget against it,
 > which is exactly the fiction the mode exists to drop. What I owe the PO is unchanged: what

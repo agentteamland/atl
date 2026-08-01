@@ -61,7 +61,7 @@ engine). A second methodology **that stays Scrum-shaped** (e.g. a different velo
 unit) ships as a second descriptor instance overriding these fields with no ceremony edit. But a
 **genuinely different** methodology (Kanban's WIP-limited continuous flow, SAFe's program-increment
 tier) is **not** a descriptor swap: `/sprint-plan` selects *a sprint's* worth of work by definition
-(velocity-driven under `mode: "scrum"`, priority + DAG readiness under `mode: "flow"` — §1.1), so
+(velocity-driven under `mode: "scrum"`, priority + DAG closure under `mode: "flow"` — §1.1.1), so
 Kanban's WIP-limited pull needs its own planning/dispatch/review ceremonies, and the descriptor's
 `cadence.planningCeremonies` *names* them — so those ceremonies must exist. The config-seam is
 ceremony-agnostic (the deterministic engine reads `plan.json`, never the descriptor), which is why
@@ -80,10 +80,11 @@ continuous flow is still the far side of that line and would need its own ceremo
 | `mode` | What a sprint is | Admission | `capacityModel` | Sprint carrier (§1.2) |
 |---|---|---|---|---|
 | `"scrum"` | a **time-box** — a dated range on the backend's schedule, with a capacity ceiling | by priority, up to a velocity-derived point budget | **REQUIRED** | the **iteration field** (concept #6) |
-| `"flow"` | **the same sprint, with no dates and no capacity ceiling** — a named set of admitted units, nothing more | by **priority + DAG readiness**; no point budget | **ABSENT** — the key is omitted, not `null` | the **`sprint:<slug>` label** (concept #4) |
+| `"flow"` | **the same sprint, with no dates and no capacity ceiling** — a named set of admitted units, nothing more | by **priority**, with the admitted set kept **DAG-closed** (§1.1.1); no point budget, and no admission ceiling of any kind | **ABSENT** — the key is omitted, not `null` | the **`sprint:<slug>` label** (concept #4) |
 
-Under `flow`, the ceremonies that read capacity stop reading it: `/sprint-plan` admits ready units
-in priority order without a ceiling, and `/sprint-review` reports **no velocity** (with no
+Under `flow`, the ceremonies that read capacity stop reading it: `/sprint-plan` admits by priority
+without a ceiling — closing the admitted set over its dependencies rather than filtering it down to
+what could start today (§1.1.1) — and `/sprint-review` reports **no velocity** (with no
 time-box to divide by, a points-per-sprint number is arithmetic without a meaning). Nothing else
 in the chain changes — decomposition, the dependency DAG, the promotion gate, and mid-flight
 intake are all mode-independent.
@@ -146,6 +147,64 @@ A complete **flow-mode** `methodology.json` — the scrum example above with `mo
   "branches": { "dev": "dev", "release": "release" }
 }
 ```
+
+#### 1.1.1 Admission vs dispatch readiness — and what `DAG-ready` means
+
+Two different questions get asked about a work-unit's dependencies, by two different consumers, at
+two different times. They have **different answers**, and answering the first with the second is
+the one mistake that quietly disables the delivery engine.
+
+| Question | Asked by | Answer |
+|---|---|---|
+| **Admission** — *does this unit belong to this sprint?* | `/sprint-plan`, once, at planning time | **priority**, and the admitted set must be **DAG-closed** |
+| **Dispatch readiness** — *can this unit start right now?* | `atl work dispatch`, continuously, at run time | **all of its predecessors are Done** — the **ready frontier**, and the only thing `DAG-ready` means |
+
+**The canonical admission rule — quote this verbatim, do not paraphrase it:**
+
+> **Under `mode: "flow"`, `/sprint-plan` admits by PRIORITY, and the admitted set must be
+> DAG-CLOSED: whenever a unit is admitted, every predecessor it depends on is admitted with it, or
+> is already complete. Never admit a unit whose predecessor stays *outside* the sprint and
+> incomplete — that unit could never start, and that is the only "readiness" admission cares
+> about. A unit blocked by another unit *in the same sprint* is entirely normal: that is precisely
+> the edge `/sprint-start` puts in the DAG and the engine orders.**
+
+**There is no admission ceiling under `flow`.** The `project-manager`'s ~4–6 concurrency cap bounds
+**execution** — how many units the engine keeps in flight at once — not **membership**. Nothing
+caps how many units a flow sprint may hold.
+
+**`DAG-ready` keeps its single, pre-existing meaning: the dispatch frontier** (predecessors Done),
+which is what the `project-manager`'s
+[`sprint-planning-blueprint.md`](../agents/project-manager/children/sprint-planning-blueprint.md)
+means by it. It is **not** an admission criterion. Admission never asks whether a unit can start
+*today*; it asks only whether the unit could **ever** start inside this sprint — which is exactly
+the DAG-closure condition above.
+
+**A unit whose predecessor stays outside the sprint and incomplete is BLOCKED, not admitted.** That
+is the same case
+[`reject-and-carryover.md`](../agents/project-manager/children/reject-and-carryover.md) carries and
+surfaces rather than pulling forward; DAG closure is that rule stated from the admission side —
+either the predecessor comes in too, or the unit stays out, and either way nothing is silently
+dropped.
+
+**None of this is a third thing `mode` selects.** Mode still selects exactly the two things §1.1
+names — whether `capacityModel` is present, and the sprint carrier. Admission is **by priority** in
+*both* modes; all that differs is what bounds it: the capacity ceiling under `scrum`, nothing at all
+under `flow`. Closure is not a bound — it is the shape the admitted set has to have for the sprint
+to be schedulable, and it is written down here because **removing the budget is what made the wrong
+reading available**. Under `scrum` the ceiling bounds a by-priority selection that already admits an
+admitted unit's dependents as ordinary backlog units; scrum was never narrowed to the ready
+frontier, and this subsection changes nothing about it.
+
+> **WHY the obvious reading is wrong.** Reading flow admission as *"admit the units that are
+> DAG-ready"* is the natural mistake, and it silently disables the engine's headline capability.
+> If every admitted unit already has all its predecessors Done, then **no admitted unit depends on
+> another admitted unit — the sprint contains no EDGE.** `/sprint-start` then materializes a
+> `plan.json` of isolated nodes, and `atl work dispatch`'s dependency ordering and parallel
+> `--cap N` scheduling — the entire reason the DAG is built — can never run. This was observed for
+> real: `/refine` decomposed a Feature into A, B→A and C→A; a ready-frontier admission admitted
+> **only A**, and a three-unit sprint shipped as a single-node plan. Under `scrum` the same three
+> units are all admitted (they fit the point budget) and the engine orders them correctly — which
+> is the tell that the defect was in the flow *admission rule*, never in the engine.
 
 ### 1.2 The sprint carrier — `sprint:<slug>` under flow
 
@@ -218,7 +277,7 @@ far inside the tighter of the two backends' limits (GitHub's 50-character label 
 field.** The label carries membership, and with no capacity ceiling nothing reads an estimate. On
 GitHub that removes the one setup step that could not be automated (the manual Iteration field);
 on both backends it removes a per-sprint schedule chore. `Priority` is still needed — flow admits
-by priority + DAG readiness — and so is `Status`.
+by priority (§1.1.1) — and so is `Status`.
 
 ## 2. `config.json` — connection identity (no secret)
 
@@ -322,8 +381,9 @@ writes one back.
 - **Methodology is data.** A ceremony loads `methodology.json`, reads the roles/cadence/
   capacity it needs, and acts — it does not encode methodology assumptions in its own prose.
 - **Resolve the mode before anything that assumes a time-box.** `mode` (§1.1) decides whether a
-  ceremony reads `capacityModel` at all and which sprint carrier it reads and writes (§1.2), so it
-  is resolved in the same descriptor load, before the first step that touches either. **Absent ⇒
+  ceremony reads `capacityModel` at all, which sprint carrier it reads and writes (§1.2), and what
+  bounds admission (§1.1.1 — the capacity ceiling under `scrum`, DAG closure under `flow`), so it
+  is resolved in the same descriptor load, before the first step that touches any of them. **Absent ⇒
   `scrum`** (an existing project's behaviour never changes underneath it); an unrecognized value
   halts the ceremony; the declared field is the only authority — never infer the mode from the
   board.

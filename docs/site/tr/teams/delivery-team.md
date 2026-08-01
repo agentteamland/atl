@@ -40,7 +40,7 @@ Sprint, her biri doğru rol olarak davranan, senin çağırdığın skill'lerle 
 /delivery-init      # backend'i (azure | github) + sprint modunu seç, koordinatları + metodolojiyi bağla
 /kickoff            # intake + business-analyst Epic/Feature backlog'unu şekillendirir
 /refine             # technical-analyst + tech-lead Feature'ları brief'li iş-birimlerine ayrıştırır
-/sprint-plan        # project-manager sprint'in birimlerini seçer — kapasiteye göre ya da öncelik + DAG hazırlığına göre
+/sprint-plan        # project-manager sprint'in birimlerini seçer — kapasiteye göre ya da küme DAG-kapalı tutularak önceliğe göre
 /sprint-start       # iş-birimi DAG'ını materialize et → motora devret
 /sprint-review      # review sonucu sayfası, sprint kapanışı (+ scrum modunda velocity)
 /request            # (her an) proje-ortası istek → triyaj → fizibilite → dürüst PO kapısı → kabul/ertele/ret
@@ -57,10 +57,16 @@ demektir**, yani mevcut bir projenin davranışı ayağının altından kaymaz.
 | | `mode: "scrum"` | `mode: "flow"` |
 |---|---|---|
 | Sprint nedir | bir **zaman kutusu** — backend'in takviminde tarihli bir aralık, kapasite tavanıyla | aynı sprint, **tarihsiz ve kapasite tavanı olmadan** |
-| `/sprint-plan` neye göre admit eder | önceliğe göre, velocity'den türetilen puan bütçesine kadar | **öncelik + DAG hazırlığına** göre; tek sınır ~4–6 eşzamanlılık sınırı |
+| `/sprint-plan` neye göre admit eder | önceliğe göre, velocity'den türetilen puan bütçesine kadar | **önceliğe** göre, admit edilen küme **DAG-kapalı** tutularak — hiçbir türde admit tavanı yok |
 | `/sprint-review` ne raporlar | gerçekleşen velocity | **velocity yok** — tamamlanan ile devreden, sprint'in tüm hesabıdır |
 | `capacityModel` | **zorunlu** | **yok** — anahtar tamamen atlanır |
 | Sprint taşıyıcısı | backend'in **iterasyon alanı** | admit edilen her birimde bir **`sprint:<n>` etiketi** |
+
+**DAG-kapalı** (DAG-closed), bir birimin bağımlı olduğu öncüller olmadan asla admit edilmemesi
+demektir: öncüller ya onunla birlikte içeri alınır ya da zaten tamamlanmıştır. Böylece bir `flow`
+sprint'i, yalnızca bugün başlayabilecek birimleri değil, `/sprint-start`'ın sıralayacağı gerçek
+bağımlılık kenarlarını taşır — ve ~4–6 eşzamanlılık sınırı, motorun **aynı anda** kaç birim
+çalıştıracağını sınırlar; seremoninin kaç birim admit edebileceğini değil.
 
 Geri kalan her şey aynıdır: aynı seremoniler, aynı roller, aynı DAG, aynı promotion kapısı.
 **Sözlük de değişmez — sprint her iki modda da sprint'tir.**

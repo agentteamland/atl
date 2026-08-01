@@ -37,7 +37,7 @@
     },
     {
       "name": "project-manager",
-      "description": "Plans sprints for the delivery org: builds the dependency DAG, admits the right unblocked items — against a velocity-derived capacity ceiling under the scrum mode, by priority + readiness under flow — and writes the sprint-review report."
+      "description": "Plans sprints for the delivery org: builds the dependency DAG, admits the right items by priority — against a velocity-derived capacity ceiling under scrum mode, against no ceiling under flow, where the admitted set is kept DAG-closed — and writes the sprint-review report."
     },
     {
       "name": "tech-lead",
@@ -67,7 +67,7 @@
     },
     {
       "name": "sprint-plan",
-      "description": "/sprint-plan — sprint selection, mode-aware: capacity from the last N=3 closed sprints bounds admission under the scrum mode, while the flow mode has no ceiling and admits by priority + DAG readiness. The project-manager admits at one granularity and stamps the sprint carrier (iteration field / sprint:<slug> label)."
+      "description": "/sprint-plan — sprint selection, mode-aware: capacity from the last N=3 closed sprints bounds admission under the scrum mode, while the flow mode has no ceiling and admits by priority with the admitted set kept DAG-closed. The project-manager admits at one granularity and stamps the sprint carrier (iteration field / sprint:<slug> label)."
     },
     {
       "name": "sprint-start",

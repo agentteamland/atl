@@ -40,7 +40,7 @@ The sprint runs through skills you invoke, each acting as the right role:
 /delivery-init      # select the backend (azure | github) + the sprint mode + wire the coordinates + methodology
 /kickoff            # intake + business-analyst shape the Epic/Feature backlog
 /refine             # technical-analyst + tech-lead decompose Features into briefed work-units
-/sprint-plan        # project-manager selects the sprint's units — against capacity, or by priority + DAG readiness
+/sprint-plan        # project-manager selects the sprint's units — against capacity, or by priority with the set kept DAG-closed
 /sprint-start       # materialize the work-unit DAG → hand it to the engine
 /sprint-review      # the review outcome page, sprint close (+ velocity under the scrum mode)
 /request            # (any time) mid-project request → triage → feasibility → honest PO gate → accept/defer/reject
@@ -57,10 +57,16 @@ an existing project's behaviour never shifts underneath it.
 | | `mode: "scrum"` | `mode: "flow"` |
 |---|---|---|
 | What a sprint is | a **time-box** — a dated range on the backend's schedule, with a capacity ceiling | the same sprint, **with no dates and no capacity ceiling** |
-| `/sprint-plan` admits | by priority, up to a velocity-derived point budget | by **priority + DAG readiness**, bounded only by the ~4–6 concurrency cap |
+| `/sprint-plan` admits | by priority, up to a velocity-derived point budget | by **priority**, with the admitted set kept **DAG-closed** — no admission ceiling of any kind |
 | `/sprint-review` reports | actual velocity | **no velocity** — completed vs. carryover is the whole account |
 | `capacityModel` | **required** | **absent** — the key is omitted |
 | The sprint carrier | the backend's **iteration field** | a **`sprint:<n>` label** on each admitted unit |
+
+**DAG-closed** means a unit is never admitted without the predecessors it depends on: they come in
+with it, or they are already complete. A `flow` sprint therefore carries real dependency edges for
+`/sprint-start` to order, rather than only the units that could start today — and the ~4–6
+concurrency cap bounds how many units the engine runs **at once**, never how many the ceremony may
+admit.
 
 Everything else is identical: the same ceremonies, the same roles, the same DAG, the same promotion
 gate. **The vocabulary does not change either — a sprint is a sprint in both modes.**

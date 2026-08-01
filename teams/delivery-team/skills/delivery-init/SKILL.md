@@ -89,12 +89,14 @@ type identifiers blind:
   Confirm Scrum.
 - **Mode** — ask how the sprints run: **`scrum`** (a time-boxed sprint with a capacity ceiling —
   velocity-driven planning over story-point estimates) or **`flow`** (a sprint with no dates and
-  no capacity — `/sprint-plan` admits by priority + DAG readiness, `/sprint-review` reports no
-  velocity, and a `sprint:<slug>` label carries the sprint instead of the iteration field).
+  no capacity — `/sprint-plan` admits by priority and keeps the admitted set **DAG-closed**,
+  `/sprint-review` reports no velocity, and a `sprint:<slug>` label carries the sprint instead of
+  the iteration field).
   **Default `scrum`** for backward-compatibility. The question behind it is *"does this project
   have a stable capacity to plan against?"* — a team with one does; a solo maintainer working with
   an autonomous agent does not, and `flow` is the honest answer there. Semantics:
-  [`knowledge/config-and-methodology.md`](../../knowledge/config-and-methodology.md) §1.1.
+  [`knowledge/config-and-methodology.md`](../../knowledge/config-and-methodology.md) §1.1
+  (admission vs dispatch readiness: §1.1.1).
 
 #### 3A.3 Resolve the project wiki (`wikiId`)
 
@@ -166,13 +168,15 @@ Offer discovered values rather than asking the user to type identifiers blind:
 - **Methodology** — confirm Scrum (the only v1 instance; the seam is real).
 - **Mode** — ask how the sprints run: **`scrum`** (a time-boxed sprint with a capacity ceiling —
   velocity-driven planning over story-point estimates) or **`flow`** (a sprint with no dates and
-  no capacity — `/sprint-plan` admits by priority + DAG readiness, `/sprint-review` reports no
-  velocity, and a `sprint:<slug>` label carries the sprint instead of the Iteration field).
+  no capacity — `/sprint-plan` admits by priority and keeps the admitted set **DAG-closed**,
+  `/sprint-review` reports no velocity, and a `sprint:<slug>` label carries the sprint instead of
+  the Iteration field).
   **Default `scrum`** for backward-compatibility. The question behind it is *"does this project
   have a stable capacity to plan against?"* — a team with one does; a solo maintainer working with
   an autonomous agent does not, and `flow` is the honest answer there. The answer also decides the
   board setup below: **`flow` needs neither the `Iteration` nor the `Story Points` field** (§3B.3).
-  Semantics: [`knowledge/config-and-methodology.md`](../../knowledge/config-and-methodology.md) §1.1.
+  Semantics: [`knowledge/config-and-methodology.md`](../../knowledge/config-and-methodology.md) §1.1
+  (admission vs dispatch readiness: §1.1.1).
 - **Merge method (preflight — warn, don't block)** — the autonomous loop completes a PBI by
   merging its PR with a **real merge commit** (`gh pr merge --merge`), which the engine's
   `MergedToBase` check then verifies; a squash- or rebase-merge rewrites the SHA, so a
