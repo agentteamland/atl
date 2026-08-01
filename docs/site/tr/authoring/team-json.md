@@ -38,7 +38,7 @@ Bu kadarı kuruluma yeter. CLI manifest dosyasını çözümler, `agents/web-age
 | `scope` | dize | — | Yayıncı varsayılan kurulum katmanı: `"project"`, `"global"` ya da `"both"`. Varsayılan `"project"`. Kullanıcı kurulum sırasında `--global` / `--project` ile her zaman geçersiz kılabilir. |
 | `dependencies` | nesne | — | CLI'nin bu takımın yanına kurması gereken diğer takımlar için `team-name → version-constraint` eşlemesi. |
 | `requires.atl` | dize | — | Bildirilen en düşük `atl` sürümü. Örneğin `">=2.0.0"`. Geleneksel üst veri — kurulum ayrıştırıcısı şu an bunu dayatmaz. |
-| `capabilities` | nesne | — | Çoğunlukla kurulum ayrıştırıcısının değil, platformun becerilerinin okuduğu isteğe bağlı sözleşmeler. `capabilities.review: "<agent>"`, [`/create-pr`](/tr/skills/create-pr)'in bu takımın uzman gözden geçireni olarak başlattığı ajanı adlandırır; `capabilities.profile`, profil katmanı sağlayıcı/tüketici rolünü bildirir ([profile-team](/tr/teams/profile-team)'e bakın). **CLI**'ın okuduğu tek anahtar `store` — aşağıya bakın. |
+| `capabilities` | nesne | — | Çoğunlukla kurulum ayrıştırıcısının değil, platformun becerilerinin okuduğu isteğe bağlı sözleşmeler. `capabilities.review: "<agent>"`, [`/create-pr`](/tr/skills/create-pr)'in bu takımın uzman gözden geçireni olarak başlattığı ajanı adlandırır; `capabilities.profile`, profil katmanı sağlayıcı/tüketici rolünü bildirir ([profile-team](/tr/teams/profile-team)'e bakın). **CLI**'ın kendisinin okuduğu iki anahtar var: `store` ve `channel` — aşağıya bakın. |
 | `backends` | dize[] | — | `backends/<name>/` altında arka uca özel bağdaştırıcı paketleri gönderen takımlar için (ör. delivery-team'in `["azure", "github"]` değeri): takımın hangi arka uçları desteklediğini bildirir. Bugün yalnızca bilgilendirme amaçlıdır — kurulum ayrıştırıcısı bunu okumaz. |
 
 ::: tip Açıklamayı kısa tut
@@ -83,6 +83,56 @@ Depoyu harici bir diskte veya bir senkronizasyon klasöründe tutuyorsanız — 
 Bilinen bir sınır: depo kendi içinde bir git repo'su barındırıyorsa, o alt ağaç gitlink olarak kaydedilir ve içeriği anlık görüntüye girmez. Bir depo makine tarafından yazılan veridir, dolayısıyla pratikte bu durum oluşmaz — ama oluşursa sessizdir.
 
 CLI bundan takımın hakkında hiçbir şey öğrenmez — ne ad, ne anlam, ne de dizinin ne tuttuğu bilgisi. Bir bildirime uyar; gelecekteki herhangi bir takımın aynı davranışı bedava almasının nedeni budur.
+
+## Yakalama kanalı bildirmek {#declaring-a-capture-channel}
+
+ATL'nin yakalama döngüsü — konuşma sırasında düşürülen bir işaretçi, kalıcı kuyruğa aktarılması, arka planda bir beceri tarafından drain edilmesi — yalnızca çekirdeğe ait değildir. Çekirdeğin sahip olduğu tek kanal `learning`'dir. Bir takım, bildirerek kendi kanalına sahip olabilir:
+
+```json
+{
+  "capabilities": {
+    "profile": {
+      "role": "provider",
+      "channel": {
+        "name": "profile-fact",
+        "drain": "/profile-drain",
+        "rule": "profile-capture",
+        "describes": "durable entity facts"
+      }
+    }
+  }
+}
+```
+
+`store` gibi `channel` da herhangi bir yetenek adının altında yer alabilir. Dört alanının her biri bir yerde tüketilir:
+
+| Alan | Neyi besler |
+|---|---|
+| `name` | kuyruk kanalı ve yakalama geçişinin aradığı işaretçi öneki — `<!-- profile-fact: … -->`. Ayrıca `atl learnings peek --channel <name>`'in kabul ettiği değer. |
+| `drain` | ajana arka planda bir alt-ajan olarak başlatması söylenen beceri. |
+| `rule` | her iki sinyalin de "ne yapılacağını söyleyen şey" olarak adlandırdığı kural. |
+| `describes` | bekçinin "son turları şu kaçırılanlar için gözden geçir: **…**" cümlesindeki insan-okur etiket. |
+
+`atl install` bildirimi kurulum manifest'ine kaydeder; bundan sonra [`atl tick`](/tr/cli/tick) ve oturum başlangıcı o kanalın sinyallerini çekirdeğinkinin yanında basar:
+
+```
+atl: 2 profile-fact(s) pending — auto-drain them now in a background subagent (per the profile-capture rule)
+atl: capture-watchdog (profile-fact) — no profile-fact markers for 4 assistant turn(s) / ~2100 chars of user input; review the recent turns for missed durable entity facts and mark them, and spawn ONE background /profile-drain subagent to mine the stretch (per the profile-capture rule, valid even with an empty queue)
+```
+
+İş bölümü işin bütün özüdür. **Sinyali platform basar; ona göre davranan, takımın kuralıdır.** ATL bir kanalın dört sözcüğünü bilir, fazlasını değil — hangi takımın gönderdiğini değil, `profile-fact`'in ne olduğunu değil, `/profile-drain`'in onunla ne yaptığını da değil. Bir sinyali davranışa çeviren yönerge, bildirimin adlandırdığı kuralda gelir; o kural da kanalın sahibi olan takımla birlikte kurulur. Dolayısıyla o takımın kurulu olmadığı bir makine sinyali hiç görmez: bildirim yoksa kanal yoktur, davranılacak bir şey de yoktur.
+
+Bu yön, **bildirilmemiş** bir kanaldaki işaretçinin başına ne geleceğini de belirler: hiçbir şey. Kuyruğa hiç girmez; böylece bir yazım hatası (`profile-fact` yerine `profile-fct`) bir olgunun yakalanmış *göründüğü* ama hiçbir drain'in asla sahiplenmeyeceği hayalet bir kanal açamaz. Etkin bir kanala çok yakın düşen bir yazım, hata sessizce yutulmak yerine raporlanır; `atl learnings peek --channel` ise hiçbir şeyle eşleşmeyen bilinmeyen bir kanalı, yazım hatasına "bekleyen öğe yok" yanıtını vermek yerine reddeder. (Kuyrukta öğesi *olan* ama artık etkin olmayan bir kanalı — örneğin öğeleri beklerken kaldırılmış bir takımın kanalını — yine de okur. O öğeler gerçektir ve `atl learnings status` da aynı nedenle onları listeler.)
+
+`drain`, `rule` ya da `describes` alanı eksik bir bildirim, içi boş bir cümle basılmaktansa reddedilir; adı zaten alınmış bir kanal — çekirdeğin `learning`'i ya da kurulu başka bir takım tarafından — yok sayılır. İkisi de [`atl doctor`](/tr/cli/doctor)'da bir uyarı olarak görünür; çünkü aksi hâlde her ikisi de sessiz kayıptır: o kanala yazılan işaretçiler hiç yakalanmaz ve nedenini kimse söylemez.
+
+`atl doctor`'ın denetleyemediği şey, `rule` ve `drain` alanlarının var olan varlıklara işaret edip etmediğidir: o, takımın kaynak ağacının çoktan gitmiş olduğu *kurulu* bir manifesti okur. Takımın hiç yayımlamadığı bir kurala işaret eden bir bildirim, ikisinden daha kötü olanıdır — kanal etkinleşir, işaretleri *gerçekten* yakalanır, ama hiçbir şey bir agent'a onları boşaltmasını söylemez. Bu monorepo'daki birinci-parti takımlar için [`atl skills check`](/tr/cli/skills) her iki adı da `rules/` ve `skills/` altında çözümler ve CI'ı kırar. Kendi deposundan yayımlanan bir takımın böyle bir kapısı yoktur; o yüzden kendiniz denetleyin: adını verdiğiniz kural, yayımladığınız bir dosya olmalı.
+
+::: tip Bu özellik gelmeden önce mi kurmuştunuz?
+`store` ile aynı hikâye: bildirim kurulum anında okunur, dolayısıyla `channels` alanından önceki bir kurulumda bu kayıt yoktur ve tam olarak hiç kanal bildirmeyen bir takım gibi davranır. `atl update` sabitlenmiş kaynağı yeniden çekerek bunu bir kez geri doldurur ve kendiliğinden çalışır — o çalışana kadar o kanalın işaretçileri yakalanmaz.
+:::
+
+**Kimseye erişim vermez.** ATL bildirilen *sözcükleri* yalnızca bu tek mekanik amaç için okur — bir sinyali sözcüklendirmek ve hangi kanalların var olduğuna karar vermek. Bir yeteneğin adlandırdığı şeyi kimin okuyup yazabileceği, platformun henüz uygulamadığı ayrı bir sözleşmedir.
 
 ## Sürüm kısıtları {#version-constraints}
 

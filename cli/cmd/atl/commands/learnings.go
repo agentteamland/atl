@@ -52,13 +52,18 @@ var learningsStatusCmd = &cobra.Command{
 			return nil
 		}
 		fmt.Println("learning queue — pending by channel:")
-		for _, ch := range []queue.Channel{queue.ChannelLearning, queue.ChannelProfileFact} {
+		for _, dc := range declaredChannels(project) {
+			ch := queue.Channel(dc.Name)
 			if n, ok := counts[ch]; ok {
 				fmt.Printf("  %-14s %d\n", string(ch), n)
 				delete(counts, ch)
 			}
 		}
-		for ch, n := range counts { // any future channels
+		// Anything left is an orphan: items queued on a channel no longer active,
+		// e.g. because the team that owned it was uninstalled while items were
+		// pending. Printed anyway — a count that vanished from the report would be
+		// items nobody can see.
+		for ch, n := range counts {
 			fmt.Printf("  %-14s %d\n", string(ch), n)
 		}
 		return nil
@@ -82,14 +87,23 @@ var learningsPeekCmd = &cobra.Command{
 		defer st.Close()
 
 		channel, _ := cmd.Flags().GetString("channel")
-		// Reject an unknown channel rather than silently returning an empty list —
-		// a typo like `--channel learnings` would otherwise look like "nothing pending".
-		if channel != "" && !knownChannel(queue.Channel(channel)) {
-			return fmt.Errorf("unknown --channel %q (known: %s, %s)", channel, queue.ChannelLearning, queue.ChannelProfileFact)
-		}
 		items, err := st.Pending(project, queue.Channel(channel))
 		if err != nil {
 			return err
+		}
+		// Reject an undeclared channel rather than silently returning an empty list —
+		// a typo like `--channel learnings` would otherwise look like "nothing pending".
+		// The error enumerates what is actually active here, which depends on which
+		// teams are installed.
+		//
+		// Checked only when the filter matched nothing, so this stays a gate on typos
+		// and never on data: items already in the queue on a channel that is no longer
+		// active — the team was uninstalled, or its declaration has not been backfilled
+		// yet — are real, and `learnings status` reports them for exactly that reason. A
+		// read must not hide what the count admits exists. A typo matches nothing, so it
+		// still fails loudly here.
+		if chans := declaredChannels(project); channel != "" && len(items) == 0 && !isDeclaredChannel(chans, channel) {
+			return fmt.Errorf("unknown --channel %q (active: %s)", channel, strings.Join(channelNames(chans), ", "))
 		}
 		if jsonOut, _ := cmd.Flags().GetBool("json"); jsonOut {
 			b, err := json.MarshalIndent(items, "", "  ")
@@ -141,9 +155,15 @@ var learningsAckCmd = &cobra.Command{
 	},
 }
 
-// learningsEnqueueCmd is a hidden helper: hooks (and tests) use it to transfer
-// a captured marker into the queue exactly once. The dedup lives in the store,
-// so calling it twice with the same marker is a safe no-op.
+// learningsEnqueueCmd is a hidden helper: hooks, the /drain skill's mining step,
+// and tests use it to transfer a captured marker into the queue exactly once.
+// The dedup lives in the store, so calling it twice with the same marker is a
+// safe no-op.
+//
+// It is one of exactly two write seams into the queue (the other is
+// drain.Drain), so it validates the channel: an undeclared name would otherwise
+// leave pending items in the project's bucket that no drain will ever claim —
+// the marker LOOKS captured while nothing can ever process it.
 var learningsEnqueueCmd = &cobra.Command{
 	Use:    "_enqueue <channel> <payload>",
 	Short:  "(internal) transfer a marker into the queue",
@@ -156,6 +176,9 @@ var learningsEnqueueCmd = &cobra.Command{
 		}
 		defer st.Close()
 
+		if chans := declaredChannels(project); !isDeclaredChannel(chans, args[0]) {
+			return fmt.Errorf("unknown channel %q (active: %s)", args[0], strings.Join(channelNames(chans), ", "))
+		}
 		ch := queue.Channel(args[0])
 		payload := args[1]
 		added, err := st.Enqueue(project, queue.Item{
@@ -286,11 +309,6 @@ func statusJSON(counts map[queue.Channel]int) (string, error) {
 		return "", err
 	}
 	return string(b), nil
-}
-
-// knownChannel reports whether ch is a queue channel the platform recognizes.
-func knownChannel(ch queue.Channel) bool {
-	return ch == queue.ChannelLearning || ch == queue.ChannelProfileFact
 }
 
 // shortID is the 12-char id prefix shown by peek (and echoed in ack's ambiguity

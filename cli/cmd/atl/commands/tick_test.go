@@ -7,8 +7,16 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/agentteamland/atl/cli/internal/manifest"
 	"github.com/agentteamland/atl/cli/internal/queue"
 )
+
+// testChannels stands in for "core's channel plus one a team declared" — the
+// set declaredChannels returns on a machine with profile-team installed.
+var testChannels = []manifest.Channel{
+	coreChannel,
+	{Name: "profile-fact", Drain: "/profile-drain", Rule: "profile-capture", Describes: "durable entity facts"},
+}
 
 // tickLine renders one transcript record in the shape ExtractFlow reads.
 func tickLine(role, text string) string {
@@ -45,7 +53,7 @@ func TestCaptureWatchdogIsPerChannel(t *testing.T) {
 	}
 	defer func() { _ = st.Close() }()
 
-	out := captureStdout(t, func() { captureWatchdogNotice(st, "/p/a", path) })
+	out := captureStdout(t, func() { captureWatchdogNotice(st, "/p/a", path, testChannels) })
 
 	if !strings.Contains(out, "capture-watchdog (profile-fact)") {
 		t.Errorf("profile-fact watchdog did not fire; output = %q\n"+
@@ -59,7 +67,7 @@ func TestCaptureWatchdogIsPerChannel(t *testing.T) {
 	}
 
 	// Fire-once: the same stretch must not nudge twice.
-	again := captureStdout(t, func() { captureWatchdogNotice(st, "/p/a", path) })
+	again := captureStdout(t, func() { captureWatchdogNotice(st, "/p/a", path, testChannels) })
 	if again != "" {
 		t.Errorf("second call re-fired: %q", again)
 	}
@@ -70,7 +78,7 @@ func TestCaptureWatchdogIsPerChannel(t *testing.T) {
 	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if out := captureStdout(t, func() { captureWatchdogNotice(st, "/p/a", path) }); out != "" {
+	if out := captureStdout(t, func() { captureWatchdogNotice(st, "/p/a", path, testChannels) }); out != "" {
 		t.Errorf("fired after the stretch was closed by a profile-fact marker: %q", out)
 	}
 }
@@ -94,7 +102,7 @@ func TestCaptureWatchdogOptOut(t *testing.T) {
 	defer func() { _ = st.Close() }()
 
 	t.Setenv("ATL_NO_CAPTURE_WATCHDOG", "1")
-	if out := captureStdout(t, func() { captureWatchdogNotice(st, "/p/a", path) }); out != "" {
+	if out := captureStdout(t, func() { captureWatchdogNotice(st, "/p/a", path, testChannels) }); out != "" {
 		t.Errorf("fired with ATL_NO_CAPTURE_WATCHDOG set: %q", out)
 	}
 }

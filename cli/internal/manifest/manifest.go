@@ -18,6 +18,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 )
 
@@ -27,7 +28,10 @@ import (
 //	2 — adds `stores`, the durable-store paths the team declared. An install
 //	    written at v1 predates the field, so its stores are unknown rather than
 //	    absent — update backfills those once and stamps v2.
-const SchemaVersion = 2
+//	3 — adds `channels`, the capture channels the team declared. Like `stores`,
+//	    the value lives only in the team's team.json, so an install written at
+//	    v2 must re-fetch its pinned source once to learn it.
+const SchemaVersion = 3
 
 // Source mirrors the index source an install resolved from, pinned to the ref
 // actually fetched, so doctor/update can re-fetch the exact same bytes.
@@ -35,6 +39,40 @@ type Source struct {
 	Repo    string `json:"repo"`
 	Subpath string `json:"subpath"`
 	Ref     string `json:"ref"`
+}
+
+// Channel is one capture channel a team declares under
+// `capabilities.<name>.channel`. Core emits the signal for it and refuses
+// markers on any channel no installed team declares; the drain skill and the
+// rule that acts on the signal both ship with the owning team, so core names
+// no team.
+type Channel struct {
+	Name      string `json:"name"`      // queue channel + marker prefix, e.g. "profile-fact"
+	Drain     string `json:"drain"`     // the skill a background subagent runs, e.g. "/profile-drain"
+	Rule      string `json:"rule"`      // the rule that carries the action instruction
+	Describes string `json:"describes"` // human label for the watchdog's "missed <…>"
+}
+
+// Valid reports whether every field a signal sentence needs is present. An
+// invalid declaration is refused rather than emitted with a hole in it.
+func (c Channel) Valid() bool { return len(c.MissingFields()) == 0 }
+
+// MissingFields lists the fields a signal sentence needs and this declaration
+// does not carry, in declaration order — the detail a doctor warning reports so
+// a broken declaration says what is wrong with it, not just that it was refused.
+func (c Channel) MissingFields() []string {
+	var out []string
+	for _, f := range []struct {
+		name  string
+		value string
+	}{
+		{"name", c.Name}, {"drain", c.Drain}, {"rule", c.Rule}, {"describes", c.Describes},
+	} {
+		if strings.TrimSpace(f.value) == "" {
+			out = append(out, f.name)
+		}
+	}
+	return out
 }
 
 // Manifest is the record of one installed team at one scope.
@@ -53,6 +91,11 @@ type Manifest struct {
 	// team owns them — core honors the declaration, it does not learn the team.
 	// Omitted for teams that declare none.
 	Stores []string `json:"stores,omitempty"`
+	// Channels are the capture channels this team declared under
+	// `capabilities.<name>.channel`. Recorded so the platform can emit each
+	// channel's signal without knowing which team owns it. Omitted for teams that
+	// declare none.
+	Channels []Channel `json:"channels,omitempty"`
 }
 
 // dirName is the installed-manifests directory under a layer root.

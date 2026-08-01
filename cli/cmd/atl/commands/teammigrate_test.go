@@ -141,3 +141,69 @@ func TestMigrateTeamManifestHandlesNoDeclaredStore(t *testing.T) {
 		t.Fatalf("schemaVersion = %d, want %d", got.SchemaVersion, manifest.SchemaVersion)
 	}
 }
+
+// The v2→v3 backfill. This is the only path by which an install that predates
+// the `channels` field ever gains it — i.e. every user who already has
+// profile-team installed. Until it runs, that install declares no channel, so
+// its markers are refused and its signals never fire; the window is bounded
+// (auto-update runs once/24h per project) but it is real, and the backfill is
+// what closes it.
+func TestMigrateTeamManifestBackfillsChannels(t *testing.T) {
+	layer := t.TempDir()
+	fetch, calls := teamSource(t, `{"name":"demo","version":"1.0.0","capabilities":{"profile":{
+	  "store":"~/.atl/profiles",
+	  "channel":{"name":"profile-fact","drain":"/profile-drain","rule":"profile-capture","describes":"durable entity facts"}}}}`)
+
+	// A v2 install: it already learned its store, but channels did not exist yet.
+	m := preV2Manifest()
+	m.SchemaVersion = 2
+	m.Stores = []string{"~/.atl/profiles"}
+
+	if err := migrateTeamManifest(m, layer, fetch); err != nil {
+		t.Fatalf("migrateTeamManifest: %v", err)
+	}
+	got, err := manifest.Read(layer, "acme", "demo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Channels) != 1 {
+		t.Fatalf("channels = %+v, want 1", got.Channels)
+	}
+	ch := got.Channels[0]
+	want := manifest.Channel{Name: "profile-fact", Drain: "/profile-drain", Rule: "profile-capture", Describes: "durable entity facts"}
+	if ch != want {
+		t.Fatalf("channel = %+v, want %+v — a field a signal sentence needs was dropped", ch, want)
+	}
+	if got.SchemaVersion != manifest.SchemaVersion {
+		t.Fatalf("schemaVersion = %d, want %d", got.SchemaVersion, manifest.SchemaVersion)
+	}
+	if len(got.Stores) != 1 || got.Stores[0] != "~/.atl/profiles" {
+		t.Fatalf("the migration disturbed the v2 field: %v", got.Stores)
+	}
+	if *calls != 1 {
+		t.Fatalf("fetch called %d times, want 1", *calls)
+	}
+}
+
+// A team that declares no channel still migrates: nothing to record, but it must
+// stop being re-examined on every update.
+func TestMigrateTeamManifestHandlesNoDeclaredChannel(t *testing.T) {
+	layer := t.TempDir()
+	fetch, _ := teamSource(t, `{"name":"demo","version":"1.0.0","capabilities":{"profile":{"store":"~/.atl/p"}}}`)
+
+	m := preV2Manifest()
+	m.SchemaVersion = 2
+	if err := migrateTeamManifest(m, layer, fetch); err != nil {
+		t.Fatal(err)
+	}
+	got, err := manifest.Read(layer, "acme", "demo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Channels) != 0 {
+		t.Fatalf("channels = %+v, want none", got.Channels)
+	}
+	if got.SchemaVersion != manifest.SchemaVersion {
+		t.Fatalf("schemaVersion = %d, want %d", got.SchemaVersion, manifest.SchemaVersion)
+	}
+}

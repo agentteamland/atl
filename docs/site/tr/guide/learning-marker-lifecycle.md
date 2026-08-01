@@ -84,9 +84,11 @@ Fix: one shared pool. Symptom was intermittent timeouts at ~200 rps.
 
 > **v1'den değişti.** Eski işaretçi yapılandırılmış YAML alanları taşıyordu (`topic`, `kind`, `doc-impact`, `body`). v2 bunların hepsini bırakır: yük düz nesirdir ve eskiden alanların kodladığı yönlendirmeyi drain yapar.
 
-### `profile-fact` kanalı
+### Diğer kanallar — kanalı bir takım bildirir
 
-Kuyruk çok kanallıdır. İkinci bir kanal, `profile-fact`, kullanıcının dünyasındaki varlıklar hakkındaki kalıcı olguları yakalar — kişiler, kurumlar, hayvanlar, yerler, nesneler, projeler — profil katmanı için. Aynı gizli-yorum şekli, `profile-fact:` öneki; ancak yük, varlığı ve öğrenilen alanları adlandıran küçük bir YAML gövdesidir (tam biçim, profile-team'in `profile-capture` kuralına aittir):
+Kuyruk çok kanallıdır ve çekirdeğin sahip olduğu tek kanal `learning`'dir. Diğer her kanal, kurulu bir takımın kendi `team.json`'ında dört şeyi adlandırarak onu **bildirmiş** olmasından doğar: kanalın kendisi (aynı zamanda işaretçi öneki), onu drain eden beceri, sinyallerine göre davranan kural ve neyi topladığı. Bkz. [yakalama kanalı bildirmek](/tr/authoring/team-json#declaring-a-capture-channel).
+
+Gönderilen örnek profile-team'in `profile-fact` kanalıdır; kullanıcının dünyasındaki varlıklar hakkındaki kalıcı olguları yakalar — kişiler, kurumlar, hayvanlar, yerler, nesneler, projeler. Aynı gizli-yorum şekli, `profile-fact:` öneki; ancak yük, varlığı ve öğrenilen alanları adlandıran küçük bir YAML gövdesidir (tam biçim, profile-team'in `profile-capture` kuralına aittir):
 
 ```html
 <!-- profile-fact:
@@ -99,7 +101,9 @@ Kuyruk çok kanallıdır. İkinci bir kanal, `profile-fact`, kullanıcının dü
 -->
 ```
 
-Her iki kanal da aynı şekilde auto-drain olur — `atl tick` her biri için sinyali basar ve ajan arka planda bir drain subagent'ı başlatır. `learning` kanalı `/drain` ile (`learning-capture` kuralına göre) drain edilir; `profile-fact` ise profile-team'in `/profile-drain`'i ile (kendi `profile-capture` kuralına göre, takımla birlikte kurulur) drain edilir — yani profile-team kurulu olmayan bir oturum `profile-fact` sinyaline hiç davranmaz.
+Her kanal aynı şekilde auto-drain olur — `atl tick` bekleyen öğesi olan her kanal için bir sinyal basar ve ajan arka planda bir drain subagent'ı başlatır. **Sinyali platform basar; ona göre davranan, takımın kuralıdır.** Cümle bildirimden kurulduğu için ATL hiçbir takımı adlandırmaz: hangi kanalın beklediğini ve hangi kuralın izleneceğini bildirir; o kural da kanalın sahibi olan takımla birlikte gelir. Çekirdeğin `learning` kanalı da aynı sözleşmeyi izler — `learning-capture` kuralı ve [`/drain`](/tr/skills/drain) ile.
+
+Bunun sonucu şudur: arkasında bir bildirim olmayan kanal hiç yoktur. profile-team kurulu olmayan bir makinede görmezden gelinecek bir `profile-fact` sinyali yoktur — öylesi hiç basılmaz. Ve bildirilmemiş bir kanala yazılan işaretçi (diyelim yanlış yazılmış bir `profile-fct`) kuyruğa hiç girmez; dolayısıyla onu asla sahiplenmeyecek bir drain'i sonsuza dek bekleyerek orada kalamaz. Etkin bir kanala çok yakın düşen böyle bir yazım, yazım hatası görünür olsun diye bunun yerine raporlanır.
 
 ## Neden satır içi işaretçi, araç çağrısı değil?
 
@@ -119,7 +123,7 @@ Her iki kanal da aynı şekilde auto-drain olur — `atl tick` her biri için si
 [`atl setup-hooks`](/tr/cli/setup-hooks), [`atl tick`](/tr/cli/tick) komutunu `UserPromptSubmit` hook'una bağlar ve `atl session-start` oturum başında bir geçiş çalıştırır. Her çalıştırmada `tick`:
 
 - bu projenin son tick'ten beri değişen Claude Code transkriptlerini keşfeder,
-- assistant metnini çıkarır ve `<!-- learning: ... -->` (ve `<!-- profile-fact: ... -->`) gizli işaretçilerini ayrıştırır,
+- assistant metnini çıkarır ve **etkin** her kanalın gizli işaretçilerini ayrıştırır — `<!-- learning: ... -->` ve kurulu bir takımın bildirdiği her kanal için bir önek daha (profile-team kuruluysa `<!-- profile-fact: ... -->`); başka bir kanaldaki işaretçi yakalanmaz,
 - **her birini kalıcı kuyruğa tam olarak bir kez sokar** — idempotenlik kuyruğun içerik-hash yineleme ayıklamasından gelir, dolayısıyla aynı metni yeniden drain etmek yeni hiçbir şey eklemez,
 - kuyruk sayısını okur ve boş olmadığında **otomatik-drain sinyalini** Claude'un bağlamına yazdırır (kısıtlamasız, dolayısıyla bekleyen iş olan her turda tetiklenir — `--throttle`'ın kapıladığı, daha ağır olan yakalama geçişidir),
 - canlı oturumun transkripti üzerinde **yakalama bekçisini** (capture watchdog) çalıştırır: **hiç işaretçi içermeyen** özlü bir seri birikmişse (son işaretçiden bu yana ≥2 assistant turu VE kullanıcıdan ≥1000 karakter), tek satırlık bir dürtme yazdırır — son turları kaçırılmış learning'ler için gözden geçir ve mining adımı seriyi kuyruk boşken bile tarayan bir arka plan `/drain`'i başlat. Kuru seri başına bir kez ateşlenir (yeni bir işaretçi ya da oturum onu yeniden kurar). Bu, boru hattının tek deterministik-olmayan halkasını kapatır: bir işaretçinin akış aşağısındaki her şey deterministikti, ama ajanın *hiç yazmadığı* bir işaretçi görünmezdi — artık ihmalin kendisi tespit ediliyor ve en kötü durum sessiz kayıp değil, "bir-iki tur geç yakalandı" oluyor.

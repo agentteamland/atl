@@ -38,7 +38,7 @@ That's enough to install. The CLI parses the manifest, copies `agents/web-agent.
 | `scope` | string | — | Publisher-default install layer: `"project"`, `"global"`, or `"both"`. Defaults to `"project"`. The user can always override at install time with `--global` / `--project`. |
 | `dependencies` | object | — | Map of `team-name → version-constraint` for other teams the CLI installs alongside this one. |
 | `requires.atl` | string | — | Declared minimum `atl` version, e.g. `">=2.0.0"`. Conventional metadata — the install parser does not currently enforce it. |
-| `capabilities` | object | — | Optional contracts, mostly read by the platform's skills rather than the install parser. `capabilities.review: "<agent>"` names the agent [`/create-pr`](/skills/create-pr) spawns as this team's specialist reviewer; `capabilities.profile` declares the profile-layer provider/consumer role (see [profile-team](/teams/profile-team)). The one key the **CLI** reads is `store` — see below. |
+| `capabilities` | object | — | Optional contracts, mostly read by the platform's skills rather than the install parser. `capabilities.review: "<agent>"` names the agent [`/create-pr`](/skills/create-pr) spawns as this team's specialist reviewer; `capabilities.profile` declares the profile-layer provider/consumer role (see [profile-team](/teams/profile-team)). Two keys are read by the **CLI** itself: `store` and `channel` — see below. |
 | `backends` | string[] | — | For teams shipping per-backend adapter packs under `backends/<name>/` (e.g. the delivery-team's `["azure", "github"]`): declares which backends the team supports. Informational today — the install parser does not read it. |
 
 ::: tip Keep the description short
@@ -83,6 +83,56 @@ If you keep the store on an external volume or a sync folder — declared direct
 One known limit: if the store itself contains a nested git repository, that subtree is recorded as a gitlink and its contents are not captured in the snapshot. A store is machine-written data, so this does not arise in practice — but it is silent if it does.
 
 The CLI learns nothing about your team from this — no name, no meaning, no knowledge of what the directory holds. It honors a declaration, which is why any future team gets the same treatment for free.
+
+## Declaring a capture channel
+
+ATL's capture loop — an inline marker dropped mid-conversation, transferred into the durable queue, drained in the background by a skill — is not core's alone. Core owns one channel, `learning`. A team can own another by declaring it:
+
+```json
+{
+  "capabilities": {
+    "profile": {
+      "role": "provider",
+      "channel": {
+        "name": "profile-fact",
+        "drain": "/profile-drain",
+        "rule": "profile-capture",
+        "describes": "durable entity facts"
+      }
+    }
+  }
+}
+```
+
+Like `store`, `channel` may sit under any capability name. Each of its four fields is consumed somewhere:
+
+| Field | What it feeds |
+|---|---|
+| `name` | the queue channel, and the marker prefix the capture pass looks for — `<!-- profile-fact: … -->`. Also what `atl learnings peek --channel <name>` accepts. |
+| `drain` | the skill the agent is told to spawn as a background subagent. |
+| `rule` | the rule both signals name as the thing that says what to do. |
+| `describes` | the human label in the watchdog's "review the recent turns for missed **…**". |
+
+`atl install` records the declaration into the install manifest, and from then on [`atl tick`](/cli/tick) and session start emit that channel's signals beside core's own:
+
+```
+atl: 2 profile-fact(s) pending — auto-drain them now in a background subagent (per the profile-capture rule)
+atl: capture-watchdog (profile-fact) — no profile-fact markers for 4 assistant turn(s) / ~2100 chars of user input; review the recent turns for missed durable entity facts and mark them, and spawn ONE background /profile-drain subagent to mine the stretch (per the profile-capture rule, valid even with an empty queue)
+```
+
+The division of labour is the whole point. **The platform emits a generic signal; the team's rule acts on it.** ATL knows a channel's four words and nothing more — not which team shipped it, not what a `profile-fact` is, not what `/profile-drain` does with one. The instruction that turns a signal into behaviour ships in the rule the declaration names, installed with the team that owns the channel. A machine without that team therefore never sees the signal at all: no declaration, no channel, nothing to act on.
+
+That direction also settles what happens to a marker on an **undeclared** channel — nothing. It is never queued, so a typo (`profile-fct` for `profile-fact`) cannot open a phantom channel where a fact *looks* captured but no drain will ever claim it. A near-miss of an active channel is reported so the typo is visible instead of silently swallowed; `atl learnings peek --channel` rejects an unknown channel that matches nothing, rather than answering a typo with "no pending items". (It still reads a channel that *has* queued items but is no longer active — a team was uninstalled with items pending, say. Those items are real, and `atl learnings status` lists them for the same reason.)
+
+A declaration missing `drain`, `rule` or `describes` is refused rather than emitted with a hole in it, and a channel whose name is already taken — by core's `learning`, or by another installed team — is ignored. Both surface as a warning from [`atl doctor`](/cli/doctor), because either one is otherwise a silent loss: markers on that channel are never captured and nothing says why.
+
+What `atl doctor` *cannot* check is whether `rule` and `drain` point at assets that exist: it reads an installed manifest, long after the team's source tree is gone. A declaration naming a rule the team never ships is the worse failure of the two — the channel goes active and its markers *are* captured, but nothing ever tells an agent to drain them. For first-party teams in this monorepo, [`atl skills check`](/cli/skills) resolves both names against `rules/` and `skills/` and fails CI. A team published from its own repo has no such gate, so check it yourself: the rule you name must be a file you ship.
+
+::: tip Already installed before this shipped?
+Same story as `store`: the declaration is read at install time, so an install that predates the `channels` field carries no record of it and behaves exactly like a team that declares none. `atl update` backfills it once by re-fetching the pinned source, and it runs on its own — until it does, that channel's markers are not captured.
+:::
+
+**It grants nobody access.** ATL reads the declared *words* for this one mechanical purpose — wording a signal, and deciding which channels exist at all. Who may read or write what a capability names is a separate contract the platform does not yet enforce.
 
 ## Version constraints
 

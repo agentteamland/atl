@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"time"
 
 	"github.com/agentteamland/atl/cli/internal/doctor"
 	"github.com/agentteamland/atl/cli/internal/drain"
 	"github.com/agentteamland/atl/cli/internal/generation"
+	"github.com/agentteamland/atl/cli/internal/manifest"
 	"github.com/agentteamland/atl/cli/internal/marker"
 	"github.com/agentteamland/atl/cli/internal/queue"
 	"github.com/agentteamland/atl/cli/internal/throttle"
@@ -38,18 +40,26 @@ var tickCmd = &cobra.Command{
 		}
 		defer st.Close()
 
+		// The capture channels active here: core's own plus whatever installed
+		// teams declared. Computed once per invocation — every channel-shaped
+		// decision below (what a marker may be drained onto, which auto-drain
+		// signals fire, which channels the watchdog measures) reads this one set,
+		// so they cannot disagree.
+		chans := declaredChannels(project)
+
 		// Manual override: drain a single file (test/debug), no throttle/cursor.
 		if file, _ := cmd.Flags().GetString("file"); file != "" {
 			b, err := os.ReadFile(file)
 			if err != nil {
 				return fmt.Errorf("read --file: %w", err)
 			}
-			r, err := drain.Drain(string(b), project, st)
+			r, err := drain.Drain(string(b), project, st, channelNames(chans))
 			if err != nil {
 				return err
 			}
 			fmt.Printf("tick: drained %s — %d marker(s), %d new, %d already queued\n",
 				file, r.Found, r.Enqueued, r.Found-r.Enqueued)
+			printNearMiss(r.NearMiss, chans)
 			return nil
 		}
 
@@ -68,18 +78,18 @@ var tickCmd = &cobra.Command{
 			}
 		}
 
-		// Auto-drain signal (unthrottled, every turn): if the queue holds pending
-		// learnings, tell the agent to drain them now in a background subagent. This
-		// is the deterministic per-turn trigger the learning-capture rule acts on —
-		// the CLI half of automatic integration (the drain itself is the agent's LLM
-		// work). Cheap (one count read); placed before the throttle gate so it fires
-		// on every prompt the queue is non-empty, not just when the heavier pass runs.
+		// Auto-drain signal (unthrottled, every turn): for each active channel that
+		// holds pending items, tell the agent to drain them now in a background
+		// subagent. This is the deterministic per-turn trigger each channel's
+		// capture rule acts on — the CLI half of automatic integration (the drain
+		// itself is the agent's LLM work). Cheap (one count read); placed before the
+		// throttle gate so it fires on every prompt a channel is non-empty, not just
+		// when the heavier pass runs.
 		if counts, cerr := st.Counts(project); cerr == nil {
-			if msg := autoDrainNotice(counts[queue.ChannelLearning]); msg != "" {
-				fmt.Println(msg)
-			}
-			if msg := autoProfileDrainNotice(counts[queue.ChannelProfileFact]); msg != "" {
-				fmt.Println(msg)
+			for _, ch := range chans {
+				if msg := autoDrainNotice(ch, counts[queue.Channel(ch.Name)]); msg != "" {
+					fmt.Println(msg)
+				}
 			}
 		}
 
@@ -97,7 +107,7 @@ var tickCmd = &cobra.Command{
 			}
 		}
 
-		scanned, found, enqueued, skipped, overLong, err := drainProjectTranscripts(st, project)
+		scanned, found, enqueued, skipped, overLong, nearMiss, err := drainProjectTranscripts(st, project, chans)
 		if err != nil {
 			return err
 		}
@@ -107,10 +117,11 @@ var tickCmd = &cobra.Command{
 		if overLong > 0 {
 			fmt.Printf("tick: skipped %d over-long transcript record(s) this pass — any markers they carried were not captured\n", overLong)
 		}
+		printNearMiss(nearMiss, chans)
 
-		// Doctor self-check (queue health + asset integrity + hook binding), same
-		// as session-start.
-		for _, r := range doctor.Run(append(doctor.QueueChecks(st, project, time.Now()), integrityCheck(project), hooksCheck())) {
+		// Doctor self-check (queue health + asset integrity + hook binding + the
+		// declared-channel contract), same as session-start.
+		for _, r := range doctor.Run(append(doctor.QueueChecks(st, project, time.Now()), integrityCheck(project), hooksCheck(), channelsCheck(project))) {
 			if r.Status != doctor.OK || r.Healed {
 				fmt.Printf("tick doctor: %s — %s\n", r.Status, r.Detail)
 			}
@@ -158,20 +169,26 @@ var tickCmd = &cobra.Command{
 // every later transcript is re-blocked). Queue dedup makes any re-scan a no-op,
 // so advancing past a skipped file is safe. overLong counts the individual
 // records dropped for exceeding the record cap — a within-file loss the file
-// count can't express, reported so it can't disappear quietly.
-func drainProjectTranscripts(st *queue.Store, project string) (scanned, found, enqueued, skipped, overLong int, err error) {
+// count can't express, reported so it can't disappear quietly. nearMiss counts
+// markers dropped onto a channel that is one edit from an active one — a likely
+// typo, the one unknown-channel case worth reporting.
+//
+// chans is the active channel set, passed in rather than recomputed so the whole
+// invocation drains, signals, and measures against exactly one set.
+func drainProjectTranscripts(st *queue.Store, project string, chans []manifest.Channel) (scanned, found, enqueued, skipped, overLong int, nearMiss map[string]int, err error) {
 	dir, err := transcript.ProjectDir(project)
 	if err != nil {
-		return 0, 0, 0, 0, 0, err
+		return 0, 0, 0, 0, 0, nil, err
 	}
 	since, err := st.Cursor(project)
 	if err != nil {
-		return 0, 0, 0, 0, 0, err
+		return 0, 0, 0, 0, 0, nil, err
 	}
 	files, err := transcript.Find(dir, since)
 	if err != nil {
-		return 0, 0, 0, 0, 0, fmt.Errorf("find transcripts: %w", err)
+		return 0, 0, 0, 0, 0, nil, fmt.Errorf("find transcripts: %w", err)
 	}
+	known := channelNames(chans)
 	var newest time.Time
 	var newestPath string
 	for _, f := range files {
@@ -185,13 +202,19 @@ func drainProjectTranscripts(st *queue.Store, project string) (scanned, found, e
 			skipped++
 			continue
 		}
-		r, e := drain.Drain(text, project, st)
+		r, e := drain.Drain(text, project, st, known)
 		if e != nil {
 			skipped++
 			continue
 		}
 		found += r.Found
 		enqueued += r.Enqueued
+		for ch, n := range r.NearMiss {
+			if nearMiss == nil {
+				nearMiss = map[string]int{}
+			}
+			nearMiss[ch] += n
+		}
 	}
 	scanned = len(files)
 	if scanned > 0 {
@@ -203,7 +226,7 @@ func drainProjectTranscripts(st *queue.Store, project string) (scanned, found, e
 			newest = now
 		}
 		if e := st.SetCursor(project, newest.Add(-time.Second)); e != nil {
-			return scanned, found, enqueued, skipped, overLong, fmt.Errorf("advance cursor: %w", e)
+			return scanned, found, enqueued, skipped, overLong, nearMiss, fmt.Errorf("advance cursor: %w", e)
 		}
 	}
 	// Record that the maintenance pass ran, for doctor's tick-freshness check.
@@ -213,8 +236,42 @@ func drainProjectTranscripts(st *queue.Store, project string) (scanned, found, e
 	// (subagent transcripts live in per-session SUBDIRS, which Find never enters).
 	// A dry stretch there means markers may have been forgotten — the one
 	// non-deterministic link in the capture pipeline made detectable.
-	captureWatchdogNotice(st, project, newestPath)
-	return scanned, found, enqueued, skipped, overLong, nil
+	captureWatchdogNotice(st, project, newestPath, chans)
+	return scanned, found, enqueued, skipped, overLong, nearMiss, nil
+}
+
+// printNearMiss reports markers dropped onto a channel one edit away from an
+// active one. A marker on an undeclared channel never enters the queue, so
+// without this the agent's typo'd capture would look exactly like a marker it
+// never wrote.
+func printNearMiss(nearMiss map[string]int, chans []manifest.Channel) {
+	for _, ch := range sortedNearMiss(nearMiss) {
+		fmt.Printf("atl: %d marker(s) on undeclared channel %q were not captured — did you mean %q?\n",
+			nearMiss[ch], ch, nearestChannel(ch, chans))
+	}
+}
+
+// sortedNearMiss orders the near-miss channels so the output is deterministic
+// (map iteration is not).
+func sortedNearMiss(nearMiss map[string]int) []string {
+	out := make([]string, 0, len(nearMiss))
+	for ch := range nearMiss {
+		out = append(out, ch)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// nearestChannel picks the active channel a dropped name most likely meant. The
+// name only reached here because marker.Scan found it within one edit of an
+// active channel, so the first such match is the suggestion.
+func nearestChannel(dropped string, chans []manifest.Channel) string {
+	for _, ch := range chans {
+		if marker.NearlyEqual(dropped, ch.Name) {
+			return ch.Name
+		}
+	}
+	return ""
 }
 
 // Capture-watchdog thresholds: fire only when BOTH are exceeded — enough
@@ -226,27 +283,19 @@ const (
 	watchdogMinChars = 1000
 )
 
-// watchdogChannels are the capture channels the watchdog measures, each with
-// the wording its own nudge needs. Both can fire on the same turn by design: a
-// stretch that captured neither kind genuinely needs both recoveries, and they
-// are different subagents running different skills.
-var watchdogChannels = []struct {
-	channel string // the capture channel, and the marker prefix the agent writes
-	missed  string // what went unmarked, for "review the recent turns for missed …"
-	drain   string // the skill the background subagent should run
-	rule    string // the rule that owns the response
-}{
-	{string(queue.ChannelLearning), "learnings", "/drain", "learning-capture"},
-	{string(queue.ChannelProfileFact), "durable entity facts", "/profile-drain", "profile-capture"},
-}
-
 // captureWatchdogNotice measures the live session's dry stretch PER CHANNEL and,
 // once per stretch per channel, prints the review nudge. Per channel is
 // load-bearing, not a refinement: a channel-agnostic "any marker at all"
 // predicate lets one learning marker reset the counter that a missed
 // profile-fact was accumulating, so a session that captures learnings regularly
 // could never trip the watchdog for the profile channel — the exact omission the
-// watchdog exists to catch, on one of the two channels it protects.
+// watchdog exists to catch, on one of the channels it protects.
+//
+// The channels come from chans — core's own plus what installed teams declared —
+// so a machine with no team installed is measured only for core's channel, and
+// can never be told to run a drain skill it does not have. Several channels can
+// fire on the same turn by design: a stretch that captured no kind genuinely
+// needs every recovery, and they are different subagents running different skills.
 //
 // Every failure path is silent — a hook must never block, and a nudge is never
 // worth an error. The latch is persisted BEFORE printing so a broken latch write
@@ -254,13 +303,13 @@ var watchdogChannels = []struct {
 // repeated one (fail toward silence — the same accepted trade-off means a manual
 // out-of-session `atl tick` can consume a stretch's one nudge where no agent
 // reads it).
-func captureWatchdogNotice(st *queue.Store, project, path string) {
+func captureWatchdogNotice(st *queue.Store, project, path string, chans []manifest.Channel) {
 	if path == "" || os.Getenv("ATL_NO_CAPTURE_WATCHDOG") != "" {
 		return
 	}
 	session := filepath.Base(path)
-	for _, c := range watchdogChannels {
-		ch := c.channel
+	for _, c := range chans {
+		ch := c.Name
 		stx, err := transcript.DryStretch(path, func(s string) bool { return marker.Has(s, ch) })
 		if err != nil {
 			return // unreadable transcript: no channel can be measured
@@ -275,7 +324,7 @@ func captureWatchdogNotice(st *queue.Store, project, path string) {
 			continue
 		}
 		fmt.Printf("atl: capture-watchdog (%s) — no %s markers for %d assistant turn(s) / ~%d chars of user input; review the recent turns for missed %s and mark them, and spawn ONE background %s subagent to mine the stretch (per the %s rule, valid even with an empty queue)\n",
-			ch, ch, stx.Turns, stx.Chars, c.missed, c.drain, c.rule)
+			ch, ch, stx.Turns, stx.Chars, c.Describes, c.Drain, c.Rule)
 	}
 }
 

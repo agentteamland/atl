@@ -54,9 +54,17 @@ var sessionStartCmd = &cobra.Command{
 			}
 		}
 
+		// The capture channels active here: core's own plus whatever installed teams
+		// declared. Computed once, then used for the drain, the auto-drain signals,
+		// and the watchdog, so all three measure the same set.
+		chans := declaredChannels(project)
+
 		// Drain the previous session's transcripts (no throttle at session start).
-		if _, _, enqueued, _, _, derr := drainProjectTranscripts(st, project); derr == nil && enqueued > 0 {
-			fmt.Printf("atl: captured %d new learning(s) from the previous session\n", enqueued)
+		if _, _, enqueued, _, _, nearMiss, derr := drainProjectTranscripts(st, project, chans); derr == nil {
+			if enqueued > 0 {
+				fmt.Printf("atl: captured %d new learning(s) from the previous session\n", enqueued)
+			}
+			printNearMiss(nearMiss, chans)
 		}
 
 		// Doctor self-check + asset integrity restore — surface non-OK / healed.
@@ -66,11 +74,11 @@ var sessionStartCmd = &cobra.Command{
 			}
 		}
 
-		// Signal pending learnings before releasing the queue lock (below).
-		var learningPending, profilePending int
-		if counts, cerr := st.Counts(project); cerr == nil {
-			learningPending = counts[queue.ChannelLearning]
-			profilePending = counts[queue.ChannelProfileFact]
+		// Snapshot the per-channel pending counts before releasing the queue lock
+		// (below); the signals themselves are printed after it.
+		var counts map[queue.Channel]int
+		if c, cerr := st.Counts(project); cerr == nil {
+			counts = c
 		}
 
 		// Release the queue's exclusive lock before the non-queue scans (gc + the
@@ -102,19 +110,17 @@ var sessionStartCmd = &cobra.Command{
 			}
 		}
 
-		// Signal pending learnings so Claude folds them in via /drain (counts read
-		// above, before the queue was closed). The skill is LLM work the CLI can't
-		// run itself (the CLI/Skill boundary) — surfacing the count here is how it
-		// gets triggered without the user remembering to.
-		if msg := autoDrainNotice(learningPending); msg != "" {
-			fmt.Println(msg)
-		}
-		// profile-team's channel: the profile-fact sibling of the learning auto-drain
-		// above. The action instruction lives in profile-team's profile-capture rule
-		// (core stays team-agnostic), so this is a harmless notice when profile-team
-		// isn't installed.
-		if msg := autoProfileDrainNotice(profilePending); msg != "" {
-			fmt.Println(msg)
+		// Signal each channel's pending items so Claude folds them in via that
+		// channel's drain skill (counts read above, before the queue was closed).
+		// The skill is LLM work the CLI can't run itself (the CLI/Skill boundary) —
+		// surfacing the count here is how it gets triggered without the user
+		// remembering to. A channel is only here because core owns it or an
+		// installed team declared it, so a signal can never name a skill this
+		// machine doesn't have.
+		for _, ch := range chans {
+			if msg := autoDrainNotice(ch, counts[queue.Channel(ch.Name)]); msg != "" {
+				fmt.Println(msg)
+			}
 		}
 
 		// Docs-correctness signal — fires only in a repo that has a docs site

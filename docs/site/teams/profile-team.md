@@ -64,6 +64,16 @@ mention in one project is the same profile everywhere.
 profile-team reuses ATL's marker → queue → drain machinery on a dedicated `profile-fact`
 channel, the sibling of the [learning loop](/guide/learning-marker-lifecycle):
 
+::: tip The channel is declared, not built in
+`capabilities.profile.channel` in profile-team's `team.json` names the channel
+(`profile-fact`), the skill that drains it (`/profile-drain`), the rule that acts on its
+signals (`profile-capture`), and what it collects. The platform assembles its signal
+sentences from those four words and stops there — it names no team. On a machine without
+profile-team the channel does not exist, so no `profile-fact` signal is ever emitted and a
+marker on it is never captured. See [declaring a capture
+channel](/authoring/team-json#declaring-a-capture-channel).
+:::
+
 1. **Capture.** The `profile-capture` rule teaches the assistant to drop a silent marker
    when a durable fact about a person comes up:
 
@@ -84,9 +94,10 @@ channel, the sibling of the [learning loop](/guide/learning-marker-lifecycle):
    counts them; `atl learnings peek --channel profile-fact` inspects them.
 
 3. **Signal.** Whenever the `profile-fact` channel is non-empty, `atl tick` (every turn)
-   and session start emit an auto-drain signal — `N profile-fact(s) pending — auto-drain …`,
-   the sibling of the learning signal. The `profile-capture` rule acts on it: the agent
-   spawns **one** background `/profile-drain` subagent (single-in-flight), so integration is
+   and session start emit an auto-drain signal — `N profile-fact(s) pending — auto-drain …
+   (per the profile-capture rule)`, the sibling of the learning signal. It names the rule,
+   never the team, and the `profile-capture` rule is what acts on it: the agent spawns
+   **one** background `/profile-drain` subagent (single-in-flight), so integration is
    automatic and you never run it by hand.
 
    A **second** signal covers the opposite failure: `capture-watchdog (profile-fact) — no

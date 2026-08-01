@@ -32,7 +32,7 @@ atl learnings transcript --json      # aynı akış, rol/metin kayıtları olara
 
 ### `atl learnings status`
 
-Her kanal için bekleyen öğe sayısını yazdırır; doğrudan kuyruktan okur (yapısı gereği doğru, asla çıkarımla bulunmaz). Kanallar `learning` ve `profile-fact`'tir. Kuyrukta hiçbir şey yokken şunu yazdırır:
+Her kanal için bekleyen öğe sayısını yazdırır; doğrudan kuyruktan okur (yapısı gereği doğru, asla çıkarımla bulunmaz). Kanallar, çekirdeğin kendi `learning` kanalı ve kurulu bir takımın bildirdiği her kanaldır — profile-team'in `profile-fact`'i gönderilen örnektir ([yakalama kanalı bildirmek](/tr/authoring/team-json#declaring-a-capture-channel)). Kuyrukta hiçbir şey yokken şunu yazdırır:
 
 ```
 learning queue: empty (nothing pending)
@@ -63,7 +63,7 @@ $ atl learnings status --json
 
 | Bayrak | Tip | Varsayılan | Ne yapar |
 |---|---|---|---|
-| `--channel <name>` | string | *(tümü)* | Tek bir kanala filtreler (ör. `learning`). |
+| `--channel <name>` | string | *(tümü)* | Tek bir kanala filtreler (ör. `learning`). Kurulu hiçbir takımın bildirmediği bir kanal reddedilir ve hata mesajı gerçekten etkin olanları listeler — böylece bir yazım hatası sessizce hiçbir şeyle eşleşmek yerine gürültülü şekilde başarısız olur. |
 | `--json` | bool | `false` | Bekleyen listenin tamamını JSON olarak verir (id, channel, payload, enqueued_at) — `/drain` skill'inin üstünde çalıştığı biçim. |
 
 İnsan-okunur çıktı, 12 karaktere kısaltılmış bir id'yi, kanalı ve yükün ilk satırını gösterir:

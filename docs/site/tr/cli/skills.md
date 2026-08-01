@@ -7,20 +7,27 @@ Bu, monorepo'nun `core/` ve `teams/` ağaçlarına karşı çalışan bir **main
 ## Kullanım
 
 ```bash
-atl skills check                      # frontmatter, team.json tutarlılığı, agent-KB çocukları, skill shell gövdelerini doğrula
+atl skills check                      # frontmatter, team.json tutarlılığı, bildirilen yakalama kanalları, agent-KB çocukları, skill shell gövdelerini doğrula
 atl skills check --record-stocktake   # HEAD'i son-stocktake-yapılan commit olarak damgala (/skill-stocktake bir taramanın sonunda çalıştırır)
 ```
 
 ## Neleri kontrol eder
 
-Üç yapısal kontrol **yapısı gereği sıfır-yanlış-pozitiftir** — bulgu, dosya hakkında bir olgudur (bir frontmatter anahtarı ya vardır ya yoktur). Dördüncüsü, `shell`, yapısal bir olgu değil, adlandırılmış yapılar üzerinde bilinçli olarak dar tutulmuş bir desen eşleştirmesidir; depodaki her skill üzerinde ölçülerek temiz bulunmuştur ve **neyi kapsamadığı** aşağıda yazılıdır. Dördü de bir PR'ı bağlamak için güvenlidir:
+Dört yapısal kontrol **yapısı gereği sıfır-yanlış-pozitiftir** — bulgu, dosya hakkında bir olgudur (bir frontmatter anahtarı ya vardır ya yoktur). Beşincisi, `shell`, yapısal bir olgu değil, adlandırılmış yapılar üzerinde bilinçli olarak dar tutulmuş bir desen eşleştirmesidir; depodaki her skill üzerinde ölçülerek temiz bulunmuştur ve **neyi kapsamadığı** aşağıda yazılıdır. Beşi de bir PR'ı bağlamak için güvenlidir:
 
 | Kontrol | Ne sağlanmalı |
 |---|---|
 | **frontmatter** | Her skill'in `SKILL.md`'si ve her agent'ın `agent.md`'si bir `name` + `description` frontmatter bloğu taşır. |
 | **manifest** | Her `team.json`'ın `agents[]` / `skills[]` adları diskteki dizinlerle eşleşir — **her iki yönde** (bildirilmiş-ama-yok yok, diskte-ama-bildirilmemiş yok). |
+| **channel** | [Bildirilen her yakalama kanalı](/tr/authoring/team-json#declaring-a-capture-channel) dört alanının hepsini taşır ve `rule` ile `drain` alanları takımın gerçekten yayımladığı bir kurala ve bir skill'e işaret eder. |
 | **children** | **Yayımlanan** her agent-KB çocuğu (`teams/<team>/agents/<x>/children/*.md`) boş olmayan bir `knowledge-base-summary` frontmatter'ı bildirir — KB-yeniden-inşa sözleşmesi. |
 | **shell** | Bir `SKILL.md` içindeki hiçbir shell bloğu, bilinen iki yalnızca-bash yapısından birini kullanmaz — eşleşmeyen bir glob, skill gövdesini gerçekten çalıştıran kabuk olan zsh'te **ölümcüldür**. Tam kapsam ve sınırları aşağıdadır. |
+
+### Bildirilen bir kanal neden diske karşı çözümleniyor
+
+Bir yakalama kanalının sinyalleri, bildirimin verdiği dört kelimeden kurulur ve çalışma zamanında hiçbir şey bu kelimelerin gerçek bir yere işaret ettiğini denetlemez. Dolayısıyla takımın yayımlamadığı bir kurala işaret eden kanal her yerde kabul edilir: kanal etkinleşir, işaretleri kuyruğa *gerçekten* alınır — ve hiçbir kural bir agent'a onları boşaltmasını söylemez. Sonsuza dek birikirler ve tek belirti, açıklaması olmayan bir birikimdir.
+
+Çalışma zamanındaki doctor kontrolü bu yarıyı yakalayamaz. O, takımın kaynak ağacının çoktan gitmiş olduğu *kurulu* bir manifesti inceler; yalnızca dört alanın var olduğunu doğrulayabilir. Burada, monorepo'da varlıklar tam oradadır — bu da bozuk bir birinci-parti bildiriminin çözümlenebileceği tek yer olmasını sağlar ve yayımlanmak yerine CI'ı kırar.
 
 ### Bir skill'in shell gövdesi neden denetleniyor
 

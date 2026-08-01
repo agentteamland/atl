@@ -38,18 +38,18 @@ Scan it for **durable** learnings the agent never captured as a marker:
   ("no, use refresh tokens not sessions", "stop editing the config, fix the code").
 - **Reverts / do-overs** — an approach was tried, rejected, and replaced.
 - **Repeated mistakes** — the same class of error recurred across the session.
-- **Unmarked durable facts** — a real decision, discovery, or profile-worthy fact
-  the turns plainly contain but no marker ever recorded. This is the
+- **Unmarked durable facts** — a real decision or discovery the turns plainly
+  contain but no marker ever recorded. This is the
   **capture-watchdog case**: when the drain was triggered by an
   `atl: capture-watchdog (learning)` signal (a marker-less dry stretch), the queue
   may be **empty and that's expected** — this mining step IS the run's purpose;
   sweep the flagged stretch and recover what should have been marked. (The
-  watchdog measures each channel separately; a `(profile-fact)` signal is
-  `/profile-drain`'s trigger, not this skill's.)
+  watchdog measures each channel separately; a signal naming any other channel is
+  that channel's own drain's trigger, not this skill's.)
 
 For each one, write a one-line learning **stating the lesson, with the why**, and
-enqueue it exactly like a marker (use the `profile-fact` channel for a durable
-non-self entity fact, per the profile-capture marker shape):
+enqueue it exactly like a marker — on the `learning` channel, the only one this
+skill mines:
 
 ```
 atl learnings _enqueue learning "<the lesson, with its reason>"
@@ -225,9 +225,9 @@ the three managed blocks, so it sits last).
 
 - **Scope**: wiki + journal are project knowledge (`<proj>/.atl/`). Agent KB
   follows the agent's install scope (project `.claude/` shadows global `~/.claude/`).
-- **profile-fact channel**: not handled here — that's profile-team's
-  `/profile-drain` (a shipped first-party team; installed with profile-team). This
-  skill processes the `learning` channel only.
+- **Other channels**: this skill processes the `learning` channel only — core's
+  own. Any other channel belongs to the team that **declared** it, and that team
+  ships the drain skill for it; the channel's signal names which one to spawn.
 - **Idempotency**: ack deletes the item, and both capture and mining dedup by
   content hash — so re-running `/drain` is safe. Mining a lesson you already saved
   re-enqueues to a no-op; an empty queue with nothing new to mine is a no-op.

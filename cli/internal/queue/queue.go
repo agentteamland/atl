@@ -30,13 +30,15 @@ import (
 )
 
 // Channel identifies the kind of work an item carries. The queue is generic:
-// one infrastructure, many per-channel processors.
+// one infrastructure, many per-channel processors. It deliberately knows no
+// channel but the platform's own — every other channel is named by an installed
+// team's declaration and arrives as a value, so this package never learns a team
+// name and never needs a new constant to carry one.
 type Channel string
 
-const (
-	ChannelLearning    Channel = "learning"
-	ChannelProfileFact Channel = "profile-fact"
-)
+// ChannelLearning is the platform's own capture channel: core ships the
+// learning-capture rule and the /drain skill, so it exists on every machine.
+const ChannelLearning Channel = "learning"
 
 // Item is a single unit of queued work.
 type Item struct {

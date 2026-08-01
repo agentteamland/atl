@@ -32,7 +32,7 @@ atl learnings transcript --json      # the same flow as role/text records
 
 ### `atl learnings status`
 
-Prints the pending item count for each channel, read straight from the queue (correct by construction, never inferred). Channels are `learning` and `profile-fact`. When nothing is queued it prints:
+Prints the pending item count for each channel, read straight from the queue (correct by construction, never inferred). The channels are core's own `learning` plus any channel an installed team declares — profile-team's `profile-fact` is the shipped example (see [declaring a capture channel](/authoring/team-json#declaring-a-capture-channel)). When nothing is queued it prints:
 
 ```
 learning queue: empty (nothing pending)
@@ -63,7 +63,7 @@ Lists the pending items the [`/drain`](/skills/drain) skill works through — `i
 
 | Flag | Type | Default | What it does |
 |---|---|---|---|
-| `--channel <name>` | string | *(all)* | Filter to one channel (e.g. `learning`). |
+| `--channel <name>` | string | *(all)* | Filter to one channel (e.g. `learning`). A channel no installed team declares is rejected, and the error lists the ones actually active — so a typo fails loudly instead of quietly matching nothing. |
 | `--json` | bool | `false` | Emit the full pending list as JSON (id, channel, payload, enqueued_at) — the form the `/drain` skill drives off of. |
 
 Human-readable output shows a truncated 12-character id, the channel, and the payload's first line:

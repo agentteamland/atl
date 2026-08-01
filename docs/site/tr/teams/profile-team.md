@@ -64,6 +64,16 @@ andığın kişi her yerde aynı profildir.
 profile-team, ATL'nin marker → kuyruk → drain düzeneğini özel bir `profile-fact` kanalında
 yeniden kullanır — [öğrenme döngüsünün](/tr/guide/learning-marker-lifecycle) kardeşi:
 
+::: tip Kanal yerleşik değil, bildirilmiştir
+profile-team'in `team.json`'ındaki `capabilities.profile.channel`, kanalı (`profile-fact`),
+onu drain eden beceriyi (`/profile-drain`), sinyallerine göre davranan kuralı
+(`profile-capture`) ve neyi topladığını adlandırır. Platform sinyal cümlelerini bu dört
+sözcükten kurar ve orada durur — hiçbir takımı adlandırmaz. profile-team kurulu olmayan bir
+makinede kanal hiç yoktur; dolayısıyla hiçbir `profile-fact` sinyali basılmaz ve o kanaldaki
+bir işaretçi hiç yakalanmaz. Bkz. [yakalama kanalı
+bildirmek](/tr/authoring/team-json#declaring-a-capture-channel).
+:::
+
 1. **Yakalama.** `profile-capture` kuralı, bir kişi hakkında kalıcı bir bilgi ortaya çıktığında
    asistana sessiz bir marker düşürmeyi öğretir:
 
@@ -84,8 +94,9 @@ yeniden kullanır — [öğrenme döngüsünün](/tr/guide/learning-marker-lifec
    `atl learnings peek --channel profile-fact` inceler.
 
 3. **Sinyal.** `profile-fact` kanalı boş olmadığında, `atl tick` (her turda) ve oturum
-   başlangıcı bir auto-drain sinyali basar — `N profile-fact(s) pending — auto-drain …`,
-   öğrenme sinyalinin kardeşi. `profile-capture` kuralı buna göre davranır: ajan arka planda
+   başlangıcı bir auto-drain sinyali basar — `N profile-fact(s) pending — auto-drain …
+   (per the profile-capture rule)`, öğrenme sinyalinin kardeşi. Sinyal takımı değil, kuralı
+   adlandırır; buna göre davranan da `profile-capture` kuralıdır: ajan arka planda
    **tek** bir `/profile-drain` subagent'ı başlatır (single-in-flight), böylece entegrasyon
    otomatiktir ve onu asla elle çalıştırmazsınız.
 

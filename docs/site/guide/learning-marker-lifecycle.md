@@ -83,9 +83,11 @@ Fix: one shared pool. Symptom was intermittent timeouts at ~200 rps.
 
 > **Changed from v1.** The old marker carried structured YAML fields (`topic`, `kind`, `doc-impact`, `body`). v2 drops all of them: the payload is plain prose, and the drain does the routing the fields used to encode.
 
-### The `profile-fact` channel
+### Other channels — a team declares one
 
-The queue is multi-channel. A second channel, `profile-fact`, captures durable facts about the entities in the user's world — people, orgs, animals, places, objects, projects — for the profile layer. Same hidden-comment shape, `profile-fact:` prefix, but the payload is a small YAML body naming the entity and the fields learned (the exact format is owned by profile-team's `profile-capture` rule):
+The queue is multi-channel, and `learning` is the only channel core owns. Every other channel exists because an installed team **declared** it in its `team.json`, naming four things: the channel (which is also the marker prefix), the skill that drains it, the rule that acts on its signals, and what it collects. See [declaring a capture channel](/authoring/team-json#declaring-a-capture-channel).
+
+The shipped example is profile-team's `profile-fact`, which captures durable facts about the entities in the user's world — people, orgs, animals, places, objects, projects. Same hidden-comment shape, `profile-fact:` prefix, but the payload is a small YAML body naming the entity and the fields learned (the exact format is owned by profile-team's `profile-capture` rule):
 
 ```html
 <!-- profile-fact:
@@ -98,7 +100,9 @@ The queue is multi-channel. A second channel, `profile-fact`, captures durable f
 -->
 ```
 
-Both channels auto-drain the same way — `atl tick` emits the signal for each, and the agent spawns a background drain subagent. The `learning` channel is drained by `/drain` (per the `learning-capture` rule); `profile-fact` is drained by profile-team's `/profile-drain` (per its `profile-capture` rule, installed with the team), so a session without profile-team simply never acts on the `profile-fact` signal.
+Every channel auto-drains the same way — `atl tick` emits one signal per channel with pending items, and the agent spawns a background drain subagent. **The platform emits the signal; the team's rule acts on it.** The sentence is assembled from the declaration, so ATL names no team: it reports which channel is pending and which rule to follow, and that rule ships with whichever team owns the channel. Core's `learning` follows the same contract, with the `learning-capture` rule and [`/drain`](/skills/drain).
+
+The consequence is that a channel with no declaration behind it does not exist. On a machine without profile-team there is no `profile-fact` signal to ignore — none is ever emitted. And a marker written on an undeclared channel (a mistyped `profile-fct`, say) is never queued at all, so it cannot sit pending forever waiting for a drain that will never claim it; a near-miss of an active channel is reported instead, so the typo is visible.
 
 ## Why inline marks, not a tool call
 
@@ -118,7 +122,7 @@ A tool call per learning would double token cost and slow the conversation. Inli
 [`atl setup-hooks`](/cli/setup-hooks) wires [`atl tick`](/cli/tick) to the `UserPromptSubmit` hook, and `atl session-start` runs a pass at session start. On each run, `tick`:
 
 - discovers this project's Claude Code transcripts modified since the last tick,
-- extracts the assistant text and parses `<!-- learning: ... -->` (and `<!-- profile-fact: ... -->`) hidden markers,
+- extracts the assistant text and parses the hidden markers of every **active** channel — `<!-- learning: ... -->`, plus one prefix per channel an installed team declares (`<!-- profile-fact: ... -->` when profile-team is installed); a marker on any other channel is not captured,
 - **enqueues each into the durable queue exactly once** — idempotency comes from the queue's content-hash dedup, so re-draining the same text enqueues nothing new,
 - reads the queue count and, when it's non-empty, prints the **auto-drain signal** into Claude's context (unthrottled, so it fires every turn there's pending work — the heavier capture pass is what the `--throttle` gates),
 - runs the **capture watchdog** on the live session's transcript: if a substantive stretch has accumulated with **no markers at all** (≥2 assistant turns AND ≥1000 chars of user input since the last marker), it prints a one-line nudge — review the recent turns for missed learnings and spawn a background `/drain`, whose mining step sweeps the stretch even with an empty queue. Fires once per dry stretch (a new marker or session re-arms it). This closes the pipeline's one non-deterministic link: everything downstream of a marker is deterministic, but a marker the agent *never wrote* used to be invisible — now the omission itself is detected, and the worst case becomes "captured a turn or two late," never silent loss.
