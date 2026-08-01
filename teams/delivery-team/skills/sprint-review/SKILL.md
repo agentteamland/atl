@@ -201,12 +201,17 @@ exact shape.
 no longer the promotion — *merging* it is.** A promotion is **verified, not asserted**.
 
 **This ceremony performs no verification of its own — `atl work promote` does, and the same call
-performs the merge.** Why the decision lives in code: it first shipped here as prose, and a real run
-proved prose is followed inconsistently — one turn read the record, saw it named a superseded
-commit, and correctly held; **the very next turn, same skill, same PR, never mentioned the record at
-all.** Whatever depends on remembering gets forgotten, and the failure is silent. Verify and merge
-are **one** call for the same reason: a gate that only returned a verdict would leave a separate
-merge step reachable without ever running the check.
+performs the merge.** Why the decision lives in code, stated honestly rather than from a story: a
+comparison written as prose is a step that *can* be skipped, and nothing detects the skip — the
+promotion simply does not happen, or worse, happens on an unchecked commit. In code it cannot be
+skipped and its verdict is testable. Verify and merge are **one** call for the same reason: a gate
+that only returned a verdict would leave a separate merge step reachable without ever running the
+check.
+
+(An earlier revision of this paragraph cited a measurement it did not have — two ceremony turns
+behaving differently — as proof that prose is followed inconsistently. Those turns ran a build of
+this skill that contained none of this, so they were evidence of nothing. The argument above stands
+on its own; the anecdote was withdrawn.)
 
 **So: do not re-implement the comparison here, and do not second-guess the verdict.** Reading the
 record yourself to "confirm" the command is how the prose path grows back.
