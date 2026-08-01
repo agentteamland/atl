@@ -95,25 +95,34 @@ write_test_index() {
 }
 
 # write_test_index_profile seeds ~/.atl/index.json with the first-party
-# profile-team entry, pointing at the monorepo subpath on `main`. profile-team
-# is a real monorepo team (not a standalone fixture repo), so `atl install`
-# fetches teams/profile-team from the atl repo tarball over public HTTPS — the
-# blueprint stays hermetic (no dedicated fixture repo) and auth-free.
+# profile-team entry, pointing at the monorepo subpath on ATL_E2E_TEAM_REF (the
+# current branch — see write_test_index_delivery below for why this must not be
+# pinned to `main`). profile-team is a real monorepo team (not a standalone
+# fixture repo), so `atl install` fetches teams/profile-team from the atl repo
+# tarball over public HTTPS — the blueprint stays hermetic (no dedicated fixture
+# repo) and auth-free.
 write_test_index_profile() {
   mkdir -p "$HOME/.atl"
-  jq -n '{schemaVersion:1,generatedAt:"2099-01-01T00:00:00Z",teams:[{handle:"agentteamland",name:"profile-team",version:"1.0.0",description:"profile-team e2e (monorepo subpath).",keywords:["profile"],scope:"global",verified:true,source:{repo:"agentteamland/atl",subpath:"teams/profile-team",ref:"main"}}]}' > "$HOME/.atl/index.json"
+  jq -n --arg ref "${ATL_E2E_TEAM_REF:-main}" '{schemaVersion:1,generatedAt:"2099-01-01T00:00:00Z",teams:[{handle:"agentteamland",name:"profile-team",version:"1.0.0",description:"profile-team e2e (monorepo subpath).",keywords:["profile"],scope:"global",verified:true,source:{repo:"agentteamland/atl",subpath:"teams/profile-team",ref:$ref}}]}' > "$HOME/.atl/index.json"
 }
 
 # write_test_index_delivery seeds ~/.atl/index.json with the first-party
-# delivery-team entry, pointing at the monorepo subpath on `main` (delivery-team
-# is not yet in the published catalog, so the e2e injects it the same way
+# delivery-team entry, pointing at the monorepo subpath (delivery-team is not yet
+# in the published catalog, so the e2e injects it the same way
 # write_test_index_profile does). It is project-scope, so the blueprint installs
-# it into the project, not globally. The ceremony CONTENT comes from `main`; the
-# mock MCP server + this blueprint come from the image (COPY test/e2e/), so a
-# delivery-team change on the branch still tests against the merged ceremonies.
+# it into the project, not globally.
+#
+# The ceremony CONTENT comes from ATL_E2E_TEAM_REF, which run.sh resolves to the
+# CURRENT BRANCH and refuses to run if the branch's teams/ differs from what is
+# on that ref. This used to be pinned to `main` — and the pin was documented here
+# as a feature ("a change on the branch still tests against the merged
+# ceremonies"), which is why it read as intentional for so long. It is not a
+# feature: it means an edited ceremony is never loaded, every assertion passes on
+# main's copy, and the run reports green on content it never saw. Only the mock
+# MCP server + the blueprints come from the image (COPY test/e2e/).
 write_test_index_delivery() {
   mkdir -p "$HOME/.atl"
-  jq -n '{schemaVersion:1,generatedAt:"2099-01-01T00:00:00Z",teams:[{handle:"agentteamland",name:"delivery-team",version:"0.1.0",description:"delivery-team e2e (monorepo subpath).",keywords:["delivery"],scope:"project",verified:true,source:{repo:"agentteamland/atl",subpath:"teams/delivery-team",ref:"main"}}]}' > "$HOME/.atl/index.json"
+  jq -n --arg ref "${ATL_E2E_TEAM_REF:-main}" '{schemaVersion:1,generatedAt:"2099-01-01T00:00:00Z",teams:[{handle:"agentteamland",name:"delivery-team",version:"0.1.0",description:"delivery-team e2e (monorepo subpath).",keywords:["delivery"],scope:"project",verified:true,source:{repo:"agentteamland/atl",subpath:"teams/delivery-team",ref:$ref}}]}' > "$HOME/.atl/index.json"
 }
 
 # gh_login echoes the authenticated GitHub login (GH_TOKEN is passed through by

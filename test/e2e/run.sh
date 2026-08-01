@@ -19,6 +19,43 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."   # atl repo root (build context)
 BPDIR="test/e2e/blueprints"
 
+# Resolve the ref the CONTAINER installs TEAM content from (host side).
+#
+# The test index pins `source.ref` and the container fetches that ref from
+# GitHub — it mounts NOTHING from this working tree. So an edit under teams/ is
+# exercised only once it is pushed to the ref being installed. A branch that
+# edits a ceremony and runs against `main` reports green on content the test
+# never loaded, which is silent by construction: every assertion still passes,
+# because they are all passing on main's copy. That has cost a full suite run.
+#
+# Default to the current branch, then verify what the container WILL fetch
+# matches what is on disk. Override with ATL_E2E_TEAM_REF to pin a ref by hand.
+ATL_E2E_TEAM_REF="${ATL_E2E_TEAM_REF:-$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)}"
+if [ "$ATL_E2E_TEAM_REF" = "HEAD" ]; then ATL_E2E_TEAM_REF=main; fi   # detached
+# ^ an `[ … ] && x` one-liner would return non-zero on the common (non-detached)
+#   path and `set -e` would kill the runner before a single blueprint ran.
+git fetch -q origin main 2>/dev/null || true
+
+if ! git fetch -q origin "$ATL_E2E_TEAM_REF" 2>/dev/null; then
+  # Not on origin. Harmless ONLY if this branch changes no team content at all.
+  if git diff --quiet origin/main -- teams/ 2>/dev/null; then
+    echo ">> ref '$ATL_E2E_TEAM_REF' is not on origin, but teams/ matches main — using main"
+    ATL_E2E_TEAM_REF=main
+  else
+    echo "!! '$ATL_E2E_TEAM_REF' changes teams/ but is not pushed to origin." >&2
+    echo "!! The container installs team content from GitHub and mounts nothing" >&2
+    echo "!! from here, so this run would exercise main's copy and report green" >&2
+    echo "!! on a change it never loaded. Push the branch, or set ATL_E2E_TEAM_REF." >&2
+    exit 2
+  fi
+elif ! git diff --quiet FETCH_HEAD -- teams/; then
+  echo "!! local teams/ differs from origin/$ATL_E2E_TEAM_REF — the container installs" >&2
+  echo "!! team content from that ref, so those edits would NOT be exercised and a" >&2
+  echo "!! green run would mean nothing. Commit and push them first." >&2
+  exit 2
+fi
+echo ">> team content from ref: $ATL_E2E_TEAM_REF"
+
 echo ">> building atl-e2e image"
 docker build -f test/e2e/Dockerfile -t atl-e2e . >/dev/null
 echo ">> image ready"
@@ -64,6 +101,7 @@ for name in $names; do
   case "$needs" in token|gh+token) secret_env+=(-e "CLAUDE_CODE_OAUTH_TOKEN=$CLAUDE_TOK" -e "ANTHROPIC_API_KEY=$API_KEY") ;; esac
   if docker run --rm \
       -e BLUEPRINT="$name" \
+      -e ATL_E2E_TEAM_REF="$ATL_E2E_TEAM_REF" \
       ${secret_env[@]+"${secret_env[@]}"} \
       atl-e2e bash "/e2e/blueprints/$name.sh"; then
     echo "<< $name PASSED"; pass=$((pass + 1))
