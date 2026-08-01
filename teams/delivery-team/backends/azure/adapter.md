@@ -169,7 +169,13 @@ ledger — a lost/stale ledger silently reintroduces duplication).
   *reviewed*: admit into **`sprint:<k>`** while its `Sprints/Sprint-<k>-Review` page (§8) is absent,
   and open **`sprint:<k+1>`** only once that page exists — advancing on the highest ordinal *alone*
   would open a fresh sprint on every re-plan, defeating the convergence the bullet above promises. A
-  board with no `sprint:` tag at all starts at `sprint:1`. Reading **one** sprint's items is the same
+  board with no `sprint:` tag at all starts at `sprint:1`, **except on a project migrating from
+  scrum**: it keeps its existing numbering rather than restarting, so take the highest ordinal `m`
+  among the existing `Sprints/Sprint-<m>-Review` pages (§8) and open `sprint:<m+1>` — those pages
+  are the reliable read, since iteration *names* are arbitrary, and otherwise the first flow sprint
+  upserts `Sprints/Sprint-1-Review` straight over the scrum sprint-1 page. `/delivery-init`
+  documents the scrum→flow switch and migrates nothing, so this board state is reachable, not
+  hypothetical. Reading **one** sprint's items is the same
   query narrowed (`System.Tags CONTAINS 'sprint:<n>'`) followed by an **exact-value** check on the
   returned items' tags: `sprint:1` is a prefix of `sprint:10`, so a prefix/substring match is never
   the exact-membership answer on its own. Re-admitting a carryover writes the item's tag list with

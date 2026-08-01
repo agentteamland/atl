@@ -23,8 +23,10 @@ where each fact comes from, and the placement contract.
 
 - **Page path:** `Sprints/Sprint-<n>-Review`, `<n>` = the closed sprint's number resolved at
   runtime (see [iteration-management.md](iteration-management.md) for resolving the sprint carrier
-  — the concrete iteration name under `mode: "scrum"`, the highest `sprint:<n>` label under
-  `mode: "flow"`). The path is **mode-independent**: `<n>` is the same ordinal either way, so a
+  — the concrete iteration name under `mode: "scrum"`; under `mode: "flow"` the sprint with
+  unfinished review business: the **lowest** ordinal whose review page still reads `pending` under
+  **Promotion decision** if there is one, otherwise the highest `sprint:<n>` label the board's items
+  carry). The path is **mode-independent**: `<n>` is the same ordinal either way, so a
   project that switches mode keeps one continuous run of review pages rather than restarting at 1.
 - **Write:** an **idempotent upsert** into the durable-knowledge store (concept #9). Re-running
   `/sprint-review` overwrites the same page rather than appending a duplicate; safe under a
@@ -171,7 +173,8 @@ _Sprint <n> · <iteration-name> · closed <date>_
 - [ ] `methodology.mode` read from the descriptor (absent ⇒ `scrum`, never inferred) — it decides
       whether `## Actual velocity` is written and whether the tables carry a Points column.
 - [ ] Page written to exactly `Sprints/Sprint-<n>-Review` with `<n>` resolved at runtime (from the
-      closed iteration under `scrum`, from the highest `sprint:<n>` label under `flow`).
+      closed iteration under `scrum`; under `flow` the lowest ordinal whose review page is still
+      `pending` on **Promotion decision**, else the highest `sprint:<n>` label carried by items).
 - [ ] `## Completed` lists only items at the runtime-resolved Completed category (never literal
       `"Done"`); Done set read to exhaustion ("list means all", concept #10).
 - [ ] `## Carryover` names every admitted-but-incomplete item with its reason — nothing silently

@@ -80,14 +80,34 @@ Resolve the concrete sprint and its states at runtime — **never hardcode a sta
 - Resolve **the sprint being closed** and its `<n>` — the number the report path uses:
   - Under **`scrum`** — the closed iteration (its name/path) via a sprint/iteration read
     (concept #6), as before.
-  - Under **`flow`** — there is no iteration and no schedule node to close. The sprint being closed
-    is the **highest `sprint:<n>` label present** (concept #4): list the board's `sprint:*` labels
-    ("list means all" — a result at the tool's cap is a truncation to surface, never a complete
-    read) and take the highest ordinal, **compared as an integer** (`sprint:10` outranks `sprint:9`;
-    a lexical "highest" closes the wrong sprint). That label set is the whole record — there is no sprint
-    object to read a name or a date from. Writing `Sprints/Sprint-<n>-Review` (step 5) is what
-    marks that sprint **reviewed**, but the page already existing does not change the resolution
-    here: a re-run resolves the same `<n>` and refreshes the same page.
+  - Under **`flow`** — there is no iteration and no schedule node to close, so resolve the sprint
+    with **unfinished review business**, in this order:
+    1. **A held gate being retried wins.** If any `Sprints/Sprint-<m>-Review` page exists whose
+       **Promotion decision** section still reads `pending` (step 3, section 7), resolve to the
+       **lowest** such `m`. Step 6 held on that sprint and the PO has since posted a record; this
+       run exists to finish it. Finish the oldest first — a newer sprint is never reviewed while an
+       older one is unpromoted.
+    2. **Otherwise the current sprint.** List the board's `sprint:*` labels ("list means all" — a
+       result at the tool's cap is a truncation to surface, never a complete read) and take the
+       highest ordinal, **compared as an integer** (`sprint:10` outranks `sprint:9`; a lexical
+       "highest" closes the wrong sprint). That label set is the whole record — there is no sprint
+       object to read a name or a date from.
+
+    > **WHY the held-gate case must come first, and cannot be resolved by "the highest label".**
+    > A held gate is the *ordinary* first-pass outcome: step 5 writes the page before step 6 runs,
+    > and on the first pass no approval record exists yet. That page existing is exactly what makes
+    > the sprint **reviewed**, so `/sprint-plan` may now legitimately open `sprint:<k+1>` — nothing
+    > gates planning on the promotion, and work should not stall while the PO decides. The retry is
+    > a whole re-run of this ceremony (there is no resume-at-step-6 path), so a rule that took the
+    > highest label would resolve the *new* sprint: it would compile a report over in-flight work,
+    > upsert `Sprints/Sprint-<k+1>-Review` — marking a live sprint reviewed, so the next plan opens
+    > `k+2` over running work — and leave the held sprint's promotion `pending` forever. Scrum has
+    > no such exposure: it resolves the *closed iteration*, a dated object that opening the next
+    > iteration does not re-open.
+
+    Nothing is promoted wrongly either way — `atl work promote` is commit-bound and mode-independent
+    (step 6) — but the durable record and the ordinal sequence are corrupted silently, which is
+    worse than a loud failure.
 - Resolve the type's state→category map (concept #7) so "Completed" means the **runtime-resolved
   Completed-category** state, not the literal `"Done"`.
 

@@ -34,7 +34,7 @@ described here.
 | Create a work-item (#1) | `gh issue create --title … --body … [--label type:<t>]` (+ `gh` REST `POST …/issues/{parent}/sub_issues` to nest) |
 | Create child / nest under a parent (#1) | REST `sub_issues` endpoint: `gh api --method POST repos/{o}/{r}/issues/{parent}/sub_issues -F sub_issue_id=<child REST id>` (note: `gh issue create --parent` is NOT available in current `gh`) |
 | Read one / a batch of work-items (#1) | `gh issue view <n> --json …` / `gh api graphql` for a batch |
-| Read a sprint's items (#6) | scrum: `gh project item-list <n> --owner <o> --format json` filtered by the Iteration field client-side · flow: `gh search issues 'label:sprint:<n>' --repo <o>/<r> --state all` — server-side, no client-side filter needed (§5) |
+| Read a sprint's items (#6) | scrum: `gh project item-list <n> --owner <o> --format json` filtered by the Iteration field client-side · flow: `gh search issues 'label:sprint:<n>' --repo <o>/<r>` — server-side, no client-side filter needed (§5) |
 | Update fields (state, iteration, labels…) (#4/#5/#6/#7) | `gh issue edit` (labels/body/state) + `gh api graphql updateProjectV2ItemFieldValue` (project fields: Status/Priority always; Iteration + `Story Points` only under `mode: "scrum"`) |
 | The ready-to-pull / idempotency / velocity query (#10) | `gh search issues` / `gh api graphql search(type:ISSUE, query:…)` — **server-side** filtering by label/state/type/assignee |
 | Add / read the analysis / brief comment (#3) | `gh issue comment <n> --body …` / `gh api …/issues/{n}/comments` (sentinel-matched) |
@@ -73,6 +73,11 @@ The interface's "never silently truncate" principle, per GitHub surface:
   There is **no server-side field filter** — page all items, filter client-side by Status/Iteration.
 - **Issue advanced search** (`gh search issues` / GraphQL `search`) — server-side filtering
   (preferred for the ready-to-pull query, §10); page its cursor to exhaustion.
+  **No `--state all` here.** Unlike `gh issue list`, `gh search issues` accepts only
+  `{open|closed}` and **errors out** on `all` (`invalid argument "all" for "--state" flag`,
+  verified on gh 2.86.0) — it returns both states by default, so the correct form simply omits
+  the flag. Every `gh search issues` call in this file is written that way on purpose; do not
+  "restore" a `--state all` for symmetry with `gh issue list`.
 - Treat a partial page read as complete = a bug, identical to the Azure `wiql`-cap rule.
 
 ## 5. Idempotency — the load-bearing part
@@ -85,7 +90,7 @@ truth (no local ledger).
   Labels are free-form, zero-setup, and **queryable via issue advanced search** — the GitHub
   analogue of `System.Tags`.
 - **Before any create, run a check-first search** for that `atl-key` label
-  (`gh search issues 'label:atl-key:<hash>' --repo <o>/<r> --state all --json number`): **found
+  (`gh search issues 'label:atl-key:<hash>' --repo <o>/<r> --json number`): **found
   → reuse + update** (converge), **not-found → create-then-stamp**. A create colliding with an
   existing item is resolved to it, not surfaced as an error.
 - Keys derive from stable `parent + ordinal` (not a per-run GUID) → convergent resume, not
@@ -102,21 +107,36 @@ truth (no local ledger).
 - **`/request` candidate issues carry `atl-request:<slug>:<initiator>`, not `atl-key`** (concept #14).
   `/request`'s capture step opens a candidate issue with an `atl-request:<request-slug>:<initiator>`
   label + `candidate` + `triage:<tier>` labels + Projects v2 **Status = `candidate`**, and dedups its
-  own re-runs by a check-first `gh search issues 'label:atl-request:<slug>' --repo <o>/<r> --state all`
+  own re-runs by a check-first `gh search issues 'label:atl-request:<slug>' --repo <o>/<r>`
   plus the item title. A `candidate`-Status issue is **excluded from the ready-to-pull / selection
   query** (concept #13) until the PO accepts it; on accept, `/request` flips the Status off `candidate`
   (the issue enters the frontier) and `/refine` materializes PBIs with their own `atl-key`. (50-char
   label limit — short slug/digest, as with `atl-key`.)
 - **Under `mode: "flow"` the sprint carrier is a `sprint:<n>` LABEL, not the Iteration field**
   (concept #6). `<n>` is the sprint's ordinal (`sprint:[0-9]+`, unpadded), **resolved not invented**:
-  list the repo's labels (`gh label list --repo <o>/<r> --limit 500 --json name`, raised until the
-  result is complete per §4), keep the ones matching `sprint:[0-9]+`, and take the highest ordinal
+  read the labels the **items actually carry** (`gh issue list --repo <o>/<r> --state all
+  --limit 500 --json number,labels`, raised until the result is complete per §4 — `gh issue list`
+  does accept `--state all`, unlike `gh search issues`), keep the ones matching `sprint:[0-9]+`,
+  and take the highest ordinal
   `k` **compared as an integer** (`sprint:10` outranks `sprint:9`; a lexical "highest" hands back a
   stale ordinal and the next sprint reuses a number already in use). `sprint:<k>` is the **current**
   sprint and stays current until it is *reviewed*: admit into **`sprint:<k>`** while its
   `docs/sprints/sprint-<k>-review.md` page (§9) is absent, and open **`sprint:<k+1>`** only once that
   page exists — advancing on the highest ordinal *alone* would open a fresh sprint on every re-plan,
-  defeating the convergence claimed immediately below. No `sprint:` label at all means `sprint:1`.
+  defeating the convergence claimed immediately below. No `sprint:` label at all means `sprint:1`,
+  **except on a project migrating from scrum**: it keeps its existing numbering rather than
+  restarting, so take the highest ordinal `m` among the existing `docs/sprints/sprint-<m>-review.md`
+  pages (§9) and open `sprint:<m+1>` — otherwise the first flow sprint upserts `sprint-1-review.md`
+  straight over the scrum sprint-1 page. `/delivery-init` documents the scrum→flow switch and
+  migrates nothing, so this board state is reachable, not hypothetical.
+  > **Read the items, not the label registry.** `gh label list` returns the repo's label
+  > *definitions*, which outlive the issues that carried them (an issue deleted or transferred, a
+  > hand-created label, a template label set) — a strict superset. So a carrier-less `sprint:7`
+  > definition sitting next to a genuinely in-flight `sprint:6` would resolve `k=7`, find no
+  > sprint-7 review page, admit into 7, and then review `label:sprint:7` — silently excluding every
+  > sprint-6 unit, while Azure resolved 6 and carried on. The Azure adapter closes the same
+  > ambiguity from the other side ("a WIQL returns work-items, not a tag list"); this is that rule
+  > stated for GitHub.
   Admission is `gh issue edit <issue#> --add-label sprint:<n>` for the resolved `<n>`, **idempotent**
   (adding a label the issue already carries is a no-op, so a re-planned or crash-resumed sprint
   converges — never model it as a create-membership). **At most ONE `sprint:` label per issue:**
@@ -124,7 +144,7 @@ truth (no local ledger).
   being the one `sprint:` label it already carries — in the **same** `gh issue edit`, since a label
   accumulates where a field replaces. The label is never removed to mean "done" — that is `gh issue
   close` (§6). A sprint's items are then a server-side read,
-  `gh search issues 'label:sprint:<n>' --repo <o>/<r> --state all` (§2) — cheaper and more exact than
+  `gh search issues 'label:sprint:<n>' --repo <o>/<r>` (§2) — cheaper and more exact than
   the Projects v2 page-then-filter the Iteration field forces. Under `mode: "scrum"` none of this
   applies: the Iteration field remains the carrier and no `sprint:` label is written.
 

@@ -71,8 +71,10 @@ state names are backend- and process-template-dependent. So, before I touch a ty
   ([iteration-management.md](iteration-management.md)) — the concrete `Sprint <n>` identifier is a
   live fact, never a constructed string. Under `mode: "flow"` there is no iteration to resolve: the
   carrier is the `sprint:<slug>` tag/label (concept #4/#6), and its ordinal is resolved the same
-  read-first way — list the `sprint:` values already on the board, take the highest, admit into the
-  next; never a number I chose.
+  read-first way — list the `sprint:` values the board's items already carry and take the highest
+  `k` (as an integer); I admit into **`sprint:<k>`** until its review page exists, and only then
+  open `k+1`. Never a number I chose, and never `k+1` unconditionally — that would open a fresh
+  sprint on every re-plan ([iteration-management.md](iteration-management.md)).
 
 > **WHY runtime resolution is non-negotiable.** Hardcoding `"Done"` (or assuming a `"Blocked"`
 > state that no standard template even has) silently breaks the moment a project uses a different
