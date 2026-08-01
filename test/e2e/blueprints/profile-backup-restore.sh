@@ -204,7 +204,17 @@ marker "$out" 'public-repo' && ok "PUBLIC repo → the guard printed 'public-rep
 [ ! -e "$PUB/profile-backup" ] && ok "PUBLIC repo → no profile-backup/ was created (guard runs before the cp)" \
                                || bad "PUBLIC repo → profile-backup/ EXISTS — profile content was written into a public repo"
 [ "$(git -C "$PUB" rev-parse HEAD)" = "$PUB_HEAD" ] && ok "PUBLIC repo → no commit was made" || bad "PUBLIC repo → HEAD moved"
-[ -z "$(git -C "$PUB" status --porcelain)" ] && ok "PUBLIC repo → working tree still clean" || bad "PUBLIC repo → working tree dirtied: $(git -C "$PUB" status --porcelain | head -3)"
+# Scoped to what the skill could have written, matching the LLM-turn assertions below. The
+# broad clean-tree form passes here today only because the extracted script runs with no
+# session behind it — the same check went red on the LLM path against `?? .atl/`, atl's own
+# scaffolding. Scoping is also the more correct assertion on the merits: the guard's contract
+# is "the backup wrote nothing", not "nothing whatsoever happened in this repo".
+[ -z "$(git -C "$PUB" diff --cached --name-only)" ] \
+  && ok "PUBLIC repo → nothing staged" \
+  || bad "PUBLIC repo → files staged: $(git -C "$PUB" diff --cached --name-only | head -3)"
+[ -z "$(git -C "$PUB" status --porcelain -- profile-backup)" ] \
+  && ok "PUBLIC repo → no profile-backup/ path touched" \
+  || bad "PUBLIC repo → profile-backup/ touched: $(git -C "$PUB" status --porcelain -- profile-backup | head -3)"
 
 # empty store, inside the PRIVATE repo — the only place this branch is reachable.
 rm -rf "$STORE"   # explicit precondition: install does not create the store, but say so
@@ -306,7 +316,22 @@ tool_inputs "$T" | grep -qF 'gh repo view' \
 # ABSENCE (nothing was written) — only meaningful paired with the two positives above.
 [ ! -e "$PUB/profile-backup" ] && ok "LLM turn 1 → no profile-backup/ in the PUBLIC repo" || bad "LLM turn 1 WROTE profile content into a public repo"
 [ "$(git -C "$PUB" rev-parse HEAD)" = "$PUB_HEAD2" ] && ok "LLM turn 1 → no commit in the PUBLIC repo" || bad "LLM turn 1 committed into a public repo"
-[ -z "$(git -C "$PUB" status --porcelain)" ] && ok "LLM turn 1 → PUBLIC working tree still clean" || bad "LLM turn 1 dirtied the public working tree: $(git -C "$PUB" status --porcelain | head -3)"
+# Scoped to what the SKILL could have written, deliberately NOT a blanket clean-tree check.
+# A blanket check fails on `?? .atl/` — atl's own session-start scaffolding of backlog.md /
+# tasks.md, created by the claude -p turn itself and entirely unrelated to /profile-backup. It
+# went red on the first real run for exactly that reason while the guard had worked perfectly:
+# the assertion was asking "did anything change?" when the question is "did the BACKUP write
+# anything?". Do not restore the broad form.
+#
+# `git add -f profile-backup` is the skill's only staging action, so an empty index is the
+# precise end-state: it stays empty whether the guard tripped before the copy (the contract) or
+# the copy ran and the commit did not (the failure this catches).
+[ -z "$(git -C "$PUB" diff --cached --name-only)" ] \
+  && ok "LLM turn 1 → nothing staged in the PUBLIC repo" \
+  || bad "LLM turn 1 staged files in a public repo: $(git -C "$PUB" diff --cached --name-only | head -3)"
+[ -z "$(git -C "$PUB" status --porcelain -- profile-backup)" ] \
+  && ok "LLM turn 1 → no profile-backup/ path touched in the PUBLIC repo" \
+  || bad "LLM turn 1 touched profile-backup/ in a public repo: $(git -C "$PUB" status --porcelain -- profile-backup | head -3)"
 grep -qiE 'public|private' <<<"$TURN_RESULT" && note "the turn's report mentions repo visibility" || note "visibility not mentioned in the turn's prose (LLM-variable wording)"
 PROJ="$PROJ_SAVE"
 
