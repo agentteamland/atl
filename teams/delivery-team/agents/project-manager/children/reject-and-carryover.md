@@ -1,5 +1,5 @@
 ---
-knowledge-base-summary: "Never silently drop work, and never abandon started work for something new. An unfinished item leaving a sprint (PO-rejected OR carried-over incomplete) is carried to the next sprint as TOP PRIORITY, admitted FIRST ahead of all new work — unfinished committed work outranks new work. Blocked-split: out-of-time / review-not-passed / rejected are workable → top-priority guaranteed; a blocked unit is carried + surfaced but does NOT consume the next sprint's workable capacity or a top slot until it unblocks (so a blocked item can't freeze the sprint). The reason always travels with the item; nothing is lost or bumped by newer work."
+knowledge-base-summary: "Never silently drop work, and never abandon started work for something new. An unfinished item leaving a sprint (PO-rejected OR carried-over incomplete) is carried to the next sprint as TOP PRIORITY, admitted FIRST ahead of all new work — unfinished committed work outranks new work. Blocked-split: out-of-time / review-not-passed / rejected are workable → top-priority guaranteed; a blocked unit is carried + surfaced but is NOT admitted to the next sprint's workable set — no top slot, and no capacity consumed under the scrum mode — until it unblocks (so a blocked item can't freeze the sprint). The discipline is mode-independent, the mechanics are mode-selected: /sprint-review leaves the sprint carrier in place and the NEXT /sprint-plan moves it — an iteration field set under scrum, a label SWAP under flow that removes whichever sprint: label the unit actually carries and adds the one that plan resolved (never two sprint: labels on one unit). The reason always travels with the item; nothing is lost or bumped by newer work."
 ---
 
 # Reject & Carryover
@@ -22,7 +22,11 @@ something newer.
 > holds the thread. Starting a *new* item while a committed one sits unfinished multiplies WIP and
 > defers value already invested. So the next sprint **finishes what it started before it starts
 > anything new** — new work, however urgent, fills only the capacity that remains after carryover.
-> The one exception is a *blocked* unit, which can't be worked yet (the blocked-split below).
+> Under `mode: "flow"` there is no ceiling for it to fill, and the rule loses nothing: carryover is
+> still admitted **first** and new work still follows behind it in priority order. The ordering was
+> always the discipline; the capacity ceiling was only the arithmetic that expressed it under a
+> time-box. The one exception is a *blocked* unit, which can't be worked yet (the blocked-split
+> below).
 
 ## The PO reject path (#9 resolution)
 
@@ -30,7 +34,13 @@ At `/sprint-review` (or whenever the PO reviews delivered work), the PO may **re
 work was done but doesn't meet acceptance. The resolution (#9):
 
 1. The rejected item is **carried to the next sprint** and marked **top priority** — not cleared to
-   the backlog to compete with new work. An idempotent field update (concept #6).
+   the backlog to compete with new work. `/sprint-review` itself **leaves the sprint carrier exactly
+   where it is**: the item stays in the sprint being closed, so the review page still reads it as
+   carryover. The carrier moves later, at the **next `/sprint-plan`'s admission** (step 4 below), and
+   there it is an idempotent update: an iteration **field** set under `mode: "scrum"` (concept #6), a
+   **label swap** under `mode: "flow"` (concept #4 — remove the `sprint:` label the unit actually
+   carries, add the one that plan resolved, in the same step; a unit never carries two `sprint:`
+   labels).
 2. Its state is set back to a not-Done, ready-to-rework category — resolve the concrete state at
    runtime (concept #7); never write a literal (it might be `New`, `Active`, `Reopened`, or a custom
    value depending on the backend and process template).
@@ -38,8 +48,18 @@ work was done but doesn't meet acceptance. The resolution (#9):
    up knows *why* it came back — the PO's acceptance gap prevents re-delivering the same miss.
 4. At the **next `/sprint-plan`** the item is admitted **FIRST, ahead of all new backlog work** — a
    rejected item is unfinished committed work (the acceptance gap isn't closed). There is still no
-   special "rejected" *pipeline*: it re-enters the one DAG-and-capacity admission algorithm, but at
-   the front of the priority order — it does not compete on stackRank with new candidates.
+   special "rejected" *pipeline*: it re-enters the one admission algorithm (DAG-and-capacity under
+   `mode: "scrum"`, DAG readiness + priority under `mode: "flow"`), but at the front of the priority
+   order — it does not compete on stackRank with new candidates.
+
+> **WHY the carrier move waits for `/sprint-plan`.** The carrier is written by the admission step
+> and read by everyone else. Moving it at review time would pull the item out of the sprint the
+> review is still reporting on — and under `mode: "flow"` it does worse: `/sprint-review` resolves
+> the closed sprint's `<n>` from the **highest `sprint:` label on the board**, so stamping
+> `sprint:<n+1>` mid-ceremony repoints a re-run at a sprint nobody has planned yet, and
+> `Sprints/Sprint-<n>-Review` stops being the page that gets refreshed. Under `scrum` the field set
+> would be just as wrong, only quieter — the review page's `<n>` comes from the closed iteration, so
+> nothing visibly breaks while the item silently leaves the sprint's item read.
 
 > **WHY no separate rejected-item pipeline.** A parallel "reprocessing" queue would be a second
 > scheduling path to keep consistent with the DAG and capacity math — pure complexity for no gain.
@@ -51,16 +71,20 @@ work was done but doesn't meet acceptance. The resolution (#9):
 An item I admitted this sprint may not reach the Completed category by sprint end. The three reasons
 **split by whether the item is workable** next sprint:
 
-- **Out of time** (workable) — the time-box closed before the item was worked or finished (refill
-  never reached it, or it was mid-flight). Next sprint it is **top-priority, guaranteed** — among the
-  first work admitted.
+- **Out of time** (workable) — the sprint closed before the item was worked or finished (refill
+  never reached it, or it was mid-flight). Under `mode: "scrum"` the closing is the time-box
+  expiring; under `mode: "flow"` there is no clock, but a sprint still closes — `/sprint-review`
+  reviews it — so an admitted unit can still be sitting unworked when it does, and the reason is
+  the same. Next sprint it is **top-priority, guaranteed** — among the first work admitted.
 - **Review not passed** (workable) — the micro-loop's `green = (tests) ∧ (review passed)` never went
   green (the `tech-lead`'s review found blocking issues). The item stays open, carries with the
   review thread as context, and is **top-priority, guaranteed** next sprint.
 - **Blocked** (NOT workable) — a dependency (in- or out-of-sprint) wasn't satisfied in time. A blocked
   unit **carries + is surfaced** in `## Carryover` (never dropped), but it does **NOT** consume the
   next sprint's workable capacity or occupy a top-priority slot — it *can't* be worked until its
-  predecessor clears, so privileging it would only freeze the sprint on un-workable work. Its
+  predecessor clears, so privileging it would only freeze the sprint on un-workable work. Under
+  `mode: "flow"` there is no capacity for it to consume, and the exclusion still binds — flow admits
+  on **priority + DAG readiness**, and a blocked unit is by definition not ready. Its
   dependency edge stays in the DAG; the moment it unblocks (predecessor Done) it becomes
   workable-carryover and takes top priority like the others.
 
@@ -85,11 +109,15 @@ Carryover handling:
    (concept #4) to the incomplete item and record its reason; a *blocked* one additionally carries
    the `blocked` tag. That `carryover` tag is the **durable signal the next `/sprint-plan` reads to
    admit these FIRST**, at top priority, ahead of new candidates: a *workable* carryover (out-of-time
-   / review-not-passed / rejected) is admitted and moved to the new sprint's iteration (its
-   `carryover` tag cleared as it re-enters); a *blocked* one stays `carryover`-tagged + surfaced but
-   is **not** admitted to the workable set until its predecessor clears. Never left silently pinned to
-   a closed sprint with no signal, never dropped. Idempotent tag/field update (a re-run re-tags /
-   re-admits to the same state).
+   / review-not-passed / rejected) is admitted and moved into the new sprint — the iteration field
+   set to the new sprint under `mode: "scrum"`, the `sprint:` label it **actually carries** (read off
+   the unit, not assumed to be the immediately-preceding ordinal) **swapped** for the one that plan
+   resolved under `mode: "flow"` (concept #4; remove-and-add in one step — two `sprint:` labels on
+   one unit is a corrupt state, because "which sprint is this in?" stops having an answer) — with its
+   `carryover` tag cleared as it re-enters; a *blocked* one stays `carryover`-tagged + surfaced but
+   is **not** admitted to the workable set until its predecessor clears, so it keeps the sprint
+   carrier it already has. Never left silently pinned to a closed sprint with no signal, never
+   dropped. Idempotent tag/field update (a re-run re-tags / re-admits to the same state).
 2. **Record it on the review page** — every carried-over item appears in the `## Carryover` section
    of `Sprints/Sprint-<n>-Review` with its reason **and its workable/blocked status**
    ([sprint-review-report.md](sprint-review-report.md)). This is the visible audit trail: the PO sees
@@ -97,15 +125,18 @@ Carryover handling:
 3. **It does not count toward the sprint's actual velocity** — only items that reached the Completed
    category contribute points ([capacity-and-velocity.md](capacity-and-velocity.md)). Carryover
    deflates the sprint it *didn't* complete in and inflates the sprint it *does* complete in — the
-   honest signal for the velocity mean.
+   honest signal for the velocity mean. Under `mode: "flow"` there is no velocity and no mean, so
+   this step is simply absent: nothing is counted, and the carryover's whole record is its
+   `## Carryover` row.
 
 ## The unifying shape
 
 Reject and carryover are two entrances to the same exit: **an unfinished item, reason recorded,
 carried to the next sprint as top priority (guaranteed, ahead of new work) — or, if blocked, carried
 + surfaced but not yet workable.** New work fills only the capacity that remains after the workable
-carryover is admitted. I never invent a side-channel, I never let an item vanish, and I never let
-started work lose its place to something newer.
+carryover is admitted; under `mode: "flow"` it simply queues behind it, with no ceiling to exhaust.
+I never invent a side-channel, I never let an item vanish, and I never let started work lose its
+place to something newer.
 
 ## Worked example (generic)
 
@@ -123,3 +154,10 @@ started work lose its place to something newer.
   then fills the remaining capacity with new work by stackRank; `W` waits for its unblock. Same
   admission algorithm, carryover at the front. Nothing was lost; nothing started was abandoned for
   something newer.
+
+Under `mode: "flow"` **every line of that example still holds** — same sequence, same priorities,
+same outcomes. Only the arithmetic and the carrier change: `X` counts toward nothing (there is no
+velocity for it to count toward — it simply appears under `## Completed`), N+1 has no remaining
+capacity to fill so new work just continues in priority order behind `Y` and `Z`, and the move into
+N+1 is a `sprint:<N>` → `sprint:<N+1>` label swap rather than an iteration field set. `W` keeps its
+`sprint:<N>` label and its `carryover` tag until it unblocks.

@@ -1,5 +1,5 @@
 ---
-knowledge-base-summary: "My second production unit: the /sprint-review deliverable written to the Sprints/Sprint-<n>-Review durable-knowledge page (concept #9, my namespace). Seven fixed sections: completed vs carryover, per-PBI PR links + test evidence, a deployable dev preview note, actual velocity for the closed sprint, integration findings (#14), and the promotion decision — which commit the PO approved and whether it was promoted or the gate held (concept #16). Idempotent upsert into the durable-knowledge store (concept #9). Generic template + checklist."
+knowledge-base-summary: "My second production unit: the /sprint-review deliverable written to the Sprints/Sprint-<n>-Review durable-knowledge page (concept #9, my namespace). Fixed sections: completed vs carryover, per-PBI PR links + test evidence, a deployable dev preview note, actual velocity for the closed sprint (mode: scrum ONLY — under mode: flow the velocity section is omitted and the points columns drop out, so the report is six sections), integration findings (#14), and the promotion decision — which commit the PO approved and whether it was promoted or the gate held (concept #16). Idempotent upsert into the durable-knowledge store (concept #9). Generic template + checklist."
 ---
 
 # Sprint Review Report (blueprint)
@@ -7,8 +7,13 @@ knowledge-base-summary: "My second production unit: the /sprint-review deliverab
 My second production unit. At `/sprint-review` I write one durable page per closed sprint to the
 durable-knowledge store at `Sprints/Sprint-<n>-Review` — the **`project-manager`-owned namespace**
 (concept #9). This page is the sprint's outcome of record: what shipped, what didn't and why, the
-evidence, and the number that feeds the next plan's velocity. It is the input the PO reads before
-deciding what to promote from `dev` to `release`.
+evidence, and — under `mode: "scrum"` — the number that feeds the next plan's velocity. It is the
+input the PO reads before deciding what to promote from `dev` to `release`.
+
+Under `mode: "flow"` this page carries a second job it does not have under `scrum`: **its existence
+is what marks the sprint reviewed.** A flow sprint has no iteration to close, so `Sprints/Sprint-<n>-Review`
+is the only durable record that sprint `<n>` is finished — write it, or the next ceremony still
+reads that sprint as the current one.
 
 The page's *content* is project-specific (this sprint's items, this project's PRs) and is written
 **at runtime** — I never pre-author it. What lives here is the reusable craft: the section shape,
@@ -17,8 +22,10 @@ where each fact comes from, and the placement contract.
 ## Where it goes — the placement contract
 
 - **Page path:** `Sprints/Sprint-<n>-Review`, `<n>` = the closed sprint's number resolved at
-  runtime (see [iteration-management.md](iteration-management.md) for resolving concrete iteration
-  names).
+  runtime (see [iteration-management.md](iteration-management.md) for resolving the sprint carrier
+  — the concrete iteration name under `mode: "scrum"`, the highest `sprint:<n>` label under
+  `mode: "flow"`). The path is **mode-independent**: `<n>` is the same ordinal either way, so a
+  project that switches mode keeps one continuous run of review pages rather than restarting at 1.
 - **Write:** an **idempotent upsert** into the durable-knowledge store (concept #9). Re-running
   `/sprint-review` overwrites the same page rather than appending a duplicate; safe under a
   re-run (concept #10). The store's locator (where the active backend needs one) is read from
@@ -34,19 +41,26 @@ where each fact comes from, and the placement contract.
 ## The report's sections (fixed shape, generic content)
 
 The page has a stable set of H2s so the PO — and a future me — read it back by location, the same
-deterministic-read-back principle as the analysis contracts (concepts #2/#3).
+deterministic-read-back principle as the analysis contracts (concepts #2/#3). **One H2 is
+mode-conditional:** `## Actual velocity` is written under `mode: "scrum"` and omitted under
+`mode: "flow"` — seven sections against six. Every other section is identical in both modes.
 
 ### `## Completed`
 Every item that reached the Completed state this sprint. Resolve the category at runtime
 (concept #7) — never filter on the literal `"Done"`. One row per item:
-id, title, story points. This is the honest "what shipped" list.
+id, title, story points — under `mode: "flow"` nothing estimates a unit, so the Points column
+drops out and a row is id + title. This is the honest "what shipped" list, and it is the section
+that answers "what did this sprint produce" in **both** modes.
 
 ### `## Carryover`
 Every admitted item that did **not** complete, with the reason (blocked on a dependency, ran out
 of sprint, review not passed). Each **carries to the next sprint as top priority** (workable) or is
 **surfaced-but-not-workable** (blocked) — I never silently drop them, and unfinished work is never
 bumped by newer work (see [reject-and-carryover.md](reject-and-carryover.md)). Listing carryover
-explicitly is what keeps the backlog honest and the next velocity mean correct. A `blocked` entry
+explicitly is what keeps the backlog honest — and, under `mode: "scrum"`, the next velocity mean
+correct. Under `mode: "flow"` there is no mean to keep correct and the section matters *more*, not
+less: with no velocity number on the page, completed-vs-carryover is the whole account of the
+sprint. Points drop out of this table too under `flow`. A `blocked` entry
 may be one the dispatch engine surfaced: `/sprint-review`'s step 2 drains any
 `.delivery/blocked/<id>.json` report, reflects it onto the work-item, and feeds it here with its
 diagnostic — so a crashed/stalled unit is listed too, not just a dependency-blocked one.
@@ -68,11 +82,21 @@ the PO's promotion decision. I read the branch/build state read-only through the
 adapter (and pipeline/build status if the project runs one); I do not deploy or promote —
 **promotion to `release` is the PO's sprint-approval decision**, not mine.
 
-### `## Actual velocity`
+### `## Actual velocity` — `mode: "scrum"` only
 The story points *actually completed* this sprint (the `## Completed` sum). This is the number
 that feeds the next sprint's velocity mean ([capacity-and-velocity.md](capacity-and-velocity.md)).
 Recording it on the review page makes the velocity history auditable — the next plan's ceiling is
 traceable to concrete closed sprints, not a hidden running total.
+
+**Under `mode: "flow"` I omit this section entirely and report no velocity.** Not "n/a", not a
+zero, not a substitute metric (a unit count, a cycle time) — the H2 is simply not written.
+
+> **WHY I omit it rather than fill it in.** The number exists to feed a ceiling, and under `flow`
+> there is no ceiling: `/sprint-plan` admits by priority + DAG readiness, and there is no time-box
+> to divide a point total by, so the arithmetic has no meaning to carry. A "0 points" or "n/a" line
+> is worse than no line — it reads as missing data and invites the next plan to budget against it,
+> which is exactly the fiction the mode exists to drop. What I owe the PO is unchanged: what
+> completed, what carried, and why — which `## Completed` and `## Carryover` already say.
 
 ### `## Integration findings` (#14)
 Cross-cutting observations from stitching the sprint's work together: integration friction, a
@@ -95,6 +119,12 @@ Naming the exact promoted commit is what makes the promotion auditable afterward
 approved" alone does not say *what* was approved.
 
 ## Generic template
+
+The `mode: "scrum"` shape. **For `mode: "flow"`: drop the `Points` column from both tables and the
+`**Total completed**` line, omit the whole `## Actual velocity` section, read `<iteration-name>` as
+`sprint:<n>`, and read `closed <date>` as the date this review ran — a flow sprint has no scheduled
+end date; it closes because `/sprint-review` reviewed it. Everything else is byte-for-byte the same
+page.**
 
 ```markdown
 # Sprint <n> Review
@@ -138,7 +168,10 @@ _Sprint <n> · <iteration-name> · closed <date>_
 
 - [ ] the durable-knowledge store's locator read from `config.json` (not re-resolved); `Sprints/`
       namespace readiness confirmed (concept #9) before first write.
-- [ ] Page written to exactly `Sprints/Sprint-<n>-Review` with `<n>` resolved at runtime.
+- [ ] `methodology.mode` read from the descriptor (absent ⇒ `scrum`, never inferred) — it decides
+      whether `## Actual velocity` is written and whether the tables carry a Points column.
+- [ ] Page written to exactly `Sprints/Sprint-<n>-Review` with `<n>` resolved at runtime (from the
+      closed iteration under `scrum`, from the highest `sprint:<n>` label under `flow`).
 - [ ] `## Completed` lists only items at the runtime-resolved Completed category (never literal
       `"Done"`); Done set read to exhaustion ("list means all", concept #10).
 - [ ] `## Carryover` names every admitted-but-incomplete item with its reason — nothing silently
@@ -146,7 +179,9 @@ _Sprint <n> · <iteration-name> · closed <date>_
 - [ ] `## Per-item evidence` has a PR link + test evidence per completed item (attachments read
       via the active adapter, concept #12; I read, I don't re-test).
 - [ ] `## Deployable dev preview` reports `dev` state read-only; **no promotion** (PO owns that).
-- [ ] `## Actual velocity` = the `## Completed` point sum, for the velocity history.
+- [ ] `## Actual velocity` = the `## Completed` point sum, for the velocity history — **under
+      `mode: "scrum"` only; under `mode: "flow"` the section is absent from the page**, with no
+      "n/a" line and no substitute metric in its place.
 - [ ] `## Integration findings` captured; durable project facts flagged to their owning role's
       namespace, not written by me outside `Sprints/`.
 - [ ] `## Promotion decision` records the gate's outcome (concept #16) — the promotion PR, the

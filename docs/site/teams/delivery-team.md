@@ -23,7 +23,7 @@ delivery-team is a set of **role-agents**, each a specialist with its own reflex
 | `intake` | Triages a raw request into a shaped Epic/Feature backlog item. |
 | `business-analyst` | Writes the business analysis — the Description's `## Problem / Business Value / Scope / Acceptance Criteria / Out of Scope`. |
 | `technical-analyst` | Writes the `**[Technical Analysis]**` sentinel comment — approach, feasibility, NFRs, dependencies, suggested areas. |
-| `project-manager` | Runs the sprint cadence — capacity, iteration assignment, velocity. |
+| `project-manager` | Runs the sprint cadence — admits the sprint's units, stamps their sprint carrier, and writes the review report. Capacity and velocity only under the `scrum` mode. |
 | `tech-lead` | Decomposes Features into work-units, writes each unit's `**[Canonical Brief]**`, owns the project wiki (`Architecture/`, `Conventions/`, ADRs), and is the **single review gate** — reviews each PR and, on green, completes it (= merge) and sets Done. |
 | `tester` | Independent Level-2 verification — re-derives intent, runs the test-gates on the right surface, attaches evidence, emits a verdict. |
 | `developer` | A dynamic, stack-agnostic worker spawned per work-unit; loads the tagged `area:<name>` knowledge-pack and implements the unit. |
@@ -37,17 +37,43 @@ A **software team** for a specific stack is just a set of area-keyed knowledge p
 The sprint runs through skills you invoke, each acting as the right role:
 
 ```bash
-/delivery-init      # select the backend (azure | github) + wire the project's coordinates + methodology
+/delivery-init      # select the backend (azure | github) + the sprint mode + wire the coordinates + methodology
 /kickoff            # intake + business-analyst shape the Epic/Feature backlog
 /refine             # technical-analyst + tech-lead decompose Features into briefed work-units
-/sprint-plan        # project-manager selects the sprint's units against capacity
+/sprint-plan        # project-manager selects the sprint's units — against capacity, or by priority + DAG readiness
 /sprint-start       # materialize the work-unit DAG → hand it to the engine
-/sprint-review      # velocity, the review outcome wiki page, sprint close
+/sprint-review      # the review outcome page, sprint close (+ velocity under the scrum mode)
 /request            # (any time) mid-project request → triage → feasibility → honest PO gate → accept/defer/reject
 ```
 
 Methodology is **config, not code**: `methodology.json` (Scrum in v1) declares the cadence the
 ceremonies read — no workflow engine to maintain.
+
+### Two sprint modes — `scrum` and `flow`
+
+`methodology.json` carries a `mode`, and it changes exactly two things. **Absent means `scrum`**, so
+an existing project's behaviour never shifts underneath it.
+
+| | `mode: "scrum"` | `mode: "flow"` |
+|---|---|---|
+| What a sprint is | a **time-box** — a dated range on the backend's schedule, with a capacity ceiling | the same sprint, **with no dates and no capacity ceiling** |
+| `/sprint-plan` admits | by priority, up to a velocity-derived point budget | by **priority + DAG readiness**, bounded only by the ~4–6 concurrency cap |
+| `/sprint-review` reports | actual velocity | **no velocity** — completed vs. carryover is the whole account |
+| `capacityModel` | **required** | **absent** — the key is omitted |
+| The sprint carrier | the backend's **iteration field** | a **`sprint:<n>` label** on each admitted unit |
+
+Everything else is identical: the same ceremonies, the same roles, the same DAG, the same promotion
+gate. **The vocabulary does not change either — a sprint is a sprint in both modes.**
+
+Pick `flow` when the project has **no stable capacity to plan against** — velocity over a fixed
+period is a mean of something that has to be stable to mean anything, and a solo maintainer working
+with an autonomous agent has no such number (one session ships eight units, the next ships zero). A
+team that does have one keeps `scrum`, unchanged.
+
+Because a label carries the sprint, a `flow` project needs **neither the `Iteration` nor the
+`Story Points` board field** — which on GitHub removes the one setup step `gh` cannot automate (a
+Projects v2 Iteration field has to be added by hand in the settings UI). `Status` and `Priority` are
+still needed, and `/delivery-init` creates or verifies both for you.
 
 ## The engine — `atl work dispatch`
 
@@ -126,6 +152,8 @@ Sprint <n> · <iteration-name>
 ## Decision
 APPROVE
 ```
+
+(Under `mode: "flow"` there is no iteration to name, so the `## Sprint` line is just `Sprint <n>`.)
 
 Only `## Approved Commit` is load-bearing — the rest is audit context. Paste it into the PR's comment box,
 or post it from the CLI:

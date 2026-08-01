@@ -39,7 +39,8 @@ rules below or is escalated, not guessed.
 | Create a work-item (Epic/Feature/PBI/Task/Bug) | `wit_create_work_item` |
 | Create child items under a parent | `wit_add_child_work_items` |
 | Read one / a batch of work-items | `wit_get_work_item` / `wit_get_work_items_batch_by_ids` |
-| Read a sprint's items | `wit_get_work_items_for_iteration` |
+| Read a sprint's items | scrum: `wit_get_work_items_for_iteration` · flow: `wit_query_by_wiql` on the `sprint:<n>` tag (§5) |
+| **Put an item in a sprint** (#6) | scrum: the `IterationPath` field · flow: the `sprint:<n>` tag in `System.Tags` — **both** via `wit_update_work_item` (§5) |
 | Update fields (state, IterationPath, tags, StoryPoints…) | `wit_update_work_item` / `wit_update_work_items_batch` |
 | **Resolve a type's states/fields at runtime** | `wit_get_work_item_type` (see §6 — never hardcode) |
 | Query by WIQL (idempotency check, velocity, selection) | `wit_query_by_wiql` |
@@ -47,8 +48,8 @@ rules below or is escalated, not guessed.
 | Link a work-item ↔ a PR | `wit_link_work_item_to_pull_request` |
 | Link/unlink work-items (Dependency, Parent…) | `wit_work_items_link` / `wit_work_item_unlink` |
 | List backlogs / backlog items | `wit_list_backlogs` / `wit_list_backlog_work_items` |
-| List / create / assign iterations | `work_list_iterations` / `work_create_iterations` / `work_assign_iterations` |
-| Read / write team capacity | `work_get_team_capacity` / `work_update_team_capacity` |
+| List / create / assign iterations (**`mode: "scrum"` only** — a flow sprint has no schedule node) | `work_list_iterations` / `work_create_iterations` / `work_assign_iterations` |
+| Read / write team capacity (**`mode: "scrum"` only** — flow has no `capacityModel`) | `work_get_team_capacity` / `work_update_team_capacity` |
 | Create / update / vote / thread a PR | `repo_create_pull_request` / `repo_update_pull_request` / `repo_vote_pull_request` / `repo_create_pull_request_thread` / `repo_list_pull_request_threads` / `repo_reply_to_comment` |
 | **Promotion approval record (#16)** | write: `repo_pull_request_thread_write` (action `create`, `content` = the record) · read: `repo_pull_request_thread` (action `list`), sentinel-matched (§7) |
 | List a project's repos (discovery, e.g. `/delivery-init`) | `repo_list_repos_by_project` |
@@ -151,11 +152,34 @@ ledger — a lost/stale ledger silently reintroduces duplication).
   accepts `System.Tags` inline. A child created with `wit_add_child_work_items` is
   stamped (`atl-key`/`atl-run`/`area:<name>`) by a **follow-up `wit_update_work_item`**;
   that is the create-then-stamp above, two calls, as atomic as the API allows.
-- **Iteration assignment is idempotent by nature** — it is an `IterationPath` field
-  *update* (`wit_update_work_item`), so re-running sets the same path to the same
-  value: a safe no-op. Never model it as a "create membership" that could double.
+- **Sprint membership is idempotent by nature — in both modes.** Under `mode: "scrum"` it is an
+  `IterationPath` field *update* (`wit_update_work_item`), so re-running sets the same path to
+  the same value: a safe no-op. Under `mode: "flow"` it is a `sprint:<n>` tag in `System.Tags`
+  (concept #6) written by that same `wit_update_work_item` — `System.Tags` is a set, so re-adding
+  a tag the item already carries is likewise a no-op. Never model either as a "create membership"
+  that could double.
+- **The flow sprint's ordinal is resolved, never invented, and an item carries at most ONE
+  `sprint:` tag.** Before admitting, WIQL the board for the items already carrying one
+  (`System.Tags CONTAINS 'sprint:'`, the same tag-query substrate as the `atl-key` check-first
+  above, under the same cap-is-truncation rule of §4) and read `System.Tags` back off the returned
+  ids (`wit_get_work_items_batch_by_ids`) — a WIQL returns **work-items, not a tag list**, so the
+  ordinals come from the items' tags. Take the highest one, **compared as an integer** (`sprint:10`
+  outranks `sprint:9`; a lexical "highest" hands back a stale ordinal and the next sprint reuses a
+  number already in use). `sprint:<k>` is the **current** sprint and stays current until it is
+  *reviewed*: admit into **`sprint:<k>`** while its `Sprints/Sprint-<k>-Review` page (§8) is absent,
+  and open **`sprint:<k+1>`** only once that page exists — advancing on the highest ordinal *alone*
+  would open a fresh sprint on every re-plan, defeating the convergence the bullet above promises. A
+  board with no `sprint:` tag at all starts at `sprint:1`. Reading **one** sprint's items is the same
+  query narrowed (`System.Tags CONTAINS 'sprint:<n>'`) followed by an **exact-value** check on the
+  returned items' tags: `sprint:1` is a prefix of `sprint:10`, so a prefix/substring match is never
+  the exact-membership answer on its own. Re-admitting a carryover writes the item's tag list with
+  the `sprint:` tag it already carries gone and the resolved `sprint:<n>` present in the **same**
+  `wit_update_work_item` — a tag list accumulates where a field replaces, and two `sprint:` tags
+  leaves "which sprint is this in?" without an answer. A tag is never removed to mean "done";
+  completion is the resolved Completed state (§6).
 - **Velocity is read-only** (query prior Done items, sum StoryPoints) → inherently
-  idempotent, no guard needed.
+  idempotent, no guard needed. It runs under `mode: "scrum"` only — a flow project has no
+  `capacityModel` and computes none.
 
 Because keys are derived from stable `parent + ordinal` (**not** a per-run
 GUID/timestamp), the same logical artifact maps to the same key across re-runs — that
@@ -225,7 +249,8 @@ guessing**:
   `dev`→`release` promotion PR** (`repo_pull_request_thread_write`, action `create`) whose first
   line is the exact sentinel `**[Promotion Approval]**` (concept #16), then fixed H2s:
   `## Approved Commit` (a 40-character lowercase hex commit id — **the only load-bearing
-  section**), `## Sprint` (`Sprint <n> · <iteration-name>`), `## Decision` (`APPROVE`). Everything
+  section**), `## Sprint` (`Sprint <n> · <iteration-name>` under `mode: "scrum"`; just `Sprint <n>`
+  under `flow`, which has no iteration to name), `## Decision` (`APPROVE`). Everything
   else in the body is audit context. It rides the PR, not a work-item, because a sprint promotion
   has no work-item to hang on. **Its read-back rule is different from every other sentinel here**
   — this channel is **append-and-supersede**, so converging on one thread is wrong: list the PR's

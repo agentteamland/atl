@@ -1,6 +1,6 @@
 ---
 name: delivery-init
-description: /delivery-init — connect a project to the delivery-team's tracker. LLM-driven Q&A that first selects the backend (azure | github), then discovers the coordinates, probes live connectivity, resolves the board + durable-knowledge store, and writes .delivery/config.json (secret-by-reference, never a literal token) + .delivery/methodology.json (the Scrum descriptor every ceremony reads). Run once per project before /kickoff.
+description: /delivery-init — connect a project to the delivery-team's tracker. LLM-driven Q&A that first selects the backend (azure | github), then discovers the coordinates, probes live connectivity, resolves the board + durable-knowledge store, picks the sprint mode (scrum | flow), and writes .delivery/config.json (secret-by-reference, never a literal token) + .delivery/methodology.json (the Scrum descriptor every ceremony reads). Run once per project before /kickoff.
 ---
 
 # /delivery-init — connect a project to its delivery backend
@@ -15,7 +15,7 @@ so every later ceremony (`/kickoff`, `/refine`, `/sprint-plan`, `/sprint-start`,
 | File | What it holds |
 |---|---|
 | `.delivery/config.json` | non-secret connection **identity** — the `backend`, the backend's coordinates, the branch pair, and a **by-name reference** to where the credential lives (never the token itself). The exact fields are **backend-specific** (see step 4). |
-| `.delivery/methodology.json` | the flat **methodology descriptor** every ceremony reads — roles + dispatch, the artifact hierarchy, cadence, the velocity/capacity model, and branch names. Backend-independent (v1 = one Scrum instance). |
+| `.delivery/methodology.json` | the flat **methodology descriptor** every ceremony reads — the **mode** (`scrum` \| `flow`), roles + dispatch, the artifact hierarchy, cadence, branch names, and — under `scrum` only — the velocity/capacity model. Backend-independent (v1 = one Scrum instance, in either mode). |
 
 Field semantics for both files live in the team's contract doc,
 [`knowledge/config-and-methodology.md`](../../knowledge/config-and-methodology.md); the
@@ -87,6 +87,14 @@ type identifiers blind:
   override). These are the two-branch delivery flow's integration + release lines.
 - **Methodology** — ask, even though **Scrum is the only v1 instance** (the seam is real).
   Confirm Scrum.
+- **Mode** — ask how the sprints run: **`scrum`** (a time-boxed sprint with a capacity ceiling —
+  velocity-driven planning over story-point estimates) or **`flow`** (a sprint with no dates and
+  no capacity — `/sprint-plan` admits by priority + DAG readiness, `/sprint-review` reports no
+  velocity, and a `sprint:<slug>` label carries the sprint instead of the iteration field).
+  **Default `scrum`** for backward-compatibility. The question behind it is *"does this project
+  have a stable capacity to plan against?"* — a team with one does; a solo maintainer working with
+  an autonomous agent does not, and `flow` is the honest answer there. Semantics:
+  [`knowledge/config-and-methodology.md`](../../knowledge/config-and-methodology.md) §1.1.
 
 #### 3A.3 Resolve the project wiki (`wikiId`)
 
@@ -156,6 +164,15 @@ Offer discovered values rather than asking the user to type identifiers blind:
 - **Branch pair** — the `dev` / `release` names (defaults `dev` / `release`; confirm, allow
   override). Same two-branch delivery flow as Azure.
 - **Methodology** — confirm Scrum (the only v1 instance; the seam is real).
+- **Mode** — ask how the sprints run: **`scrum`** (a time-boxed sprint with a capacity ceiling —
+  velocity-driven planning over story-point estimates) or **`flow`** (a sprint with no dates and
+  no capacity — `/sprint-plan` admits by priority + DAG readiness, `/sprint-review` reports no
+  velocity, and a `sprint:<slug>` label carries the sprint instead of the Iteration field).
+  **Default `scrum`** for backward-compatibility. The question behind it is *"does this project
+  have a stable capacity to plan against?"* — a team with one does; a solo maintainer working with
+  an autonomous agent does not, and `flow` is the honest answer there. The answer also decides the
+  board setup below: **`flow` needs neither the `Iteration` nor the `Story Points` field** (§3B.3).
+  Semantics: [`knowledge/config-and-methodology.md`](../../knowledge/config-and-methodology.md) §1.1.
 - **Merge method (preflight — warn, don't block)** — the autonomous loop completes a PBI by
   merging its PR with a **real merge commit** (`gh pr merge --merge`), which the engine's
   `MergedToBase` check then verifies; a squash- or rebase-merge rewrites the SHA, so a
@@ -191,15 +208,26 @@ override (e.g. a personal repo tracked on an org-level board). Ask **existing or
 - Then run the **field check** below (a fresh board has only the default fields).
 
 **Field check (both paths — this is the field-setup half of #213).** List the board's fields
-with `gh project field-list <n> --owner <owner> --format json` and reconcile against the four
-the autonomous loop needs. **Create only what is missing** (idempotent):
+with `gh project field-list <n> --owner <owner> --format json` and reconcile against the fields
+the autonomous loop needs **in the chosen mode** — all four under `scrum`, **only Status +
+Priority** under `flow`. **Create only what is missing** (idempotent):
 
 | Field | Type | How to ensure it |
 |---|---|---|
-| **Status** | single-select | **Already exists by default** (`Todo` / `In Progress` / `Done`). Do **not** try to recreate it — the built-in Status field's *options* are not cleanly API-settable (see wiki `gh-projects-wip-manual`). Verify it carries `In Progress` + `Done` (a new board does); the loop's three states are exactly these. Note for the team: Projects v2's built-in automation only sets **Done** (on close/merge) — the *start* → `In Progress` transition is the ceremony's job, not the platform's. **If the project will use `/request` (mid-project intake):** it needs an extra **`candidate`** option on this Status field (a request captured pre-accept sits at `candidate`, excluded from the ready frontier). Options are not API-settable, so **tell the user to add a `candidate` option via the Projects settings UI** (Projects v2 → ⚙ → Status → new option), like the Iteration field — do not attempt it via `gh`. Optional: skip it if the project won't run `/request`. |
-| **Iteration** | iteration | **`gh` / GraphQL cannot create an iteration field** (`field-create --data-type` supports only TEXT / SINGLE_SELECT / DATE / NUMBER). If it is missing, **tell the user to add an "Iteration" field via the Project's settings UI** (Projects v2 → ⚙ → new field → Iteration) and re-run — do not fake it as a text/number field. |
-| **Story Points** | number | `gh project field-create <n> --owner <owner> --name "Story Points" --data-type NUMBER` |
+| **Status** | single-select | **Already exists by default** (`Todo` / `In Progress` / `Done`). Do **not** try to recreate it — the built-in Status field's *options* are not cleanly API-settable (see wiki `gh-projects-wip-manual`). Verify it carries `In Progress` + `Done` (a new board does); the loop's three states are exactly these. Note for the team: Projects v2's built-in automation only sets **Done** (on close/merge) — the *start* → `In Progress` transition is the ceremony's job, not the platform's. **If the project will use `/request` (mid-project intake):** it needs an extra **`candidate`** option on this Status field (a request captured pre-accept sits at `candidate`, excluded from the ready frontier). Options are not API-settable, so **tell the user to add a `candidate` option via the Projects settings UI** (Projects v2 → ⚙ → Status → new option), like a Projects v2 Iteration field — do not attempt it via `gh`. Optional: skip it if the project won't run `/request`. |
+| **Iteration** | iteration | **Scrum mode only — under `flow`, skip this row entirely** (the sprint is carried by a `sprint:<slug>` label, so no iteration field is read or written). Under `scrum`: **`gh` / GraphQL cannot create an iteration field** (`field-create --data-type` supports only TEXT / SINGLE_SELECT / DATE / NUMBER). If it is missing, **tell the user to add an "Iteration" field via the Project's settings UI** (Projects v2 → ⚙ → new field → Iteration) and re-run — do not fake it as a text/number field. |
+| **Story Points** | number | **Scrum mode only — under `flow`, skip this row entirely** (no capacity ceiling, so nothing reads an estimate). Under `scrum`: `gh project field-create <n> --owner <owner> --name "Story Points" --data-type NUMBER` |
 | **Priority** | single-select | `gh project field-create <n> --owner <owner> --name "Priority" --data-type SINGLE_SELECT --single-select-options "P0,P1,P2,P3"` |
+
+> **Flow mode removes the one board step that cannot be automated.** Under `flow` the
+> reconciliation is **Status + Priority**, and this skill creates or verifies both through `gh` —
+> so the board needs **no manual Projects-settings-UI work at all**, with the `candidate` Status
+> option the lone exception (and only for a project that will run `/request`). The **Iteration**
+> field is the step that hurts today: `gh` cannot create it, so a human has to add it by hand
+> before the loop can run at all — and under `flow` it simply is not needed, because a
+> `sprint:<slug>` label carries the sprint
+> ([`config-and-methodology.md`](../../knowledge/config-and-methodology.md) §1.2). Say this to the
+> user when they pick `flow`; it is the setup they no longer owe.
 
 > **Scope boundary — native Issue Types stay in #213.** This field setup does **not** adopt
 > native org **Issue Types** (Epic / Feature / PBI / Task / Bug) — that needs an `admin:org`
@@ -259,14 +287,19 @@ only if your token lives in a differently-named var.
 
 ### 5. Write `.delivery/methodology.json` — the shared Scrum descriptor
 
-Backend-independent — write it **verbatim** for both backends (do not resolve the
-`workItemTypeMap` here — it stays `null`-seeded; ceremonies resolve the real per-backend
-type/state names at connect time via the active adapter, never hardcoded):
+Backend-independent — the same document for both backends, and **the chosen mode decides exactly
+two lines of it** (`mode`, and whether `capacityModel` is there). Everything else is written
+verbatim; in particular do not resolve the `workItemTypeMap` here — it stays `null`-seeded, and
+ceremonies resolve the real per-backend type/state names at connect time via the active adapter,
+never hardcoded.
+
+**Scrum mode** — as below, with `capacityModel` present:
 
 ```json
 {
   "id": "scrum",
   "displayName": "Scrum",
+  "mode": "scrum",
   "roles": [
     { "name": "intake",            "binding": "agent", "dispatch": "in-session" },
     { "name": "business-analyst",  "binding": "agent", "dispatch": "subagent" },
@@ -284,6 +317,13 @@ type/state names at connect time via the active adapter, never hardcoded):
   "branches": { "dev": "dev", "release": "release" }
 }
 ```
+
+**Flow mode** — the *same* document with two changes and no others: `"mode": "flow"`, and the
+`capacityModel` line **deleted**. Omit the key entirely; do **not** write `"capacityModel": null`
+— absent means "this project has no capacity model", while a `null` value is a half-written scrum
+descriptor a ceremony has to guess at. `id` and `displayName` stay `"scrum"` / `"Scrum"`: they
+name the methodology (the ceremony chain and role set), which both modes share
+([`knowledge/config-and-methodology.md`](../../knowledge/config-and-methodology.md) §1.1).
 
 If the user chose non-default `dev` / `release` names, mirror them into **both**
 `config.branchPair` and `methodology.branches` so the two agree.
@@ -323,8 +363,10 @@ tracked.
 
 Summarize what was written — the backend, its coordinates (Azure: org/project/repo + the
 `wikiId` or the "provision a wiki" note; GitHub: `owner/repo` + the resolved `projectNumber` +
-any field the user must still add in the UI), the branch pair, and the credential **reference
-name** (never a value). Point the user to the next step: `/kickoff` for a brand-new project, or
+any field the user must still add in the UI), the branch pair, the **mode** (and, when it is
+`flow`, that sprints are carried by a `sprint:<slug>` label and that no `Iteration` or
+`Story Points` field is needed), and the credential **reference name** (never a value). Point the
+user to the next step: `/kickoff` for a brand-new project, or
 `/refine` / `/sprint-plan` for a project that already has a backlog.
 
 ## Security: the credential is never stored
@@ -343,7 +385,17 @@ name** (never a value). Point the user to the next step: `/kickoff` for a brand-
 
 If `.delivery/config.json` already exists, **do not blind-overwrite**. Read it, show the current
 values, and ask what to change — then rewrite only the confirmed fields. Same for
-`methodology.json`: if the user has edited it, offer to update rather than clobbering.
+`methodology.json`: if the user has edited it, offer to update rather than clobbering. A
+`methodology.json` with **no `mode` field** is a pre-mode project running `scrum` — present
+`scrum` as its current value, and never treat the absent field as an invitation to switch it.
+
+**Switching the mode** on a re-run rewrites `capacityModel` with it — the two must agree or every
+later ceremony reads a contradiction: `scrum` → `flow` **deletes** the `capacityModel` key,
+`flow` → `scrum` writes one back (defaults as in step 5; `seedVelocity` stays `null` for the PO to
+set). A mode switch also changes the **sprint carrier** (§1.2 of
+[`config-and-methodology.md`](../../knowledge/config-and-methodology.md)) for every *future*
+sprint, and this skill migrates nothing: units already admitted keep whatever carrier they were
+admitted with. Say so, and point at the next `/sprint-plan` as where the new mode takes effect.
 
 **Switching the backend** on a re-run is an explicit re-scope, not a field edit: the coordinate
 fields differ between backends (Azure `org`/`project`/`wikiId` vs GitHub `owner`/`projectNumber`),

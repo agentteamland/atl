@@ -1,6 +1,6 @@
 ---
 name: sprint-review
-description: /sprint-review — the delivery-team's sprint-end ceremony: compiles the Sprint Review Report (completed vs carryover, per-PBI PR links, test evidence, the deployable dev preview, actual velocity, and cross-unit integration findings) as the tech-lead + project-manager subagents in shared context, upserts it to the Sprints/Sprint-<n>-Review page in the durable-knowledge store, and runs the commit-bound promotion gate — `atl work promote` merges the dev→release PR only when a durable approval record posted by the human product-owner names that PR's current head commit. The record IS the PO's decision; the ceremony never asks for a conversational approval and never waits for one. Runs at each sprint end (methodology.cadence.reviewCeremony).
+description: /sprint-review — the delivery-team's sprint-end ceremony: compiles the Sprint Review Report (completed vs carryover, per-PBI PR links, test evidence, the deployable dev preview, actual velocity in scrum mode, and cross-unit integration findings) as the tech-lead + project-manager subagents in shared context, upserts it to the Sprints/Sprint-<n>-Review page in the durable-knowledge store, and runs the commit-bound promotion gate — `atl work promote` merges the dev→release PR only when a durable approval record posted by the human product-owner names that PR's current head commit. The record IS the PO's decision; the ceremony never asks for a conversational approval and never waits for one. Runs at each sprint end (methodology.cadence.reviewCeremony).
 ---
 
 # /sprint-review — deliverable + PO dev→release gate
@@ -19,15 +19,15 @@ through the active backend's adapter.
 
 | Artifact | Direction | Where |
 |---|---|---|
-| Sprint's iteration items + their runtime-resolved states | read | read a sprint's items (concept #6) + resolve the completion/state model (concept #7) |
+| The sprint's admitted items + their runtime-resolved states | read | read a sprint's items — by the iteration field under `mode: "scrum"`, by the `sprint:<n>` label under `mode: "flow"` (concepts #6/#4) — + resolve the completion/state model (concept #7) |
 | Per-PBI PR links + test-evidence attachments | read | the work-item↔PR link (concept #11) + read evidence via the active adapter (concept #12) |
 | `dev` HEAD + its green CI run + preview URL | read | read the `dev` branch state via the active adapter (concept #16 — the head-commit read leg) + pipeline/build status |
 | Sprint Review Report | write (idempotent upsert) | the durable-knowledge store `Sprints/Sprint-<n>-Review` (concept #9) |
 | dev→release promotion PR | write (open-or-find, **before** the gate) | open the promotion PR — or reuse the one already open — per the active adapter (concept #11); **merged only on a verified approval** |
 | Promotion approval record + the promotion PR's current head commit | read + merge | **`atl work promote`** — it reads the `**[Promotion Approval]**` record and the PR's head, compares them, and merges on an exact match (concept #16). The ceremony runs the command and relays its verdict; it does not read the record itself |
-| Rejected PBI (on PO Reject only) | write (idempotent tag + field + comment) | tag `carryover` (concept #4 — the carry-forward signal `/sprint-plan` admits first), set the runtime-resolved rework state (concept #7), comment the reason (concept #3); **iteration left in place** (the #9 resolution — reuse, don't file a parallel item) |
+| Rejected PBI (on PO Reject only) | write (idempotent tag + field + comment) | tag `carryover` (concept #4 — the carry-forward signal `/sprint-plan` admits first), set the runtime-resolved rework state (concept #7), comment the reason (concept #3); **the sprint carrier left in place** — the iteration field under `scrum`, the `sprint:<n>` label under `flow` (the #9 resolution — reuse, don't file a parallel item) |
 | Blocked-unit reports (dispatch engine) | read + clear | `<projectRoot>/.delivery/blocked/*.json` |
-| Blocked reflection on each report's work-item | write (idempotent tag + comment) | resolve the completion/state model (concept #7) → update the work-item (merge the `blocked` tag, concept #4; completion-state + iteration untouched) + add the diagnostic comment (concept #3) |
+| Blocked reflection on each report's work-item | write (idempotent tag + comment) | resolve the completion/state model (concept #7) → update the work-item (merge the `blocked` tag, concept #4; completion-state + sprint carrier untouched) + add the diagnostic comment (concept #3) |
 
 Field semantics for the config live in
 [`config-and-methodology.md`](../../knowledge/config-and-methodology.md). The concepts this ceremony
@@ -67,11 +67,27 @@ cached at init — never re-resolve it; GitHub: none — the store is the in-rep
 **`config.branchPair`** as the authoritative dev/release branch names (config wins over
 `methodology.branches`).
 
+Read **`methodology.mode`** in the same load — `"scrum"` or `"flow"`, **absent ⇒ `"scrum"`**, never
+inferred from a missing `capacityModel` or from which board fields exist, and an unrecognized value
+stops the ceremony ([`config-and-methodology.md`](../../knowledge/config-and-methodology.md) §1.1).
+The mode decides two things here and nothing else: which carrier identifies the sprint's items (the
+sprint carrier, §1.2 of the same page) and whether the report carries a velocity section (step 3).
+The blocked-report drain, the integration checkpoint and the promotion gate are mode-independent.
+
 Resolve the concrete sprint and its states at runtime — **never hardcode a state literal**
 (concept #7):
 
-- Resolve the closed iteration (its name/path) via a sprint/iteration read (concept #6); `<n>` for
-  the report path is this sprint's number, resolved here.
+- Resolve **the sprint being closed** and its `<n>` — the number the report path uses:
+  - Under **`scrum`** — the closed iteration (its name/path) via a sprint/iteration read
+    (concept #6), as before.
+  - Under **`flow`** — there is no iteration and no schedule node to close. The sprint being closed
+    is the **highest `sprint:<n>` label present** (concept #4): list the board's `sprint:*` labels
+    ("list means all" — a result at the tool's cap is a truncation to surface, never a complete
+    read) and take the highest ordinal, **compared as an integer** (`sprint:10` outranks `sprint:9`;
+    a lexical "highest" closes the wrong sprint). That label set is the whole record — there is no sprint
+    object to read a name or a date from. Writing `Sprints/Sprint-<n>-Review` (step 5) is what
+    marks that sprint **reviewed**, but the page already existing does not change the resolution
+    here: a re-run resolves the same `<n>` and refreshes the same page.
 - Resolve the type's state→category map (concept #7) so "Completed" means the **runtime-resolved
   Completed-category** state, not the literal `"Done"`.
 
@@ -92,8 +108,9 @@ or stalled unit accumulates on disk, invisible to the PO.
   (the [backend interface](../../knowledge/backend-interface.md)'s state-resolution policy), which is
   **NOT** a state transition: resolve the completion/state model (concept #7), then update the
   work-item to **merge** `blocked` into the item's tags (concept #4; never clobber existing tags).
-  Leave the completion-state **and** the iteration **unchanged** here — the item must stay in the
-  closed iteration so the report (step 3) still reads it as carryover; its carry-forward (surfaced
+  Leave the completion-state **and** the sprint carrier **unchanged** here — the item must stay in
+  the sprint being closed (its iteration under `scrum`, its `sprint:<n>` label under `flow`) so the
+  report (step 3) still reads it as carryover; its carry-forward (surfaced
   as blocked-not-workable until it unblocks, then top-priority) is the standard carryover handling
   ([reject-and-carryover.md](../../agents/project-manager/children/reject-and-carryover.md)), not
   this step's job.
@@ -118,13 +135,16 @@ or stalled unit accumulates on disk, invisible to the PO.
 Acting as the `project-manager` (read
 [`../../agents/project-manager/agent.md`](../../agents/project-manager/agent.md) + its `children/`,
 especially [`sprint-review-report.md`](../../agents/project-manager/children/sprint-review-report.md)),
-gather the sprint's data **read-only** and build the seven-section report. Read the sprint's items
-(concept #6, batched; "list means all" — if the set could exceed the tool's return, close the gap
-with a high-limit idempotency/velocity query (concept #10) and treat a result *at* the cap as a
-truncation error, never a complete read). The seven sections:
+gather the sprint's data **read-only** and build the report — **seven sections under `scrum`, six
+under `flow`** (which carries no velocity, section 5). Read the sprint's items by the carrier
+resolved in step 1 (the iteration under `scrum`, concept #6; the `sprint:<n>` label under `flow`,
+concept #4 — batched either way; "list means all" — if the set could exceed the tool's return,
+close the gap with a high-limit idempotency/velocity query (concept #10) and treat a result *at*
+the cap as a truncation error, never a complete read). The sections:
 
 1. **Completed vs carryover** — partition the sprint's PBIs by the **runtime-resolved
-   Completed-category** state (concept #7, from step 1), each with id / title / story-points; every
+   Completed-category** state (concept #7, from step 1), each with id / title / story-points —
+   under `flow` nothing estimates a unit, so it is id / title only; every
    admitted item that did NOT complete is **tagged `carryover`** (concept #4 — the durable signal the
    next `/sprint-plan` admits FIRST, at top priority; a blocked one additionally keeps `blocked`) and
    flagged in the report for the PO (never silently dropped —
@@ -139,8 +159,15 @@ truncation error, never a complete read). The seven sections:
 4. **Deployable dev preview** — the current `dev` HEAD (read the `dev` branch state via the active
    adapter, on `config.branchPair.dev`) + its green CI/build run + the running preview URL where the
    stack-pack defines one. The PO reviews the integrated **running result**, not a diff list.
-5. **Actual velocity** — the story points completed this sprint (the Completed sum from section 1);
-   this is read-only arithmetic and feeds the next `/sprint-plan`'s velocity window.
+5. **Actual velocity — under `mode: "scrum"` only** — the story points completed this sprint (the
+   Completed sum from section 1); this is read-only arithmetic and feeds the next `/sprint-plan`'s
+   velocity window. **Under `mode: "flow"` this section is omitted entirely** and the ceremony
+   reports **no velocity**: there is no capacity ceiling for the number to feed and no time-box to
+   divide by, so a point total would be arithmetic without a meaning — and a number on the page
+   invites the next plan to budget against it. Nothing replaces it; what the PO reads for "what did
+   this sprint produce" is section 1's completed-vs-carryover account, which is unchanged and is
+   the honest answer in both modes. Do not substitute a unit count, a cycle time, or any other
+   invented metric.
 6. **Integration findings** — the cross-unit open findings from the tech-lead's checkpoint (step 4)
    plus the forward-fix tasks filed there.
 7. **Promotion decision** — the outcome of the step-6 commit-bound gate: the promotion PR, the

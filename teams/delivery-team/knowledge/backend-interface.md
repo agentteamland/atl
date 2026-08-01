@@ -43,13 +43,13 @@ agent role-craft.
 | 1 | **Work-item + hierarchy** | Create typed units (Epic→Feature→PBI→Task/Bug); a parent/child containment link for authoring/traceability (NOT a scheduling edge). | work-item types · `wit_create_work_item` · `wit_add_child_work_items` | issues + Issue Types · sub-issues (`gh` + REST `sub_issues`) |
 | 2 | **Spec field** | The durable, always-loaded "what & why", read back **by heading** (`## Problem`/`## Business Value`/`## Scope`/`## Acceptance Criteria`/`## Out of Scope`). | `System.Description` (Markdown) | issue **body** (Markdown) |
 | 3 | **Sentinel comment channel** | Append-only content located by an exact first-line **sentinel** (`**[Technical Analysis]**`, `**[Canonical Brief]**`), never "the newest comment". | `wit_add_work_item_comment` / `wit_list_work_item_comments` | issue comments (`gh`/REST) |
-| 4 | **Typed metadata / tags** | Free-form, queryable, zero-setup labels carrying the machine-contracts: `atl-key:<hash>` idempotency + `atl-run:<…>` provenance, `area:<name>` pack-binding, `atl-brainstorm:<slug>` brainstorm-source provenance (a `/brainstorm done` board-sync stamps it; a decomposition ceremony adopts such an item in place), `blocked`. | `System.Tags` | issue **labels** (queryable via issue advanced search) |
+| 4 | **Typed metadata / tags** | Free-form, queryable, zero-setup labels carrying the machine-contracts: `atl-key:<hash>` idempotency + `atl-run:<…>` provenance, `area:<name>` pack-binding, `atl-brainstorm:<slug>` brainstorm-source provenance (a `/brainstorm done` board-sync stamps it; a decomposition ceremony adopts such an item in place), `sprint:<slug>` sprint membership under `mode: "flow"` (the sprint carrier, #6 — the slug is the sprint's **ordinal**, so a live label reads `sprint:<n>` and the whole shape matches `sprint:[0-9]+`), `blocked`. | `System.Tags` | issue **labels** (queryable via issue advanced search) |
 | 5 | **Priority** | A per-unit admission/ready-frontier order (lower = higher priority). | `Microsoft.VSTS.Common.StackRank` | a Number "Priority" project field |
-| 6 | **Iteration / sprint** | Sprints as named date ranges; item membership as an idempotent field set; read a sprint's items. | `IterationPath` + `work_*_iterations` | Projects v2 **Iteration** field |
+| 6 | **Iteration / sprint** | Mark a unit as belonging to a sprint — idempotently — and read a sprint's items. The **carrier is mode-selected** (`methodology.mode`): under `scrum` a sprint is a named date range on the backend's schedule and membership is an iteration **field** set; under `flow` a sprint has no backend object at all and membership is a **`sprint:<slug>` tag/label** (#4), swapped rather than accumulated on re-admission. | scrum: `IterationPath` + `work_*_iterations` · flow: `sprint:<n>` in `System.Tags`, a sprint's items read by WIQL on that tag | scrum: Projects v2 **Iteration** field · flow: `sprint:<n>` issue **label**, a sprint's items read by `gh search issues 'label:sprint:<n>'` |
 | 7 | **Completion / state** | Detect "this unit is done" (a category, resolved at runtime — never a literal string); claim to in-progress; set done after merge. | state-category via `wit_get_work_item_type` (Completed) | issue **closed** + Status **Done** (one fixed model — no per-template resolution) |
 | 8 | **Dependency link** | Typed, queryable predecessor edges — **this graph IS the scheduler** (`/sprint-start` reads it into `plan.json`; the Go engine topo-sorts). | `System.LinkTypes.Dependency-Forward/-Reverse` | a **`## Depends On` convention** the ceremony reads (GitHub has no native typed dependency — see backends/github) |
 | 9 | **Durable-knowledge store** | Namespaced, single-owner-per-namespace current-truth (`Domain/`, `Analysis/`, `Architecture/`, `Architecture/ADR/`, `Conventions/`, `Sprints/`); idempotent upsert; workers read, only the tech-lead writes. | project **wiki** (`wiki_*`) | in-repo **`/docs`** (Contents API; diffable + PR-reviewable) |
-| 10 | **Query / idempotency substrate** | Check-first-by-key before every create (found→reuse+update, not-found→create-then-stamp); read the completed set for velocity; read the backlog. "List means all" — never silently truncate. | `wit_query_by_wiql` | **issue advanced search** (`gh`/GraphQL, server-side) + Projects GraphQL |
+| 10 | **Query / idempotency substrate** | Check-first-by-key before every create (found→reuse+update, not-found→create-then-stamp); read the completed set — for the review report in both modes, for velocity under `mode: "scrum"`; read the backlog. "List means all" — never silently truncate. | `wit_query_by_wiql` | **issue advanced search** (`gh`/GraphQL, server-side) + Projects GraphQL |
 | 11 | **PR + review + merge** | Open a PR to `dev`, review it, and **merge = the completion gate**; the merge must leave a real merge commit the engine's `MergedToBase` can verify. | `repo_*` (autoComplete + **NoFastForward**) | `gh` — open/review; **`gh pr merge --merge` only** (never squash/rebase); explicit `gh issue close` on merge-verify |
 | 12 | **Test-evidence attachment** | Attach verifiable evidence (screenshots/results) to a unit; read it back at review. A surface that can't be run is UNVERIFIED → block, never fake-green. | REST carve-out (`scripts/az-attach.sh`) + `wit_get_work_item_attachment` | comment image upload / repo-committed artifact (see backends/github) |
 | 13 | **Candidate / triage state** | A mid-project request captured as a *candidate* (pre-accept): visible on the board, distinguishable from real work-units, carrying a triage weight (`light`/`standard`/`heavy`), and **excluded from the ready-frontier query (#10)** until the PO accepts it — on accept it becomes normal backlog, on reject it is closed with reasoning, on defer it goes to backlog with a trigger. Used only by `/request`. | `candidate` + `triage:<tier>` in `System.Tags` on a New item (a flag, like `blocked` — no native candidate category) | issue with Projects v2 **Status = `candidate`** (a NEW Status option — board-setup, like Iteration/#213) + `candidate` + `triage:<tier>` labels |
@@ -89,6 +89,28 @@ adapter pack states it). Agent role-craft states the principle; the pack states 
   process-template's Completed category at runtime; on GitHub the model is fixed (closed + Status
   Done), so "resolution" collapses to that one model. Blocking is a **flag** (`blocked` tag/label
   + a diagnostic comment), never a state transition, on both.
+- **The sprint carrier is mode-selected — one carrier, never both.** `methodology.mode` decides how
+  a unit is marked as belonging to a sprint (#6): the **iteration field** under `scrum`, the
+  **`sprint:<slug>` tag/label** (#4) under `flow`. A ceremony resolves the mode in its descriptor load
+  and then touches exactly one — there is no dual-write, so the two can never disagree about which
+  sprint a unit is in. Under flow the ordinal is **resolved, never invented**: list the existing
+  `sprint:*` tags/labels ("list means all", #10 — a capped read is a truncation to surface) and take
+  the highest ordinal `k`, **compared as an integer** (`sprint:10` outranks `sprint:9`). `sprint:<k>`
+  is the **current** sprint and stays current until it is *reviewed*, so a run plans **into
+  `sprint:<k>`** while its `Sprints/Sprint-<k>-Review` page (#9) is absent, and opens **`sprint:<k+1>`**
+  only once that page exists — advancing on the highest ordinal *alone* would open a fresh sprint on
+  every re-plan, which is what makes a re-run converge instead of forking. An empty board starts at
+  `sprint:1`, and a project migrating from scrum continues its existing numbering — take the highest
+  ordinal `m` among its `Sprints/Sprint-<m>-Review` pages (#9) and open `sprint:<m+1>`, never reading
+  it off iteration *names*, which are arbitrary. Call
+  the resolved ordinal `<n>`. **At most one `sprint:` label per unit** — re-admitting a carryover
+  removes the `sprint:` label it already carries and adds `sprint:<n>` in the same write, because a
+  label accumulates where a field replaces, and two of them leaves "which sprint is this in?"
+  without an answer. A label is **never** removed to mean
+  "done" — completion is a state (#7). And a flow sprint has **no backend object**: it is the set
+  of units carrying its label — nothing creates, dates, or closes a sprint entity, and *reviewed*
+  (the flow analogue of a closed iteration) is read off the review page above. Full contract:
+  [`config-and-methodology.md`](config-and-methodology.md) §1.2.
 - **NEVER-merge carve-out (D3)** — the autonomous tech-lead **worker** merges the green PR to
   `dev` (the completion gate); the human PO reviews only at sprint review (`dev`→`release`). The
   carve-out is scoped to the machine, both backends.
@@ -97,9 +119,10 @@ adapter pack states it). Agent role-craft states the principle; the pack states 
   and matched against the commit about to merge. Absent, malformed, or mismatched ⇒ **no promotion**
   — the gate holds and reports what the PO must set. A conversational "approve" is the *input* to
   the signal, never a substitute for it. **That check does not live in `/sprint-review`'s
-  instructions:** it shipped there first, and a real run had the same skill follow it on one turn
-  and silently skip it on the next, falling back to a conversational gate — whatever depends on
-  remembering gets forgotten. It is now `atl work promote`, a deterministic CLI that **verifies and
+  instructions:** it shipped there first, in a spec that contradicted itself — one paragraph told the
+  ceremony to put a blocking Approve/Reject question *before* the check, another forbade accepting a
+  conversational approval at all. Both sentences were well-formed and every mechanical gate passed;
+  an agent simply obeys whichever it reaches first. It is now `atl work promote`, a deterministic CLI that **verifies and
   merges in one call** so no caller can reach the merge without the check. A ceremony's job is to
   run it, obey the exit code, and relay the reason; re-deriving the comparison in prose is how the
   skipped path grows back.

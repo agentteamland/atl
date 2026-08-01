@@ -63,8 +63,11 @@ never invent a tool name.
 
 > **GitHub board-setup prerequisite:** the candidate state (concept #13) needs a **`candidate` Status
 > option** on the Project's built-in Status field. Projects v2 Status options are not cleanly
-> API-settable, so `/delivery-init` instructs the user to add it via the Projects settings UI (the
-> same UI-only constraint as the Iteration field). On Azure the `candidate` tag is zero-setup. If the
+> API-settable, so `/delivery-init` instructs the user to add it via the Projects settings UI — the
+> same UI-only constraint as the Iteration field a `mode: "scrum"` project adds by hand. Under
+> `mode: "flow"` there is no Iteration field to add (the sprint rides a label), so this `candidate`
+> option is the **only** Projects-settings-UI step such a project needs at all — which is why
+> skipping it is tempting and still wrong. On Azure the `candidate` tag is zero-setup. If the
 > option is absent on GitHub, still capture the candidate (the `candidate` **label** + the
 > intake-provenance key carry the state) and surface that the Status option should be added.
 

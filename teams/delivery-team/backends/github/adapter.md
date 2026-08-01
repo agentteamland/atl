@@ -34,13 +34,13 @@ described here.
 | Create a work-item (#1) | `gh issue create --title … --body … [--label type:<t>]` (+ `gh` REST `POST …/issues/{parent}/sub_issues` to nest) |
 | Create child / nest under a parent (#1) | REST `sub_issues` endpoint: `gh api --method POST repos/{o}/{r}/issues/{parent}/sub_issues -F sub_issue_id=<child REST id>` (note: `gh issue create --parent` is NOT available in current `gh`) |
 | Read one / a batch of work-items (#1) | `gh issue view <n> --json …` / `gh api graphql` for a batch |
-| Read a sprint's items (#6) | `gh project item-list <n> --owner <o> --format json` filtered by the Iteration field client-side |
-| Update fields (state, iteration, labels…) (#4/#5/#6/#7) | `gh issue edit` (labels/body/state) + `gh api graphql updateProjectV2ItemFieldValue` (project fields: Status/Iteration/Priority/`Story Points`) |
+| Read a sprint's items (#6) | scrum: `gh project item-list <n> --owner <o> --format json` filtered by the Iteration field client-side · flow: `gh search issues 'label:sprint:<n>' --repo <o>/<r> --state all` — server-side, no client-side filter needed (§5) |
+| Update fields (state, iteration, labels…) (#4/#5/#6/#7) | `gh issue edit` (labels/body/state) + `gh api graphql updateProjectV2ItemFieldValue` (project fields: Status/Priority always; Iteration + `Story Points` only under `mode: "scrum"`) |
 | The ready-to-pull / idempotency / velocity query (#10) | `gh search issues` / `gh api graphql search(type:ISSUE, query:…)` — **server-side** filtering by label/state/type/assignee |
 | Add / read the analysis / brief comment (#3) | `gh issue comment <n> --body …` / `gh api …/issues/{n}/comments` (sentinel-matched) |
 | Link a work-item ↔ a PR (#11) | native: `Fixes #N` in the PR body + `PullRequest.closingIssuesReferences` (GraphQL) |
 | Record a dependency edge (#8) | the **`## Depends On` convention** (§8) — GitHub has no native typed dependency link |
-| Iteration/sprint membership (#6) | the Projects v2 **Iteration** field on the item (idempotent field set) |
+| Iteration/sprint membership (#6) | scrum: the Projects v2 **Iteration** field on the item (idempotent field set) · flow: the `sprint:<n>` **label** for the resolved ordinal `<n>` — `gh issue edit <issue#> --add-label sprint:<n> [--remove-label sprint:<prior>]`, the add and the carryover swap in one call (§5) |
 | Open / review / merge a PR (#11) | `gh pr create` / `gh pr review` + `gh pr comment` / **`gh pr merge --merge`** (§10) |
 | Read a branch's head commit (#16) | `gh api repos/{o}/{r}/commits/<branch> --jq .sha` — the plain branch read. **The gate does not use this one:** it compares against the promotion PR's own `headRefOid` (row below), which is the commit `--match-head-commit` pins at merge (§10) |
 | Promotion approval record (#16) | write (the PO): `gh pr comment <n> --body-file <file>` · read: `gh pr view <n> --json headRefOid,comments` (one call returns the record **and** the head to compare it against) |
@@ -107,6 +107,26 @@ truth (no local ledger).
   query** (concept #13) until the PO accepts it; on accept, `/request` flips the Status off `candidate`
   (the issue enters the frontier) and `/refine` materializes PBIs with their own `atl-key`. (50-char
   label limit — short slug/digest, as with `atl-key`.)
+- **Under `mode: "flow"` the sprint carrier is a `sprint:<n>` LABEL, not the Iteration field**
+  (concept #6). `<n>` is the sprint's ordinal (`sprint:[0-9]+`, unpadded), **resolved not invented**:
+  list the repo's labels (`gh label list --repo <o>/<r> --limit 500 --json name`, raised until the
+  result is complete per §4), keep the ones matching `sprint:[0-9]+`, and take the highest ordinal
+  `k` **compared as an integer** (`sprint:10` outranks `sprint:9`; a lexical "highest" hands back a
+  stale ordinal and the next sprint reuses a number already in use). `sprint:<k>` is the **current**
+  sprint and stays current until it is *reviewed*: admit into **`sprint:<k>`** while its
+  `docs/sprints/sprint-<k>-review.md` page (§9) is absent, and open **`sprint:<k+1>`** only once that
+  page exists — advancing on the highest ordinal *alone* would open a fresh sprint on every re-plan,
+  defeating the convergence claimed immediately below. No `sprint:` label at all means `sprint:1`.
+  Admission is `gh issue edit <issue#> --add-label sprint:<n>` for the resolved `<n>`, **idempotent**
+  (adding a label the issue already carries is a no-op, so a re-planned or crash-resumed sprint
+  converges — never model it as a create-membership). **At most ONE `sprint:` label per issue:**
+  re-admitting a carryover passes `--remove-label sprint:<prior> --add-label sprint:<n>` — `<prior>`
+  being the one `sprint:` label it already carries — in the **same** `gh issue edit`, since a label
+  accumulates where a field replaces. The label is never removed to mean "done" — that is `gh issue
+  close` (§6). A sprint's items are then a server-side read,
+  `gh search issues 'label:sprint:<n>' --repo <o>/<r> --state all` (§2) — cheaper and more exact than
+  the Projects v2 page-then-filter the Iteration field forces. Under `mode: "scrum"` none of this
+  applies: the Iteration field remains the carrier and no `sprint:` label is written.
 
 ## 6. State & completion — one fixed model (no runtime template resolution)
 
@@ -114,8 +134,9 @@ Unlike Azure (where the Completed category is resolved per process-template at r
 has **one model**, so "resolution" collapses to it:
 
 - **"Done" = the issue is CLOSED** (+ the Projects v2 **Status** field set to its **Done**
-  category). The tech-lead closes the issue on merge-verify (§10). Velocity sums the
-  `Story Points` field over closed issues in the last N sprints.
+  category). The tech-lead closes the issue on merge-verify (§10). Under `mode: "scrum"`, velocity
+  sums the `Story Points` field over closed issues in the last N sprints; a `flow` project has no
+  `Story Points` field and `/sprint-review` reports no velocity — completion itself is unchanged.
 - **Claim = set Status to In Progress** (+ optionally self-assign).
 - **"Blocked" is a FLAG, never a state:** add a `blocked` **label** + a diagnostic comment,
   leaving the issue open. Same discipline as the Azure `blocked` tag — never invent a blocked
@@ -149,7 +170,8 @@ Identical discipline to the interface (#2/#3), GitHub binding:
 - **Promotion approval** (the human PO, at `/sprint-review`'s gate) → a **PR comment on the
   `dev`→`release` promotion PR**, first line the exact sentinel `**[Promotion Approval]**`
   (concept #16), then `## Approved Commit` (a 40-character lowercase hex commit id — **the only
-  load-bearing section**), `## Sprint` (`Sprint <n> · <iteration-name>`), `## Decision`
+  load-bearing section**), `## Sprint` (`Sprint <n> · <iteration-name>` under `mode: "scrum"`; just
+  `Sprint <n>` under `flow`, which has no iteration to name), `## Decision`
   (`APPROVE`). Everything else in the body is audit context. Posted with
   `gh pr comment <n> --body-file <file>`, never `--body`: `atl guard` scans the whole Bash
   command string, so a multi-line record belongs in a file, not in the argv.
@@ -248,7 +270,8 @@ The interface's PR concept (#11), bound to `gh`, honouring the D3 decision:
   provider-enforced line of defence behind the command's own comparison, not a replacement for
   it. `--merge` stays mandatory here too — never `--squash`/`--rebase`.
   **Why a command and not an instruction:** the comparison shipped as `/sprint-review` prose first,
-  and a real run had the same skill honour it on one turn and skip it on the next. The command
+  in a spec that contradicted itself — a blocking Approve/Reject question ordered *before* the check
+  by one paragraph, and conversational approval forbidden outright by another. The command
   verifies **and** merges in one call, so there is no separate merge step a caller can reach without
   the check — which is also why this row is the whole binding: reproducing the read+compare+merge
   sequence in a ceremony re-creates the skippable path.

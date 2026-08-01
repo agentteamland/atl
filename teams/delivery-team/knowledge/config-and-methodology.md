@@ -9,20 +9,22 @@ are *data* a ceremony reads, never logic baked into an agent.
 | File | Purpose | Written by |
 |---|---|---|
 | `.delivery/config.json` | connection **identity** — where the work lives + how to reach it | `/delivery-init` |
-| `.delivery/methodology.json` | the **methodology descriptor** — how the team works | `/delivery-init` (v1: one Scrum instance) |
+| `.delivery/methodology.json` | the **methodology descriptor** — how the team works | `/delivery-init` (v1: one Scrum instance, in `scrum` or `flow` **mode** — §1.1) |
 
 Both are committed (like `.atl/`): the connection identity and the methodology are project
 facts the whole team shares, not per-machine state. Neither file ever contains a secret.
 
 ## 1. `methodology.json` — the descriptor every ceremony reads
 
-A **flat, ceremony-read descriptor**. v1 ships exactly one instance — Scrum. The descriptor
-holds *intent*; the active backend holds concrete *names* (resolved at runtime, §3).
+A **flat, ceremony-read descriptor**. v1 ships exactly one instance — Scrum, run in one of two
+**modes** (`scrum` or `flow`, §1.1). The descriptor holds *intent*; the active backend holds
+concrete *names* (resolved at runtime, §3).
 
 ```json
 {
   "id": "scrum",
   "displayName": "Scrum",
+  "mode": "scrum",
   "roles": [
     { "name": "intake",            "binding": "agent", "dispatch": "in-session" },
     { "name": "business-analyst",  "binding": "agent", "dispatch": "subagent" },
@@ -43,12 +45,13 @@ holds *intent*; the active backend holds concrete *names* (resolved at runtime, 
 
 | Field | Meaning |
 |---|---|
-| `id` / `displayName` | the methodology key + human label. |
+| `id` / `displayName` | the methodology key + human label. They name the *methodology* — the ceremony chain + role set — so they are **mode-independent** (a flow-mode project still carries `"scrum"`/`"Scrum"`). |
+| `mode` | **`"scrum"`** (the sprint is a time-box with a capacity ceiling) or **`"flow"`** (the sprint has no dates and no capacity ceiling). Selects two things and nothing else: whether `capacityModel` is present, and which carrier the sprint uses (§1.2). **Absent ⇒ `scrum`** — see the resolution rule in §1.1. |
 | `roles[]` | each role's `binding` (**`agent`** vs **`human`**) *and* its `dispatch` nature — **`in-session`** (interactive, e.g. `intake`), **`subagent`** (a short-lived ceremony subagent: analysts, PM, tech-lead), or **`worker`** (a fresh isolated `claude -p` per work-unit: `developer`, `tester`). A ceremony reads *both* facts from one place — "is this a human?" and "how do I spawn it?". `developer` carries `"instances": "dynamic"` (the dispatcher decides how many). |
 | `artifactHierarchy` | the abstract, template-independent work-item ladder (Epic → Feature → PBI → Task). |
 | `workItemTypeMap` | **null-seeded on purpose.** Concrete type + state names are backend- and process-template-dependent — they differ across backends and templates. Ceremonies fill this at connect time by resolving the type/state model per the active backend's adapter (completion/state, concept #7) — **never** hardcode a literal (§3). |
-| `cadence` | the time unit + which ceremonies plan vs review a cycle. |
-| `capacityModel` | the velocity/capacity formula co-located with the methodology (not baked into the PM agent): `velocityWindowN` (mean over the last N closed sprints), `unit` (story points), `coldStart` (`po-seed` when `< N` sprints exist), `seedVelocity` (PO-set at kickoff), `availabilityFactorDefault` (a 0–1 dial for short-staffed sprints). |
+| `cadence` | the time unit + which ceremonies plan vs review a cycle. **Mode-independent** — the unit is `sprint` and the same ceremonies plan and review it in both modes. |
+| `capacityModel` | the velocity/capacity formula co-located with the methodology (not baked into the PM agent): `velocityWindowN` (mean over the last N closed sprints), `unit` (story points), `coldStart` (`po-seed` when `< N` sprints exist), `seedVelocity` (PO-set at kickoff), `availabilityFactorDefault` (a 0–1 dial for short-staffed sprints). **REQUIRED under `mode: "scrum"`, ABSENT under `mode: "flow"`** (the key is omitted entirely — §1.1). |
 | `branches` | the descriptor's **default** dev/release branch names. The project's *actual* names live in `config.branchPair` (§2) — see the reconciliation note there. |
 
 The descriptor is deliberately **not** a per-phase state-machine — phase flow lives in the
@@ -57,12 +60,165 @@ be the multi-methodology *engine*, which is deferred (YAGNI: build the config-se
 engine). A second methodology **that stays Scrum-shaped** (e.g. a different velocity window or capacity
 unit) ships as a second descriptor instance overriding these fields with no ceremony edit. But a
 **genuinely different** methodology (Kanban's WIP-limited continuous flow, SAFe's program-increment
-tier) is **not** a descriptor swap: `/sprint-plan` is velocity-driven sprint selection *by
-definition*, so Kanban needs its own planning/dispatch/review ceremonies, and the descriptor's
+tier) is **not** a descriptor swap: `/sprint-plan` selects *a sprint's* worth of work by definition
+(velocity-driven under `mode: "scrum"`, priority + DAG readiness under `mode: "flow"` — §1.1), so
+Kanban's WIP-limited pull needs its own planning/dispatch/review ceremonies, and the descriptor's
 `cadence.planningCeremonies` *names* them — so those ceremonies must exist. The config-seam is
 ceremony-agnostic (the deterministic engine reads `plan.json`, never the descriptor), which is why
 the seam is done; but "multi-methodology" means writing a second ceremony chain, not one more JSON
 file.
+
+### 1.1 `mode` — `scrum` or `flow`
+
+**Mode is not a second methodology.** The paragraph above draws the line at the ceremony chain: a
+methodology that needs *different ceremonies* is a different methodology. Mode stays on the near
+side of that line — same chain, same `roles`, same `artifactHierarchy`, same `cadence` unit, the
+same ceremonies planning and reviewing it. Exactly **two** things differ between the modes, and
+everything else in the descriptor is identical. (Flow **mode** is not Kanban: Kanban's WIP-limited
+continuous flow is still the far side of that line and would need its own ceremonies.)
+
+| `mode` | What a sprint is | Admission | `capacityModel` | Sprint carrier (§1.2) |
+|---|---|---|---|---|
+| `"scrum"` | a **time-box** — a dated range on the backend's schedule, with a capacity ceiling | by priority, up to a velocity-derived point budget | **REQUIRED** | the **iteration field** (concept #6) |
+| `"flow"` | **the same sprint, with no dates and no capacity ceiling** — a named set of admitted units, nothing more | by **priority + DAG readiness**; no point budget | **ABSENT** — the key is omitted, not `null` | the **`sprint:<slug>` label** (concept #4) |
+
+Under `flow`, the ceremonies that read capacity stop reading it: `/sprint-plan` admits ready units
+in priority order without a ceiling, and `/sprint-review` reports **no velocity** (with no
+time-box to divide by, a points-per-sprint number is arithmetic without a meaning). Nothing else
+in the chain changes — decomposition, the dependency DAG, the promotion gate, and mid-flight
+intake are all mode-independent.
+
+> **WHY the time-box is optional.** Velocity over a fixed period assumes a *stable capacity* to
+> measure. A solo maintainer working with an autonomous agent has none — one session produces
+> eight shippable units, the next produces zero — so a mean over the last three sprints predicts
+> nothing, and the ceiling derived from it silently caps real work behind a fiction. A team with a
+> stable capacity still wants that ceiling, which is why `scrum` is unchanged and stays the
+> default.
+
+**The vocabulary does not change.** A sprint is a **sprint** in both modes; flow mode means
+exactly and only *a sprint with no dates and no capacity*. There is no second noun for it, and
+`id`/`displayName` keep naming the methodology (`"scrum"`/`"Scrum"`), so `config.methodology` (§2)
+still reads `"scrum"` on a flow-mode project.
+
+**Resolution — how a ceremony gets the mode:**
+
+- **Read `mode` from `.delivery/methodology.json`**, in the descriptor load every ceremony already
+  does before its first step. It is a *methodology* fact, never a connection fact — it is not in
+  `config.json`.
+- **Absent ⇒ `scrum`.** Every project configured before this field existed ran a time-boxed,
+  capacity-driven sprint, so `scrum` is the only default that leaves an existing project's
+  behaviour exactly as it was: the field is additive, and a project changes mode when someone
+  writes the field, never by upgrading. (The same backward-compatibility posture as
+  `config.backend` defaulting to `azure`.)
+- **Never infer it.** Not from a missing `capacityModel`, not from which board fields exist, not
+  from whether the backend has iterations. A derived signal lies — a leftover block after a mode
+  switch, a hand-edit — while the declared field is the only authority, and its absence *is* an
+  answer (`scrum`).
+- **An unrecognized value stops the ceremony.** `mode` is `"scrum"` or `"flow"`; anything else (a
+  typo, a methodology name) is surfaced with the two valid values and the ceremony halts. Falling
+  back to `scrum` on a typo would impose a capacity ceiling on a project that asked not to have
+  one and present the resulting plan as correct.
+- **A mismatched `capacityModel` is not a second opinion.** Present under `mode: "flow"` → ignored
+  (mode wins; `/delivery-init` removes it on a re-run). Missing under `mode: "scrum"` → a broken
+  descriptor: surface it and stop, never invent a velocity window or a seed.
+
+A complete **flow-mode** `methodology.json` — the scrum example above with `mode` flipped and
+`capacityModel` gone; every other field byte-identical:
+
+```json
+{
+  "id": "scrum",
+  "displayName": "Scrum",
+  "mode": "flow",
+  "roles": [
+    { "name": "intake",            "binding": "agent", "dispatch": "in-session" },
+    { "name": "business-analyst",  "binding": "agent", "dispatch": "subagent" },
+    { "name": "technical-analyst", "binding": "agent", "dispatch": "subagent" },
+    { "name": "project-manager",   "binding": "agent", "dispatch": "subagent" },
+    { "name": "tech-lead",         "binding": "agent", "dispatch": "subagent" },
+    { "name": "tester",            "binding": "agent", "dispatch": "worker" },
+    { "name": "developer",         "binding": "agent", "dispatch": "worker", "instances": "dynamic" },
+    { "name": "product-owner",     "binding": "human" }
+  ],
+  "artifactHierarchy": ["Epic", "Feature", "Pbi", "Task"],
+  "workItemTypeMap": { "Pbi": null, "Task": null, "Bug": null },
+  "cadence": { "unit": "sprint", "planningCeremonies": ["sprint-plan", "sprint-start"], "reviewCeremony": "sprint-review" },
+  "branches": { "dev": "dev", "release": "release" }
+}
+```
+
+### 1.2 The sprint carrier — `sprint:<slug>` under flow
+
+A sprint needs a **carrier**: the durable mark that says *this unit belongs to this sprint*, and
+which the "read a sprint's items" query filters on. The carrier is mode-selected — the second and
+last thing mode changes.
+
+| `mode` | Carrier | Membership is |
+|---|---|---|
+| `"scrum"` | the **iteration field** (concept #6) — unchanged | an idempotent iteration **field** set; the sprint is a dated node on the backend's schedule |
+| `"flow"` | the **`sprint:<slug>` label** (concept #4) | an idempotent **tag/label add**; there is no schedule node at all |
+
+**The literal shape is `sprint:<slug>`** — the lowercase word `sprint`, one colon, then the slug,
+and nothing else in the label: no dates, no title, no spaces.
+
+**`<slug>` is the sprint's ordinal** — a positive decimal integer, unpadded, no leading zeros:
+`sprint:1`, `sprint:2`, … `sprint:14`. The whole label therefore matches `sprint:[0-9]+`, and sits
+far inside the tighter of the two backends' limits (GitHub's 50-character label cap — stated in
+`backends/github/adapter.md` §5, the same cap that bounds `atl-key` and `atl-request`).
+
+- **Form it by resolving, never by inventing.** List the `sprint:*` labels/tags already on the
+  board (concept #10 — "list means all"; a capped read is a truncation to surface, not a complete
+  one) and take the highest ordinal `k`, **compared as an integer** (`sprint:10` outranks
+  `sprint:9`; a lexical "highest" hands back a stale ordinal and the next sprint reuses a number
+  already in use). `sprint:<k>` is the **current** sprint and stays current until it is *reviewed*,
+  so a run plans **into `sprint:<k>`** while its `Sprints/Sprint-<k>-Review` page (concept #9) is
+  absent, and opens **`sprint:<k+1>`** only once that page exists — advancing on the highest
+  ordinal *alone* would open a fresh sprint on every re-plan, defeating the convergence the
+  idempotency bullet below promises. A board with none starts at `sprint:1`. A project **migrating
+  from scrum** continues its existing numbering rather than restarting at 1: take the highest
+  ordinal `m` among the existing `Sprints/Sprint-<m>-Review` pages (concept #9) and open
+  `sprint:<m+1>` — those pages are the reliable read, since iteration *names* are arbitrary — so
+  review pages never collide.
+- **`<n>` is whichever ordinal that resolved to.** The `Sprints/Sprint-<n>-Review` durable-knowledge
+  page keeps its name and its meaning in both modes; under flow, `<n>` comes from the label instead
+  of from the resolved iteration name.
+- **Written by the admission step, read by everyone else.** The label is stamped by the same
+  ceremony step that sets the iteration field under scrum. Everything downstream treats it as
+  read-only. Leaving a unit in a sprint — a `/sprint-review` carryover keeps its sprint — means
+  leaving the label in place; a label is **never** removed to mean "done", because completion is a
+  state (concept #7) and always was.
+- **At most ONE `sprint:` label per unit — re-admission SWAPS it.** A field replaces its value
+  where a label would accumulate, so the contract closes that gap by hand: admitting a carryover
+  unit into the sprint being planned removes **the `sprint:` label that unit actually carries** —
+  read that ordinal off the unit, never assume it is the immediately-preceding one, since a unit
+  that stayed blocked across sprints was never re-admitted and still carries the ordinal of the last
+  sprint it *was* in — and adds `sprint:<n>` in the same step. Two
+  sprint labels on one unit is a corrupt state — "which sprint is this in?" stops having an answer
+  and the sprint's item read returns units that moved on. History is not lost by the swap any more
+  than it is under scrum (where the field is likewise overwritten): the sprint's membership record
+  is its `Sprints/Sprint-<n>-Review` page.
+- **Idempotent by nature, exactly like the field set.** Adding a label that is already there is a
+  no-op, so a re-planned or crash-resumed sprint converges instead of duplicating. Never model
+  membership as a "create membership" operation that could double.
+- **A flow sprint has no object on the backend.** It exists only as the set of units carrying its
+  label — nothing creates, dates, or closes a sprint entity. The **current** sprint is the highest
+  ordinal present; it stays current until `/sprint-review` reviews it, and reviewed (the flow
+  analogue of a *closed* iteration) means its `Sprints/Sprint-<n>-Review` page exists.
+
+> **WHY a label rather than the iteration field.** It is the only carrier that needs **zero
+> board-admin setup on either backend** — Azure tags and GitHub issue labels are free-form and
+> queryable out of the box, while a Projects v2 **Iteration** field cannot be created through
+> `gh`/GraphQL at all (`field-create --data-type` offers no iteration type) and has to be added by
+> hand in the Projects settings UI. It also matches the machine-contract convention already carrying every
+> other cross-cutting fact on an item — `type:<t>`, `area:<name>`, `atl-key:<hash>`,
+> `atl-run:<…>`, `atl-brainstorm:<slug>`, `atl-request:<slug>:<initiator>` (concept #4) — so it
+> introduces a value, not a mechanism.
+
+**Consequence — a flow-mode project needs neither the `Iteration` field nor the `Story Points`
+field.** The label carries membership, and with no capacity ceiling nothing reads an estimate. On
+GitHub that removes the one setup step that could not be automated (the manual Iteration field);
+on both backends it removes a per-sprint schedule chore. `Priority` is still needed — flow admits
+by priority + DAG readiness — and so is `Status`.
 
 ## 2. `config.json` — connection identity (no secret)
 
@@ -93,7 +249,7 @@ procedure).
 | `org` / `project` / `repo` | the active backend's project coordinates. `org` is derived from the project's `url` authority at init, not asked separately. |
 | `branchPair` | the project's **actual** `dev` / `release` branch names (the two-branch delivery flow's integration + release lines). |
 | `backend` | the active backend the project runs on — `"azure"` or `"github"`, chosen once at `/delivery-init` and cached here. Selects which `backends/<backend>/adapter.md` every ceremony and worker loads to bind each interface concept to a concrete tool. Default `azure`. |
-| `methodology` | the `id` of the active `methodology.json` (v1: `"scrum"`). |
+| `methodology` | the `id` of the active `methodology.json` (v1: `"scrum"`). The **mode** lives in the descriptor, not here (§1.1). |
 | `transport` | the transport the active adapter uses — `"mcp"` for the Azure backend (see `backends/<backend>/adapter.md`). |
 | `restFallbackEnabled` | `true` — enables the Azure backend's one REST carve-out for evidence attachment (concept #12; see `backends/azure/adapter.md`). |
 | `wikiId` | the Azure backend's durable-knowledge store id, resolved **once** at init and cached so ceremonies never re-resolve it (durable-knowledge store, concept #9; see `backends/azure/adapter.md`). `null` when none is provisioned yet — the store must exist before `/kickoff` seeds knowledge. |
@@ -119,7 +275,7 @@ procedure).
 | `projectNumber` | the **owner-scoped GitHub Projects v2 board number** (`gh project … --owner <owner> <projectNumber>`). Distinct from `repo` — a board is owner-level, not nested under the repo. Resolved (or created) once at init. |
 | `branchPair` | the project's actual `dev` / `release` branch names — same two-branch delivery flow as Azure. |
 | `backend` | `"github"`. |
-| `methodology` | the `id` of the active `methodology.json` (v1: `"scrum"`) — backend-independent. |
+| `methodology` | the `id` of the active `methodology.json` (v1: `"scrum"`) — backend-independent. The **mode** lives in the descriptor, not here (§1.1). |
 | `credential` | **`{ "ref": "GH_TOKEN" }` — a **by-name** pointer to the env var the GitHub token lives in, never the token itself.** The engine reads the value from that env var (`os.Getenv(config.credential.ref)`, defaulting to `GH_TOKEN`) and injects it into workers **as** `GH_TOKEN` so `gh` finds it (`workerenv.go`) — so `credential.ref` names the SOURCE env var the engine reads from (parity with Azure's `pat.ref`), and re-pointing it re-points the read. There is no token field. |
 
 GitHub carries **no** `wikiId` (its durable-knowledge store is in-repo `/docs`, which has no id —
@@ -165,6 +321,12 @@ writes one back.
 
 - **Methodology is data.** A ceremony loads `methodology.json`, reads the roles/cadence/
   capacity it needs, and acts — it does not encode methodology assumptions in its own prose.
+- **Resolve the mode before anything that assumes a time-box.** `mode` (§1.1) decides whether a
+  ceremony reads `capacityModel` at all and which sprint carrier it reads and writes (§1.2), so it
+  is resolved in the same descriptor load, before the first step that touches either. **Absent ⇒
+  `scrum`** (an existing project's behaviour never changes underneath it); an unrecognized value
+  halts the ceremony; the declared field is the only authority — never infer the mode from the
+  board.
 - **Resolve concrete names at runtime, never hardcode.** `workItemTypeMap` is null in the
   descriptor by design. Before touching a work-item's type or state, resolve the real name per
   the active backend's adapter (completion/state, concept #7): "Done" for velocity is the

@@ -95,7 +95,9 @@ inherit unspoken.
 Shaping is elicitation, and it ends at the seam:
 
 - I do **not** estimate or size. Story points, velocity, capacity — the `project-manager`'s
-  job, from `methodology.capacityModel` (config-and-methodology.md §1). I might hear "this
+  job, from `methodology.capacityModel` under `mode: "scrum"` (config-and-methodology.md §1/§1.1;
+  under `mode: "flow"` there is no capacity model at all and nothing reads an estimate, which
+  changes nothing for me — I did not size in either mode). I might hear "this
   feels big" and capture it as a note; I never attach a number.
 - I do **not** decompose into Epics/Features/PBIs or assign plan ordinals. The `tech-lead`
   owns decomposition and its idempotency ordinals (concept #10). My vertical slice is *input*
