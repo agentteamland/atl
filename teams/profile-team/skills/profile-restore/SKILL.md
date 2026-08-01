@@ -65,10 +65,19 @@ else
     echo "  (none — shared files already match the snapshot)"
   else
     echo "$D" | while read -r _ f _ g _; do
-      GEP=$(stat -f %m "$g" 2>/dev/null || stat -c %Y "$g" 2>/dev/null || echo "")
-      if [ -z "$SNAP_EPOCH" ]; then
-        echo "  ?? $g — snapshot age unknown (not in git); cannot tell if global is newer — do NOT assume safe"
-      elif [ -n "$GEP" ] && [ "$GEP" -gt "$SNAP_EPOCH" ]; then
+      # GNU first, BSD second — the order is load-bearing, not cosmetic. `stat -f` means
+      # --file-system on GNU coreutils, so `stat -f %m FILE` PRINTS a filesystem report on
+      # STDOUT and only then fails on `%m` as a missing operand: with BSD first, $GEP is a
+      # multi-line dump on every Linux machine, the numeric compare below errors, and the
+      # !! branch becomes unreachable — the newer-guard silently off, exactly where the loss
+      # is irreversible. BSD `stat -c` fails cleanly with no stdout, so this order is safe
+      # both ways. The numeric gate then makes any other partial read fail CLOSED (??)
+      # instead of falling through to the unflagged branch.
+      GEP=$(stat -c %Y "$g" 2>/dev/null || stat -f %m "$g" 2>/dev/null || echo "")
+      case "$GEP" in *[!0-9]*|"") GEP="" ;; esac
+      if [ -z "$SNAP_EPOCH" ] || [ -z "$GEP" ]; then
+        echo "  ?? $g — age comparison unavailable (snapshot not in git, or this file's timestamp is unreadable); cannot tell if global is newer — do NOT assume safe"
+      elif [ "$GEP" -gt "$SNAP_EPOCH" ]; then
         echo "  !! $g is NEWER than the snapshot (modified after the snapshot commit) — applying would overwrite newer memory with older data"
       else
         echo "     $g"
@@ -127,8 +136,9 @@ stop.
   the snapshot's git commit time* is marked `!!` in the preview — the exact case where
   restoring would trade newer memory for older data. The check keys off the commit time, not
   file mtimes: git does not preserve mtimes across a clone, so an mtime check would miss this
-  on another machine. Outside a git repo the snapshot's age is unknown, so shared files are
-  marked `??` instead — and an absent flag must never be read as "safe".
+  on another machine. When the comparison cannot be made at all — the snapshot is outside a git
+  repo, or a file's timestamp is unreadable — the file is marked `??` instead, never left
+  unflagged; and an absent flag must never be read as "safe".
 - **`--apply` is itself reversible.** Before overwriting, restore copies the current global
   to `~/.atl/profiles.pre-restore-<timestamp>/` and prints the one-line undo.
 
