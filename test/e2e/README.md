@@ -22,6 +22,32 @@ Auth is passed into the container only when present on the host:
 A blueprint whose auth is absent is skipped, so the same script is CI-safe (only
 the auth-free core runs) and local-full (everything runs when you're authed).
 
+### Always watch a full run
+
+**A full suite takes ~2 hours, and `run.sh` reports only once — at the end.** So a
+blueprint that goes red four minutes in sits unread for the rest of the run, while every
+later LLM blueprint burns budget on a tree already known to be broken. Arm the watcher in
+the same breath as the run:
+
+```bash
+test/e2e/watch.sh <run-log>     # under the Monitor tool, persistent
+```
+
+It polls every 5 minutes (`ATL_E2E_WATCH_INTERVAL`) and prints only what someone would act
+on — one line per newly failed blueprint **with that blueprint's failing assertions**, so
+the notification is diagnosable on its own rather than a pointer into a 40k-line log. Then
+the final tally, and it exits.
+
+It also reports a **stall**, which nothing else can: a hung `claude -p` turn produces no
+`FAIL` line *and* no summary line, so from the outside it is indistinguishable from "still
+working" — see [`e2e-hung-claude-turn-no-summary`](https://github.com/agentteamland/workspace/blob/main/.atl/wiki/e2e-hung-claude-turn-no-summary.md).
+The threshold (`ATL_E2E_WATCH_STALL`, default 1200s) is sized off the real bound rather
+than guessed: `lib.sh` caps one turn at `CLAUDE_TURN_TIMEOUT` (900s) plus a 30s kill grace,
+and assertions print between turns, so no legitimate quiet stretch reaches 20 minutes.
+
+Exit codes: `0` clean · `1` finished with failures · `2` stalled · `3` the log never
+appeared.
+
 ## Blueprints
 
 Each lives in `blueprints/<name>.sh`, declares its auth need on a `# needs:` line,
