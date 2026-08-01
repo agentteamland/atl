@@ -1,8 +1,29 @@
 ---
-knowledge-base-summary: "The capacityModel as data: velocity = mean story points over the last velocityWindowN (=3) closed sprints; the cold-start po-seed + seed-decay blend for the first N sprints; the availabilityFactor 0-1 dial for short-staffed sprints. Velocity is read-only, idempotent, client-side arithmetic over the active backend's completed-work-item queries (resolve the Completed state at runtime, concept #7). Reading the backend's own team-capacity model as a secondary signal (concept #6)."
+knowledge-base-summary: "SCRUM-MODE ONLY (methodology.json mode scrum) — under the flow mode there is no capacityModel, no velocity and no seed, and NOTHING on this page runs. The capacityModel as data: velocity = mean story points over the last velocityWindowN (=3) closed sprints; the cold-start po-seed + seed-decay blend for the first N sprints; the availabilityFactor 0-1 dial for short-staffed sprints. Velocity is read-only, idempotent, client-side arithmetic over the active backend's completed-work-item queries (resolve the Completed state at runtime, concept #7). Reading the backend's own team-capacity model as a secondary signal (concept #6)."
 ---
 
 # Capacity & Velocity
+
+> **Scope: `mode: "scrum"` only.** Everything on this page is the craft of a **time-boxed** sprint —
+> a capacity ceiling derived from proven velocity. Under `mode: "flow"` the descriptor carries **no
+> `capacityModel`** ([`config-and-methodology.md`](../../../knowledge/config-and-methodology.md)
+> §1.1), and none of it runs: no velocity to compute, no availability factor to apply, no seed to
+> ask the PO for. **What replaces it:** nothing — the ceiling is simply absent, and nothing else
+> bounds admission in its place (the ~4–6 concurrency cap bounds *execution*, not membership).
+> Admission becomes priority, with the admitted set kept DAG-closed
+> ([`config-and-methodology.md`](../../../knowledge/config-and-methodology.md) §1.1.1,
+> [sprint-planning-blueprint.md](sprint-planning-blueprint.md) §4), and `/sprint-review` reports no
+> velocity. Read `mode` before you reach for anything here; if it is `flow`, **skip this page** —
+> do not compute a ceiling nobody asked for, and above all do not prompt the PO for a
+> `seedVelocity` (see the cold-start section's flow note).
+>
+> **WHY the whole page is mode-scoped rather than rewritten to cover both.** Velocity over a fixed
+> period is only meaningful when the team's capacity is stable enough to average. A solo maintainer
+> working with an autonomous agent has no such capacity — one session produces eight shippable
+> units, the next produces zero — so the mean is arithmetic without a referent, and a ceiling
+> derived from it caps real work behind a fiction. The honest answer there is *no ceiling*, not *a
+> different formula*, which is why this craft stays intact for the projects that do have a stable
+> capacity instead of being diluted into something that fits both.
 
 Capacity is the ceiling my sprint-planning blueprint admits against. It is a *number I compute*,
 not a policy I hold — every parameter comes from `capacityModel` in `.delivery/methodology.json`
@@ -70,6 +91,11 @@ the query cap as a truncation error to surface — never as a complete read.
 is `22` points.
 
 ## Cold start — the po-seed + seed-decay blend (#6)
+
+> **Under `mode: "flow"` there is no cold start.** The seed seeds a *velocity*, and flow measures
+> none — so a flow project never reaches this section and must **never be asked for a
+> `seedVelocity`**. That question has stalled a headless run on a number the ceremony would then
+> have used for nothing.
 
 Before `velocityWindowN` closed sprints exist, there is no honest empirical mean. The
 `coldStart: "po-seed"` strategy blends the PO's seed with the accumulating real data so the

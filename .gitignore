@@ -7,3 +7,6 @@ coverage.out
 
 # OS
 .DS_Store
+
+# e2e run mirror (stable path for test/e2e/watch.sh)
+test/e2e/.last-run.log

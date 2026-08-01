@@ -20,10 +20,10 @@ than duplicating it. What it reads and writes:
 | Reads | Writes |
 |---|---|
 | `.delivery/config.json` (the active backend's coordinates + `branchPair` + durable-knowledge locator + credential ref — see [`config-and-methodology.md`](../../knowledge/config-and-methodology.md) §2) | the first **Epic** + **Feature(s)** (create work-items, concept #1) |
-| `.delivery/methodology.json` (`roles`, `cadence`, `artifactHierarchy`, `capacityModel`) | business framing into each item's spec field (fixed H2s, concept #2) |
+| `.delivery/methodology.json` (`mode`, `roles`, `cadence`, `artifactHierarchy`, and `capacityModel` under `mode: "scrum"`) | business framing into each item's spec field (fixed H2s, concept #2) |
 | the live PO conversation (intake) | technical analysis as one `**[Technical Analysis]**` comment (add a comment, concept #3) |
 | existing backlog on a re-run (check-first query by `atl-key`, concept #10) | the first `Domain/` + `Architecture/` durable-knowledge pages (upsert the durable-knowledge store, concept #9) |
-| | optional sprint-0 iteration + starter backlog (create an iteration, concept #6, prompted, default skip) |
+| | optional sprint-0 + starter backlog (prompted, default skip) — an iteration under `mode: "scrum"` (create an iteration, concept #6), the `sprint:1` label under `mode: "flow"` (concept #4) |
 
 Field semantics for the config live in [`config-and-methodology.md`](../../knowledge/config-and-methodology.md);
 the operation → tool map, idempotency, runtime type resolution, content placement, and
@@ -64,7 +64,14 @@ files exist at the project root **before** touching the backend or the PO:
   and that step 3's knowledge-seeding needs it — they should create it and re-run `/delivery-init`
   before proceeding. (GitHub's in-repo `/docs` store needs no provisioning.)
 - From `methodology.json`, load `roles` (with each `dispatch`), `artifactHierarchy`
-  (`["Epic","Feature","Pbi","Task"]`), `cadence`, and `capacityModel`.
+  (`["Epic","Feature","Pbi","Task"]`), `cadence`, and — under `mode: "scrum"` — `capacityModel`.
+  Load **`mode`** itself first: `"scrum"` or `"flow"`, **absent ⇒ `"scrum"`**, never inferred from
+  a missing `capacityModel`, and an unrecognized value stops the ceremony
+  ([`config-and-methodology.md`](../../knowledge/config-and-methodology.md) §1.1). Under `"flow"`
+  the `capacityModel` key is **absent by design** — that is not a broken descriptor and nothing
+  here invents one. Kickoff's behaviour forks on the mode in exactly one place: the optional
+  sprint-0 seed (step 4) uses the mode's sprint carrier (§1.2). Intake and analysis are
+  mode-independent.
 - **Live backend probe** — run the active backend's connectivity check (resolve project / identity,
   per the adapter) to confirm auth + reachability. A successful response → the backend is live;
   continue. Auth error / nothing returned / tool unavailable → STOP and point the user at their
@@ -146,17 +153,25 @@ no durable-knowledge seed for analysis that didn't land.
 **Ask the user explicitly** whether to seed a first sprint now so they can go straight to
 `/sprint-plan`; **default to skip** if they don't opt in. If they opt in:
 
-- **Resolve the first sprint iteration (concept #6) and REUSE an existing one** — some backends
-  pre-provision default iterations (a Scrum-style template may ship `Sprint 1`–`Sprint 6`). Create a
-  new iteration (concept #6) **only if no suitable iteration exists**: on some backends a create
-  **errors on a name already in use**, so a blind create fails against a pre-provisioned project.
-  Assigning an item to the resolved iteration is then an idempotent iteration field set (concept #6)
-  — a safe no-op on re-run.
+- **Resolve the first sprint through the mode's carrier** (§1.2 of
+  [`config-and-methodology.md`](../../knowledge/config-and-methodology.md)):
+  - Under **`mode: "scrum"`** — **resolve the first sprint iteration (concept #6) and REUSE an
+    existing one**. Some backends pre-provision default iterations (a Scrum-style template may ship
+    `Sprint 1`–`Sprint 6`). Create a new iteration (concept #6) **only if no suitable iteration
+    exists**: on some backends a create **errors on a name already in use**, so a blind create
+    fails against a pre-provisioned project. Assigning an item to the resolved iteration is then an
+    idempotent iteration field set (concept #6) — a safe no-op on re-run.
+  - Under **`mode: "flow"`** — there is nothing to create or reuse: a flow sprint has no backend
+    object, only the set of units carrying its label. Sprint-0 on a greenfield project is
+    **`sprint:1`** (the board has no `sprint:*` label yet, so the resolve-the-highest-ordinal rule
+    starts there — still resolve rather than assume, since a re-run finds `sprint:1` already
+    present). Seeding an item into it is an idempotent label add (concept #4) — adding a label the
+    item already carries is a no-op.
 - Optionally create a small starter PBI set under the first Feature (create work-items, concept #1),
   each run through the **same** step-3 idempotency discipline (resolve type at runtime, concept #7;
   check-first query by `atl-key`, concept #10; stamp `atl-run:kickoff:<id>` + `atl-key:<hash>`).
 
-If skipped, tell the user `/sprint-plan` will handle the first iteration when they're ready.
+If skipped, tell the user `/sprint-plan` will open the first sprint when they're ready.
 
 ### 5. Report and point to the next ceremony
 
@@ -186,9 +201,10 @@ ledger:
   comment, sentinel-match the comments (read comments, concept #3); found → don't stack a duplicate.
   (The sentinel comment channel is append-only, concept #3; a genuine re-plan adds one fresh
   sentinel comment that supersedes.)
-- **Durable-knowledge + iterations are idempotent by nature.** The durable-knowledge upsert
-  (concept #9) is idempotent; an iteration assignment is an idempotent iteration field set
-  (concept #6, a safe no-op on re-run).
+- **Durable-knowledge + sprint membership are idempotent by nature.** The durable-knowledge upsert
+  (concept #9) is idempotent; sprint membership is an idempotent iteration field set under
+  `mode: "scrum"` (concept #6) and an idempotent label add under `mode: "flow"` (concept #4) — a
+  safe no-op on re-run either way. Never model membership as a create-membership that could double.
 
 On a re-discovery re-run (a mid-project vision shift), the intake framing should call out the
 *delta* against the established understanding so the analysts update rather than duplicate — the

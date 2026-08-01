@@ -29,10 +29,17 @@ whole-sprint view can answer, over the units that merged to `dev` this sprint:
   Acceptance Criteria (from the spec field, concept #2, I read at decomposition), not just each
   Task's local goal.
 
-I read the sprint's merged units (concept #6, batched) under the **"list means all"** policy —
-never a silently-truncated read; if the set could exceed the tool's return I close the gap with
-the idempotency/velocity query (concept #10) and treat a capped result as a truncation error, not
-a complete read. I read their PRs/threads on the active backend's PR surface (concept #11).
+I read the sprint's merged units through whichever carrier the project's `methodology.mode` selects
+— the iteration field under `mode: "scrum"` (concept #6), the `sprint:<n>` label under
+`mode: "flow"` (concept #4) — batched either way, under the **"list means all"** policy: never a
+silently-truncated read; if the set could exceed the tool's return I close the gap with the
+idempotency/velocity query (concept #10) and treat a capped result as a truncation error, not a
+complete read. I read their PRs/threads on the active backend's PR surface (concept #11).
+
+Nothing else in this checkpoint moves with the mode. Coherence is a property of the code the sprint
+produced, not of how the sprint was scheduled — the seams, the area composition, the architecture
+boundaries and the Acceptance Criteria read exactly the same whether admission was bounded by a
+velocity budget under `scrum` or by nothing at all under `flow`.
 
 ## Surfacing integration findings and filing forward-fixes
 
@@ -85,8 +92,9 @@ page.
 
 ## Checklist
 
-- [ ] Read all units merged to `dev` this sprint (concept #6, batched); "list means all" — no
-      silent truncation; a capped result treated as a truncation error.
+- [ ] Read all units merged to `dev` this sprint through the mode's carrier (the iteration field,
+      concept #6, under `scrum`; the `sprint:<n>` label, concept #4, under `flow`), batched; "list
+      means all" — no silent truncation; a capped result treated as a truncation error.
 - [ ] Verified seams between dependent/same-area units line up as built.
 - [ ] Verified the aggregate still fits `Architecture/` boundaries + `Conventions/`, and the
       Feature's Acceptance Criteria are collectively delivered.

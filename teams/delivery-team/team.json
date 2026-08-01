@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "name": "delivery-team",
-  "version": "0.8.3",
+  "version": "0.9.0",
   "description": "Work-item-driven, sprint-based autonomous software delivery on a pluggable backend (Azure DevOps or GitHub): role-agents + ceremony skills orchestrated by atl work dispatch over claude -p workers.",
   "author": {
     "name": "AgentTeamLand",
@@ -37,7 +37,7 @@
     },
     {
       "name": "project-manager",
-      "description": "Plans sprints for the delivery org: computes capacity from velocity, builds the dependency DAG, admits the right unblocked items, and writes the sprint-review report."
+      "description": "Plans sprints for the delivery org: builds the dependency DAG, admits the right items by priority — against a velocity-derived capacity ceiling under scrum mode, against no ceiling under flow, where the admitted set is kept DAG-closed — and writes the sprint-review report."
     },
     {
       "name": "tech-lead",
@@ -55,7 +55,7 @@
   "skills": [
     {
       "name": "delivery-init",
-      "description": "/delivery-init — connect a project to its backend (azure | github): select it, discover coordinates, probe connectivity, then write .delivery/config.json (secret-by-reference) + methodology.json."
+      "description": "/delivery-init — connect a project to its backend (azure | github): select it, discover coordinates, probe connectivity, pick the sprint mode (scrum | flow), then write .delivery/config.json (secret-by-reference) + methodology.json."
     },
     {
       "name": "kickoff",
@@ -67,7 +67,7 @@
     },
     {
       "name": "sprint-plan",
-      "description": "/sprint-plan — velocity-driven sprint selection: capacity from the last N=3 closed sprints, then the project-manager admits backlog units by priority at one granularity and assigns each the sprint's iteration."
+      "description": "/sprint-plan — sprint selection, mode-aware: capacity from the last N=3 closed sprints bounds admission under the scrum mode, while the flow mode has no ceiling and admits by priority with the admitted set kept DAG-closed. The project-manager admits at one granularity and stamps the sprint carrier (iteration field / sprint:<slug> label)."
     },
     {
       "name": "sprint-start",
@@ -75,7 +75,7 @@
     },
     {
       "name": "sprint-review",
-      "description": "/sprint-review — sprint-end: compile the Sprint Review Report (completed, PRs, evidence, dev preview, velocity, findings, promotion decision) and run the commit-bound PO gate — dev→release merges only for the exact commit a durable approval record names (GitHub backend in v1)."
+      "description": "/sprint-review — sprint-end: compile the Sprint Review Report (completed, PRs, evidence, dev preview, velocity under the scrum mode, findings, promotion decision) and run the commit-bound PO gate — dev→release merges only for the exact commit a durable approval record names (GitHub backend in v1)."
     },
     {
       "name": "request",

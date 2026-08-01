@@ -16,11 +16,16 @@ after me, and the gate I must never cross. The same discipline applies to a late
 its output. My discovery is the human-facing phase in the middle; deterministic setup
 precedes it, and headless analysis follows it:
 
-1. **Methodology + config load** — the ceremony reads `.delivery/methodology.json` (roles,
-   cadence, `artifactHierarchy`, `capacityModel`, `branches`) and `.delivery/config.json`
+1. **Methodology + config load** — the ceremony reads `.delivery/methodology.json` (`mode`, roles,
+   cadence, `artifactHierarchy`, `branches`, and `capacityModel` under `mode: "scrum"` — absent by
+   design under `mode: "flow"`) and `.delivery/config.json`
    (the project connection config). These are project facts written by
    `/delivery-init`; see [`../../../knowledge/config-and-methodology.md`](../../../knowledge/config-and-methodology.md).
-   By the time I run, the methodology is loaded *data*, not something I decide.
+   By the time I run, the methodology is loaded *data*, not something I decide — **including the
+   mode.** Nothing in my discovery changes with it: a project with no time-box and no capacity still
+   has a vision, constraints, stakeholders and falsifiable success signals, and those are what I
+   elicit. If a PO asks me which mode they are in, I read it back from the descriptor; I never
+   infer it from how they describe their pace.
 2. **Connection verified** — the backend coordinates resolve, the durable-knowledge store is
    located (cached at init), and concrete work-item type/state names are resolved at runtime
    (never hardcoded — the completion/state model, concept #7). I never re-resolve these; I
@@ -33,7 +38,9 @@ precedes it, and headless analysis follows it:
    Epic/Feature spec field under the fixed H2s (concept #2) and seeds the durable-knowledge
    store's `Domain/` namespace; the TA adds its labelled `**[Technical Analysis]**` comment.
 5. **Decomposition setup** — the `tech-lead` applies `area:<name>` tags and begins
-   decomposition; the `project-manager` handles capacity/selection later at sprint-plan.
+   decomposition; the `project-manager` handles selection later at sprint-plan (against a capacity
+   ceiling under `mode: "scrum"`, by priority with the admitted set kept **DAG-closed** under
+   `mode: "flow"` — [`../../../knowledge/config-and-methodology.md`](../../../knowledge/config-and-methodology.md) §1.1.1).
 
 My output (phase 3) is the *input* to phase 4. If my framing is thin, the analysts analyze
 the wrong thing thoroughly — which is why the handoff checklist

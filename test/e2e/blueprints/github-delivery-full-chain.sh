@@ -34,9 +34,19 @@
 #     >=2 NEW merges to dev, with at least one dependent issue CLOSED no earlier than the
 #     foundation (the scheduler enforced the edge).
 #   * NOTE (ok/note) — LLM-variable fidelity: the full 3-way fan-out, worktree reclaim,
-#     Status=Done, the exact code on dev, sprint-plan's Iteration write (the fixture Project
-#     has no Iteration field — gh cannot create it — so sprint-plan stays NOTE and
-#     sprint-start derives the DAG from the PBIs' `## Depends On` briefs, not the board).
+#     Status=Done, the exact code on dev, whether the plan turn labelled EVERY unit, and
+#     whether sprint-start therefore planned exactly the sprint's membership.
+#
+# This blueprint runs the delivery-team in **flow mode** (`"mode": "flow"`), the only one
+# that does; the other five seed no `mode` field, which resolves to scrum. Flow lives here
+# because this is the chain whose ceremonies differ AND because sprint admission was
+# previously untestable on this backend: scrum's carrier is a Projects v2 Iteration field,
+# `gh` cannot create one, and the fixture board has none — so "was this unit admitted to a
+# sprint?" was permanently NOTE, and sprint-start had to be told to sweep the open
+# area:web PBIs rather than read a sprint. Flow's carrier is a `sprint:<n>` label, which
+# `gh` CAN create, so that question becomes a CORE gate here (existence, shape, the
+# at-most-one-per-unit rule, and first-sprint-is-1), and the carrier->plan seam becomes
+# observable. The DAG still comes from the PBIs' `## Depends On` briefs either way.
 #     The workers run against the no-per-PBI-TA steady state (they read the [Technical
 #     Analysis] from the ancestor Feature, delivery-team >= 0.5.2); the ancestor traversal
 #     itself is NOT independently asserted here — a trivial task completes from the brief.
@@ -98,10 +108,19 @@ cat > "$PROJ/.delivery/config.json" <<EOF
   "credential": { "ref": "GH_TOKEN" }
 }
 EOF
+# FLOW MODE. This is the one blueprint that runs mode:"flow" — the other five seed a
+# descriptor with capacityModel and NO mode field, which under the contract resolves to
+# scrum, so they keep proving the scrum path and its backward compatibility unchanged.
+# Flow is tested HERE because this is the chain whose ceremonies actually differ, and
+# because scrum could never test sprint admission on this backend at all: the carrier is
+# a Projects v2 Iteration field, `gh` cannot create one, and the fixture board has none.
+# The flow carrier is a `sprint:<n>` label, which `gh` CAN create — so "was the sprint
+# admitted onto a durable carrier?" becomes assertable for the first time on GitHub.
 cat > "$PROJ/.delivery/methodology.json" <<'EOF'
 {
   "id": "scrum",
   "displayName": "Scrum",
+  "mode": "flow",
   "roles": [
     { "name": "intake",            "binding": "agent", "dispatch": "in-session" },
     { "name": "business-analyst",  "binding": "agent", "dispatch": "subagent" },
@@ -115,11 +134,16 @@ cat > "$PROJ/.delivery/methodology.json" <<'EOF'
   "artifactHierarchy": ["Epic", "Feature", "Pbi", "Task"],
   "workItemTypeMap": { "Pbi": null, "Task": null, "Bug": null },
   "cadence": { "unit": "sprint", "planningCeremonies": ["sprint-plan", "sprint-start"], "reviewCeremony": "sprint-review" },
-  "capacityModel": { "velocityWindowN": 3, "unit": "storyPoints", "coldStart": "po-seed", "seedVelocity": null, "availabilityFactorDefault": 1.0 },
   "branches": { "dev": "dev", "release": "release" }
 }
 EOF
-ok "seeded .delivery/config.json (github) + methodology.json"
+# capacityModel is ABSENT on purpose — the contract says the key is omitted under flow,
+# never written as null. A `"capacityModel": null` here would seed a half-written scrum
+# descriptor, which is exactly the shape the ceremonies are told to surface and stop on.
+jq -e 'has("mode") and .mode == "flow" and (has("capacityModel") | not)' \
+  "$PROJ/.delivery/methodology.json" >/dev/null 2>&1 \
+  && ok "seeded .delivery/config.json (github) + methodology.json (mode: flow, no capacityModel)" \
+  || bad "flow-mode methodology.json seed is malformed"
 
 # a ceremony turn: real claude -p; the delivery-team reaches GitHub through `gh` (which
 # reads GH_TOKEN from the env) — NO --mcp-config (github is gh-native, not an MCP).
@@ -171,13 +195,63 @@ done
   && note "no PBI carries its own [Technical Analysis] — workers ran the ancestor-Feature fallback steady state (traversal not independently asserted; trivial task completes from the brief)" \
   || note "$own_ta PBI(s) carry an own TA this run (refine-variable); the ancestor fallback still applies to the rest"
 
-# ---- 3. /sprint-plan — cold-start; NOTE (the fixture Project has no Iteration field) -
-gturn "/sprint-plan. You are ALSO acting as the human product owner. This is a cold-start project (no closed sprints) — use the po-seed velocity path with a seed velocity of 8 story points. Set a Story Points estimate (1-2 points each, they are small) on every open area:web PBI and admit them to the sprint. NOTE: the fixture GitHub Project has no Iteration field (it cannot be created via the CLI); if you cannot set Iteration, say so and proceed — /sprint-start will derive the plan from the open area:web PBIs. Report the seed velocity used." || bad "sprint-plan turn errored"
-items=$(gh project item-list "$PROJNUM" --owner "$OWNER" --format json -q '.items | length' 2>/dev/null || echo 0)
-ge "$items" && ok "sprint-plan added units to the Project board" || note "no board items this run (LLM-variable; sprint-start derives the plan from open PBIs)"
+# ---- 3. /sprint-plan — FLOW: no capacity ceiling, admit onto a `sprint:<n>` label ----
+# Deliberately does NOT tell the ceremony which ordinal to use or what the label looks
+# like: resolving "no sprint:* labels exist yet, so this is sprint:1" and forming the
+# label are the contract under test. An instruction naming `sprint:1` would assert only
+# that the turn can copy a string out of its own prompt.
+gturn "/sprint-plan. You are ALSO acting as the human product owner. This project runs in FLOW mode (see .delivery/methodology.json) — there is no capacity ceiling and no velocity to compute, so do NOT ask for a seed velocity and do NOT set story-point estimates. Admit ALL open area:web PBIs to the sprint by priority and DAG readiness, using the sprint carrier your mode's contract specifies. Add each admitted issue to Project #$PROJNUM as well. Report which sprint you opened and which units you admitted." || bad "sprint-plan turn errored"
+
+# The carrier assertions. Under scrum these could not exist on this backend at all: the
+# carrier is a Projects v2 Iteration field, `gh` cannot create one, and the fixture board
+# has none — so "was this unit actually admitted to a sprint?" was permanently unaskable
+# and sat at NOTE. A label IS `gh`-creatable, so it becomes a real gate here.
+#
+# Structured so the NULL outcome cannot pass: if the ceremony admitted nothing, the first
+# assertion FAILS and the rest are skipped rather than trivially passing on an empty set
+# (`jq 'all'` is true for []) — a vacuous green is worse than a missing test, because it
+# counts as coverage.
+LBLS=$(gh issue list --repo "$REPO" --state all --limit 100 --json number,labels 2>/dev/null || echo '[]')
+jqi() { echo "$LBLS" | jq -r "$1" 2>/dev/null || echo 0; }
+CARRIED=$(jqi '[.[] | select((.labels // []) | map(.name) | any(startswith("sprint:")))] | length')
+
+if [ "${CARRIED:-0}" -ge 1 ] 2>/dev/null; then
+  ok "sprint-plan admitted $CARRIED unit(s) onto a sprint carrier label"
+
+  # Shape: `sprint:<positive decimal integer, unpadded>`. Catches `sprint:sprint-1`,
+  # `sprint:Sprint 1`, `sprint:01` — each of which breaks the `sprint:[0-9]+` read every
+  # later ceremony filters on.
+  BADSHAPE=$(jqi '[.[] | .labels[]?.name | select(startswith("sprint:")) | select(test("^sprint:[1-9][0-9]*$") | not)] | unique | join(", ")')
+  [ -z "$BADSHAPE" ] && ok "every sprint label matches sprint:<unpadded positive integer>" \
+                     || bad "malformed sprint label(s): $BADSHAPE"
+
+  # At most ONE per unit. A field REPLACES its value where a label ACCUMULATES, so this is
+  # the gap the contract closes by hand; two labels on one unit means "which sprint is this
+  # in?" stops having an answer and the sprint's item read returns units that moved on.
+  MAXL=$(jqi '[.[] | (.labels // []) | map(select(.name | startswith("sprint:"))) | length] | max // 0')
+  [ "${MAXL:-0}" -le 1 ] 2>/dev/null && ok "no unit carries more than one sprint label (max $MAXL)" \
+                                     || bad "a unit carries $MAXL sprint labels — the two-label corrupt state"
+
+  # A fresh board has no sprint:* labels, so the contract's resolution rule ("a board with
+  # none starts at sprint:1") must produce exactly 1. reset_delivery_repo clears issues each
+  # run, so this is a real absolute, not a leftover from a previous run.
+  ORDS=$(jqi '[.[] | .labels[]?.name | select(startswith("sprint:")) | sub("^sprint:"; "")] | unique | join(",")')
+  [ "$ORDS" = "1" ] && ok "the first sprint on a fresh board resolved to sprint:1" \
+                    || note "sprint ordinal(s) '$ORDS' rather than a lone 1 (LLM-variable resolution)"
+
+  # Fidelity, not plumbing: whether the turn labelled ALL of them.
+  [ "${CARRIED:-0}" -ge "${PBI_CT:-0}" ] 2>/dev/null \
+    && ok "all $PBI_CT decomposed PBIs carry the sprint label" \
+    || note "$CARRIED of $PBI_CT PBIs carry the sprint label (LLM-variable; sprint-start falls back to open PBIs below)"
+else
+  bad "no issue carries a sprint:<n> label — flow-mode sprint admission did not happen"
+fi
+
+items=$(gh project item-list "$PROJNUM" --owner "$OWNER" --format json --limit 400 -q '.items | length' 2>/dev/null || echo 0)
+ge "$items" && ok "sprint-plan added units to the Project board" || note "no board items this run (LLM-variable; the sprint label is the carrier, the board is the view)"
 
 # ---- 4. /sprint-start — build the MULTI-NODE DAG + materialize plan.json (harness dispatches)
-gturn "/sprint-start. Read the sprint's admitted work-units (the open area:web PBIs; if none are on the board, use ALL open area:web PBIs). Read each PBI's '**[Canonical Brief]**' comment '## Depends On' lines to build the dependency DAG (a '#<n>' line under ## Depends On means this unit depends on unit n). Validate the DAG is acyclic. Materialize .delivery/plan.json in the EXACT dispatch.Plan schema: {\"sprintSlug\":\"<fs-safe-slug>\",\"granularity\":\"pbi\",\"units\":[{\"id\":<issue#>,\"title\":\"<title>\",\"predecessors\":[<issue#>...],\"stackRank\":<n>}]}. Use the JSON key 'stackRank' (the engine accepts 'priority' too, but this blueprint's assertions check 'stackRank'). There are no mobile-tagged units, so skip the emulator preflight. STOP after writing plan.json — do NOT run 'atl work dispatch'; the harness drives the engine." || bad "sprint-start turn errored"
+gturn "/sprint-start. Read the sprint's admitted work-units the way your mode's contract says a sprint's membership is read; if NO issue carries a sprint carrier at all, fall back to ALL open area:web PBIs so the run can continue. Read each PBI's '**[Canonical Brief]**' comment '## Depends On' lines to build the dependency DAG (a '#<n>' line under ## Depends On means this unit depends on unit n). Validate the DAG is acyclic. Materialize .delivery/plan.json in the EXACT dispatch.Plan schema: {\"sprintSlug\":\"<fs-safe-slug>\",\"granularity\":\"pbi\",\"units\":[{\"id\":<issue#>,\"title\":\"<title>\",\"predecessors\":[<issue#>...],\"stackRank\":<n>}]}. Use the JSON key 'stackRank' (the engine accepts 'priority' too, but this blueprint's assertions check 'stackRank'). There are no mobile-tagged units, so skip the emulator preflight. STOP after writing plan.json — do NOT run 'atl work dispatch'; the harness drives the engine." || bad "sprint-start turn errored"
 
 # CORE checkpoint: plan.json exists, valid, and a MULTI-NODE DAG (>=2 units, >=1 real edge, stackRank keys)
 if [ -f "$PROJ/.delivery/plan.json" ] && jq -e '.' "$PROJ/.delivery/plan.json" >/dev/null 2>&1; then
@@ -191,6 +265,28 @@ if [ -f "$PROJ/.delivery/plan.json" ] && jq -e '.' "$PROJ/.delivery/plan.json" >
   fi
 else
   bad "no valid .delivery/plan.json materialized"
+fi
+
+# The carrier -> sprint-start seam, reachable for the first time on this backend. Under
+# scrum sprint-start could only be told to use "all open area:web PBIs" (see the header),
+# because no carrier existed to read a sprint's membership FROM — so whether the ceremony
+# reads the sprint or just sweeps the backlog was untestable. NOTE tier, not CORE: it only
+# holds when the plan turn labelled every unit, which is LLM-variable.
+if [ "${CARRIED:-0}" -ge 1 ] 2>/dev/null && [ -f "$PROJ/.delivery/plan.json" ]; then
+  LABELLED=$(echo "$LBLS" | jq -c '[.[] | select((.labels // []) | map(.name) | any(startswith("sprint:"))) | .number] | sort' 2>/dev/null)
+  PLANNED=$(jq -c '[.units[].id] | sort' "$PROJ/.delivery/plan.json" 2>/dev/null)
+  [ -n "$LABELLED" ] && [ "$LABELLED" = "$PLANNED" ] \
+    && ok "sprint-start planned exactly the sprint's labelled units — the carrier->plan seam" \
+    || note "planned $PLANNED vs labelled $LABELLED (sprint-start swept open PBIs, or the label set was partial)"
+fi
+
+# sprintSlug stays a JSON STRING in both modes. dispatch.Plan.SprintSlug is a Go string,
+# so a bare `"sprintSlug": 1` fails json.Unmarshal and kills the WHOLE plan load before the
+# engine starts — a flow-specific footgun, since the flow slug reads like an integer.
+if [ -f "$PROJ/.delivery/plan.json" ]; then
+  jq -e '.sprintSlug | type == "string"' "$PROJ/.delivery/plan.json" >/dev/null 2>&1 \
+    && ok "plan.json sprintSlug is a JSON string (the engine's Go type)" \
+    || bad "plan.json sprintSlug is $(jq -r '.sprintSlug | type' "$PROJ/.delivery/plan.json" 2>/dev/null), not a string — json.Unmarshal will reject the plan"
 fi
 
 # ---- 5. DRIVE THE ENGINE: atl work dispatch --cap 2 (real claude -p workers) --------

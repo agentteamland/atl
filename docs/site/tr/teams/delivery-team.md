@@ -23,7 +23,7 @@ delivery-team, her biri kendi reflekslerine sahip birer uzman olan **rol-ajanlar
 | `intake` | Ham bir isteği şekillenmiş bir Epic/Feature backlog öğesine ayıklar. |
 | `business-analyst` | İş analizini yazar — Description'daki `## Problem / Business Value / Scope / Acceptance Criteria / Out of Scope`. |
 | `technical-analyst` | `**[Technical Analysis]**` sentinel yorumunu yazar — yaklaşım, fizibilite, NFR'ler, bağımlılıklar, önerilen alanlar. |
-| `project-manager` | Sprint temposunu yürütür — kapasite, iterasyon ataması, velocity. |
+| `project-manager` | Sprint temposunu yürütür — sprint'in birimlerini admit eder, sprint taşıyıcısını damgalar ve review raporunu yazar. Kapasite ve velocity yalnızca `scrum` modunda. |
 | `tech-lead` | Feature'ları iş-birimlerine ayrıştırır, her birimin `**[Canonical Brief]**`'ini yazar, proje wiki'sinin (`Architecture/`, `Conventions/`, ADR'ler) sahibidir ve **tek review kapısıdır** — her PR'ı gözden geçirir ve yeşilse tamamlar (= merge) ve Done'a set eder. |
 | `tester` | Bağımsız Level-2 doğrulama — niyeti yeniden türetir, doğru yüzeyde test-gate'leri koşar, kanıt ekler, bir verdict yayınlar. |
 | `developer` | İş-birimi başına spawn edilen, stack'ten bağımsız, dinamik bir worker; etiketli `area:<name>` bilgi-paketini yükler ve birimi implement eder. |
@@ -37,17 +37,49 @@ ekibi yeni bir ajan olmadan takılır.
 Sprint, her biri doğru rol olarak davranan, senin çağırdığın skill'lerle işler:
 
 ```bash
-/delivery-init      # backend'i seç (azure | github) + projenin koordinatlarını + metodolojiyi bağla
+/delivery-init      # backend'i (azure | github) + sprint modunu seç, koordinatları + metodolojiyi bağla
 /kickoff            # intake + business-analyst Epic/Feature backlog'unu şekillendirir
 /refine             # technical-analyst + tech-lead Feature'ları brief'li iş-birimlerine ayrıştırır
-/sprint-plan        # project-manager sprint'in birimlerini kapasiteye göre seçer
+/sprint-plan        # project-manager sprint'in birimlerini seçer — kapasiteye göre ya da küme DAG-kapalı tutularak önceliğe göre
 /sprint-start       # iş-birimi DAG'ını materialize et → motora devret
-/sprint-review      # velocity, review sonucu wiki sayfası, sprint kapanışı
+/sprint-review      # review sonucu sayfası, sprint kapanışı (+ scrum modunda velocity)
 /request            # (her an) proje-ortası istek → triyaj → fizibilite → dürüst PO kapısı → kabul/ertele/ret
 ```
 
 Metodoloji **kod değil, config'tir**: `methodology.json` (v1'de Scrum) seremonilerin okuduğu tempoyu
 bildirir — bakımı gereken bir workflow motoru yoktur.
+
+### İki sprint modu — `scrum` ve `flow`
+
+`methodology.json` bir `mode` taşır ve bu alan tam olarak iki şeyi değiştirir. **Alan yoksa `scrum`
+demektir**, yani mevcut bir projenin davranışı ayağının altından kaymaz.
+
+| | `mode: "scrum"` | `mode: "flow"` |
+|---|---|---|
+| Sprint nedir | bir **zaman kutusu** — backend'in takviminde tarihli bir aralık, kapasite tavanıyla | aynı sprint, **tarihsiz ve kapasite tavanı olmadan** |
+| `/sprint-plan` neye göre admit eder | önceliğe göre, velocity'den türetilen puan bütçesine kadar | **önceliğe** göre, admit edilen küme **DAG-kapalı** tutularak — hiçbir türde admit tavanı yok |
+| `/sprint-review` ne raporlar | gerçekleşen velocity | **velocity yok** — tamamlanan ile devreden, sprint'in tüm hesabıdır |
+| `capacityModel` | **zorunlu** | **yok** — anahtar tamamen atlanır |
+| Sprint taşıyıcısı | backend'in **iterasyon alanı** | admit edilen her birimde bir **`sprint:<n>` etiketi** |
+
+**DAG-kapalı** (DAG-closed), bir birimin bağımlı olduğu öncüller olmadan asla admit edilmemesi
+demektir: öncüller ya onunla birlikte içeri alınır ya da zaten tamamlanmıştır. Böylece bir `flow`
+sprint'i, yalnızca bugün başlayabilecek birimleri değil, `/sprint-start`'ın sıralayacağı gerçek
+bağımlılık kenarlarını taşır — ve ~4–6 eşzamanlılık sınırı, motorun **aynı anda** kaç birim
+çalıştıracağını sınırlar; seremoninin kaç birim admit edebileceğini değil.
+
+Geri kalan her şey aynıdır: aynı seremoniler, aynı roller, aynı DAG, aynı promotion kapısı.
+**Sözlük de değişmez — sprint her iki modda da sprint'tir.**
+
+Projenin **planlama yapılacak istikrarlı bir kapasitesi yoksa** `flow`'u seç — sabit bir periyot
+üzerinden velocity, anlam taşıması için istikrarlı olması gereken bir şeyin ortalamasıdır ve otonom bir
+ajanla çalışan tek kişilik bir maintainer'ın böyle bir sayısı yoktur (bir oturum sekiz birim çıkarır,
+sonraki sıfır). Böyle bir sayısı olan bir ekip `scrum`'da kalır, hiçbir değişiklik olmadan.
+
+Sprint'i bir etiket taşıdığı için bir `flow` projesi **ne `Iteration` ne de `Story Points` board
+alanına** ihtiyaç duyar — bu da GitHub'da `gh`'nin otomatikleştiremediği tek kurulum adımını ortadan
+kaldırır (bir Projects v2 Iteration alanı ayarlar arayüzünden elle eklenmek zorundadır). `Status` ve
+`Priority` hâlâ gerekir ve `/delivery-init` ikisini de senin için oluşturur ya da doğrular.
 
 ## Motor — `atl work dispatch`
 
@@ -126,6 +158,9 @@ Sprint <n> · <iterasyon-adı>
 ## Decision
 APPROVE
 ```
+
+(`mode: "flow"` altında adı verilecek bir iterasyon yoktur, dolayısıyla `## Sprint` satırı yalnızca
+`Sprint <n>` olur.)
 
 Yalnızca `## Approved Commit` taşıyıcıdır — gerisi denetim bağlamıdır. Bunu PR'ın yorum kutusuna yapıştır
 ya da CLI'dan gönder:

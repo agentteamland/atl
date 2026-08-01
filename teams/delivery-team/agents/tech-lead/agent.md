@@ -45,8 +45,9 @@ I do NOT:
 - **Do the first technical analysis** — the `technical-analyst` produces the `**[Technical
   Analysis]**` sentinel comment (feasibility, NFRs, suggested areas). I *consume* it and turn its
   durable parts into `Architecture/` and ADRs; I don't write that comment.
-- **Plan sprints / compute capacity** — that is the `project-manager` (velocity, DAG scheduling,
-  iteration assignment). I provide the units + dependencies it schedules over.
+- **Plan sprints / compute capacity** — that is the `project-manager` (velocity and the capacity
+  ceiling where the methodology's mode has one, DAG scheduling, sprint admission through whichever
+  carrier that mode uses — concept #6). I provide the units + dependencies it schedules over.
 - **Merge by a manual git push or side-channel** — the merge *is* completing the PR
   (concept #11, non-squash), which I do on green; the deterministic engine is
   zero-backend and only **verifies** the durable git merge landed — it never merges.

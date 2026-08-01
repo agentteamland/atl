@@ -6,7 +6,8 @@ description: /sprint-start — build the sprint's dependency DAG from the active
 # /sprint-start — DAG build, emulator preflight, dispatch launch
 
 This is the delivery-team's **bridge ceremony**: it sits after `/sprint-plan` has admitted a
-sprint's work-units (assigned their iteration, tagged their areas, linked their
+sprint's work-units (stamped them with the sprint's carrier — the iteration field under
+`mode: "scrum"`, the `sprint:<slug>` label under `mode: "flow"` — tagged their areas, linked their
 dependencies) and turns that settled backend state into the one file the deterministic Go engine
 reads, then launches the engine. It is the single point where an LLM ceremony hands off to
 `atl work dispatch` — no other ceremony spawns a `developer`/`tester` worker; the engine does.
@@ -47,7 +48,11 @@ Read `.delivery/config.json` + `.delivery/methodology.json` first (both are read
 ceremonies — only `/delivery-init` writes them). The concurrency cap, the `area:*` conventions,
 and the branch pair all flow from this data; the sprint's actual `dev` branch name comes from
 `config.branchPair` (config wins over `methodology.branches`), which the engine bases every
-worktree off.
+worktree off. **Resolve `mode` in that same read** — `"scrum"` or `"flow"`, **absent ⇒ `scrum`**,
+never inferred, an unrecognized value halts the ceremony
+([`config-and-methodology.md`](../../knowledge/config-and-methodology.md) §1.1) — because it decides
+how step 1 reads "this sprint's units". Nothing else in this ceremony is mode-dependent: the DAG,
+the acyclicity gate, the emulator preflight, and the handoff are identical in both modes.
 
 ### 1. Build the sprint's dependency DAG (roles: tech-lead + project-manager, in shared context)
 
@@ -57,8 +62,13 @@ Acting as the `tech-lead` (read [`../../agents/tech-lead/agent.md`](../../agents
 [`../../agents/project-manager/agent.md`](../../agents/project-manager/agent.md) + its `children/`,
 chiefly `sprint-planning-blueprint.md`), assemble the DAG from the sprint's committed work-units:
 
-- Read the sprint's admitted units — read the sprint's items (concept #6) for this sprint's
-  iteration. **"List means all"** (concept #10, the query/idempotency substrate): if the set
+- Read the sprint's admitted units — **by the mode's carrier**: under `scrum`, read the sprint's
+  items (concept #6) for this sprint's iteration; under `flow`, query the units carrying this
+  sprint's `sprint:<n>` label/tag (concept #4), where `<n>` is the **highest ordinal present** on the
+  board — **compared as an integer** (`sprint:10` outranks `sprint:9`; a lexical "highest" builds the
+  DAG from the wrong sprint) — i.e. the current sprint, which stays current until its
+  `Sprints/Sprint-<n>-Review` page exists.
+  Either way, **"List means all"** (concept #10, the query/idempotency substrate): if the set
   could exceed the tool's return, close the gap with a high-limit query and treat a
   result **at** the query's cap as a truncation error to surface, never as a complete read — a
   half-read sprint yields a broken DAG.
@@ -156,6 +166,11 @@ verbatim):
 
 - `sprintSlug` — a filesystem-safe id for this sprint; it becomes the `{slug}` in the engine's
   `delivery/{slug}/{id}` branch + worktree naming, so every branch traces to one unit and one PR.
+  Under `flow` this is the sprint's **ordinal** — the `<slug>` of its `sprint:<slug>` label — so it
+  is already filesystem-safe and needs no sanitizing; under `scrum` it is derived from the resolved
+  iteration name as before. **It is a JSON string in both modes**: a flow sprint writes
+  `"sprintSlug": "4"`, never the unquoted number — the engine deserializes this field as a string,
+  so a JSON number fails the whole plan load and the handoff never starts.
 - `granularity` — `"pbi"` or `"task"`, matching the single level `/sprint-plan` admitted at (the
   all-PBI-or-all-task rule; the DAG never spans levels). Do not mix.
 - `units[]` — one entry per admitted unit: `id` (the backend work-item id, concept #1 — the stable
