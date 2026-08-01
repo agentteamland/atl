@@ -64,6 +64,55 @@ const NudgeText = "atl guard — first edit of this file this session: before ch
 	"surgical (touch only what the task needs), and verify the blast radius rather than assuming it. " +
 	"(grep-before-edit · surgical-change)"
 
+// PipeExitNudge is the quality-layer text for reading $? after a pipeline. Like
+// the grep-before-edit nudge it never blocks — being wrong costs one line, while
+// being silent costs a measurement nobody knows is wrong.
+const PipeExitNudge = "atl guard — this reads $? after a pipeline, which is the LAST command's " +
+	"status (the `head`/`tail`/`grep` you piped into), not the one you care about. A failing " +
+	"command whose output you filtered will report success. Use ${PIPESTATUS[0]}, run the command " +
+	"without the filter and read its status, or `set -o pipefail` first. (a check whose failure " +
+	"does not reach the exit code is not a check)"
+
+// pipeExitRe matches a `$?` read that follows a pipeline in the same command:
+// a `|`, then a command separator, then `$?` before the next separator.
+// Deliberately loose about what sits between — the point is proximity, not
+// grammar — and per-command, since guard sees one Bash call at a time.
+//
+// `||` and `&&` are stripped BEFORE this runs. RE2 has no lookaround, so a
+// pattern that tried to exclude them inline would still match the second `|` of
+// `||` by backtracking — `cmd || true; echo $?` read as a pipeline. Removing the
+// control operators first is both correct and legible.
+var pipeExitRe = regexp.MustCompile(`\|[^;\n]*[;\n][^;\n]*\$\?`)
+
+// ctrlOpRe is the `||` / `&&` pair, replaced by `;` so a control operator is
+// never mistaken for a pipe.
+var ctrlOpRe = regexp.MustCompile(`\|\||&&`)
+
+// PipeExitCode reports whether a Bash command reads $? after a pipeline without
+// having set pipefail — the shape that silently reports a filtered command's
+// success. Pure; the unit-test target.
+//
+// This exists because the mistake is invisible by construction: the reading is
+// plausible, the number is real, and nothing errors. It was made twice in one
+// session, written to the knowledge base both times, and made again — which is
+// the case for a deterministic check rather than another page.
+//
+// Not a Deny. `$?` after a pipeline is legitimate when the pipeline's own status
+// is what you want, so this is the Context tier: it says what the number means
+// and moves on.
+func PipeExitCode(cmd string) bool {
+	if cmd == "" {
+		return false
+	}
+	// pipefail makes a pipeline's $? meaningful, so the shape is intentional.
+	if strings.Contains(cmd, "pipefail") {
+		return false
+	}
+	// A `||` or `&&` is a control operator, not a pipe — neutralise them before
+	// looking for a pipeline, or `a || b; echo $?` reads as one.
+	return pipeExitRe.MatchString(ctrlOpRe.ReplaceAllString(cmd, ";"))
+}
+
 // Decide routes a PreToolUse Input to a Result. fileExists reports whether a path
 // exists on disk; firstEdit reports (and records) whether this is the first edit
 // of a path in the session. Both are injected so the policy is testable without
@@ -73,6 +122,9 @@ func Decide(in Input, fileExists func(string) bool, firstEdit func(path string) 
 	case "Bash":
 		if reason, blocked := Catastrophe(in.ToolInput.Command); blocked {
 			return Result{Action: Deny, Reason: reason}
+		}
+		if PipeExitCode(in.ToolInput.Command) {
+			return Result{Action: Context, Reason: PipeExitNudge}
 		}
 	case "Edit", "MultiEdit", "Write":
 		p := in.ToolInput.FilePath
