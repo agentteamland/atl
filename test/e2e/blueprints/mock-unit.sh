@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # needs: none
+# touches: test/e2e/mock-mcp
 #
 # mock-unit — the auth-free backbone for delivery-team stone #9 ②. Runs the mock
 # azureDevOps MCP server's OWN unit tests (node --test) in-container: store CRUD +

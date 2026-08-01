@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # needs: gh
+# touches: cli/internal/publish, cli/internal/manifest, cli/cmd/atl/commands/publish.go
 #
 # publish-own — a team you OWN: a global-layer gain re-publishes to your repo as
 # a real commit + version bump + tag against <login>/atl-e2e-owned. The repo is

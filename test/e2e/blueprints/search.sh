@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # needs: none
+# touches: cli/internal/index, cli/cmd/atl/commands/search.go
 #
 # search — the catalog is searchable by keyword and by name, browsable with no
 # query, and a miss reports cleanly. Runs against the injected test index, so it

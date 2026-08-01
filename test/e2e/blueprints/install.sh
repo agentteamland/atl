@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # needs: none
+# touches: cli/internal/teampkg, cli/internal/manifest, cli/internal/index, cli/internal/source, cli/cmd/atl/commands/install.go, core/
 #
 # install — a clean user installs the fixture team at both scopes; assets +
 # manifests land, and the embedded core (rules + skills) reflects to global.

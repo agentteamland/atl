@@ -54,6 +54,37 @@ claude_turn() {
   jq -r '.result // empty' "$raw" >>"$HOME/turns.log" 2>/dev/null
   if [ "$rc" -eq 124 ] || [ "$rc" -eq 137 ]; then
     echo "  turn timed out after ${CLAUDE_TURN_TIMEOUT}s (see turns.log)" | tee -a "$HOME/turns.log"
+    return "$rc"
+  fi
+
+  # ONE retry on a transient API failure. A dropped connection has cost a
+  # 29-minute blueprint outright: the ceremony did its work -- the Epic, the
+  # Feature and the [Technical Analysis] comment all landed, and the assertions
+  # after it passed -- but the envelope never arrived, so the turn returned
+  # non-zero and the blueprint failed on a network event.
+  #
+  # Retrying is safe because of a property the ceremonies already guarantee, not
+  # because a second attempt is cheap: every create is check-first by a stable
+  # `atl-key`, so a re-run CONVERGES on the same items instead of duplicating
+  # them. That is the whole reason this is one line rather than a rollback. Do
+  # not extend this to a step without that guarantee.
+  #
+  # Only genuinely transient shapes, and only once: a real failure must stay a
+  # failure, and a retry loop would hide a systematic error behind a longer wait.
+  if [ "$rc" -ne 0 ] && grep -qiE 'API Error|Connection closed|overloaded_error|rate.?limit|502 Bad Gateway|503 Service' "$raw" 2>/dev/null; then
+    echo "  transient API failure — retrying the turn once (ceremonies converge by atl-key)" | tee -a "$HOME/turns.log"
+    printf '===== RETRY: %.120s\n' "$prompt" >>"$HOME/turns.log"
+    ( cd "$PROJ" && timeout -k 30s "$CLAUDE_TURN_TIMEOUT" \
+        claude -p "$prompt" "$@" --dangerously-skip-permissions --output-format json \
+    ) >"$raw" 2>&1
+    rc=$?
+    cat "$raw" >>"$HOME/turns.log"
+    jq -r '.result // empty' "$raw" >>"$HOME/turns.log" 2>/dev/null
+    if [ "$rc" -eq 0 ]; then
+      echo "  retry succeeded" | tee -a "$HOME/turns.log"
+    else
+      echo "  retry also failed (rc=$rc) — treating as a real failure" | tee -a "$HOME/turns.log"
+    fi
   fi
   return "$rc"
 }

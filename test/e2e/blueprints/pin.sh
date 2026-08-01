@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # needs: none
+# touches: cli/internal/manifest, cli/cmd/atl/commands/pin.go
 #
 # pin — a pinned project file is held back from promote; unpin re-enables it.
 source /e2e/lib.sh

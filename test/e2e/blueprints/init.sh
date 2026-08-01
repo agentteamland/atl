@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # needs: none
+# touches: cli/internal/scaffold, cli/cmd/atl/commands/init.go
 #
 # init — `atl init` scaffolds a starter CLAUDE.md per tier, only if one doesn't
 # already exist (never clobbers a user file), and the flags are mutually
