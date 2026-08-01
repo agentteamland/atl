@@ -45,8 +45,14 @@ The threshold (`ATL_E2E_WATCH_STALL`, default 1200s) is sized off the real bound
 than guessed: `lib.sh` caps one turn at `CLAUDE_TURN_TIMEOUT` (900s) plus a 30s kill grace,
 and assertions print between turns, so no legitimate quiet stretch reaches 20 minutes.
 
+`run.sh` mirrors every run to `test/e2e/.last-run.log`, so `watch.sh` needs no argument at
+all — and guessing one (`ls -t` over a task directory, say) is how you end up watching the
+wrong file and trusting a green that belongs to something else.
+
 Exit codes: `0` clean · `1` finished with failures · `2` stalled · `3` the log never
-appeared.
+appeared. **A non-zero exit here describes the SUITE, not the watcher** — under the Monitor
+tool that surfaces as "script failed", which reads like the watcher broke. It did not; the
+event line immediately above it carries the real verdict.
 
 ## Blueprints
 

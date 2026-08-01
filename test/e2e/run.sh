@@ -18,6 +18,21 @@
 set -euo pipefail
 cd "$(dirname "$0")/../.."   # atl repo root (build context)
 BPDIR="test/e2e/blueprints"
+RUNLOG="test/e2e/.last-run.log"
+
+# Mirror everything to a STABLE path so the watcher can be armed without being handed a
+# path — guessing one (`ls -t` over a task directory, say) is how you end up watching the
+# wrong file and trusting a green that belongs to something else.
+#
+# Re-exec through a pipe rather than `exec > >(tee …)`: a process substitution is not
+# waited for, so the final tally — the one line that matters most — can be lost when the
+# script exits first. The pipeline is waited for, and PIPESTATUS[0] carries the real
+# status through unchanged.
+if [ -z "${ATL_E2E_TEED:-}" ]; then
+  export ATL_E2E_TEED=1
+  bash "$BPDIR/../run.sh" "$@" 2>&1 | tee "$RUNLOG"
+  exit "${PIPESTATUS[0]}"
+fi
 
 # Resolve the ref the CONTAINER installs TEAM content from (host side).
 #
@@ -55,6 +70,8 @@ elif ! git diff --quiet FETCH_HEAD -- teams/; then
   exit 2
 fi
 echo ">> team content from ref: $ATL_E2E_TEAM_REF"
+echo ">> logging to $RUNLOG — a full run takes ~2h and reports only at the end, so watch it:"
+echo ">>   test/e2e/watch.sh          (under the Monitor tool, persistent)"
 
 SUITE_START=$SECONDS
 echo ">> building atl-e2e image"
