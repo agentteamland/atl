@@ -18,8 +18,10 @@
 #   * CORE (ok/bad) — the reliable e2e plumbing that must hold: install, kickoff's
 #     Epic+Feature issues + the [Technical Analysis] sentinel comment, sprint-start's
 #     valid plan.json, the developer->tech-lead PR merged to `dev` + its issue CLOSED
-#     (the adapter §10 completion gate), and the sprint-review dev->release PR. A
-#     regression here fails the test.
+#     (the adapter §10 completion gate), and sprint-review's commit-bound promotion
+#     gate (#16) — `atl work promote` HOLDs without a matching approval record and
+#     merges dev->release only for the exact commit that was approved. A regression
+#     here fails the test.
 #   * NOTE (ok/note) — the less-deterministic ceremony field-writes (refine PBIs,
 #     area/atl-key labels, the Project Iteration/Status/Story-Points writes, the docs/
 #     seed). Across runs an LLM turn may skip one; a miss is NOTED, not failed — a
@@ -181,15 +183,142 @@ ge "$clc" && ok "the worked issue was closed on merge-verify (§10)" || bad "no 
 done_ct=$(gh project item-list "$PROJNUM" --owner "$OWNER" --format json -q '[.items[] | select((.status // "") == "Done")] | length' 2>/dev/null || echo 0)
 ge "$done_ct" && ok "a board item reached Status=Done" || note "no board item at Status=Done this run (LLM-variable; the close still happened)"
 
-# ---- 6. /sprint-review — report to docs/sprints + PO approve -> dev->release PR ----
-# Baseline the dev->release PR count FIRST: its head is `dev` (never branch-deleted by
-# the reset), so the PR record persists across runs — assert an INCREASE this run.
-prev_rel=$(gh pr list --repo "$REPO" --base release --state all --limit 400 --json number -q 'length' 2>/dev/null || echo 0)
-gturn "/sprint-review. You ARE the human product owner for this run — the real decision-maker, not a stand-in, and this is your own genuine call, NOT a pre-commitment made before the report existed. Compile the Sprint Review Report and upsert it to docs/sprints/sprint-1-review.md in the repo (the in-repo durable-knowledge store). Then — having NOW read that compiled report yourself as the PO — make the Approve/Reject decision at the gate: you **APPROVE** this sprint. You have already weighed the state and accept it: a partial completion (some PBIs carried over to the next sprint is fine), no CI configured in this fixture, and no preview link are all expected and acceptable to you here; you choose to promote what shipped and carry the rest forward. This is a real, reviewed PO approval — you are the human, so do NOT hold, defer, or wait for any further human input. Record the approval and open the dev->release promotion PR now: gh pr create --base release --head dev." || bad "sprint-review turn errored"
+# ---- 6. /sprint-review — the COMMIT-BOUND PO approval gate (concept #16) ----------
+# The gate reads state, not prose — and it no longer lives in the ceremony at all. The
+# PO's approval is a durable record on the promotion PR whose first line is exactly
+# '**[Promotion Approval]**' and which names ONE commit under '## Approved Commit'; the
+# comparison against the PR's CURRENT head, and the merge, are BOTH performed by
+# `atl work promote`. /sprint-review opens-or-finds the PR (step 6a) and runs that
+# command.
+#
+# So these phases assert on the COMMAND — its exit code and its --json verdict — not on
+# the ceremony's wording. That is the whole reason the decision moved into code: the
+# prose version of this check was honoured on one turn and silently skipped on the very
+# next, and no assertion on ceremony prose can tell those two apart.
+#
+# The PO-identity framing this turn used to carry ("you ARE the product owner … you
+# APPROVE") stays DELETED: its only job was to talk the gate into proceeding, and
+# against a state-read gate it would make it impossible to tell whether the STATE or
+# the PROSE crossed the gate. The harness sets the signal out of band with plain `gh`,
+# exactly as the human PO would.
+#
+# Three phases, one ceremony turn each, each followed by a direct gate assertion:
+#   1. no record naming the head           -> HOLD (nothing merges)
+#   2. a record naming a SUPERSEDED commit -> HOLD, reason 'superseded' (the binding)
+#   3. a record naming the CURRENT head    -> verify + merge; `release` then CONTAINS it
+# Phase 2 runs BEFORE the merge deliberately: a merged PR cannot be reused, so a stale
+# record posted after phase 3 would land on a freshly-opened PR carrying no record at
+# all, and the assertion would pass for the wrong reason (no-record, not stale-SHA).
+#
+# Baseline MERGED dev->release PRs — upgraded from `--state all`, which also counted
+# OPEN ones: opening the promotion PR is now a PRE-gate step (6a), so only a MERGED PR
+# is a promotion. Its head is `dev` (never branch-deleted by the reset), so the merged
+# record persists across runs — assert an INCREASE this run, never an all-time count.
+relm()   { gh pr list --repo "$REPO" --base release --state merged --limit 400 --json number -q 'length' 2>/dev/null || echo 0; }
+prhead() { gh pr view "$1" --repo "$REPO" --json headRefOid -q .headRefOid 2>/dev/null; }
+# rel_contains <sha> — does `release` actually CONTAIN that commit? This is the MERGED
+# state. Comparing the promotion PR's head to the approved sha is NOT: those two are
+# trivially equal when nothing merged at all, which is how that check passed in a run
+# where the promotion never happened. compare/BASE...HEAD reports 'identical' when the
+# two are the same commit and 'behind' when HEAD is an ancestor of BASE — both mean
+# release has it; 'ahead'/'diverged' mean it does not.
+rel_contains() {
+  local st; st=$(gh api "repos/$REPO/compare/release...$1" -q .status 2>/dev/null)
+  [ "$st" = "identical" ] || [ "$st" = "behind" ]
+}
+# gate — run the deterministic promotion gate DIRECTLY and capture its machine verdict.
+# The --json verdict goes to stdout; cobra's one-line error summary goes to stderr and
+# would corrupt it for jq, so stderr is dropped. Exit 0 = promoted, non-zero = hold
+# (which merges nothing, so calling this in the HOLD phases is side-effect-free).
+GATE_RC=0; GATE_VERDICT=""; GATE_REASON=""
+gate() {
+  local out; out=$(cd "$PROJ" && atl work promote --json 2>/dev/null); GATE_RC=$?
+  GATE_VERDICT=$(printf '%s' "$out" | jq -r '.verdict // empty' 2>/dev/null)
+  GATE_REASON=$(printf '%s' "$out" | jq -r '.reason // empty' 2>/dev/null)
+}
+# post_approval <pr#> <sha> — set the #16 record out of band, as the PO would.
+# --body-file, not --body: `atl guard` scans the whole Bash command string.
+post_approval() {
+  printf '**[Promotion Approval]**\n\n## Approved Commit\n%s\n\n## Sprint\nSprint 1\n\n## Decision\nAPPROVE\n' "$2" > "$HOME/approval.md"
+  gh pr comment "$1" --repo "$REPO" --body-file "$HOME/approval.md" >/dev/null 2>&1
+}
+prev_rel=$(relm)
 
-# CORE: a NEW dev->release promotion PR opened this run
-rel=$(gh pr list --repo "$REPO" --base release --state all --limit 400 --json number -q 'length' 2>/dev/null || echo 0)
-{ [ "$rel" -gt "$prev_rel" ]; } 2>/dev/null && ok "PO-approved dev->release promotion PR opened this run (§10)" || bad "no NEW dev->release PR opened"
+# --- phase 1: compile + open-or-find the promotion PR + HOLD (no approval on record) -
+gturn "/sprint-review. Compile the Sprint Review Report and upsert it to docs/sprints/sprint-1-review.md. Open or find the dev->release promotion PR, then run the gate. Report the promotion PR number and its head commit." || bad "sprint-review turn 1 errored"
+
+# CORE: the gate HELD — nothing merged without an approval record. "matching" is the
+# honest predicate: the reset leaves a record-free baseline, but a promotion PR left open
+# by a FAILED prior run survives it (its head is `dev`, never deleted) carrying that run's
+# records — all superseded, since the reset force-pushes a fresh `dev` head. Either way
+# the property asserted is the same: no merge without a record naming the current head.
+rel_h=$(relm)
+{ [ "$rel_h" -eq "$prev_rel" ]; } 2>/dev/null && ok "gate HELD with no matching approval record — no dev->release merge (#16 fail-closed)" || bad "promotion merged with no matching approval record on the PR"
+# CORE liveness (so the negative above is not vacuous): the ceremony did reach the gate.
+PRNUM=$(gh pr list --repo "$REPO" --base release --state open --limit 400 --json number -q '.[0].number // empty' 2>/dev/null)
+[ -n "$PRNUM" ] && ok "promotion PR opened before the gate (step 6a)" || bad "no promotion PR — the ceremony never reached the gate"
+# CORE: the gate's OWN verdict, on the same PR. Both 'no-record' and 'superseded' are
+# correct here — the reset leaves a record-free baseline, but a promotion PR left OPEN
+# by a failed prior run survives it (its head is `dev`, never deleted) carrying that
+# run's records, all superseded by the fresh force-pushed head. What must hold either
+# way is a HOLD verdict and a non-zero exit: no record names the current head.
+gate
+{ [ "$GATE_RC" -ne 0 ] && [ "$GATE_VERDICT" = "hold" ]; } && ok "atl work promote HELD with no record naming the head (reason=$GATE_REASON, exit $GATE_RC)" || bad "atl work promote did not hold: verdict='$GATE_VERDICT' reason='$GATE_REASON' exit $GATE_RC"
+# NOTE: the refusal wording is LLM-variable
+grep -Eiq 'promotion approval|no approval on record|HOLD' "$HOME/turns.log" 2>/dev/null && ok "the hold was surfaced to the PO" || note "hold message not detected (LLM-variable wording)"
+
+# --- phase 2: approve a commit, then let `dev` advance past it ----------------------
+# Read every SHA through the SERVER, never from $PROJ: the merges happen server-side
+# (gh pr merge), so the local clone never holds the promoted state.
+STALE_SHA=$(prhead "$PRNUM")
+post_approval "$PRNUM" "$STALE_SHA" || bad "could not set the approval signal"
+git -C "$PROJ" fetch -q origin
+git -C "$PROJ" checkout -q -f dev
+git -C "$PROJ" reset -q --hard origin/dev
+git -C "$PROJ" -c user.email=e2e@atl.local -c user.name=atl-e2e commit -q --allow-empty -m "e2e: advance dev after the approval"
+git -C "$PROJ" push -q origin HEAD:dev || bad "could not advance dev — the stale control is not armed"
+# CORE: the control is ARMED. Without this the HOLD below passes vacuously — a `dev`
+# that never moved leaves the on-record approval CURRENT, not stale.
+# POLL, don't read once: `git push` returns before GitHub has updated the PR's
+# headRefOid, so a single read races the server — it reported the OLD sha and failed
+# this assertion in a run whose end-of-run debug showed the head HAD advanced.
+moved=$(prhead "$PRNUM")
+tries=0
+while [ "$tries" -lt 30 ] && { [ -z "$moved" ] || [ "$moved" = "$STALE_SHA" ]; }; do
+  sleep 2
+  tries=$((tries + 1))
+  moved=$(prhead "$PRNUM")
+done
+{ [ -n "$moved" ] && [ "$moved" != "$STALE_SHA" ]; } && ok "stale control armed — the promotion PR head advanced past the approved commit (after $tries poll(s))" || bad "the promotion PR head did not advance past $STALE_SHA within 60s"
+
+gturn "/sprint-review. Re-run the gate on the existing promotion PR." || bad "sprint-review turn 2 errored"
+# CORE: an approval naming a superseded commit is not an approval
+rel_s=$(relm)
+{ [ "$rel_s" -eq "$prev_rel" ]; } 2>/dev/null && ok "a stale approval (dev advanced) did NOT promote (#16 commit-binding)" || bad "stale approval promoted an unapproved commit"
+# CORE: the binding itself, on the gate's own verdict. 'superseded' is exact here
+# (unlike phase 1): a record for a commit `dev` has since moved past is on the PR, so
+# no other hold reason is correct.
+gate
+{ [ "$GATE_RC" -ne 0 ] && [ "$GATE_REASON" = "superseded" ]; } && ok "atl work promote reported reason=superseded for the stale record (#16 commit-binding)" || bad "expected a superseded hold: got verdict='$GATE_VERDICT' reason='$GATE_REASON' exit $GATE_RC"
+
+# --- phase 3: approve the CURRENT head -> verify + merge ----------------------------
+APPROVED=$(prhead "$PRNUM")
+post_approval "$PRNUM" "$APPROVED" || bad "could not set the approval signal"
+gturn "/sprint-review. Re-run the gate on the existing promotion PR." || bad "sprint-review turn 3 errored"
+
+# CORE: a NEW dev->release PR was MERGED this run
+rel=$(relm)
+{ [ "$rel" -gt "$prev_rel" ]; } 2>/dev/null && ok "commit-bound PO approval promoted dev->release (#16)" || bad "no NEW MERGED dev->release PR after a valid approval"
+# CORE: `release` actually CONTAINS the approved commit — the MERGED state, not the PR
+# head. The old form compared the PR head to $APPROVED, which is trivially equal when
+# nothing merged at all: it passed in a run where the promotion never happened.
+rel_contains "$APPROVED" && ok "release contains the approved commit $APPROVED (#16 binding)" || bad "release does NOT contain the approved commit $APPROVED — nothing was promoted"
+# CORE: a re-run converges. With the promotion merged there is no open dev->release PR
+# left, so the gate holds with 'no-open-pr' and nothing merges twice. (If the ceremony
+# above failed to promote, this call promotes instead and reports 'promoted' — an extra
+# honest FAIL here, never a false pass: the two assertions above have already fired.)
+gate
+{ [ "$GATE_RC" -ne 0 ] && [ "$GATE_REASON" = "no-open-pr" ]; } && ok "a re-run converges — no open promotion PR left, nothing merged twice" || bad "expected a no-open-pr hold on re-run: got verdict='$GATE_VERDICT' reason='$GATE_REASON' exit $GATE_RC"
 # NOTE: the sprint-review page written to docs/sprints/.
 # ?ref=dev is load-bearing: the ceremony works on the dev branch, but `contents`
 # without a ref resolves against the DEFAULT branch, so this could never find the
@@ -206,6 +335,14 @@ if [ "$FAIL" -gt 0 ]; then
   echo "--- turns.log (tail) ---"; tail -100 "$HOME/turns.log" 2>/dev/null
   echo "--- issues ---";           gh issue list --repo "$REPO" --state all --json number,title,state,labels 2>/dev/null
   echo "--- PRs ---";              gh pr list --repo "$REPO" --state all --json number,baseRefName,state 2>/dev/null
+  if [ -n "${PRNUM:-}" ]; then
+    echo "--- promotion PR head + approval records ---"
+    gh pr view "$PRNUM" --repo "$REPO" --json headRefOid,comments -q '{head: .headRefOid, approvals: [.comments[] | select(.body | startswith("**[Promotion Approval]**")) | {author: .author.login, at: .createdAt, body: .body}]}' 2>/dev/null
+  fi
+  # The last gate verdict as captured, NOT a fresh `atl work promote` — re-running it
+  # here could merge a promotion the failing run had not made.
+  echo "--- last gate verdict ---"; echo "verdict='${GATE_VERDICT:-}' reason='${GATE_REASON:-}' exit=${GATE_RC:-}"
+  echo "--- release head ---";      gh api "repos/$REPO/commits/release" -q .sha 2>/dev/null
   echo "--- board items ---";      gh project item-list "$PROJNUM" --owner "$OWNER" --format json 2>/dev/null | jq '[.items[] | {title, status}]' 2>/dev/null
   echo "--- plan.json ---";        cat "$PROJ/.delivery/plan.json" 2>/dev/null
   echo "==============================================="

@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/signal"
@@ -8,6 +9,7 @@ import (
 	"syscall"
 
 	"github.com/agentteamland/atl/cli/internal/dispatch"
+	"github.com/agentteamland/atl/cli/internal/promotiongate"
 	"github.com/spf13/cobra"
 )
 
@@ -103,9 +105,82 @@ var workDispatchCmd = &cobra.Command{
 	},
 }
 
-var workDispatchCap int
+// workPromoteRunner is the exec seam `work promote` shells gh through — the real
+// binary in production, a fake in tests, so every hold path and the promote path
+// are covered without a network.
+var workPromoteRunner = promotiongate.ExecRunner
+
+var workPromoteCmd = &cobra.Command{
+	Use:   "promote",
+	Short: "Verify the commit-bound promotion approval and merge the dev→release PR",
+	Long: "Read the `**[Promotion Approval]**` record the human product owner posted on\n" +
+		"the dev→release PR, compare the commit it names against that PR's CURRENT head,\n" +
+		"and merge only on an exact match — every other outcome holds and merges nothing.\n" +
+		"Verification and merge are one step on purpose: a separate merge is a step a\n" +
+		"ceremony can reach without the check. Invoked by /sprint-review's gate.",
+	Args: cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		root, err := os.Getwd()
+		if err != nil {
+			return err
+		}
+		cfg, err := dispatch.LoadDeliveryConfig(root)
+		if err != nil {
+			return err
+		}
+		if cfg == nil {
+			return fmt.Errorf("no %s — run /delivery-init first", dispatch.DeliveryConfigPath(root))
+		}
+
+		var res promotiongate.Result
+		switch backend := cfg.ActiveBackend(); backend {
+		case "github":
+			if cfg.Owner == "" || cfg.Repo == "" {
+				return fmt.Errorf("%s is missing owner/repo — the github backend needs both", dispatch.DeliveryConfigPath(root))
+			}
+			res = promotiongate.Gate{
+				Owner:   cfg.Owner,
+				Repo:    cfg.Repo,
+				Dev:     cfg.DevBranch(),
+				Release: cfg.ReleaseBranch(),
+				PR:      workPromotePR,
+				Run:     workPromoteRunner,
+			}.Verify()
+		default:
+			// Only the record leg of concept #16 is bound outside GitHub; the
+			// head-commit read is not, so the comparison cannot run at all.
+			res = promotiongate.HoldBackendUnbound(backend)
+		}
+
+		out := cmd.OutOrStdout()
+		if workPromoteJSON {
+			b, err := json.MarshalIndent(res, "", "  ")
+			if err != nil {
+				return err
+			}
+			fmt.Fprintln(out, string(b))
+		} else {
+			fmt.Fprintln(out, res.Message)
+		}
+		if res.Verdict != promotiongate.Promoted {
+			// Non-zero so a caller that ignores the message still cannot read a hold
+			// as a promotion. The detail is already on stdout (the `atl skills check`
+			// shape); this line is the one-sentence summary.
+			return fmt.Errorf("promotion held (%s) — nothing was merged", res.Reason)
+		}
+		return nil
+	},
+}
+
+var (
+	workDispatchCap int
+	workPromotePR   int
+	workPromoteJSON bool
+)
 
 func init() {
 	workDispatchCmd.Flags().IntVar(&workDispatchCap, "cap", dispatch.DefaultCap, "max concurrent workers")
-	workCmd.AddCommand(workDispatchCmd)
+	workPromoteCmd.Flags().IntVar(&workPromotePR, "pr", 0, "promotion PR number (default: the open dev→release PR)")
+	workPromoteCmd.Flags().BoolVar(&workPromoteJSON, "json", false, "emit the machine-readable verdict instead of the message")
+	workCmd.AddCommand(workDispatchCmd, workPromoteCmd)
 }

@@ -50,13 +50,28 @@ rules below or is escalated, not guessed.
 | List / create / assign iterations | `work_list_iterations` / `work_create_iterations` / `work_assign_iterations` |
 | Read / write team capacity | `work_get_team_capacity` / `work_update_team_capacity` |
 | Create / update / vote / thread a PR | `repo_create_pull_request` / `repo_update_pull_request` / `repo_vote_pull_request` / `repo_create_pull_request_thread` / `repo_list_pull_request_threads` / `repo_reply_to_comment` |
+| **Promotion approval record (#16)** | write: `repo_pull_request_thread_write` (action `create`, `content` = the record) · read: `repo_pull_request_thread` (action `list`), sentinel-matched (§7) |
 | List a project's repos (discovery, e.g. `/delivery-init`) | `repo_list_repos_by_project` |
-| Read repo/branch/file | `repo_get_repo_by_name_or_id` / `repo_get_branch_by_name` / `repo_get_file_content` |
+| **Read a branch (its head commit id, #16)** | `repo_branch` (action `get`, `branchName`) — ⚠ the response field carrying the commit id is **UNRESOLVED**; see §10 |
+| **Verify the promotion approval + merge `dev`→`release` (#16)** | **not bound** — `atl work promote` holds with `backend-unbound` here (§10); no Azure surface is called |
+| Read repo/file | `repo_get_repo_by_name_or_id` / `repo_get_file_content` |
 | Read / upsert / list wiki pages | `wiki_get_page_content` / `wiki_create_or_update_page` / `wiki_list_pages` / `wiki_get_wiki` / `wiki_list_wikis` |
 | Discovery search | `search_workitem` / `search_wiki` / `search_code` |
 | Resolve project/team/identity | `core_list_projects` / `core_list_project_teams` / `core_get_identity_ids` |
 | **Attachment UPLOAD** (evidence: screenshots/results) | **no MCP tool → REST carve-out (§9)** |
 | Attachment READ | `wit_get_work_item_attachment` |
+
+**Which rows are verified.** The two `#16` rows name tools resolved verbatim against the
+currently-shipped `@azure-devops/mcp` surface, which consolidates the older granular tools into
+action-based ones (`repo_branch` with `action: "get"`, `repo_pull_request_thread` /
+`repo_pull_request_thread_write` with `action`). The remaining rows still name the
+**pre-consolidation** surface and have **not** been re-verified here — repairing them is a
+separate pass, not this one, so expect a row above (and a tool named in the prose of §7 / §10) to
+disagree with the live server; the PR-thread tools are named both ways in this file for that
+reason. When it does,
+the rule at the top of this section wins: **resolve the real name before calling, never guess one**,
+then record it here. The same standard applies to a response **field**: a field you cannot evidence
+is not a field you may write down (see §10 for the one that currently blocks #16 on Azure).
 
 ## 3. Resilience — rate-limit / backoff
 
@@ -206,6 +221,21 @@ guessing**:
   `## Dissent On Record` (the team's preserved dissent under (b)/(c); empty on an (a) merit-win). Same
   one-comment,
   sentinel-located discipline as the analysis/brief.
+- **Promotion approval** (the human PO, at `/sprint-review`'s gate) → a **thread on the
+  `dev`→`release` promotion PR** (`repo_pull_request_thread_write`, action `create`) whose first
+  line is the exact sentinel `**[Promotion Approval]**` (concept #16), then fixed H2s:
+  `## Approved Commit` (a 40-character lowercase hex commit id — **the only load-bearing
+  section**), `## Sprint` (`Sprint <n> · <iteration-name>`), `## Decision` (`APPROVE`). Everything
+  else in the body is audit context. It rides the PR, not a work-item, because a sprint promotion
+  has no work-item to hang on. **Its read-back rule is different from every other sentinel here**
+  — this channel is **append-and-supersede**, so converging on one thread is wrong: list the PR's
+  threads (`repo_pull_request_thread`, action `list`), keep **every** thread whose first comment's
+  first line is exactly the sentinel, and in each take the first `[0-9a-f]{40}` token on a line
+  after `## Approved Commit`. Selection is then **by commit id, never by recency** — a record
+  counts only if the commit it names is the one about to be promoted; a newer record supersedes an
+  older one *by naming a newer commit*, not by being newer. Records are never edited or deleted;
+  stale ones stay as audit history. **The comparison this rule feeds is not runnable on Azure in
+  v1** — see §10.
 - **Read-back** (at `/refine`, and by every spawned worker): `wit_get_work_item` (parse
   Description headings) + `wit_list_work_item_comments` filtered to the comment starting
   with its sentinel — `**[Technical Analysis]**` for the analysis, `**[Canonical Brief]**`
@@ -300,6 +330,54 @@ landed (`MergedToBase` = `rev-list origin/dev..branch == 0`) — it never merges
   feature→`dev` merge — that is the machine's job and the loop breaks without it. The human PO
   reviews only at sprint review (`dev`→`release` promotion). The carve-out is scoped to the
   machine, never the interactive session.
+
+**The `dev`→`release` promotion — the commit-bound gate does NOT operate on this backend in v1.**
+Concept #16 has two legs: a durable approval record naming one commit, and a read of the promotion
+PR's **current head commit id** so the two can be compared. On Azure the **record leg is bound**
+(§2 + §7 — the PR-thread tools are resolved, and a PO can post the record today), but the
+**head-commit read is not**: `repo_branch` (action `get`) is the shipped branch read, and *which
+field of its response carries the branch's head commit id* has not been resolved against a live
+Azure DevOps server. §2's never-invent rule covers a response **field** exactly as it covers a tool
+name, so that field is not written down here — and without it there is nothing to compare the
+record against. Do **not** close the gap with a local `git` read: the head must come through the
+active adapter, or the gate is verifying something other than what the backend will merge. So **a
+reader must not take this section as "the gate is live on Azure"**.
+
+**What that means operationally is a HOLD, not a fallback.** An unresolvable head is a **read
+failure**, and #16 fails closed on a read failure exactly as it does on a missing or mismatched
+record: until the read is bound, the `dev`→`release` promotion **holds** on this backend and reports
+why. It does **not** revert to promoting on a conversational PO decision — that is precisely the
+weakness #16 exists to remove, and reintroducing it as a fallback would give this backend the worst
+of both. Unverified is never approved.
+
+**The promotion operation is `atl work promote`** — the deterministic gate that verifies the record
+against the PR's head and merges in the same call (the GitHub adapter §10 binds it; `/sprint-review`
+step 6b runs it). On this backend it resolves the configured `backend` and, finding the head-commit
+read unbound, returns the hold **`"reason": "backend-unbound"`** — it makes **no** call to any Azure
+surface, merges nothing, and leaves the promotion PR and any approval record untouched. That is the
+whole Azure binding of #16's compare-and-merge leg today: a refusal that names itself. Binding the
+read below is what makes this backend's promotion live; nothing in this file authorizes promoting
+around it.
+
+**The named next step:** resolve the response of `repo_branch` (action `get`) against a live Azure
+DevOps server, record the commit-id field here verbatim, then bind the branch row in §2 and lift
+this notice. (The team's e2e mock models that field as `objectId` — a shape assumption to confirm,
+not evidence about a live server.)
+
+Two rules hold from now, so that binding the read is the *only* remaining step:
+
+- **Never set `autoComplete` when the promotion PR is opened.** `autoComplete` lets the server
+  complete the PR the moment its policies pass — which would promote `dev` before any gate ran, and
+  would do it invisibly. Open the promotion PR plain; setting `autoComplete` is the deliberate merge
+  action, taken only after a verified match, never a property the PR carries from birth.
+- **Azure has no `--match-head-commit` equivalent in evidence**, so the two backends are
+  asymmetric here and the asymmetry is real, not cosmetic. GitHub pins the SHA *in the merge call*
+  and the provider itself refuses a moved head (verify-**and**-merge, atomic). Azure can only
+  verify-**then**-complete, leaving a narrow window between the comparison and the completion in
+  which `dev` could advance. Mitigation once the read binds: re-read the head **immediately** before
+  the `autoComplete` write and re-compare — never reuse the value read earlier in the ceremony.
+  Closing the window outright needs an Azure PR-completion SHA guard confirmed against the live API;
+  that is deferred, and the window is stated rather than papered over.
 
 ## 11. Mockability & testing (how this contract is exercised)
 

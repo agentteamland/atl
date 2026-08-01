@@ -88,9 +88,99 @@ their exact first line (never "the newest comment"), and area binding by a `Syst
 
 Work integrates to **`dev`** (the tech-lead completes each unit's PR on green — the scoped exception to
 the platform's never-merge rule), and the Product Owner promotes an approved sprint from `dev` to
-**`release`**. Review is **delivery-native**: the tech-lead runs the adversarial review pattern
-(evidence gate + refute-to-keep) directly on the backend's PR — `repo_*` threads and vote on Azure,
-`gh pr comment` / `gh pr review` on GitHub — not `/create-pr`.
+**`release`** — never on a conversational approval, but on a commit-bound approval record that
+`atl work promote` reads back from the backend and merges against (the gate below; v1 binds it on
+**GitHub**, and **holds** the promotion on Azure until the missing read is bound there). Review is
+**delivery-native**: the tech-lead runs the
+adversarial review pattern (evidence gate + refute-to-keep) directly on the backend's PR — `repo_*`
+threads and vote on Azure, `gh pr comment` / `gh pr review` on GitHub — not `/create-pr`.
+
+## The promotion gate — a commit-bound approval
+
+`dev` → `release` is the one irreversible step, so it is not granted in conversation. `/sprint-review`
+compiles the report, opens (or finds) the `dev` → `release` **promotion PR**, and then hands the decision
+to **`atl work promote`** — a deterministic command that reads a durable **approval record** back from the
+backend, compares it to the PR's current head, and merges only on an exact match. Opening that PR is no
+longer the promotion — **merging it is**. In v1 the gate is bound on the **GitHub** backend only — see
+**GitHub-only in v1** at the end of this section for what is still missing on Azure.
+
+**The check is code, not ceremony instructions, and that is the point.** It first shipped as a procedure
+written into the `/sprint-review` skill, and a real run had the same ceremony follow it on one turn and
+silently skip it on the next — falling back to asking "Approve or Reject?" in chat, the exact gate the
+design removes. A step that depends on being remembered eventually isn't, and the failure is quiet. So the
+command **verifies and merges in one call**: there is no separate merge for a ceremony to reach without the
+check, and the ceremony's job is reduced to running it and relaying the verdict.
+
+To approve, the Product Owner adds a comment on the promotion PR whose **first line is exactly**
+`**[Promotion Approval]**` and which names the commit being approved:
+
+```markdown
+**[Promotion Approval]**
+
+## Approved Commit
+<40-character lowercase hex commit id>
+
+## Sprint
+Sprint <n> · <iteration-name>
+
+## Decision
+APPROVE
+```
+
+Only `## Approved Commit` is load-bearing — the rest is audit context. Paste it into the PR's comment box,
+or post it from the CLI:
+
+```bash
+gh pr comment <PR#> --repo <owner>/<repo> --body-file approval.md
+```
+
+That is the whole of the PO's job. `atl work promote` then reads the PR's head and every record on it in
+one call, and merges only when a record names that exact head — SHA-pinned
+(`gh pr merge --merge --match-head-commit <approved-commit>`), so the provider itself refuses the merge if
+the head moved in between. The outcome is recorded on the sprint's review page under
+`## Promotion decision`: approved commit, approver, timestamp, PR link. Every other outcome is a **HOLD** —
+the command exits non-zero, nothing merges, no work-item changes state, and the message tells you exactly
+what to set:
+
+| What the gate finds | What it does (`reason`) |
+|---|---|
+| No `**[Promotion Approval]**` record on the PR | Holds, and prints the PR link + the head commit to approve (`no-record`). |
+| A record with no 40-hex id under `## Approved Commit` | Holds, and asks for a re-post naming the current head (`unparseable-record`). |
+| A record naming a commit that is not the PR's head | Holds — the approved state is not the state that would ship (`superseded`). |
+| The record could not be read | Holds. Unverified is not approved (`read-failed`). |
+| The record matched, but GitHub refused the pinned merge | Holds (`merge-refused`) — `dev` moved between the check and the merge, so the provider rejected it. Nothing was promoted; approve the new head. |
+| No open `dev` → `release` PR to act on | Holds — open it first (`no-open-pr`). This is also how an already-promoted sprint converges: a re-run merges nothing. |
+| The backend does not bind the head-commit read | Holds (`backend-unbound`) — see **GitHub-only in v1** below. |
+
+A hold is not a rejection: nothing is closed, nothing is tagged carryover, and the record is left where it
+is. An explicit **reject** stays conversational and runs the existing carryover path — the gate protects
+only the irreversible direction, and declining a promotion cannot over-ship.
+
+**When `dev` advances after an approval, the approval expires with it.** The gate reports the approved
+commit and the current head, and it does **not** carry the approval forward. To promote the current state,
+re-read the refreshed report and add a new record for the new head; to promote exactly what you approved,
+reset `dev` back to that commit first. The stale record stays in place as audit history — the channel is
+append-and-supersede, and the next record supersedes it by naming a newer commit.
+
+Two limits, stated plainly:
+
+**Checkable, not unforgeable.** In an interactive session the ceremony holds the same credential as the PO,
+so an author check cannot tell a ceremony-written record from a PO-written one. What the gate buys is that a
+promotion is commit-scoped (it can never silently ship a state later than the one that was reviewed) and
+attributable (a durable record naming a commit, an author, and a timestamp) — a correctness gate, not an
+authentication one.
+
+**GitHub-only in v1.** On Azure the approval record itself is bound (PR threads, read and write), but the
+head-commit read is not: the response field carrying the commit id on the branch read (`repo_branch`,
+`action: "get"`) has not been resolved against a live server, and the team never writes a field name it
+cannot evidence. **The commit-bound gate therefore does not operate on the Azure backend yet.**
+
+That is a **HOLD, not a fallback** — an unresolvable head is a read failure, so on Azure `/sprint-review`
+compiles the report, opens (or finds) the promotion PR, and then holds: `atl work promote` reports
+`backend-unbound`, calls no Azure surface at all, and merges nothing. It does **not** revert to promoting
+on a conversational approval. Until the read is bound, an Azure project on this version promotes by
+completing that promotion PR itself, in Azure DevOps. Resolving the field against a live server and binding
+it is the named next step.
 
 ## What ships
 

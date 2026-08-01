@@ -1,5 +1,5 @@
 ---
-knowledge-base-summary: "My second production unit: the /sprint-review deliverable written to the Sprints/Sprint-<n>-Review durable-knowledge page (concept #9, my namespace). Completed vs carryover, per-PBI PR links + test evidence, a deployable dev preview note, actual velocity for the closed sprint, and integration findings (#14). Idempotent upsert into the durable-knowledge store (concept #9). Generic template + checklist."
+knowledge-base-summary: "My second production unit: the /sprint-review deliverable written to the Sprints/Sprint-<n>-Review durable-knowledge page (concept #9, my namespace). Seven fixed sections: completed vs carryover, per-PBI PR links + test evidence, a deployable dev preview note, actual velocity for the closed sprint, integration findings (#14), and the promotion decision — which commit the PO approved and whether it was promoted or the gate held (concept #16). Idempotent upsert into the durable-knowledge store (concept #9). Generic template + checklist."
 ---
 
 # Sprint Review Report (blueprint)
@@ -83,6 +83,17 @@ for the owning role to promote to their durable-knowledge namespace (architectur
 way to schedule, a capacity mis-estimate pattern) route to my *own* `children/` via `/drain`, not
 to the durable-knowledge store — the two-layer split (brief §5).
 
+### `## Promotion decision`
+The outcome of `/sprint-review`'s **commit-bound** PO gate (concept #16), written back onto this
+same page once the gate has run: which commit the PO approved, who set that approval and when, the
+promotion PR, and whether that exact commit was promoted to `release` or the gate **held** — with
+the reason **as `atl work promote` reported it** (`no-record`, `unparseable-record`, `superseded`,
+`read-failed`, `no-open-pr`, `backend-unbound`), not a reason I derived myself. Until the gate runs,
+this section reads **pending**: a compiled report is not yet a decision. I record the outcome; I
+never decide it and I never promote.
+Naming the exact promoted commit is what makes the promotion auditable afterwards — "the PO
+approved" alone does not say *what* was approved.
+
 ## Generic template
 
 ```markdown
@@ -116,6 +127,11 @@ _Sprint <n> · <iteration-name> · closed <date>_
 ## Integration findings
 - <cross-cutting observation>
 - <flagged for tech-lead → Architecture/ | business-analyst → Domain/ …>
+
+## Promotion decision
+- Promotion PR: <pr-link>
+- Approved commit: <40-char hex commit id> — set by <approver> at <ts>
+- Outcome: <promoted to `release` | HELD — reason | pending — the gate has not run yet>
 ```
 
 ## Completion checklist
@@ -133,5 +149,8 @@ _Sprint <n> · <iteration-name> · closed <date>_
 - [ ] `## Actual velocity` = the `## Completed` point sum, for the velocity history.
 - [ ] `## Integration findings` captured; durable project facts flagged to their owning role's
       namespace, not written by me outside `Sprints/`.
+- [ ] `## Promotion decision` records the gate's outcome (concept #16) — the promotion PR, the
+      approved commit **verbatim**, the approver + timestamp, and promoted-or-held with the reason;
+      `pending` until the gate has run. I record it, the PO decides it.
 - [ ] Written as an idempotent upsert into the durable-knowledge store (concept #9), wrapped in
       adapter backoff (the resilience policy).

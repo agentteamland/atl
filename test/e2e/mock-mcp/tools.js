@@ -269,7 +269,14 @@ const tools = {
   repo_get_branch_by_name: {
     description: 'Read a branch.',
     inputSchema: { type: 'object', properties: { repositoryId: {}, name: {}, project: {} } },
-    handler: (st, a) => ({ name: S(a.name || 'dev'), objectId: 'deadbeef', repo: st.state.repos[0].name }),
+    // A realistic 40-char lowercase hex commit id, never a short placeholder: the
+    // promotion-approval gate (#16) matches a head commit with a strict 40-hex parse, so
+    // the fixture must carry a value that parse can accept. NOT exercised by the gate
+    // today — the commit-bound gate is GitHub-only in v1 and the Azure head-commit read
+    // is unbound (backends/azure/adapter.md §10). This keeps the fixture correct for the
+    // run where that read binds; the field name here is the mock's own shape assumption,
+    // not evidence about a live server.
+    handler: (st, a) => ({ name: S(a.name || 'dev'), objectId: '9c1f5f0e6d4b3a2c8e7d6b5a4938271605f4e3d2', repo: st.state.repos[0].name }),
   },
   repo_get_file_content: {
     description: 'Read a file from a branch.',

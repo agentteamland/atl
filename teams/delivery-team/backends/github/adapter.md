@@ -42,6 +42,9 @@ described here.
 | Record a dependency edge (#8) | the **`## Depends On` convention** (§8) — GitHub has no native typed dependency link |
 | Iteration/sprint membership (#6) | the Projects v2 **Iteration** field on the item (idempotent field set) |
 | Open / review / merge a PR (#11) | `gh pr create` / `gh pr review` + `gh pr comment` / **`gh pr merge --merge`** (§10) |
+| Read a branch's head commit (#16) | `gh api repos/{o}/{r}/commits/<branch> --jq .sha` — the plain branch read. **The gate does not use this one:** it compares against the promotion PR's own `headRefOid` (row below), which is the commit `--match-head-commit` pins at merge (§10) |
+| Promotion approval record (#16) | write (the PO): `gh pr comment <n> --body-file <file>` · read: `gh pr view <n> --json headRefOid,comments` (one call returns the record **and** the head to compare it against) |
+| Verify the approval + merge `dev`→`release` (#16) | **`atl work promote`** — the deterministic gate. It issues the read above and, on an exact match, `gh pr merge … --match-head-commit <SHA>` (§10). A ceremony runs the command; it does **not** issue these `gh` calls itself |
 | Durable-knowledge read/upsert (#9) | in-repo `/docs` via the Contents API: `gh api --method PUT repos/{o}/{r}/contents/{path}` / read via `gh api …/contents/{path}` (§9) |
 | Discovery search | `gh search issues` / `gh search code` |
 | Resolve repo / default branch / identity | `gh repo view --json …` / `gh api user` |
@@ -143,6 +146,13 @@ Identical discipline to the interface (#2/#3), GitHub binding:
   position), `## PO Decision` (accept/reject/defer + the convergence mechanism: concession /
   judgment-call standoff / human-authority lock), `## Dissent On Record` (the team's preserved dissent
   under standoff/lock; empty on a merit-win).
+- **Promotion approval** (the human PO, at `/sprint-review`'s gate) → a **PR comment on the
+  `dev`→`release` promotion PR**, first line the exact sentinel `**[Promotion Approval]**`
+  (concept #16), then `## Approved Commit` (a 40-character lowercase hex commit id — **the only
+  load-bearing section**), `## Sprint` (`Sprint <n> · <iteration-name>`), `## Decision`
+  (`APPROVE`). Everything else in the body is audit context. Posted with
+  `gh pr comment <n> --body-file <file>`, never `--body`: `atl guard` scans the whole Bash
+  command string, so a multi-line record belongs in a file, not in the argv.
 - **Area** → an `area:<name>` **label**, applied by the tech-lead at decomposition.
 - **Read-back** = `gh issue view` (parse body headings) + list comments filtered to the one
   starting with its sentinel — a **sentinel match, not "the newest comment"**, so a later human
@@ -152,6 +162,16 @@ Identical discipline to the interface (#2/#3), GitHub binding:
   (`gh api graphql` — `{ repository(owner,name){ issue(number:N){ parent { number } } } }`; the REST
   `sub_issues` endpoint lists an issue's *children*, not its parent), climbing parent links until you
   reach the Feature that bears a `**[Technical Analysis]**` (concept #1).
+- **The approval record is the one exception to that read-back rule** — its channel is
+  **append-and-supersede**, so converging on a single comment is wrong here. **`atl work promote`
+  implements this read; no ceremony performs it** (§10). It collects **every** comment whose first
+  line is exactly `**[Promotion Approval]**`; in each, it takes the first `[0-9a-f]{40}` token on a
+  line after `## Approved Commit`. Selection is then **by commit id, never by recency**: a record
+  counts as an approval only if the commit it names equals the promotion PR's current `headRefOid`.
+  A newer record supersedes an older one *by naming a newer commit*, not by being newer, and a
+  record naming any other commit is not an approval and is never carried forward. Records are never
+  edited or deleted — stale ones stay as audit history. The format is documented here because the
+  **PO** writes it by hand; reading it back is the command's job.
 
 ## 8. Dependency links — the `## Depends On` convention
 
@@ -216,6 +236,22 @@ The interface's PR concept (#11), bound to `gh`, honouring the D3 decision:
   feature→`dev` merge — that is the machine's job and the loop breaks without it. The human PO
   reviews only at sprint review (`dev`→`release` promotion). The carve-out is scoped to the
   machine, never the interactive session.
+- **The `dev`→`release` promotion is SHA-pinned (#16), and it is `atl work promote` that does it —
+  not a ceremony issuing `gh` by hand.** **Opening** the promotion PR is not the promotion —
+  **merging** it is, and the merge the command issues is
+  `gh pr merge <PR#> --repo <o>/<r> --merge --match-head-commit <APPROVED_SHA>`, where
+  `<APPROVED_SHA>` is the commit named in the verified `**[Promotion Approval]**` record (§7).
+  `--match-head-commit` is what makes the binding real: **GitHub itself** refuses the merge unless
+  the PR head is still that exact commit, so the verify→merge window is closed by the provider
+  rather than by how fast the caller acts — if `dev` advances between the comparison and the
+  merge, the merge fails instead of promoting a commit nobody approved. It is a second,
+  provider-enforced line of defence behind the command's own comparison, not a replacement for
+  it. `--merge` stays mandatory here too — never `--squash`/`--rebase`.
+  **Why a command and not an instruction:** the comparison shipped as `/sprint-review` prose first,
+  and a real run had the same skill honour it on one turn and skip it on the next. The command
+  verifies **and** merges in one call, so there is no separate merge step a caller can reach without
+  the check — which is also why this row is the whole binding: reproducing the read+compare+merge
+  sequence in a ceremony re-creates the skippable path.
 
 ## 11. Test-evidence attachment
 

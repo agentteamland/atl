@@ -184,10 +184,10 @@ func TestDeliveryWorkerEnv(t *testing.T) {
 
 func TestActiveBackend(t *testing.T) {
 	// nil + empty → the "azure" default (backward-compat for pre-field configs).
-	if got := (*DeliveryConfig)(nil).activeBackend(); got != "azure" {
+	if got := (*DeliveryConfig)(nil).ActiveBackend(); got != "azure" {
 		t.Errorf("nil config activeBackend = %q, want azure", got)
 	}
-	if got := (&DeliveryConfig{}).activeBackend(); got != "azure" {
+	if got := (&DeliveryConfig{}).ActiveBackend(); got != "azure" {
 		t.Errorf("empty config activeBackend = %q, want azure", got)
 	}
 	// an explicit backend is honored (parsed from JSON).
@@ -195,8 +195,36 @@ func TestActiveBackend(t *testing.T) {
 	if err := json.Unmarshal([]byte(`{"org":"o","backend":"github"}`), &c); err != nil {
 		t.Fatal(err)
 	}
-	if got := c.activeBackend(); got != "github" {
+	if got := c.ActiveBackend(); got != "github" {
 		t.Errorf("explicit activeBackend = %q, want github", got)
+	}
+}
+
+// TestBranchPair pins BOTH halves of the pair, since the promotion gate queries
+// `--base <release> --head <dev>` with them: a wrong default or a swapped pair
+// finds no promotion PR and the gate holds forever on a PR that is right there —
+// a silent failure that looks like the gate working.
+func TestBranchPair(t *testing.T) {
+	// nil + empty → the documented defaults (/delivery-init + the adapters).
+	if got := (*DeliveryConfig)(nil).DevBranch(); got != "dev" {
+		t.Errorf("nil config DevBranch = %q, want dev", got)
+	}
+	if got := (*DeliveryConfig)(nil).ReleaseBranch(); got != "release" {
+		t.Errorf("nil config ReleaseBranch = %q, want release", got)
+	}
+	if got := (&DeliveryConfig{}).ReleaseBranch(); got != "release" {
+		t.Errorf("empty config ReleaseBranch = %q, want release", got)
+	}
+	// a renamed pair is honored — and the two halves do not cross.
+	var c DeliveryConfig
+	if err := json.Unmarshal([]byte(`{"branchPair":{"dev":"trunk","release":"prod"}}`), &c); err != nil {
+		t.Fatal(err)
+	}
+	if got := c.DevBranch(); got != "trunk" {
+		t.Errorf("explicit DevBranch = %q, want trunk", got)
+	}
+	if got := c.ReleaseBranch(); got != "prod" {
+		t.Errorf("explicit ReleaseBranch = %q, want prod", got)
 	}
 }
 

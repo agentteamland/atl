@@ -527,7 +527,7 @@ func (s *Scheduler) spawnStage(us *unitSched, worktreePath string, now time.Time
 	if s.deliveryCfg != nil {
 		// The azureDevOps MCP is injected only for the Azure backend; a GitHub-backend
 		// worker drives gh (no MCP) and gets GH_TOKEN via deliveryWorkerEnv (D3/D4).
-		if s.deliveryCfg.activeBackend() == "azure" {
+		if s.deliveryCfg.ActiveBackend() == "azure" {
 			mcpPath, mErr := writeMCPConfig(s.ProjectRoot, s.deliveryCfg.Org, id)
 			if mErr != nil {
 				return mErr
