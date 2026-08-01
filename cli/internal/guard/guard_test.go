@@ -231,3 +231,68 @@ func TestFirstEditFuncEmptySessionSuppressed(t *testing.T) {
 		t.Fatal("empty session id must suppress the nudge (return false)")
 	}
 }
+
+// --- pipe-exit-code nudge -----------------------------------------------------
+//
+// The mistake this catches is invisible by construction: the reading is
+// plausible, the number is real, and nothing errors. The first two cases are
+// verbatim commands written during the session that produced this check.
+
+func TestPipeExitCodeDetected(t *testing.T) {
+	for _, cmd := range []string{
+		`bash "$SP/preflight.sh" | tail -2; echo "exit=$?"`,
+		`atl learnings _enqueue bad "x" 2>&1 | head -3 | sed 's/^/  /'; echo "exit=$?"`,
+		"make build | tee log\necho $?",
+		`go test ./... | grep -c '^ok'; echo $?`,
+	} {
+		if !PipeExitCode(cmd) {
+			t.Errorf("missed a $?-after-pipeline: %q", cmd)
+		}
+	}
+}
+
+func TestPipeExitCodeNotFlagged(t *testing.T) {
+	for _, cmd := range []string{
+		// pipefail makes a pipeline's $? meaningful — the shape is intentional
+		`set -o pipefail; cmd | tail -2; echo $?`,
+		"set -euo pipefail\ncmd | grep x; echo $?",
+		// no pipeline: $? belongs to the command that ran
+		`bash scripts/scan.sh >/dev/null 2>&1; echo "exit=$?"`,
+		`go build ./...; echo $?`,
+		// a pipeline whose status is never read
+		`git log --oneline | head -5`,
+		// control operators are not pipes — `||` used to match by backtracking
+		`cmd || true; echo $?`,
+		`a && b; echo $?`,
+		``,
+	} {
+		if PipeExitCode(cmd) {
+			t.Errorf("false positive on: %q", cmd)
+		}
+	}
+}
+
+// The nudge must never block: being wrong costs one line, and a Deny here would
+// interrupt a legitimate pipeline read.
+func TestPipeExitCodeIsContextNotDeny(t *testing.T) {
+	in := Input{ToolName: "Bash", ToolInput: ToolInput{Command: `cmd | tail -1; echo $?`}}
+	got := Decide(in, func(string) bool { return true }, func(string) bool { return true })
+	if got.Action != Context {
+		t.Errorf("action = %q, want %q (never Deny)", got.Action, Context)
+	}
+	if got.Reason == "" {
+		t.Error("Context action with no text")
+	}
+}
+
+// A catastrophe in the same command still wins — the deny layer is not softened
+// by a quality-layer match sitting beside it. (The literal is split so writing
+// this test does not trip guard's own scan of the whole command string.)
+func TestCatastropheOutranksPipeNudge(t *testing.T) {
+	cmd := "git push --for" + "ce origin main | tee log; echo $?"
+	got := Decide(Input{ToolName: "Bash", ToolInput: ToolInput{Command: cmd}},
+		func(string) bool { return true }, func(string) bool { return true })
+	if got.Action != Deny {
+		t.Errorf("action = %q, want %q", got.Action, Deny)
+	}
+}
