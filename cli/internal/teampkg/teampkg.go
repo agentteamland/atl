@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	"github.com/agentteamland/atl/cli/internal/fanout"
+	"github.com/agentteamland/atl/cli/internal/manifest"
 )
 
 // AssetDirs are the top-level subtrees reflected into .claude, and the single
@@ -49,9 +50,10 @@ type TeamManifest struct {
 	// every other entry is resolved from the index and installed transitively.
 	Dependencies map[string]string `json:"dependencies"`
 	// Capabilities is read ONLY to learn where a team keeps a durable store it
-	// wants versioned (see DeclaredStores). Everything else under it — role,
-	// curator, reads/writes access lists — is still tolerated and ignored here;
-	// enforcing the access contract is a separate, deferred concern (#167).
+	// wants versioned (see DeclaredStores) and which capture channels it owns
+	// (see DeclaredChannels). Everything else under it — role, curator,
+	// reads/writes access lists — is still tolerated and ignored here; enforcing
+	// the access contract is a separate, deferred concern (#167).
 	// Values are kept raw because the shape varies across capabilities (an
 	// object for `profile`, a bare string for `review`).
 	Capabilities map[string]json.RawMessage `json:"capabilities"`
@@ -80,6 +82,39 @@ func (t *TeamManifest) DeclaredStores() []string {
 		if s := strings.TrimSpace(cap.Store); s != "" {
 			out = append(out, s)
 		}
+	}
+	return out
+}
+
+// DeclaredChannels returns the capture channels this team declares under
+// `capabilities.<name>.channel`, in sorted capability order — the exact sibling
+// of DeclaredStores.
+//
+// A team that owns a capture channel — profile-team's `profile-fact` is the
+// first — declares it here so the platform can emit that channel's per-turn
+// signal without knowing which team owns it. The drain skill and the rule that
+// acts on the signal both ship with the team; core honors a generic
+// declaration, it does not learn a team name.
+//
+// Capability values whose shape carries no `channel` are skipped, as are
+// declarations with a blank name (without a name there is nothing to record).
+// A named declaration MISSING one of the other fields is returned anyway,
+// deliberately: it is the only way the platform can later tell "declared but
+// broken" from "not declared" without re-fetching the team source. Read-side
+// callers refuse it loudly (see the channels doctor check).
+func (t *TeamManifest) DeclaredChannels() []manifest.Channel {
+	var out []manifest.Channel
+	for _, name := range sortedKeys(t.Capabilities) {
+		var cap struct {
+			Channel *manifest.Channel `json:"channel"`
+		}
+		if err := json.Unmarshal(t.Capabilities[name], &cap); err != nil {
+			continue // not an object, or otherwise unreadable — tolerate it
+		}
+		if cap.Channel == nil || strings.TrimSpace(cap.Channel.Name) == "" {
+			continue
+		}
+		out = append(out, *cap.Channel)
 	}
 	return out
 }

@@ -70,18 +70,20 @@ func updateTeams(projectRoot string) (int, error) {
 // migrateTeamManifest brings an already-current install forward to the current
 // manifest schema, without touching a single reflected file.
 //
-// Schema v2 added `stores` — the durable-store paths the team declared. That
-// value lives in the team's own team.json, which install does not reflect onto
-// disk, so the only way to learn it is to re-fetch the pinned source. This runs
-// at most once per install (a successful run stamps the new schema version), and
-// only for installs that predate the field. The source is re-fetched from the
-// MANIFEST's pin, not the index entry's: the manifest records the repo, subpath
-// and ref this install actually resolved from, which is the version whose
-// declarations we are describing.
+// Schema v2 added `stores` — the durable-store paths the team declared — and v3
+// `channels`, the capture channels it owns. Both values live in the team's own
+// team.json, which install does not reflect onto disk, so the only way to learn
+// them is to re-fetch the pinned source. This runs at most once per install (a
+// successful run stamps the new schema version), and only for installs that
+// predate a field. The source is re-fetched from the MANIFEST's pin, not the
+// index entry's: the manifest records the repo, subpath and ref this install
+// actually resolved from, which is the version whose declarations we are
+// describing.
 //
 // Best-effort: a failed fetch leaves the manifest at the old schema, so the next
 // update simply tries again. Nothing downstream breaks in the meantime — an
-// unknown store is treated exactly like a team that declares none.
+// unknown store, or an unknown channel, is treated exactly like a team that
+// declares none.
 func migrateTeamManifest(m *manifest.Manifest, layer string, fetch fetchFunc) error {
 	srcDir, err := fetch(m.Source.Repo, m.Source.Subpath, m.Source.Ref)
 	if err != nil {
@@ -94,6 +96,7 @@ func migrateTeamManifest(m *manifest.Manifest, layer string, fetch fetchFunc) er
 		return err
 	}
 	m.Stores = tm.DeclaredStores()
+	m.Channels = tm.DeclaredChannels()
 	m.SchemaVersion = manifest.SchemaVersion
 	return m.Write(layer)
 }
@@ -114,13 +117,15 @@ func upgradeTeam(m *manifest.Manifest, entry *index.Entry, layer, claude string)
 	m.Version = entry.Version
 	m.Source = manifest.Source{Repo: entry.Source.Repo, Subpath: entry.Source.Subpath, Ref: entry.Source.Ref}
 	m.Files = files
-	// Re-read the declared stores from the version just fetched: a team may add,
-	// move, or drop a store between releases, and the manifest must track the
-	// version actually on disk. A team.json we cannot read leaves the previous
-	// value alone rather than silently clearing it — and leaves the schema alone
-	// too, so the record stays migratable instead of claiming a shape it lacks.
+	// Re-read the declarations from the version just fetched: a team may add,
+	// move, or drop a store or a capture channel between releases, and the
+	// manifest must track the version actually on disk. A team.json we cannot
+	// read leaves the previous values alone rather than silently clearing them —
+	// and leaves the schema alone too, so the record stays migratable instead of
+	// claiming a shape it lacks.
 	if tm, terr := teampkg.ReadManifest(srcDir); terr == nil {
 		m.Stores = tm.DeclaredStores()
+		m.Channels = tm.DeclaredChannels()
 		m.SchemaVersion = manifest.SchemaVersion
 	}
 	return m.Write(layer)

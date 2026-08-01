@@ -3,9 +3,10 @@
 //
 // docscheck validates the docs *site* against the code (docs-drift); skillcheck
 // validates the *assets themselves*: does every skill/agent carry a valid
-// frontmatter, does each team.json match what's on disk, does every agent-KB
+// frontmatter, does each team.json match what's on disk, does every declared
+// capture channel name assets the team actually ships, does every agent-KB
 // child declare its summary, and does any skill's executable shell body carry
-// one of two known shell-fragile constructs. Every check is LLM-free. The three
+// one of two known shell-fragile constructs. Every check is LLM-free. The four
 // structural checks are zero-false-positive by construction — the finding is a
 // fact about the file; the shell check is a deliberately narrow pattern match
 // over named constructs, so see ShellBodies for what it does and does NOT cover.
@@ -17,7 +18,10 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
+
+	"github.com/agentteamland/atl/cli/internal/manifest"
 )
 
 // Severity ranks a finding. Fail breaks the CI gate; Warn is surfaced only.
@@ -30,7 +34,7 @@ const (
 
 // Finding is a single content-quality problem.
 type Finding struct {
-	Check    string // "frontmatter" | "manifest" | "children" | "shell"
+	Check    string // "frontmatter" | "manifest" | "channel" | "children" | "shell"
 	Severity Severity
 	Path     string // asset path relative to the repo root
 	Detail   string
@@ -47,6 +51,7 @@ func RunAll(in Input) []Finding {
 	var f []Finding
 	f = append(f, Frontmatter(in.CoreDir, in.TeamsDir)...)
 	f = append(f, TeamManifest(in.TeamsDir)...)
+	f = append(f, Channels(in.TeamsDir)...)
 	f = append(f, Children(in.TeamsDir)...)
 	f = append(f, ShellBodies(in.CoreDir, in.TeamsDir)...)
 	return f
@@ -181,6 +186,98 @@ func matchNames(base, team, kind string, declared []string) []Finding {
 		}
 	}
 	return f
+}
+
+// Channels checks every capture channel a team declares under
+// `capabilities.<name>.channel` — that the declaration carries every field a
+// signal sentence needs, and that its `rule` and `drain` name assets the team
+// actually ships. Fail-level.
+//
+// This is the deterministic gate for the one failure the runtime cannot catch.
+// The platform assembles a channel's signals purely from the four declared
+// words and stops there, so a declaration naming a rule the team does not ship
+// is accepted, the channel goes active, and its markers are captured into the
+// queue — while nothing ever tells an agent to drain them. They accumulate
+// forever, and the only symptom is a backlog with no explanation. The install-
+// time doctor check (`channelsCheck`) sees the same declaration but has no way
+// to resolve it: it inspects an installed manifest, where the team's source
+// tree is long gone. Here, in the monorepo, the assets are right there — so a
+// first-party team's broken declaration fails CI instead of shipping.
+//
+// The reach is exactly first-party teams under teams/. A third-party team's
+// declaration is caught by nothing until it is installed, where the doctor's
+// runtime warning is the backstop for the field-presence half.
+func Channels(teamsDir string) []Finding {
+	var f []Finding
+	for _, team := range teamNames(teamsDir) {
+		base := filepath.Join(teamsDir, team)
+		rel := "teams/" + team + "/team.json"
+		b, err := os.ReadFile(filepath.Join(base, "team.json"))
+		if err != nil {
+			continue // TeamManifest already reports a missing/unparseable team.json
+		}
+		var meta struct {
+			Capabilities map[string]json.RawMessage `json:"capabilities"`
+		}
+		if err := json.Unmarshal(b, &meta); err != nil {
+			continue
+		}
+		for _, capName := range sortedCapabilities(meta.Capabilities) {
+			var wrapper struct {
+				Channel *manifest.Channel `json:"channel"`
+			}
+			// A capability whose value carries no `channel` — a bare string, an
+			// object without the field — is not a declaration; skip it, the same
+			// tolerance teampkg.DeclaredChannels applies.
+			if err := json.Unmarshal(meta.Capabilities[capName], &wrapper); err != nil || wrapper.Channel == nil {
+				continue
+			}
+			f = append(f, checkChannel(base, team, rel, capName, *wrapper.Channel)...)
+		}
+	}
+	return f
+}
+
+// checkChannel validates one declaration: every field present, and `rule` +
+// `drain` resolving to assets on disk.
+func checkChannel(base, team, rel, capName string, ch manifest.Channel) []Finding {
+	where := "capabilities." + capName + ".channel"
+
+	// Field presence first — the same predicate the read path and the doctor
+	// check use, so the three can never disagree about what "valid" means. A
+	// declaration missing `name` is the sharpest case: the platform drops it
+	// entirely, so it looks declared in team.json and is invisible everywhere else.
+	if missing := ch.MissingFields(); len(missing) > 0 {
+		return []Finding{{"channel", Fail, rel,
+			where + " is missing `" + strings.Join(missing, "`, `") + "` — the platform refuses a declaration it cannot word a signal from"}}
+	}
+
+	var f []Finding
+	if _, err := os.Stat(filepath.Join(base, "rules", ch.Rule+".md")); err != nil {
+		f = append(f, Finding{"channel", Fail, rel,
+			where + " names rule `" + ch.Rule + "` but there is no rules/" + ch.Rule + ".md — the signal would point at a rule the team never ships, so nothing would act on it"})
+	}
+	// The declared drain is a slash-command as the agent types it; the asset on
+	// disk is the skill dir it resolves to. skillFile carries the case-sensitivity
+	// rule (SKILL.md vs skill.md) so this does not re-derive it.
+	drain := strings.TrimPrefix(ch.Drain, "/")
+	skillPath, _ := skillFile(filepath.Join(base, "skills", drain), "")
+	if _, err := os.Stat(skillPath); err != nil {
+		f = append(f, Finding{"channel", Fail, rel,
+			where + " names drain `" + ch.Drain + "` but there is no skills/" + drain + "/SKILL.md — the signal would tell an agent to spawn a skill the team never ships"})
+	}
+	return f
+}
+
+// sortedCapabilities orders capability names so findings are deterministic
+// (map iteration is not).
+func sortedCapabilities(m map[string]json.RawMessage) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
 }
 
 // Children checks every agent-KB child (agents/<x>/children/*.md) declares a

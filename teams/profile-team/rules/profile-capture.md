@@ -17,6 +17,22 @@ subagent when the queue signals.
 Profiles are **global** — the same entity is one profile across every project. Capture is
 cheap (~30 tokens); free to skip when nothing durable about an entity came up.
 
+## Where this channel comes from
+
+**The channel exists because profile-team declares it.** `capabilities.profile.channel` in
+profile-team's `team.json` names the channel (`profile-fact`), the skill that drains it
+(`/profile-drain`), the rule that acts on its signals (this one), and what it collects
+("durable entity facts"). The platform assembles its signal sentences from that declaration
+and stops there — **this rule is the only thing that says what to do about them.** On a
+machine without profile-team the channel does not exist, so no signal is ever emitted and
+nothing ever points at a `/profile-drain` that is not installed. Reading a declaration to
+word a signal is mechanical; it grants nobody access to anything, and who may read or write
+the profile store stays a separate contract the platform does not yet enforce.
+
+A marker on an **undeclared** channel is never captured: a mistyped prefix (`profile-fct`)
+queues nothing at all. A near-miss like that is reported rather than silently swallowed, but
+the fix is to write `profile-fact:` exactly.
+
 ## What counts as a profile fact
 
 A **durable** fact about an entity in the user's inner world — someone or something they

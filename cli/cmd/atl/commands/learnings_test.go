@@ -34,7 +34,7 @@ func TestStatusJSON(t *testing.T) {
 		// output is stable ("learning" before "profile-fact").
 		{
 			"multi-channel",
-			map[queue.Channel]int{queue.ChannelLearning: 2, queue.ChannelProfileFact: 1},
+			map[queue.Channel]int{queue.ChannelLearning: 2, queue.Channel("profile-fact"): 1},
 			`{"learning":2,"profile-fact":1}`,
 		},
 	}
@@ -99,7 +99,7 @@ func TestResolveAckID(t *testing.T) {
 	items := []queue.Item{
 		{ID: "aa11cccccccccccc", Channel: queue.ChannelLearning},
 		{ID: "aa22dddddddddddd", Channel: queue.ChannelLearning},
-		{ID: "bb33eeeeeeeeeeee", Channel: queue.ChannelProfileFact},
+		{ID: "bb33eeeeeeeeeeee", Channel: queue.Channel("profile-fact")},
 	}
 
 	// A full id resolves to itself.

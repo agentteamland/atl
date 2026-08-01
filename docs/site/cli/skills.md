@@ -7,20 +7,27 @@ This is a **maintainer-side** gate that runs against the monorepo's `core/` and 
 ## Usage
 
 ```bash
-atl skills check                      # validate frontmatter, team.json consistency, agent-KB children, skill shell bodies
+atl skills check                      # validate frontmatter, team.json consistency, declared capture channels, agent-KB children, skill shell bodies
 atl skills check --record-stocktake   # stamp HEAD as the last-stocktaken commit (run by /skill-stocktake after a sweep)
 ```
 
 ## What it checks
 
-The three structural checks are **zero-false-positive by construction** — the finding is a fact about the file (a frontmatter key is either there or it isn't). The fourth, `shell`, is a deliberately narrow pattern match over named constructs rather than a structural fact; it is measured clean across every skill in the repo, and what it does *not* cover is stated below. All four are safe to gate a PR on:
+The four structural checks are **zero-false-positive by construction** — the finding is a fact about the file (a frontmatter key is either there or it isn't). The fifth, `shell`, is a deliberately narrow pattern match over named constructs rather than a structural fact; it is measured clean across every skill in the repo, and what it does *not* cover is stated below. All five are safe to gate a PR on:
 
 | Check | What must hold |
 |---|---|
 | **frontmatter** | Every skill's `SKILL.md` and every agent's `agent.md` carries a `name` + `description` frontmatter block. |
 | **manifest** | Each `team.json`'s `agents[]` / `skills[]` names match the on-disk directories — **both directions** (nothing declared-but-absent, nothing on-disk-but-undeclared). |
+| **channel** | Every [declared capture channel](/authoring/team-json#declaring-a-capture-channel) carries all four fields, and its `rule` and `drain` name a rule and a skill the team actually ships. |
 | **children** | Every **shipped** agent-KB child (`teams/<team>/agents/<x>/children/*.md`) declares a non-empty `knowledge-base-summary` frontmatter — the KB-rebuild contract. |
 | **shell** | No fenced shell block in a `SKILL.md` uses one of two known bash-only constructs — an unmatched glob is **fatal** under zsh, which is the shell that actually runs a skill body. The exact scope, and its limits, are below. |
+
+### Why a declared channel is resolved against disk
+
+A capture channel's signals are assembled from the four words the declaration supplies, and nothing at runtime checks that they point anywhere real. So a channel naming a rule the team does not ship is accepted everywhere: the channel goes active, its markers *are* captured into the queue — and no rule ever tells an agent to drain them. They accumulate forever, and the only symptom is a backlog with no explanation.
+
+The runtime doctor check cannot catch that half. It inspects an *installed* manifest, where the team's source tree is long gone, so it can only verify that the four fields are present. Here in the monorepo the assets are right there, which makes this the one place a broken first-party declaration can be resolved — and it fails CI instead of shipping.
 
 ### Why a skill's shell body is checked
 

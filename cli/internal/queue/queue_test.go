@@ -123,7 +123,7 @@ func TestPerProjectIsolation(t *testing.T) {
 	if _, err := s.Enqueue("projA", Item{ID: "1", Channel: ChannelLearning, Payload: "a"}); err != nil {
 		t.Fatalf("enqueue A: %v", err)
 	}
-	if _, err := s.Enqueue("projB", Item{ID: "1", Channel: ChannelProfileFact, Payload: "b"}); err != nil {
+	if _, err := s.Enqueue("projB", Item{ID: "1", Channel: Channel("profile-fact"), Payload: "b"}); err != nil {
 		t.Fatalf("enqueue B: %v", err)
 	}
 
@@ -144,7 +144,7 @@ func TestChannelFilterAndCounts(t *testing.T) {
 	for _, it := range []Item{
 		{ID: "l1", Channel: ChannelLearning, Payload: "x"},
 		{ID: "l2", Channel: ChannelLearning, Payload: "y"},
-		{ID: "pf1", Channel: ChannelProfileFact, Payload: "z"},
+		{ID: "pf1", Channel: Channel("profile-fact"), Payload: "z"},
 	} {
 		if _, err := s.Enqueue("p", it); err != nil {
 			t.Fatalf("enqueue %s: %v", it.ID, err)
@@ -156,7 +156,7 @@ func TestChannelFilterAndCounts(t *testing.T) {
 		t.Fatalf("want 2 learning items, got %d", len(learnings))
 	}
 	counts, _ := s.Counts("p")
-	if counts[ChannelLearning] != 2 || counts[ChannelProfileFact] != 1 {
+	if counts[ChannelLearning] != 2 || counts[Channel("profile-fact")] != 1 {
 		t.Fatalf("counts wrong: %+v", counts)
 	}
 }

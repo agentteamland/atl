@@ -9,48 +9,44 @@ import (
 	"github.com/agentteamland/atl/cli/internal/scope"
 )
 
-// autoDrainNotice fires only when the queue is non-empty, and its text tells the
-// agent to auto-drain in the background (not the old passive "run /drain").
+// autoDrainNotice fires only when the channel is non-empty, and its text tells
+// the agent to auto-drain in the background (not the old passive "run /drain").
+// The wording is byte-identical to the pre-declaration output for core's own
+// channel — a signal the rules already tell agents to act on must not shift
+// because the channel now arrives as a value.
 func TestAutoDrainNotice(t *testing.T) {
-	if autoDrainNotice(0) != "" {
+	if autoDrainNotice(coreChannel, 0) != "" {
 		t.Error("an empty queue must produce no auto-drain signal (no false-fire)")
 	}
-	if autoDrainNotice(-1) != "" {
+	if autoDrainNotice(coreChannel, -1) != "" {
 		t.Error("a negative count must produce no signal")
 	}
-	msg := autoDrainNotice(3)
-	if !strings.Contains(msg, "3 learning") {
-		t.Errorf("the signal must carry the count: %q", msg)
-	}
-	if !strings.Contains(msg, "auto-drain") || !strings.Contains(msg, "background") {
-		t.Errorf("the signal must instruct a background auto-drain, not a manual /drain: %q", msg)
+	msg := autoDrainNotice(coreChannel, 3)
+	want := "atl: 3 learning(s) pending — auto-drain them now in a background subagent (per the learning-capture rule)"
+	if msg != want {
+		t.Errorf("core-channel signal drifted:\n got %q\nwant %q", msg, want)
 	}
 	if strings.Contains(msg, "run /drain") {
 		t.Errorf("the signal must not be the old passive 'run /drain' wording: %q", msg)
 	}
 }
 
-// autoProfileDrainNotice is the profile-fact sibling: same background auto-drain
-// shape, but its own channel noun and its own action-owning capture rule.
-func TestAutoProfileDrainNotice(t *testing.T) {
-	if autoProfileDrainNotice(0) != "" {
+// The same function serves a team-declared channel, taking its noun and its
+// action-owning rule from the declaration — core emits the signal without ever
+// learning which team ships that rule. The text is byte-identical to the
+// hardcoded profile-fact signal it replaces.
+func TestAutoDrainNoticeForADeclaredChannel(t *testing.T) {
+	ch := manifest.Channel{
+		Name: "profile-fact", Drain: "/profile-drain",
+		Rule: "profile-capture", Describes: "durable entity facts",
+	}
+	if autoDrainNotice(ch, 0) != "" {
 		t.Error("an empty profile-fact queue must produce no signal (no false-fire)")
 	}
-	if autoProfileDrainNotice(-1) != "" {
-		t.Error("a negative count must produce no signal")
-	}
-	msg := autoProfileDrainNotice(2)
-	if !strings.Contains(msg, "2 profile-fact") {
-		t.Errorf("the signal must carry the count and channel: %q", msg)
-	}
-	if !strings.Contains(msg, "auto-drain") || !strings.Contains(msg, "background") {
-		t.Errorf("the signal must instruct a background auto-drain: %q", msg)
-	}
-	if !strings.Contains(msg, "profile-capture") {
-		t.Errorf("the signal must point at the profile-capture rule (its action owner): %q", msg)
-	}
-	if strings.Contains(msg, "run /profile-drain") {
-		t.Errorf("the signal must not be the old passive 'run /profile-drain' wording: %q", msg)
+	msg := autoDrainNotice(ch, 2)
+	want := "atl: 2 profile-fact(s) pending — auto-drain them now in a background subagent (per the profile-capture rule)"
+	if msg != want {
+		t.Errorf("declared-channel signal drifted:\n got %q\nwant %q", msg, want)
 	}
 }
 
@@ -64,8 +60,8 @@ func TestOwnedRuleNames(t *testing.T) {
 	m := &manifest.Manifest{
 		Handle: "acme", Name: "team",
 		Files: map[string]string{
-			"rules/team-house.md":  "sha",
-			"agents/api/agent.md":  "sha", // a non-rule asset must not leak in
+			"rules/team-house.md": "sha",
+			"agents/api/agent.md": "sha", // a non-rule asset must not leak in
 		},
 	}
 	if err := m.Write(layer); err != nil {

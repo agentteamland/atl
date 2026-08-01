@@ -16,7 +16,7 @@ import (
 // every test.
 func platformChecks(st *queue.Store, project string, now time.Time) []doctor.Check {
 	return append(doctor.QueueChecks(st, project, now),
-		integrityCheck(project), hooksCheck(), doctor.BrainstormPinCheck(project))
+		integrityCheck(project), hooksCheck(), channelsCheck(project), doctor.BrainstormPinCheck(project))
 }
 
 var doctorCmd = &cobra.Command{
