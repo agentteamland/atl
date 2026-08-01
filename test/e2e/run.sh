@@ -56,9 +56,11 @@ elif ! git diff --quiet FETCH_HEAD -- teams/; then
 fi
 echo ">> team content from ref: $ATL_E2E_TEAM_REF"
 
+SUITE_START=$SECONDS
 echo ">> building atl-e2e image"
 docker build -f test/e2e/Dockerfile -t atl-e2e . >/dev/null
-echo ">> image ready"
+BUILD_SECS=$((SECONDS - SUITE_START))
+echo ">> image ready (${BUILD_SECS}s)"
 
 if [ "$#" -gt 0 ]; then
   names="$*"
@@ -75,7 +77,12 @@ GH_TOKEN_VAL="$(gh auth token 2>/dev/null || true)"
 CLAUDE_TOK="${CLAUDE_CODE_OAUTH_TOKEN:-}"
 API_KEY="${ANTHROPIC_API_KEY:-}"
 
+# Per-blueprint wall clock. Without it the suite's cost is invisible: the LLM-tier
+# blueprints run many minutes each while the auth-free ones finish in seconds, so the
+# progress fraction misleads badly -- a LONGER run can mean the suite got FURTHER, not
+# that it slowed down -- and "is this normal?" can only be answered by hand-timing it.
 pass=0; fail=0; skip=0
+timings=()
 for name in $names; do
   bp="$BPDIR/$name.sh"
   if [ ! -f "$bp" ]; then echo "!! no such blueprint: $name" >&2; exit 2; fi
@@ -99,17 +106,33 @@ for name in $names; do
   secret_env=()
   case "$needs" in gh|gh+token)    secret_env+=(-e "GH_TOKEN=$GH_TOKEN_VAL") ;; esac
   case "$needs" in token|gh+token) secret_env+=(-e "CLAUDE_CODE_OAUTH_TOKEN=$CLAUDE_TOK" -e "ANTHROPIC_API_KEY=$API_KEY") ;; esac
+  bp_start=$SECONDS
   if docker run --rm \
       -e BLUEPRINT="$name" \
       -e ATL_E2E_TEAM_REF="$ATL_E2E_TEAM_REF" \
       ${secret_env[@]+"${secret_env[@]}"} \
       atl-e2e bash "/e2e/blueprints/$name.sh"; then
-    echo "<< $name PASSED"; pass=$((pass + 1))
+    bp_secs=$((SECONDS - bp_start)); verdict=PASSED; pass=$((pass + 1))
   else
-    echo "<< $name FAILED"; fail=$((fail + 1))
+    bp_secs=$((SECONDS - bp_start)); verdict=FAILED; fail=$((fail + 1))
   fi
+  echo "<< $name $verdict (${bp_secs}s)"
+  timings+=("$bp_secs|$name|$verdict|$needs")
 done
 
+SUITE_SECS=$((SECONDS - SUITE_START))
+
+# Slowest first: the point of the table is to show WHERE the time goes, and the
+# distribution is extremely lopsided -- the blueprints that never invoke `claude` finish
+# in seconds while a single LLM-tier one can run twenty minutes on its own.
+if [ "${#timings[@]}" -gt 0 ]; then
+  echo ""
+  echo "===== timing (slowest first; image build ${BUILD_SECS}s) ====="
+  printf '%s\n' "${timings[@]}" | sort -t'|' -k1,1nr | while IFS='|' read -r s n v d; do
+    printf '  %6ss  %-38s %-6s %s\n' "$s" "$n" "$v" "$d"
+  done
+fi
+
 echo ""
-echo "===== harness: $pass passed, $fail failed, $skip skipped ====="
+echo "===== harness: $pass passed, $fail failed, $skip skipped — $((SUITE_SECS / 60))m$((SUITE_SECS % 60))s total ====="
 [ "$fail" -eq 0 ]
