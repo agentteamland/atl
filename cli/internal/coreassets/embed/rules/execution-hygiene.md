@@ -12,6 +12,33 @@ A subagent **returns the conclusion, not the file dumps**: the parent keeps the 
 - One task per subagent — don't bundle unrelated investigations into a single call.
 - This complements [karpathy-guidelines](karpathy-guidelines.md) §2 (Simplicity): a bloated working context is its own kind of complexity.
 
+### Background by default; block only when you need the answer to continue
+
+Delegating is half of it. A subagent you sit and wait for still costs the wall-clock — so run it
+in the **background** and keep working, unless the next thing you do genuinely depends on its
+result. The completion notification is what brings you back.
+
+Two boundaries, both of which cost real time when ignored:
+
+- **A running job's output is not its result.** A multi-phase job writes files in its first phase
+  and rewrites them in every later one, so a pipeline whose later stages are *verification* always
+  looks finished before it is — the stronger the verifier, the wider the window. Never commit,
+  branch or open a PR from a job that has not reported completion.
+- **Silence is not success.** A long job that reports only at exit hides a failure for its whole
+  duration. If it can fail or hang, watch it — and make the watch cover the hang too, since a
+  hung step often emits neither a failure nor a summary and is indistinguishable from progress.
+
+### Fan out over independent work; never over a shared mutable thing
+
+Sequencing work that has no dependency between the parts is a choice to be slow. Split by the
+seams the work already has — one agent per file cluster, per subsystem, per question — and let a
+consolidator keep only the conclusions.
+
+The boundary is the same one that makes it safe: **fan out only where the parts are genuinely
+independent.** Two agents in one repo, on one branch, or over one file are not parallel — they
+are a race, and the loser's work disappears without an error. Where the work must touch the same
+mutable thing, serialize it, or give each part its own isolated copy.
+
 ## 2. Autonomous bug-fix
 
 Given a reproducible bug, an error, or a failing test, investigate and fix it yourself — read the log, the stack trace, the test, and the surrounding code; form a hypothesis; fix it; verify the fix — rather than bouncing it back to the user for hand-holding.
