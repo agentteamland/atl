@@ -55,6 +55,7 @@ while [[ $# -gt 0 ]]; do
     --staged) MODE="staged"; shift ;;
     --diff)   MODE="diff"; DIFF_REF="${2:-}"; shift 2 ;;
     --all)    MODE="all"; shift ;;
+    --self-test) MODE="self-test"; shift ;;
     -h|--help)
       sed -n '2,46p' "$0"
       exit 0
@@ -70,6 +71,14 @@ INCLUDE_GLOBS=(
   '*.tmpl' '*.template'
   '*.go' '*.py' '*.rb' '*.js' '*.ts' '*.tsx' '*.jsx'
   '*.html' '*.css' '*.dart' '*.kt' '*.swift' '*.rs'
+  # This file exempts ITSELF, and every repo's thin delegate of the same name. A matcher's
+  # fixtures have to contain strings that MATCH — `--self-test` cannot pin "a real home
+  # path is a leak" without holding a real-looking home path — so the scanner would
+  # otherwise flag its own test data forever, and the standard escape from that is to
+  # weaken the fixtures until they stop matching, which quietly removes the test. Narrow
+  # by construction: one filename, and nothing in it is content this repo publishes.
+  ':(exclude,glob)**/scan-personal-paths.sh'
+  ':(exclude)scan-personal-paths.sh'
 )
 
 # Built-in OS-path patterns. Universal — safe to live in this public file.
@@ -77,7 +86,13 @@ INCLUDE_GLOBS=(
 declare -a BUILTIN_PATTERNS=(
   '/Users/[A-Za-z][A-Za-z0-9_.-]+/'                  # macOS
   '/home/[a-z_][a-z0-9_-]+/'                          # Linux
-  'C:\\\\Users\\\\[A-Za-z][A-Za-z0-9_.-]+\\\\'        # Windows (escaped backslashes)
+  # Windows. TWO backslashes in this single-quoted string, not four: single quotes are
+  # literal, so `\\` reaches grep -E as an escaped backslash and matches ONE. The
+  # original four made the ERE require a DOUBLED backslash, which occurs only in
+  # already-escaped text (JSON, a shell literal) — so this pattern matched no real
+  # Windows path and the Windows third of the guard never fired at all. Fixed here;
+  # `--self-test` now pins it.
+  'C:\\Users\\[A-Za-z][A-Za-z0-9_.-]+\\'
 )
 
 # Read user-specific patterns from the external config (if it exists).
@@ -103,6 +118,10 @@ case "$MODE" in
     fi
     DIFF=$(git diff --unified=0 "$DIFF_REF" -- "${INCLUDE_GLOBS[@]}" 2>/dev/null || true)
     ;;
+  self-test)
+    # No repo needed — the self-test block below swaps in its own fixture per case.
+    DIFF="(self-test)"
+    ;;
   all)
     # Full working-tree scan: list tracked files matching globs, concatenate.
     DIFF=""
@@ -122,12 +141,42 @@ fi
 violations=0
 report=""
 
+# Home-directory names that are never a person: container and CI conventions. A real
+# leak is a real human's account name, so these can be dropped without weakening the
+# check — and they have to be, or the gate is unusable in a repo that documents its own
+# test containers. Measured on agentteamland/workspace: 17 hits, all of them
+# `/home/testuser/` and `/home/linuxbrew/` from container fixtures and the wiki pages
+# describing them. A gate that fails 17 times on correct content gets switched off in a
+# week, which is the failure mode `denylist-fp-safety-does-not-transfer` describes.
+#
+# Deliberately NOT here: placeholder names from documentation examples (`foo`, `bar`).
+# Allowlisting those would let a real account of that name through. Write examples with
+# the angle-bracket form this file's own header uses — `/Users/<name>/...` — which no
+# pattern matches.
+declare -a NONPERSONAL_HOMES=(testuser linuxbrew runner node vscode ubuntu)
+
+# True when the line still holds a home path belonging to somebody real. Judged per
+# OCCURRENCE, never per line: `/home/testuser/x and /home/realname/y` on one line must
+# still report, so a line is dropped only when EVERY match on it is non-personal.
+line_has_personal_home() {
+  local line="$1" pat="$2" occ name a allow
+  while IFS= read -r occ; do
+    [[ -z "$occ" ]] && continue
+    name="${occ%[/\\]}"; name="${name##*[/\\]}"
+    allow=0
+    for a in "${NONPERSONAL_HOMES[@]}"; do [[ "$name" == "$a" ]] && { allow=1; break; }; done
+    [[ "$allow" -eq 0 ]] && return 0
+  done < <(printf '%s' "$line" | grep -oE -- "$pat" 2>/dev/null || true)
+  return 1
+}
+
 # Helper: scan DIFF against a single ERE pattern, collect added-line matches.
 # Added lines start with '+' (but not '+++ b/' file-header).
 scan_pattern() {
   local label="$1"
   local pattern="$2"
   local mode="$3"  # 'regex' or 'fixed'
+  local allowlist="${4:-no}"  # 'yes' only for the built-in OS-path patterns
   local matches
   if [[ "$mode" == "fixed" ]]; then
     # Fixed-string match on added lines only (exclude '+++ b/' file headers)
@@ -135,6 +184,17 @@ scan_pattern() {
   else
     matches=$(printf '%s\n' "$DIFF" | grep -nE -- "$pattern" 2>/dev/null | grep -E '^[0-9]+:\+' | grep -vE '^[0-9]+:\+\+\+ ' || true)
   fi
+  # The allowlist applies ONLY to the built-in OS-path patterns. A user pattern is a
+  # personal string the maintainer named on purpose; nothing filters those.
+  if [[ "$allowlist" == "yes" && -n "$matches" ]]; then
+    local kept=""
+    while IFS= read -r line; do
+      [[ -z "$line" ]] && continue
+      line_has_personal_home "$line" "$pattern" && kept+="$line"$'\n'
+    done <<< "$matches"
+    matches="${kept%$'\n'}"
+  fi
+  if [[ "${SELFTEST_CAPTURE:-0}" == "1" ]]; then SELFTEST_OUT+="$matches"$'\n'; return 0; fi
   if [[ -n "$matches" ]]; then
     report+=$'\n'"  ✗ $label"$'\n'
     while IFS= read -r line; do
@@ -144,9 +204,45 @@ scan_pattern() {
   fi
 }
 
-# Run built-in OS-path patterns
+# --self-test: pin the built-in patterns and the allowlist against fixtures.
+#
+# This exists because the Windows pattern was WRONG from the day it was written and
+# nobody noticed: it required a doubled backslash, so it matched no real Windows path
+# and that third of the guard never fired. A scanner reports "clean" identically whether
+# it looked and found nothing or never looked at all, so the failure is invisible by
+# construction — exactly the case `untested-guard-is-as-fragile-as-what-it-guards`
+# describes. Run it after touching BUILTIN_PATTERNS or NONPERSONAL_HOMES.
+if [[ "$MODE" == "self-test" ]]; then
+  st_pass=0; st_fail=0
+  # want=hit → the line must be reported · want=miss → it must not be
+  st() { # <want> <description> <line>
+    local want="$1" desc="$2" line="$3" got=miss
+    SELFTEST_CAPTURE=1 SELFTEST_OUT=""
+    local d="+++ b/f.md"$'\n'"+$line"
+    local saved="$DIFF"; DIFF="$d"; SELFTEST_OUT=""
+    for pat in "${BUILTIN_PATTERNS[@]}"; do scan_pattern "x" "$pat" "regex" "yes"; done
+    DIFF="$saved"; SELFTEST_CAPTURE=0
+    [[ -n "${SELFTEST_OUT//[$'\n' ]/}" ]] && got=hit
+    if [[ "$got" == "$want" ]]; then st_pass=$((st_pass+1)); echo "  ok   - $desc"
+    else st_fail=$((st_fail+1)); echo "  FAIL - $desc (wanted $want, got $got)"; fi
+  }
+  echo "scan-personal-paths --self-test"
+  st hit  "macOS home is a leak"            '/Users/somebody/projects/x'
+  st hit  "linux home is a leak"            '/home/somebody/projects/x'
+  st hit  "windows home is a leak"          'C:\Users\Someone\Desktop'
+  st miss "macOS <name> placeholder exempt" '/Users/<name>/projects/...'
+  st miss "linux <name> placeholder exempt" '/home/<name>/projects/...'
+  st miss "container home allowlisted"      '/home/testuser/proj and /home/linuxbrew/bin'
+  st miss "CI home allowlisted"             'C:\Users\runner\work'
+  st hit  "MIXED line still reports"        '/home/testuser/x plus /home/realname/y'
+  st hit  "allowlist is exact, not prefix"  '/home/testuser2/x'
+  echo "self-test: $st_pass passed, $st_fail failed"
+  [[ "$st_fail" -eq 0 ]]; exit $?
+fi
+
+# Run built-in OS-path patterns (allowlist on — see NONPERSONAL_HOMES)
 for pat in "${BUILTIN_PATTERNS[@]}"; do
-  scan_pattern "OS personal path: $pat" "$pat" "regex"
+  scan_pattern "OS personal path: $pat" "$pat" "regex" "yes"
 done
 
 # Run user-defined patterns. Each line is a fixed string unless it starts with "regex:".
