@@ -2,9 +2,11 @@ package commands
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -55,11 +57,7 @@ var publishCmd = &cobra.Command{
 		}
 		defer os.RemoveAll(srcDir)
 
-		candidates := make([]string, 0, len(m.Files))
-		for rel := range m.Files {
-			candidates = append(candidates, rel)
-		}
-		sort.Strings(candidates)
+		candidates := publishCandidates(globalClaude, m.Files)
 
 		changes, err := publish.Plan(globalClaude, srcDir, candidates)
 		if err != nil {
@@ -185,4 +183,76 @@ func ghLogin() string {
 		return ""
 	}
 	return strings.TrimSpace(string(out))
+}
+
+// publishCandidates returns the .claude-relative paths publish should diff: every
+// file the install manifest recorded, PLUS any file that has appeared since inside
+// a directory this team owns.
+//
+// The manifest records what INSTALL wrote, so a file the learning loop grows in
+// place — a new children/<topic>.md under an installed agent — is absent from it by
+// construction. Project-scope growth still reaches a manifest, via `atl promote`
+// registering it at the global layer. Global-scope growth has no ring above it to be
+// promoted into, so without this it could never be published at all — and the global
+// agents are precisely the ones accumulating craft across every project, i.e. the
+// growth most worth circulating. This is the caller the publish.Plan contract already
+// describes ("plus any grown files the caller discovered") and that did not exist.
+//
+// Ownership is derived from the MANIFEST, never from the asset dirs: agents/ and
+// skills/ are shared by every installed team, so walking them wholesale would offer a
+// neighbouring team's files for publication under this team's name. A team owns the
+// directory holding a file it installed (agents/<agent>, skills/<skill>, …); only
+// files under those roots are considered. A manifest entry that is itself the whole
+// unit (rules/<name>.md) contributes no root, which is correct — nothing grows inside
+// a single file.
+func publishCandidates(globalClaude string, files map[string]string) []string {
+	seen := make(map[string]bool, len(files))
+	units := make(map[string]bool)
+	for rel := range files {
+		seen[rel] = true
+		// Manifest keys are always slash-separated, so split on "/" directly.
+		// An agent's growth lands in a SUBDIRECTORY of the agent (children/), so
+		// the owned root is the asset UNIT — agents/<agent> — not the deepest
+		// directory the manifest happens to mention.
+		//
+		// A two-segment entry (rules/<name>.md) is itself the whole unit and
+		// contributes NO root. Deriving one would claim the shared rules/
+		// directory and offer every other team's rules for publication — the
+		// exact cross-team leak this ownership rule exists to prevent.
+		if parts := strings.Split(rel, "/"); len(parts) >= 3 {
+			units[parts[0]+"/"+parts[1]] = true
+		}
+	}
+
+	for unit := range units {
+		root := filepath.Join(globalClaude, filepath.FromSlash(unit))
+		_ = filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return nil // a unit listed in the manifest but gone from disk — skip it
+			}
+			if d.IsDir() {
+				// Never descend into a nested VCS or editor directory.
+				if strings.HasPrefix(d.Name(), ".") {
+					return fs.SkipDir
+				}
+				return nil
+			}
+			if !d.Type().IsRegular() || strings.HasPrefix(d.Name(), ".") {
+				return nil
+			}
+			rel, rerr := filepath.Rel(globalClaude, p)
+			if rerr != nil {
+				return nil
+			}
+			seen[filepath.ToSlash(rel)] = true
+			return nil
+		})
+	}
+
+	out := make([]string, 0, len(seen))
+	for rel := range seen {
+		out = append(out, rel)
+	}
+	sort.Strings(out)
+	return out
 }
