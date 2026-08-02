@@ -136,6 +136,48 @@ func (w *Worktree) branchExists(name string) bool {
 	return err == nil
 }
 
+// BranchTaken reports whether a unit's canonical branch already exists ANYWHERE —
+// locally, or on origin. It is the admission-time check that keeps the engine off a
+// branch someone else is driving; Create's own branchExists call is a different
+// question (can `worktree add -b` succeed here) asked at a different moment.
+//
+// Both halves are load-bearing and they catch different collisions:
+//
+//   - LOCAL catches a driver working in this same clone. That is the collision that
+//     matters for the worktree: Create would find the branch, quarantine it, and rename
+//     it out from under whoever is mid-edit.
+//   - REMOTE catches a driver working in a DIFFERENT clone who has pushed. Nothing
+//     local would notice, `worktree add -b` would succeed, and the collision surfaces
+//     later as a second PR against the same unit — worse, because by then two people
+//     have written code.
+//
+// The remote half is `ls-remote`, not a `refs/remotes/origin/...` lookup, because the
+// engine only ever fetches BaseRef: a stale remote-tracking ref would answer "no branch"
+// for one that was pushed five minutes ago. That costs one network round-trip per
+// admission decision, which is bought back many times over by not spawning a worker onto
+// occupied ground.
+//
+// It returns an error rather than a bare bool because a safety predicate has THREE
+// outcomes — taken, free, and can't-tell — and collapsing the third into "free" is how a
+// guard fails open. A network blip or an auth failure must not read as "nobody is on this
+// branch". The caller decides what can't-tell means; here it is only reported honestly.
+//
+// Note the deliberate absence of `--exit-code`: with it, "ref not found" and "the fetch
+// failed" are both a non-zero exit and the two become indistinguishable. Without it,
+// `ls-remote` exits 0 and prints nothing for an absent ref, so empty-output means free and
+// any error means exactly what it says.
+func (w *Worktree) BranchTaken(slug string, id int) (bool, error) {
+	name := BranchName(slug, id)
+	if w.branchExists(name) {
+		return true, nil
+	}
+	out, err := w.git("ls-remote", "--heads", "origin", "refs/heads/"+name)
+	if err != nil {
+		return false, err
+	}
+	return strings.TrimSpace(out) != "", nil
+}
+
 // Quarantine retires the worktree + branch of a unit whose worker the recovery
 // ladder (#12) just killed — the reclaim step that must free the canonical
 // delivery/<slug>/<id> name for a retry WITHOUT ever destroying real work. It

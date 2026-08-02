@@ -18,6 +18,8 @@ type fakeRunner struct {
 	revListCount    string
 	statusPorcelain string
 	branches        map[string]bool // branch names that `show-ref` reports as existing
+	remoteBranches  map[string]bool // branch names that `ls-remote` reports as existing on origin
+	lsRemoteErr     error           // when set, `ls-remote` fails — the can't-tell case
 }
 
 func (f *fakeRunner) run(name string, args ...string) ([]byte, error) {
@@ -30,6 +32,19 @@ func (f *fakeRunner) run(name string, args ...string) ([]byte, error) {
 		return []byte(f.revListCount), nil
 	case strings.Contains(joined, "status --porcelain"):
 		return []byte(f.statusPorcelain), nil
+	// Before the default: `ls-remote` exits 0 with EMPTY output for an absent ref, and
+	// falling through to the default's (nil, nil) would say exactly that — so the case
+	// must exist for a PRESENT ref, and for the failure that must not read as absent.
+	case strings.Contains(joined, "ls-remote"):
+		if f.lsRemoteErr != nil {
+			return nil, f.lsRemoteErr
+		}
+		for b := range f.remoteBranches {
+			if strings.HasSuffix(joined, "refs/heads/"+b) {
+				return []byte("0123456789abcdef\trefs/heads/" + b + "\n"), nil
+			}
+		}
+		return nil, nil // exit 0 + no output = the ref is not on origin
 	case strings.Contains(joined, "show-ref"):
 		for b := range f.branches {
 			if strings.HasSuffix(joined, "refs/heads/"+b) {
