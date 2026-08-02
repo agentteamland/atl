@@ -41,6 +41,7 @@ described here.
 | Link a work-item ↔ a PR (#11) | native: `Fixes #N` in the PR body + `PullRequest.closingIssuesReferences` (GraphQL) |
 | Record a dependency edge (#8) | the **`## Depends On` convention** (§8) — GitHub has no native typed dependency link |
 | Iteration/sprint membership (#6) | scrum: the Projects v2 **Iteration** field on the item (idempotent field set) · flow: the `sprint:<n>` **label** for the resolved ordinal `<n>` — `gh issue edit <issue#> --add-label sprint:<n> [--remove-label sprint:<prior>]`, the add and the carryover swap in one call (§5) |
+| Assign a unit to its driver | `gh issue edit <issue#> --add-assignee @me` (drop the assignee with `--remove-assignee`). Optional for the autonomous loop — a spawned worker has no GitHub identity of its own, and claiming there is the Status field (§6). **Bound for the drive loop**, where the board should say *who* has the unit in hand |
 | Open / review / merge a PR (#11) | `gh pr create` / `gh pr review` + `gh pr comment` / **`gh pr merge --merge`** (§10) |
 | Read a branch's head commit (#16) | `gh api repos/{o}/{r}/commits/<branch> --jq .sha` — the plain branch read. **The gate does not use this one:** it compares against the promotion PR's own `headRefOid` (row below), which is the commit `--match-head-commit` pins at merge (§10) |
 | Promotion approval record (#16) | write (the PO): `gh pr comment <n> --body-file <file>` · read: `gh pr view <n> --json headRefOid,comments` (one call returns the record **and** the head to compare it against) |
@@ -112,6 +113,19 @@ truth (no local ledger).
   query** (concept #13) until the PO accepts it; on accept, `/request` flips the Status off `candidate`
   (the issue enters the frontier) and `/refine` materializes PBIs with their own `atl-key`. (50-char
   label limit — short slug/digest, as with `atl-key`.)
+- **Hand-created issues carry `atl-manual:<slug>`, not `atl-key`** (the drive loop's `/work-new`).
+  `atl-key` is `hash(parent-id + plan-ordinal)` and its whole convergence property rests on the
+  ordinal being assigned by a durable decomposition plan and never reused — a hand-opened item has
+  neither, so any `atl-key` it carried would be fabricated and could collide with one a later
+  `/refine` computes legitimately. `/work-new` therefore stamps `atl-manual:<slug>` (slug derived
+  from stable words in the title) and dedups its own re-runs by a check-first
+  `gh search issues 'label:atl-manual:<slug>' --repo <o>/<r> --json number` — **found ⇒ update in
+  place, not-found ⇒ create-then-stamp**. Third member of the same family as `atl-brainstorm:<slug>`
+  and `atl-request:<slug>:<initiator>`: real items with no plan position. (50-char label limit.)
+- **A Bug's reproduction goes under a `## Repro` heading in the spec field** (concept #2), not in a
+  provider field. GitHub binds no repro field, and the fixed-heading spec field is already the
+  deterministic read-back location every consumer uses — adding a heading keeps that contract
+  whole, where reaching for an unbound native field would break it.
 - **Under `mode: "flow"` the sprint carrier is a `sprint:<n>` LABEL, not the Iteration field**
   (concept #6). `<n>` is the sprint's ordinal (`sprint:[0-9]+`, unpadded), **resolved not invented**:
   read the labels the **items actually carry** (`gh issue list --repo <o>/<r> --state all

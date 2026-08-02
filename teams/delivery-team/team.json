@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "name": "delivery-team",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "description": "Work-item-driven, sprint-based autonomous software delivery on a pluggable backend (Azure DevOps or GitHub): role-agents + ceremony skills orchestrated by atl work dispatch over claude -p workers.",
   "author": {
     "name": "AgentTeamLand",
@@ -80,6 +80,30 @@
     {
       "name": "request",
       "description": "/request — mid-project request intake: capture a PO- or team-raised request as a candidate, triage it, run feasibility, then gate it at an honest PO dialectic before it becomes backlog work."
+    },
+    {
+      "name": "work-new",
+      "description": "/work-new <title> — open one work item by hand, in the right place in the hierarchy: infer the type, find or propose a parent, elicit only what is missing, and stamp a manual-provenance key so a re-run converges. The light sibling of /request."
+    },
+    {
+      "name": "work-start",
+      "description": "/work-start <id> — claim a unit for hand-driven work: refuse it if the dispatch engine owns it, resolve the sprint carrier, cut the engine's own delivery/<slug>/<id> branch off a fresh integration branch, move it to In Progress, and brief the driver."
+    },
+    {
+      "name": "work-finish",
+      "description": "/work-finish — close out the unit on the current delivery branch: gate on a scoped build and tests, push, open or update the PR to the integration branch with the item linked, and verify the link by reading it back. Never merges, never moves state."
+    },
+    {
+      "name": "work-move",
+      "description": "/work-move <id> <state> — the drive loop's only state writer. Writes every surface a state spans in one pass, reads the result back, refuses an illegal transition with the legal ones named, and guards Done against a PR that never merged."
+    },
+    {
+      "name": "work-sync",
+      "description": "/work-sync [dry-run] — sweep the board for drift between what the code says and what the item says: a merged PR still in flight, a Done item with no merge, an orphan branch, a double sprint carrier. Reports with evidence, then fixes as a batch."
+    },
+    {
+      "name": "work-list",
+      "description": "/work-list [mine|active|sprint|blocked|backlog|<type>] — read-only view of the board for a human working a queue: server-side filters where the backend allows, candidates excluded from the ready frontier, rendered as a grouped table. Writes nothing."
     }
   ],
   "areas": [
