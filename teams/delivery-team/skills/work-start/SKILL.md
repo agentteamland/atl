@@ -1,13 +1,19 @@
 ---
 name: work-start
-description: /work-start <id> — claim one work item and set a human up to build it by hand. Resolves the item over the active backend, refuses if the autonomous engine already owns it, resolves the sprint carrier, cuts the engine's own `delivery/<slug>/<id>` branch off a freshly fetched integration branch, moves the item to In Progress, and briefs the driver from the item's own spec field, its Canonical Brief, and the nearest ancestor's Technical Analysis. Mutating and interactive — run it explicitly; it is not something to invoke in passing. Hand-driven half of the drive loop; `/work-finish` closes the unit.
+description: /work-start <id> — claim one work item and build it, in a session the human is steering. Resolves the item over the active backend, refuses if the autonomous engine already owns it, resolves the sprint carrier, cuts the engine's own `delivery/<slug>/<id>` branch off a freshly fetched integration branch, moves the item to In Progress, briefs from the item's own spec field, its Canonical Brief and the nearest ancestor's Technical Analysis, loads the area's stack pack, then proceeds with implementation by default — `--prep-only` stops after the briefing. Mutating and interactive — run it explicitly; it is not something to invoke in passing. Hand-driven half of the drive loop; `/work-finish` closes the unit.
 ---
 
-# /work-start — claim a unit and cut its branch
+# /work-start — claim a unit and build it
 
-The drive loop's entry point. Where `atl work dispatch` spawns a worker per unit, this hands
-**one** unit to the human at the keyboard: same board, same card, same branch grammar, same PR
-contract. Only the executor differs.
+The drive loop's entry point. Where `atl work dispatch` spawns N isolated workers with nobody
+watching, this takes **one** unit in the session the human is steering: same board, same card, same
+branch grammar, same PR contract. Only the supervision differs.
+
+**"Hand-driven" names who is steering, not who is typing.** The human is present, one card is in
+flight, and every step is visible and interruptible — that is the whole of it. Stopping to ask
+"shall I begin?" after a briefing the human just requested buys none of that and costs a round trip
+on every single card, so implementation proceeds by default. `--prep-only` is there for the times
+you want to read the brief and decide.
 
 That symmetry is the design, not a coincidence. The branch this cuts is the engine's own
 `delivery/<slug>/<id>`, so a hand-driven unit is indistinguishable from an engine-driven one
@@ -28,6 +34,19 @@ adapter, it is not bound, and the honest move is to say so rather than to guess 
 - **After** the unit exists on the board and has been refined enough to work from — `/kickoff`,
   `/refine`, or `/work-new` put it there.
 - **Not** for a unit the engine is driving. Step 2 refuses that case; see the plan guard.
+
+## Arguments
+
+`/work-start <id> [--prep-only]`
+
+| | |
+|---|---|
+| `<id>` | the work item to claim. Required — this skill never picks for you. |
+| `--prep-only` | claim, cut the branch, brief — then **stop**. Also accepted: `--no-implement`, or the same intent stated in prose ("just prep it", "brief me first, don't implement yet"), **in whatever language the user is writing in** — match the intent, not an English phrase. |
+
+The flag is an **opt-out**, so an invocation that says nothing about implementation gets it. Read
+the intent from the invocation as a whole rather than matching the literal flag: a human who asks
+for the briefing is asking for the briefing.
 
 ## Backend support
 
@@ -194,7 +213,7 @@ Two read rules that are easy to get wrong:
 If the Canonical Brief names pages to load, load them before starting — that list is the unit's
 context, and skipping it is how a unit gets built against the wrong conventions.
 
-### 10. Report, then stop
+### 10. Report, then build
 
 State what changed and what did not:
 
@@ -205,19 +224,46 @@ Started #<id> — <title>
   sprint:  <carrier>[ — pulled into this sprint]
   comment: claim posted
 
-Next: build it, then /work-finish.
+Next: building it now. /work-finish when it is green.
 ```
 
-**Do not start implementing.** `/work-start` claims and briefs; the human drives. That is the whole
-difference between this and the dispatch engine, and a skill that quietly began coding would erase
-it.
+### 11. Load the area's pack, then implement
+
+**Proceed with implementation by default — do not stop and wait for a "go ahead."** The human
+asked for this card by id; a pause here re-asks a question they already answered.
+
+1. **Load the area's stack pack** — `.claude/packs/<area>/`, keyed off the unit's `area:<name>`
+   label. Its `production-unit.md` carries the blueprint, the test commands, and the registration
+   step a scaffolded unit needs to exist at runtime. A unit built without its pack is built against
+   the generic conventions instead of this stack's.
+2. **Load whatever the Canonical Brief named** (step 9) — that list is the unit's bounded context.
+3. **Plan, implement, and test**, against the acceptance criteria printed in the briefing. The test
+   gate is not optional and it is not `/work-finish`'s job to write it for you:
+   [`testing-surfaces.md`](../../knowledge/testing-surfaces.md) §7 — diff coverage ≥ 90% of the
+   lines this unit adds or modifies, **and** at least one test that goes red when the change is
+   reverted.
+4. **Hand control back** when it is green, so the human can review and invoke `/work-finish`.
+
+**Area unset ⇒ ask which pack, do not guess.** Picking a pack by reading the title is how a unit
+gets built against the wrong stack's conventions, and the mistake is invisible until review.
+
+**Stop after the briefing instead — the exceptions:**
+
+- `--prep-only` / `--no-implement`, or the same intent in the user's own words.
+- The briefing exposed a card that **cannot be built as written** — no acceptance criterion, a
+  scope step that contradicts the code, a dependency that has not landed. Say which, and stop.
+  This is the case the briefing exists to catch; carrying on regardless is how a wrong card becomes
+  a wrong PR.
+- The unit's area names a pack that is not installed.
 
 ## Idempotent re-run
 
 Re-running on a unit you already started is a **resume**, and it must be safe:
 
-- Branch exists **and is checked out** ⇒ print the briefing only. Skip the carrier write, the state
-  change, and the claim comment; none of them would change anything and the comment would be noise.
+- Branch exists **and is checked out** ⇒ re-print the briefing, then **carry on building**. Skip
+  the carrier write, the state change, and the claim comment; none of them would change anything
+  and the comment would be noise. A resume is still a session that means to finish the card, so it
+  proceeds to step 11 exactly as a fresh start does — resuming should be safe *and* productive.
 - Branch exists but is **not** checked out ⇒ this is **not** a resume. It is a stale branch from an
   earlier attempt while HEAD sits elsewhere, so steps 4–8 run normally and step 6 asks
   resume-or-rename as usual. Skipping ahead here would hand the driver a working tree on the wrong

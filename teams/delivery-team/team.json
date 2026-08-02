@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "name": "delivery-team",
-  "version": "0.13.0",
+  "version": "0.14.0",
   "description": "Work-item-driven, sprint-based autonomous software delivery on a pluggable backend (Azure DevOps or GitHub): role-agents + ceremony skills orchestrated by atl work dispatch over claude -p workers.",
   "author": {
     "name": "AgentTeamLand",
@@ -21,7 +21,10 @@
   "repository": "https://github.com/agentteamland/atl",
   "homepage": "https://github.com/agentteamland",
   "scope": "project",
-  "backends": ["azure", "github"],
+  "backends": [
+    "azure",
+    "github"
+  ],
   "agents": [
     {
       "name": "intake",
@@ -87,7 +90,7 @@
     },
     {
       "name": "work-start",
-      "description": "/work-start <id> — claim a unit for hand-driven work: refuse it if the dispatch engine owns it, resolve the sprint carrier, cut the engine's own delivery/<slug>/<id> branch off a fresh integration branch, move it to In Progress, and brief the driver."
+      "description": "/work-start <id> — claim a unit and build it, in a session the human is steering: refuse it if the dispatch engine owns it, resolve the sprint carrier, cut the engine's own delivery/<slug>/<id> branch off a fresh integration branch, move it to In Progress, brief from the card, load the area's pack, then implement. --prep-only stops after the briefing."
     },
     {
       "name": "work-finish",
