@@ -99,6 +99,19 @@ cat > "$PROJ/.delivery/methodology.json" <<'EOF'
   "branches": { "dev": "dev", "release": "release" }
 }
 EOF
+# The .gitignore a real /delivery-init writes (its step 6). Engine scratch —
+# plan.json above all — must be ignored, or it dirties the tree and /work-start
+# refuses. Omitting this seeded a .delivery/ the real ceremony would never produce,
+# and the blueprint then failed the skill for the harness's own incompleteness.
+cat > "$PROJ/.delivery/.gitignore" <<'EOF'
+worktrees/
+runstate.json
+plan.json
+blocked/
+mcp/
+dispatch.lock
+EOF
+
 # Commit the scaffolding before driving. /work-start refuses a dirty tree — correctly,
 # and unconditionally — and everything above (install + .delivery/) leaves this clone
 # dirty. A real project commits .delivery/ right after /delivery-init; leaving it
@@ -177,8 +190,18 @@ gh issue view "$DRIVE" --repo "$REPO" --comments 2>/dev/null | grep -qi "$BR" &&
 # No `|| git checkout -b` fallback. On the first run /work-start did not cut the branch
 # and that fallback created it silently, so every assertion after it measured the harness
 # instead of the skill — the failure was reported once and then papered over.
-git checkout -q "$BR" 2>/dev/null \
-  || { bad "cannot continue: /work-start left no $BR to work on"; finish; exit 1; }
+if ! git checkout -q "$BR" 2>/dev/null; then
+  bad "cannot continue: /work-start left no $BR to work on"
+  # Dump BEFORE exiting. The first version of this stop exited straight away and
+  # took the turns.log with it — a fast failure that explains nothing costs a whole
+  # run to re-learn what one dump would have said.
+  echo "===== DEBUG (github-drive-loop: /work-start cut no branch) ====="
+  echo "--- git status ---";   git -C "$PROJ" status --porcelain 2>/dev/null | head -20
+  echo "--- branches ---";     git -C "$PROJ" branch -a 2>/dev/null | head -20
+  echo "--- turns.log ---";    tail -80 "$HOME/turns.log" 2>/dev/null
+  echo "=============================================================="
+  finish; exit 1
+fi
 cat >> app.js <<'EOF'
 
 export function subtract(a, b) { return a - b; }
