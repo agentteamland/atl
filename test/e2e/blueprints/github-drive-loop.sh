@@ -116,16 +116,25 @@ EOF
 # and unconditionally — and everything above (install + .delivery/) leaves this clone
 # dirty. A real project commits .delivery/ right after /delivery-init; leaving it
 # untracked here made the harness fail the skill for the harness's own setup.
-# Commit it onto DEV, not the default branch. /work-start cuts from origin/dev, so
-# scaffolding committed to main is DELETED from the working tree the moment the
-# branch is created — which is how the third run lost .claude/ mid-flight and the
-# later /work-move came back "Unknown command" with the turn never reaching the model.
-git -C "$PROJ" checkout -q dev 2>/dev/null || git -C "$PROJ" checkout -q -b dev origin/dev
-git -C "$PROJ" add -A >/dev/null 2>&1
-git -C "$PROJ" -c user.email=e2e@local -c user.name=e2e commit -qm "chore: delivery scaffolding" >/dev/null 2>&1
-git -C "$PROJ" push -q origin dev >/dev/null 2>&1
+# EXCLUDE the scaffolding locally — do not commit it, and above all do not push it.
+#
+# Two earlier attempts were both wrong. Committing to the default branch loses the
+# files the moment /work-start cuts from origin/dev (that is how a later /work-move
+# came back "Unknown command"). Committing AND PUSHING to dev fixed that and polluted
+# the SHARED fixture repo for every delivery blueprint — a harness must never leave
+# a trace in the fixture it borrows.
+#
+# The tree only has to be CLEAN for /work-start's preflight; nothing requires these
+# paths to be tracked. `.git/info/exclude` is local, per-clone, and disappears with
+# the container.
+cat >> "$PROJ/.git/info/exclude" <<'EOF'
+.claude/
+.atl/
+.delivery/
+CLAUDE.md
+EOF
 [ -z "$(git -C "$PROJ" status --porcelain)" ] \
-  && ok "seeded + COMMITTED .delivery/config.json (github, flow) + methodology.json — clean tree for /work-start" \
+  && ok "seeded .delivery/ + excluded the scaffolding locally — clean tree for /work-start" \
   || bad "the tree is still dirty; /work-start will refuse and the run measures the harness, not the skill"
 
 # ---- seed two units: one to drive, one the engine owns ------------------------------
