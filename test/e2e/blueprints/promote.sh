@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # needs: none
+# touches: cli/internal/fanout, cli/internal/manifest, cli/cmd/atl/commands/promote.go
 #
 # promote — a project-layer gain (modified file + new child) lifts to global,
 # and a second pass is a no-op (idempotent).

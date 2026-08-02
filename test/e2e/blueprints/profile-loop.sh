@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # needs: token
+# touches: teams/profile-team, cli/internal/queue, cli/internal/marker, cli/internal/drain, core/
 #
 # profile-loop — the full real-Claude profile loop: install profile-team, a
 # `claude -p` session drops a profile-fact marker -> atl tick enqueues it ->

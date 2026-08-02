@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # needs: gh+token
+# touches: teams/delivery-team
 #
 # github-delivery-autonomous-refine — the delivery-team's FULL ceremony chain on the GitHub
 # backend, proving the ONE seam github-delivery-full-chain.sh (atl#271) deliberately leaves

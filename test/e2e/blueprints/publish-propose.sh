@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # needs: gh
+# touches: cli/internal/publish, cli/internal/manifest, cli/cmd/atl/commands/publish.go
 #
 # publish-propose — a team you DON'T own: a global-layer gain is proposed
 # upstream as a real fork + PR against agentteamland/atl-e2e-team, then the PR is

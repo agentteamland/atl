@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # needs: none
+# touches: cli/internal/manifest, cli/internal/teampkg, cli/cmd/atl/commands
 #
 # list-remove — list shows the installed team; remove deletes its files +
 # manifest at the scope.

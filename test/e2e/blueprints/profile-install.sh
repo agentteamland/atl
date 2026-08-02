@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # needs: none
+# touches: teams/profile-team, cli/internal/teampkg, cli/internal/index
 #
 # profile-install — a clean user installs profile-team globally: the curator
 # agent + /profile-drain skill + profile-capture rule reflect to ~/.claude, and

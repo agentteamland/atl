@@ -73,19 +73,31 @@ echo ">> team content from ref: $ATL_E2E_TEAM_REF"
 echo ">> logging to $RUNLOG — a full run takes ~2h and reports only at the end, so watch it:"
 echo ">>   test/e2e/watch.sh          (under the Monitor tool, persistent)"
 
-SUITE_START=$SECONDS
-echo ">> building atl-e2e image"
-docker build -f test/e2e/Dockerfile -t atl-e2e . >/dev/null
-BUILD_SECS=$((SECONDS - SUITE_START))
-echo ">> image ready (${BUILD_SECS}s)"
-
-if [ "$#" -gt 0 ]; then
+# Pick the blueprints BEFORE the image build: --changed can legitimately select
+# nothing, and paying a docker build to discover that is the same "expensive setup
+# above the precondition" mistake the ref check above exists to avoid.
+if [ "${1:-}" = "--changed" ]; then
+  shift
+  names="$(test/e2e/select.sh "$@" | tr '\n' ' ')"
+  names="${names% }"
+  if [ -z "$names" ]; then
+    echo ">> --changed selected no blueprints — nothing to run"
+    exit 0
+  fi
+  echo ">> --changed selected: $names"
+elif [ "$#" -gt 0 ]; then
   names="$*"
   echo ">> running selected blueprints: $names"
 else
   names="$(ls "$BPDIR"/*.sh | xargs -n1 basename | sed 's/\.sh$//' | sort)"
   echo ">> running ALL blueprints (full suite — the default; pass names to run a subset)"
 fi
+
+SUITE_START=$SECONDS
+echo ">> building atl-e2e image"
+docker build -f test/e2e/Dockerfile -t atl-e2e . >/dev/null
+BUILD_SECS=$((SECONDS - SUITE_START))
+echo ">> image ready (${BUILD_SECS}s)"
 
 # Resolve auth once (host side). Prefer gh's configured token; fall back to a
 # GH_TOKEN env so CI can pass a PAT (there is no interactive `gh auth login`).

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # needs: none
+# touches: cli/internal/gc, cli/cmd/atl/commands/gc.go, cli/internal/manifest
 #
 # gc — orphaned assets (files no manifest owns) are reported (dry-run), soft-
 # deleted (--apply) while owned + core files stay intact, and restored (--undo).

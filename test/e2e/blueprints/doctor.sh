@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # needs: none
+# touches: cli/internal/doctor, cli/cmd/atl/commands/doctor.go, cli/internal/manifest
 #
 # doctor — a deleted installed file is detected as drift and self-healed from
 # the pinned source.

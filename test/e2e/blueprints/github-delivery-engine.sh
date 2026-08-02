@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # needs: gh+token
+# touches: cli/internal/dispatch, teams/delivery-team/backends
 #
 # github-delivery-engine — the delivery-team's Go orchestration engine (`atl work
 # dispatch`) driving a REAL `claude -p` worker pipeline (developer -> tester -> tech-lead)

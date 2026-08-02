@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # needs: gh+token
+# touches: teams/profile-team, cli/internal/teampkg
 #
 # profile-backup-restore — the two skills that touch the user's most sensitive data, and the
 # only two whose failure mode is IRREVERSIBLE. /profile-backup copies ~/.atl/profiles into
