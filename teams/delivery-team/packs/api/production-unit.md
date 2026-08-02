@@ -185,6 +185,34 @@ Attach the integration-test output — the `2xx` shape plus the boundary `400` a
 rejections — to the work-item as the Level-1 self-test evidence ([testing.md](testing.md)). A raw pass
 count is not evidence for this unit type; the demonstrated contract is.
 
+## 4b. Ship the test — the unit is not done without one
+
+Step 4 proved the thing works **now**, by looking at it. This step is what keeps it working: a unit
+is not complete until it ships a test covering the behaviour it added. The policy, identical across
+packs, is [`testing-surfaces.md` §7](../../knowledge/testing-surfaces.md):
+
+> **diff coverage >= 90%** of the lines this unit added or modified, **and** at least one test that
+> goes RED when the change is reverted.
+
+The second half is not ceremony. Coverage proves a line *ran*; it says nothing about whether anything
+*checked* the result — a test that exercises the code and asserts nothing scores 100%. Confirming it
+costs a minute: revert the change, run the test, see red, restore.
+
+Coverage for this stack:
+
+```bash
+npm test -- --coverage
+```
+
+**The false green peculiar to this stack is already named in step 4:** a test that builds its own
+little app instead of importing the real one. It exercises routing, validation and the envelope
+against an application that exists only inside the test file — so it passes while the real endpoint
+is unmounted, unauthenticated, or wired into the wrong middleware position. Coverage does not catch
+it; the test genuinely runs those lines. Check the import by eye.
+
+If 90% is genuinely unreachable because the new code is entangled with something untestable, record
+the exception on the work-item — which lines, and why. Never a silent pass.
+
 ## 5. Common pitfalls
 
 - **The router is new and nobody mounted it.** The commonest form of the failure: the route line looks

@@ -69,8 +69,28 @@ This gate is the loop's definition of done, not polish. In a loop with no gate, 
 disappear — it re-enters later as a bug, as carryover, or underneath a second unit built on the
 broken first, and the wall-clock is spent twice on work already reported complete.
 
-If the diff adds code paths with no matching test, **say so and offer to add them**. Do not block
-on it — that is the driver's call — but do not let it pass unmentioned either.
+**If the diff adds or changes behaviour with no test covering it, stop.** Not a warning — the same
+refusal a failing test gets, and for the same reason: an untested change is an unverified one, and
+the whole gate exists to keep unverified work from being reported as done.
+
+The bar is [`testing-surfaces.md` §7](../../knowledge/testing-surfaces.md):
+
+> **diff coverage ≥ 90%** of the lines this change added or modified, **and** at least one test that
+> goes RED when the change is reverted.
+
+Both halves earn their place. Without the first, the suite passes precisely *because* nothing in it
+touches the new code — green terminal, untested change, and nothing downstream notices. Without the
+second, a test that calls the code and asserts nothing satisfies the first at 100%.
+
+This is a **gate, not advice, and it does not soften on an existing codebase.** The diff is
+newly-written code whatever the project's age, and relaxing it for a brownfield project would remove
+it exactly where it is needed most. What *does* differ is the project-wide number: it is a ratchet
+(may not decrease), never a day-one threshold — see §7.
+
+**The one escape hatch is recorded, never silent.** When 90% is genuinely unreachable — the new line
+is entangled with legacy code that has no seam — say which lines and why, and write that on the work
+item. Then proceed. A recorded exception is a decision someone can revisit; a silent pass is a hole
+nobody knows about.
 
 **A check that could not run is UNVERIFIED, and unverified is never a pass.** Report it as blocked
 with the evidence; never fake a green.

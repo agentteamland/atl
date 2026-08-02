@@ -118,6 +118,33 @@ Two more effects worth observing when they apply:
 Attach that output to the work-item as the Level-1 self-test evidence. "Tests passed" is not
 evidence for this unit type; the help output is.
 
+## 4b. Ship the test — the unit is not done without one
+
+Step 4 proved the thing works **now**, by looking at it. This step is what keeps it working: a unit
+is not complete until it ships a test covering the behaviour it added. The policy, identical across
+packs, is [`testing-surfaces.md` §7](../../knowledge/testing-surfaces.md):
+
+> **diff coverage >= 90%** of the lines this unit added or modified, **and** at least one test that
+> goes RED when the change is reverted.
+
+The second half is not ceremony. Coverage proves a line *ran*; it says nothing about whether anything
+*checked* the result — a test that exercises the code and asserts nothing scores 100%. Confirming it
+costs a minute: revert the change, run the test, see red, restore.
+
+Coverage for this stack:
+
+```bash
+go test -coverprofile=cover.out ./... && go tool cover -func=cover.out
+```
+
+**The false green peculiar to this stack:** a table test that calls the command's `RunE` directly.
+The body is covered, the assertions are real, and the command may still be unreachable because
+nothing added it to the composed root. Step 3 is what catches that; this test does not, and its green
+makes it look as though something did. Cover the body here, and let step 4 prove the wiring.
+
+If 90% is genuinely unreachable because the new code is entangled with something untestable, record
+the exception on the work-item — which lines, and why. Never a silent pass.
+
 ## 5. Common pitfalls
 
 - **Registered on the wrong parent.** It runs, but under a name nobody expects. The help output in

@@ -175,6 +175,33 @@ If the dev/preview server won't start or the MCP can't drive the flow, the regis
 **unverified** — surface it as such. Never emit a pass for a surface that did not execute
 ([testing.md](testing.md)).
 
+## 4b. Ship the test — the unit is not done without one
+
+Step 4 proved the thing works **now**, by looking at it. This step is what keeps it working: a unit
+is not complete until it ships a test covering the behaviour it added. The policy, identical across
+packs, is [`testing-surfaces.md` §7](../../knowledge/testing-surfaces.md):
+
+> **diff coverage >= 90%** of the lines this unit added or modified, **and** at least one test that
+> goes RED when the change is reverted.
+
+The second half is not ceremony. Coverage proves a line *ran*; it says nothing about whether anything
+*checked* the result — a test that exercises the code and asserts nothing scores 100%. Confirming it
+costs a minute: revert the change, run the test, see red, restore.
+
+Coverage for this stack:
+
+```bash
+npm run test -- --run --coverage
+```
+
+**The false green peculiar to this stack:** a test that renders the component and asserts only that
+it rendered — or a snapshot regenerated to match whatever the component now does. Both stay green
+forever, including after the component breaks. Assert the behaviour a user would notice, then check
+that reverting the change turns that assertion red.
+
+If 90% is genuinely unreachable because the new code is entangled with something untestable, record
+the exception on the work-item — which lines, and why. Never a silent pass.
+
 ## 5. Common pitfalls
 
 - **Built but never imported.** The leaf that only ever renders inside its own test. Green everywhere,

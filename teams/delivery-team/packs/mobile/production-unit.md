@@ -157,6 +157,33 @@ holding*) — and attach it to the work-item through that topic's attach helper.
 for what it proves and tie it to the criterion. A screenshot proves the screen renders; only the
 navigation proves it exists to the app.
 
+## 4b. Ship the test — the unit is not done without one
+
+Step 4 proved the thing works **now**, by looking at it. This step is what keeps it working: a unit
+is not complete until it ships a test covering the behaviour it added. The policy, identical across
+packs, is [`testing-surfaces.md` §7](../../knowledge/testing-surfaces.md):
+
+> **diff coverage >= 90%** of the lines this unit added or modified, **and** at least one test that
+> goes RED when the change is reverted.
+
+The second half is not ceremony. Coverage proves a line *ran*; it says nothing about whether anything
+*checked* the result — a test that exercises the code and asserts nothing scores 100%. Confirming it
+costs a minute: revert the change, run the test, see red, restore.
+
+Coverage for this stack:
+
+```bash
+flutter test --coverage
+```
+
+**The false green peculiar to this stack:** a widget test that constructs the screen directly instead
+of entering it the way the app does. It renders, it asserts, it passes — while the screen is absent
+from the app's real route table and no user can reach it. That is the same gap step 3's registration
+check exists for, and a direct-construction test hides it rather than catching it.
+
+If 90% is genuinely unreachable because the new code is entangled with something untestable, record
+the exception on the work-item — which lines, and why. Never a silent pass.
+
 ## 5. Common pitfalls
 
 - **The route name as a bare literal at each call site.** A typo compiles, analyzes clean, and fails
