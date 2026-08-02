@@ -223,26 +223,41 @@ Started #<id> — <title>
   board:   Status → In Progress[, assigned to <you>]
   sprint:  <carrier>[ — pulled into this sprint]
   comment: claim posted
-
-Next: building it now. /work-finish when it is green.
 ```
+
+The report is **retrospective** — what changed and what did not. What happens next is step 11's to
+decide and to announce, because `--prep-only` and the stop-anyway exceptions all run after this
+point, and a report promising a build that never starts is worse than one that says nothing.
 
 ### 11. Load the area's pack, then implement
 
 **Proceed with implementation by default — do not stop and wait for a "go ahead."** The human
-asked for this card by id; a pause here re-asks a question they already answered.
+asked for this card by id; a pause here re-asks a question they already answered. Print
+`Next: building it now. /work-finish when it is green.`, then:
 
 1. **Load the area's stack pack** — `.claude/packs/<area>/`, keyed off the unit's `area:<name>`
    label. Its `production-unit.md` carries the blueprint, the test commands, and the registration
    step a scaffolded unit needs to exist at runtime. A unit built without its pack is built against
    the generic conventions instead of this stack's.
+
+   **Check the pack matches the project's stack before you obey it.** All reference packs reflect
+   into every project regardless of what it is written in, so `.claude/packs/api/` existing is not
+   evidence that it describes *this* API. Read its opening lines: if it names a stack the repo does
+   not use, the pack is a template that arrived by reflection and its commands, blueprint and
+   registration step are all wrong here. Say so, work from the project's own `docs/conventions/`
+   and `docs/architecture/` instead, and note the gap — a project whose stack has no pack is a real
+   finding, not a thing to route around silently.
 2. **Load whatever the Canonical Brief named** (step 9) — that list is the unit's bounded context.
 3. **Plan, implement, and test**, against the acceptance criteria printed in the briefing. The test
    gate is not optional and it is not `/work-finish`'s job to write it for you:
    [`testing-surfaces.md`](../../knowledge/testing-surfaces.md) §7 — diff coverage ≥ 90% of the
    lines this unit adds or modifies, **and** at least one test that goes red when the change is
    reverted.
-4. **Hand control back** when it is green, so the human can review and invoke `/work-finish`.
+4. **Commit on the branch** once it is green. The branch is this loop's only state, and a clean
+   tree is what both exits need: `/work-finish` refuses a dirty tree, and a resumed `/work-start`
+   reads the working tree as this card's own progress. Leaving the work uncommitted is what makes
+   a resume ambiguous.
+5. **Hand control back**, so the human can review and invoke `/work-finish`.
 
 **Area unset ⇒ ask which pack, do not guess.** Picking a pack by reading the title is how a unit
 gets built against the wrong stack's conventions, and the mistake is invisible until review.
@@ -254,16 +269,20 @@ gets built against the wrong stack's conventions, and the mistake is invisible u
   scope step that contradicts the code, a dependency that has not landed. Say which, and stop.
   This is the case the briefing exists to catch; carrying on regardless is how a wrong card becomes
   a wrong PR.
-- The unit's area names a pack that is not installed.
+
+Each of those prints its own reason in place of the `Next:` line above, so the report never
+promises a build that is not happening.
 
 ## Idempotent re-run
 
 Re-running on a unit you already started is a **resume**, and it must be safe:
 
 - Branch exists **and is checked out** ⇒ re-print the briefing, then **carry on building**. Skip
-  the carrier write, the state change, and the claim comment; none of them would change anything
-  and the comment would be noise. A resume is still a session that means to finish the card, so it
-  proceeds to step 11 exactly as a fresh start does — resuming should be safe *and* productive.
+  steps 4, 6, 7 and 8: the carrier write, the state change and the claim comment would change
+  nothing and the comment would be noise, and **step 6 has nothing left to preflight** — its
+  dirty-tree refusal guards a branch cut that is not happening, and uncommitted changes on the
+  branch you are resuming are this card's own work in progress, not a parallel session's. Then
+  proceed to step 11 exactly as a fresh start does — a resume should be safe *and* productive.
 - Branch exists but is **not** checked out ⇒ this is **not** a resume. It is a stale branch from an
   earlier attempt while HEAD sits elsewhere, so steps 4–8 run normally and step 6 asks
   resume-or-rename as usual. Skipping ahead here would hand the driver a working tree on the wrong
