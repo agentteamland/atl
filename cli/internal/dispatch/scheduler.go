@@ -43,6 +43,13 @@ type Scheduler struct {
 	deliveryCfg *DeliveryConfig
 
 	units map[int]*unitSched
+
+	// priorInFlight holds the unit ids the PREVIOUS run had running when it last
+	// checkpointed. It exists for exactly one question, asked at admission: this
+	// unit's branch already exists — is it our own leftover, or someone else's?
+	// A restart's leftover is in this set; a branch a human cut with /work-start
+	// never is.
+	priorInFlight map[int]bool
 }
 
 // Config tunes the scheduler. Cap is the concurrency limit (keystone #4, ~4–6);
@@ -190,6 +197,11 @@ func (s *Scheduler) RunContext(ctx context.Context) (Summary, error) {
 	// re-seeded from the durable run-state so a restart never re-runs it (git can't
 	// recover done-ness once the branch is torn down) — the done-side sibling of the above.
 	s.markPreviouslyDone()
+
+	// Record which units the previous run had in flight, so admission can tell our
+	// own restart leftover from a branch somebody else is driving. Must run before
+	// the first admit().
+	s.markPriorInFlight()
 
 	orphans, err := s.Worktree.Reconcile(map[string]bool{})
 	if err != nil {
@@ -466,6 +478,29 @@ func (s *Scheduler) admit(now time.Time) error {
 		if us.state != statePending {
 			continue // Ready still lists running/blocked units (not done) — skip them
 		}
+		// The drive-mode boundary. plan.json is what separates autonomous work from
+		// hand-driven work: dispatch admits from the plan and nothing else, so a unit
+		// absent from it is safely someone's to drive by hand. But a unit that IS in
+		// the plan can still be occupied — a human can run /work-start on it, and that
+		// skill's own guard only refuses when it can see the plan. This is the other
+		// half: the engine checking before it takes ground.
+		if !s.priorInFlight[u.ID] {
+			taken, err := s.Worktree.BranchTaken(s.Plan.SprintSlug, u.ID)
+			if err != nil {
+				// Can't tell. Leave the unit pending and try again next tick rather
+				// than either admitting onto possibly-occupied ground or holding it
+				// permanently over what is usually a transient fetch failure.
+				s.Log(fmt.Sprintf("unit %d not admitted this tick — could not check whether %s is taken: %v",
+					u.ID, BranchName(s.Plan.SprintSlug, u.ID), err))
+				continue
+			}
+			if taken {
+				if err := s.blockForeignBranch(us, now); err != nil {
+					return err
+				}
+				continue
+			}
+		}
 		if err := s.spawnUnit(us, now); err != nil {
 			return err
 		}
@@ -623,6 +658,64 @@ func (s *Scheduler) markPreviouslyBlocked() {
 // unit's successors until the redundant re-run finishes. The done-side sibling of
 // markPreviouslyBlocked; guarded by SprintSlug so a stale or other-sprint run-state file
 // never wrongly skips this sprint's work.
+// markPriorInFlight seeds the set of units the previous run had RUNNING when it last
+// checkpointed, read from the same durable run-state markPreviouslyDone uses and guarded
+// the same way (a run-state left by another sprint is not ours).
+//
+// It answers one question and only one: at admission, a unit's branch already exists —
+// did WE leave it there? A restart mid-pipeline leaves exactly these units holding a
+// committed-but-unmerged branch, and re-admitting them is correct: Create quarantines the
+// leftover and re-drives from a fresh worktree. A branch belonging to anything else is
+// not ours to move.
+//
+// Erring direction, stated deliberately: an empty or unreadable run-state yields an empty
+// set, so every existing branch reads as foreign and the engine holds off. That is the
+// safe way to be wrong — a held unit is visible and one command away from resuming, while
+// a wrongly-admitted one renames someone's branch mid-edit.
+func (s *Scheduler) markPriorInFlight() {
+	s.priorInFlight = map[int]bool{}
+	rs, err := ReadRunState(RunStatePath(s.ProjectRoot))
+	if err != nil {
+		return // no run-state yet (first run) — nothing was in flight
+	}
+	if rs.SprintSlug != s.Plan.SprintSlug {
+		return // a run-state left by a different sprint — not ours
+	}
+	for id := range rs.Units {
+		s.priorInFlight[id] = true
+	}
+}
+
+// blockForeignBranch holds a unit whose canonical branch is already taken by something
+// this engine did not put there — a human on /work-start, most likely.
+//
+// It deliberately does NOT quarantine, which makes it the one block path that differs
+// from every other. Elsewhere quarantining is right: the branch is the engine's own
+// leftover and the canonical name has to be freed for a retry. Here it is precisely
+// wrong — moving the branch aside would rename it out from under whoever is working on
+// it, and "I preserved your work under a different name, mid-edit" is not a kindness.
+// The engine's job at this boundary is to keep its hands off and say so clearly.
+func (s *Scheduler) blockForeignBranch(u *unitSched, now time.Time) error {
+	branch := BranchName(s.Plan.SprintSlug, u.unit.ID)
+	report := &BlockedReport{
+		ID:     u.unit.ID,
+		Branch: branch,
+		Reason: "branch already exists and this run never had the unit in flight — " +
+			"something else is driving it (hand-driven via /work-start, most likely). " +
+			"Not touched. Finish or abandon that branch, then clear this report to admit the unit.",
+		Phase:     "admission",
+		Preserved: true, // nothing was moved or deleted — the branch is exactly as it was
+		BlockedAt: now,
+	}
+	if err := WriteBlockedReport(s.ProjectRoot, report); err != nil {
+		return err
+	}
+	s.Log(fmt.Sprintf("unit %d HELD — %s is already taken and this run never had it in flight; not touching it",
+		u.unit.ID, branch))
+	u.state = stateBlocked
+	return nil
+}
+
 func (s *Scheduler) markPreviouslyDone() {
 	rs, err := ReadRunState(RunStatePath(s.ProjectRoot))
 	if err != nil {

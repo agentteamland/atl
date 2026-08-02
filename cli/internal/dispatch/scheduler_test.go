@@ -2,6 +2,7 @@ package dispatch
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -717,5 +718,111 @@ func TestRunContextCancelReturns(t *testing.T) {
 	}
 	if s.runningCount() != 0 {
 		t.Errorf("no worker should be left running after a cancel, got %d", s.runningCount())
+	}
+}
+
+// --- the drive-mode boundary: the engine keeps off an occupied branch ----------
+//
+// plan.json separates autonomous work from hand-driven work, but a unit that IS in
+// the plan can still be occupied — someone can run /work-start on it. These pin the
+// engine's half of that boundary. The load-bearing assertion is not that the unit is
+// held; it is that the branch was NOT TOUCHED, because every other block path in this
+// scheduler quarantines (moves the branch aside and renames it), and doing that to a
+// branch somebody is mid-edit on is the actual damage.
+
+func TestAdmitHoldsAUnitWhoseBranchIsAlreadyTaken(t *testing.T) {
+	plan := planOf("s1", WorkUnit{ID: 7})
+	s, w := newTestScheduler(t, plan, 1)
+	// A human cut delivery/s1/7 with /work-start. This run never had it in flight.
+	w.fr.branches = map[string]bool{"delivery/s1/7": true}
+
+	if _, err := s.step(); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := s.stateOf(7); got != stateBlocked {
+		t.Errorf("unit on an occupied branch should be held, got state %v", got)
+	}
+	if w.handles[7] != nil {
+		t.Error("a worker was spawned onto an occupied branch")
+	}
+	// The whole point: no quarantine. `worktree move` and `branch -m` are how the other
+	// block paths free the canonical name, and here they would rename someone's branch
+	// out from under them.
+	if w.fr.called("worktree move") || w.fr.called("branch -m") {
+		t.Error("the held branch was quarantined — it must be left exactly as it was")
+	}
+	if w.fr.called("worktree add") {
+		t.Error("a worktree was created for a unit that was supposed to be held")
+	}
+	// And the hold is legible: a report says why, and says the branch is intact.
+	raw, err := os.ReadFile(filepath.Join(BlockedDir(s.ProjectRoot), "7.json"))
+	if err != nil {
+		t.Fatalf("no blocked report written: %v", err)
+	}
+	var r BlockedReport
+	if err := json.Unmarshal(raw, &r); err != nil {
+		t.Fatalf("blocked report is not readable: %v", err)
+	}
+	if !r.Preserved {
+		t.Error("report should say the branch was preserved — nothing was moved or deleted")
+	}
+	if !strings.Contains(r.Reason, "already exists") {
+		t.Errorf("report reason should name the collision, got %q", r.Reason)
+	}
+}
+
+func TestAdmitHoldsOnARemoteOnlyBranch(t *testing.T) {
+	plan := planOf("s1", WorkUnit{ID: 7})
+	s, w := newTestScheduler(t, plan, 1)
+	// Driven from a DIFFERENT clone: nothing local, but it is pushed. Left unguarded
+	// this is the worse collision — `worktree add -b` succeeds and the damage surfaces
+	// later as a second PR against the same unit.
+	w.fr.remoteBranches = map[string]bool{"delivery/s1/7": true}
+
+	if _, err := s.step(); err != nil {
+		t.Fatal(err)
+	}
+	if got := s.stateOf(7); got != stateBlocked {
+		t.Errorf("a pushed branch should hold the unit too, got state %v", got)
+	}
+}
+
+func TestAdmitStillTakesOverItsOwnRestartLeftover(t *testing.T) {
+	plan := planOf("s1", WorkUnit{ID: 7})
+	s, w := newTestScheduler(t, plan, 1)
+	// The same observable state — the branch exists — but this run's predecessor had
+	// the unit in flight, so the branch is the engine's own leftover. Re-admitting it
+	// is correct and is what makes a restart mid-pipeline recoverable.
+	w.fr.branches = map[string]bool{"delivery/s1/7": true}
+	s.priorInFlight = map[int]bool{7: true}
+
+	if _, err := s.step(); err != nil {
+		t.Fatal(err)
+	}
+	if got := s.stateOf(7); got != stateRunning {
+		t.Errorf("the engine must still reclaim its own leftover, got state %v", got)
+	}
+}
+
+func TestAdmitDefersWhenItCannotTellWhetherTheBranchIsTaken(t *testing.T) {
+	plan := planOf("s1", WorkUnit{ID: 7})
+	s, w := newTestScheduler(t, plan, 1)
+	// The remote check failed. That is neither "taken" nor "free", and collapsing it
+	// into either is wrong: admitting risks occupied ground, blocking makes a transient
+	// fetch failure permanent. The unit stays pending for the next tick.
+	w.fr.lsRemoteErr = errors.New("could not read from remote repository")
+
+	if _, err := s.step(); err != nil {
+		t.Fatal(err)
+	}
+	if got := s.stateOf(7); got != statePending {
+		t.Errorf("an unknown branch state should defer, not decide; got %v", got)
+	}
+	if w.handles[7] != nil {
+		t.Error("a worker was spawned despite not knowing whether the branch is free")
+	}
+	if _, err := os.Stat(filepath.Join(BlockedDir(s.ProjectRoot), "7.json")); err == nil {
+		t.Error("a transient check failure must not write a durable blocked report")
 	}
 }
