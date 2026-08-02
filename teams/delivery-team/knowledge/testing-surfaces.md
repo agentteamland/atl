@@ -195,9 +195,31 @@ otherwise just teaches everyone to route around the rule.
 The exception is **written on the work-item**: which lines, and why they could not be covered. A
 recorded exception is a decision someone can revisit; a silent pass is a hole nobody knows about.
 
+### Measuring it — `atl work coverage`
+
+The number is **produced, never claimed**:
+
+```bash
+atl work coverage --json            # the form attached as evidence
+atl work coverage                    # human-readable, names the uncovered lines
+```
+
+It intersects the lines `<base>...HEAD` added or modified with the lines a coverage report says were
+executed, and exits non-zero below the minimum. Three things it does that a hand-written percentage
+cannot: the denominator is **measurable** lines only (a comment is not uncovered, it is unmeasurable),
+test files and non-source files are excluded, and a changed source file the report never mentions
+counts as **zero** rather than being skipped — an untested new file must not score 100%.
+
+It carries its own inputs (base ref, report path) into the output, because a number whose provenance
+you cannot see is not reviewable: a stale report scores exactly as green as a fresh one.
+
+Run it **after committing** — `base...HEAD` sees committed work only, so a mid-edit run reports a free
+100%. The command says so when the tree is dirty.
+
 ### Where this is enforced
 
-- The **developer** authors the test as part of the unit and reports coverage with its self-test.
+- The **developer** authors the test as part of the unit and attaches `atl work coverage --json` —
+  the measurement, not a sentence about it.
 - The **tech-lead's evidence gate** (`green = (all test-gates passed) ∧ (review passed)`, ordered)
-  reads this section's definition of evidence: a passing suite is *not* evidence on its own.
+  reads the attached measurement rather than a claim; a passing suite is *not* evidence on its own.
 - The **pack** supplies the stack's how — see each pack's `production-unit.md`.

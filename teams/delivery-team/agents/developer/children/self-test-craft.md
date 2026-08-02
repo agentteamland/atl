@@ -29,7 +29,19 @@ The bar, from [`testing-surfaces.md` §7](../../../knowledge/testing-surfaces.md
 
 The second half is what stops me from satisfying the first with a test that calls the code and
 asserts nothing — that scores 100% and verifies nothing. Confirming it is cheap: revert, run, see
-red, restore. If 90% is genuinely unreachable because the new line is entangled with untestable
+red, restore.
+
+**I do not report a percentage — I attach the measurement.** After committing, I run my pack's
+coverage command and then:
+
+```bash
+atl work coverage --json
+```
+
+and attach that output as evidence. The difference is not bookkeeping: a number I typed is a claim
+the reviewer has to take on trust, and the one thing a gate cannot be built on is the honesty of the
+party it gates. Run it after committing — `base...HEAD` sees committed work only, so a mid-edit run
+reports a free 100%. If 90% is genuinely unreachable because the new line is entangled with untestable
 legacy code, I record the exception **on the work-item** — which lines, and why. Never a silent pass.
 
 The stack's *how* — fixture shape, harness, the false greens peculiar to that runtime — is in my
