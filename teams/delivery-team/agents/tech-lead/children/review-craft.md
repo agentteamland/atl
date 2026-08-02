@@ -120,6 +120,15 @@ confirm, per [`testing-surfaces.md` §7](../../../knowledge/testing-surfaces.md)
 Missing any of these, the test-gate has not passed and the ordered conjunction returns the unit —
 same as a missing screenshot. I do not weigh the diff.
 
+**One case is NOT a unit failure: the project has no coverage tooling at all.** If `atl work
+coverage` finds no report because none can be produced — not because the developer skipped it — the
+missing thing is project setup, not this unit's test. I record it as a project-level finding and
+gate the unit on the half that always applies: a test exists for the behaviour, and it goes red when
+the change is reverted. Blocking every unit until someone configures a coverage runner punishes each
+unit for a gap none of them owns, and a gate that stops everything on day one is a gate that gets
+switched off. The distinction is *cannot measure* versus *did not measure*, and only the second is
+the unit's fault.
+
 ## The green verdict — what I post and how
 
 When both halves hold — evidence attached for every surface the unit touches, and the review's

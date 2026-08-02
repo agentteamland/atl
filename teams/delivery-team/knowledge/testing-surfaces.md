@@ -186,6 +186,33 @@ they reject both the untested change and the vacuous test. The second half is ch
 revert the change, run the test, see red, restore — and it is the same shape as any assertion worth
 trusting: *what would this report if the thing under test simply had not happened?*
 
+### When the project cannot measure at all — a project finding, not a unit block
+
+The rule above has **two independent claims**, and conflating them is what makes it unusable on a
+project that has not set up coverage yet:
+
+| Claim | Checkable |
+|---|---|
+| **a test exists for the behaviour** | always — **this never softens** |
+| **diff coverage ≥ 90%** | only when the project can produce a report |
+
+So distinguish two situations that look identical from inside a work-unit:
+
+- **Tooling exists and no measurement is attached** ⇒ the unit **blocks**. You skipped a step.
+- **The project has no coverage tooling configured at all** (`atl work coverage` finds no report and
+  the pack's coverage command produces none) ⇒ **do not block the unit.** Record it as a
+  **project-level finding** — "this project cannot measure diff coverage; set up a coverage runner" —
+  and gate the unit on the first claim alone: a test exists, and it goes red when the change is
+  reverted.
+
+The reason is not leniency. The missing thing is **project setup**, and setting it up is not this
+unit's work — blocking every unit until someone does it punishes each unit for a gap none of them
+owns, and a gate that blocks everything on day one gets switched off within a week. **Measured
+2026-08-02:** the e2e fixture ships `"test": "node --test"` with no coverage flag at all, and the
+rule as first written made every unit in it unpassable.
+
+The important half never bends: **no test, no green**, regardless of whether the project can measure.
+
 ### The escape hatch — recorded, never silent
 
 Occasionally 90% is genuinely unreachable: the new line is entangled with legacy code that cannot be

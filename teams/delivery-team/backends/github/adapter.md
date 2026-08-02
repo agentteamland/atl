@@ -38,7 +38,7 @@ described here.
 | Update fields (state, iteration, labels…) (#4/#5/#6/#7) | `gh issue edit` (labels/body/state) + `gh api graphql updateProjectV2ItemFieldValue` (project fields: Status/Priority always; Iteration + `Story Points` only under `mode: "scrum"`) |
 | The ready-to-pull / idempotency / velocity query (#10) | `gh search issues` / `gh api graphql search(type:ISSUE, query:…)` — **server-side** filtering by label/state/type/assignee |
 | Add / read the analysis / brief comment (#3) | `gh issue comment <n> --body …` / `gh api …/issues/{n}/comments` (sentinel-matched) |
-| Link a work-item ↔ a PR (#11) | native: `Fixes #N` in the PR body + `PullRequest.closingIssuesReferences` (GraphQL) |
+| Link a work-item ↔ a PR (#11) | `Fixes #N` in the PR body + the unit's canonical `delivery/<slug>/<id>` head branch. **`closingIssuesReferences` is NOT the read-back for this flow** — see §10 |
 | Record a dependency edge (#8) | the **`## Depends On` convention** (§8) — GitHub has no native typed dependency link |
 | Iteration/sprint membership (#6) | scrum: the Projects v2 **Iteration** field on the item (idempotent field set) · flow: the `sprint:<n>` **label** for the resolved ordinal `<n>` — `gh issue edit <issue#> --add-label sprint:<n> [--remove-label sprint:<prior>]`, the add and the carryover swap in one call (§5) |
 | Assign a unit to its driver | `gh issue edit <issue#> --add-assignee @me` (drop the assignee with `--remove-assignee`). Optional for the autonomous loop — a spawned worker has no GitHub identity of its own, and claiming there is the Status field (§6). **Bound for the drive loop**, where the board should say *who* has the unit in hand |
@@ -288,6 +288,25 @@ The interface's PR concept (#11), bound to `gh`, honouring the D3 decision:
 - **Issue completion:** `Fixes #N` auto-closes an issue **only on merge to the DEFAULT branch**,
   but the flow merges to `dev` → so on merge-verify the tech-lead explicitly `gh issue close #N`
   + sets the Projects Status to Done. Do not rely on auto-close for the `dev` merge.
+- **The work-item↔PR link is NOT readable back via `closingIssuesReferences`** — and a skill that
+  verifies it there can never pass in this flow. **Measured 2026-08-02** on a real fixture PR whose
+  body carried `Fixes #593`: `base=dev`, repo default `main`, `closingIssuesReferences` → **0 nodes**.
+  GitHub promotes a closing keyword to a *closing reference* only when the PR targets the default
+  branch; against any other base it stays an ordinary cross-reference. Since this flow **always**
+  targets `branchPair.dev`, that read is empty by construction, not by accident.
+
+  What is verifiable, and what each part actually proves:
+
+  | Read | Proves | Always available? |
+  |---|---|---|
+  | the PR body contains `Fixes #<id>` (`gh pr view <n> --json body`) | the reference was written | yes |
+  | the PR's head is `delivery/<slug>/<id>` (`--json headRefName`) | this PR belongs to exactly **one** unit — the branch grammar IS the link | yes |
+  | the issue's `CROSS_REFERENCED_EVENT` timeline names this PR | GitHub registered the reference | yes, once the PR exists |
+  | `closingIssuesReferences` contains the id | it will auto-close on merge | **only** when base == the default branch |
+
+  So verify the first three; assert the fourth **only** when `branchPair.dev` *is* the repo default.
+  The head-branch check is the strong one here: the canonical branch name ties a PR to one work item
+  deterministically, which is the property the closing reference was being used as a proxy for.
 - **NEVER-merge carve-out (D3):** the autonomous tech-lead **worker** performs this green
   feature→`dev` merge — that is the machine's job and the loop breaks without it. The human PO
   reviews only at sprint review (`dev`→`release` promotion). The carve-out is scoped to the
