@@ -137,7 +137,11 @@ gh pr create --base <dev> --title "<type>(<scope>): <subject>" --body-file <file
 Use `--body-file`, not `--body`: `atl guard` scans the entire Bash command string, so a body that
 quotes a blocked command in prose gets the whole call denied.
 
-The body must contain **`Fixes #<id>`** — that is the link mechanism on this backend.
+The body must contain **`Fixes #<id>`** — **always, and step 5 explains why it still matters even
+though it produces no closing reference against a non-default base.** It is what a human reading the
+PR follows back to the card, what release notes pick up, and what makes the cross-reference appear
+on the issue's timeline. Omitting it because it "does not close anything here" removes the human
+half of traceability to save nothing.
 
 ### 5. Verify the link landed — the step that must not be skipped
 
