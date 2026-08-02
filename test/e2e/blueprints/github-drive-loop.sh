@@ -99,7 +99,43 @@ cat > "$PROJ/.delivery/methodology.json" <<'EOF'
   "branches": { "dev": "dev", "release": "release" }
 }
 EOF
-ok "seeded .delivery/config.json (github, flow) + methodology.json"
+# The .gitignore a real /delivery-init writes (its step 6). Engine scratch —
+# plan.json above all — must be ignored, or it dirties the tree and /work-start
+# refuses. Omitting this seeded a .delivery/ the real ceremony would never produce,
+# and the blueprint then failed the skill for the harness's own incompleteness.
+cat > "$PROJ/.delivery/.gitignore" <<'EOF'
+worktrees/
+runstate.json
+plan.json
+blocked/
+mcp/
+dispatch.lock
+EOF
+
+# Commit the scaffolding before driving. /work-start refuses a dirty tree — correctly,
+# and unconditionally — and everything above (install + .delivery/) leaves this clone
+# dirty. A real project commits .delivery/ right after /delivery-init; leaving it
+# untracked here made the harness fail the skill for the harness's own setup.
+# EXCLUDE the scaffolding locally — do not commit it, and above all do not push it.
+#
+# Two earlier attempts were both wrong. Committing to the default branch loses the
+# files the moment /work-start cuts from origin/dev (that is how a later /work-move
+# came back "Unknown command"). Committing AND PUSHING to dev fixed that and polluted
+# the SHARED fixture repo for every delivery blueprint — a harness must never leave
+# a trace in the fixture it borrows.
+#
+# The tree only has to be CLEAN for /work-start's preflight; nothing requires these
+# paths to be tracked. `.git/info/exclude` is local, per-clone, and disappears with
+# the container.
+cat >> "$PROJ/.git/info/exclude" <<'EOF'
+.claude/
+.atl/
+.delivery/
+CLAUDE.md
+EOF
+[ -z "$(git -C "$PROJ" status --porcelain)" ] \
+  && ok "seeded .delivery/ + excluded the scaffolding locally — clean tree for /work-start" \
+  || bad "the tree is still dirty; /work-start will refuse and the run measures the harness, not the skill"
 
 # ---- seed two units: one to drive, one the engine owns ------------------------------
 DRIVE=$(gh issue create --repo "$REPO" --title "e2e drive: add a subtract helper" \
@@ -166,7 +202,21 @@ gh issue view "$DRIVE" --repo "$REPO" --comments 2>/dev/null | grep -qi "$BR" &&
 [ "$claimed" = 1 ] && ok "a claim comment naming the branch landed on #$DRIVE" || note "no claim comment naming the branch (wording is the LLM's)"
 
 # ---- 3. do the work by hand, then /work-finish --------------------------------------
-git checkout -q "$BR" 2>/dev/null || git checkout -q -b "$BR" origin/dev 2>/dev/null
+# No `|| git checkout -b` fallback. On the first run /work-start did not cut the branch
+# and that fallback created it silently, so every assertion after it measured the harness
+# instead of the skill — the failure was reported once and then papered over.
+if ! git checkout -q "$BR" 2>/dev/null; then
+  bad "cannot continue: /work-start left no $BR to work on"
+  # Dump BEFORE exiting. The first version of this stop exited straight away and
+  # took the turns.log with it — a fast failure that explains nothing costs a whole
+  # run to re-learn what one dump would have said.
+  echo "===== DEBUG (github-drive-loop: /work-start cut no branch) ====="
+  echo "--- git status ---";   git -C "$PROJ" status --porcelain 2>/dev/null | head -20
+  echo "--- branches ---";     git -C "$PROJ" branch -a 2>/dev/null | head -20
+  echo "--- turns.log ---";    tail -80 "$HOME/turns.log" 2>/dev/null
+  echo "=============================================================="
+  finish; exit 1
+fi
 cat >> app.js <<'EOF'
 
 export function subtract(a, b) { return a - b; }
@@ -197,12 +247,28 @@ if [ -n "$PR" ]; then
   base=$(gh pr view "$PR" --repo "$REPO" --json baseRefName -q .baseRefName 2>/dev/null)
   [ "$base" = "dev" ] && ok "the PR targets the integration branch (dev), read from config" || bad "PR targets '$base', expected dev"
 
-  # The one guarantee /work-finish exists to give: the link is real, not merely written.
-  linked=$(gh api graphql -f query="{ repository(owner:\"$OWNER\", name:\"atl-e2e-delivery\") { pullRequest(number: $PR) { closingIssuesReferences(first:10) { nodes { number } } } } }" \
-    --jq "[.data.repository.pullRequest.closingIssuesReferences.nodes[].number] | index($DRIVE) // -1" 2>/dev/null || echo -1)
-  { [ "${linked:--1}" != "-1" ] && [ -n "$linked" ]; } 2>/dev/null \
-    && ok "the work item #$DRIVE is genuinely linked (closingIssuesReferences), not just referenced" \
-    || bad "#$DRIVE is NOT in the PR's closingIssuesReferences — the link did not land"
+  # The link, verified the way GitHub actually records it for a non-default base.
+  #
+  # The first run of this blueprint asserted `closingIssuesReferences` and could never
+  # pass: GitHub promotes a closing keyword to a CLOSING reference only for a PR
+  # targeting the DEFAULT branch, and this flow always targets dev. Measured on that
+  # run — body carried `Fixes #<id>`, base=dev, default=main, zero nodes. An assertion
+  # that cannot pass is not a strict test, it is a broken one.
+  body=$(gh pr view "$PR" --repo "$REPO" --json body -q .body 2>/dev/null)
+  echo "$body" | grep -qiE "fixes #$DRIVE\b" \
+    && ok "the PR body carries Fixes #$DRIVE — the reference was written" \
+    || bad "the PR body has no 'Fixes #$DRIVE'"
+
+  head=$(gh pr view "$PR" --repo "$REPO" --json headRefName -q .headRefName 2>/dev/null)
+  [ "$head" = "$BR" ] \
+    && ok "the PR head is $BR — the branch grammar ties it to exactly one unit" \
+    || bad "PR head is '$head', expected $BR"
+
+  xref=$(gh api graphql -f query="{ repository(owner:\"$OWNER\", name:\"atl-e2e-delivery\") { issue(number: $DRIVE) { timelineItems(first:50, itemTypes:[CROSS_REFERENCED_EVENT]) { nodes { ... on CrossReferencedEvent { source { ... on PullRequest { number } } } } } } } }" \
+    --jq "[.data.repository.issue.timelineItems.nodes[]?.source.number] | index($PR) // -1" 2>/dev/null || echo -1)
+  { [ "${xref:--1}" != "-1" ] && [ -n "$xref" ]; } 2>/dev/null \
+    && ok "GitHub registered the cross-reference from PR #$PR on #$DRIVE" \
+    || note "no CROSS_REFERENCED_EVENT yet (GitHub registers it asynchronously)"
 
   # DID NOT DO #1 — no merge. Reviewing your own PR by merging it from a skill removes the
   # only review a hand-driven unit gets.

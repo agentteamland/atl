@@ -98,6 +98,12 @@ newly-written code whatever the project's age, and relaxing it for a brownfield 
 it exactly where it is needed most. What *does* differ is the project-wide number: it is a ratchet
 (may not decrease), never a day-one threshold — see §7.
 
+**If the project has no coverage tooling at all, do not block.** When the pack's coverage command
+produces no report because none is configured — as opposed to you not having run it — the missing
+thing is project setup, not this unit's test. Say so in the report as a project-level finding, and
+gate on the half that always applies: a test exists, and it goes red when the change is reverted.
+The distinction is *cannot measure* versus *did not measure*; only the second is this unit's fault.
+
 **The one escape hatch is recorded, never silent.** When 90% is genuinely unreachable — the new line
 is entangled with legacy code that has no seam — say which lines and why, and write that on the work
 item. Then proceed. A recorded exception is a decision someone can revisit; a silent pass is a hole
@@ -131,26 +137,48 @@ gh pr create --base <dev> --title "<type>(<scope>): <subject>" --body-file <file
 Use `--body-file`, not `--body`: `atl guard` scans the entire Bash command string, so a body that
 quotes a blocked command in prose gets the whole call denied.
 
-The body must contain **`Fixes #<id>`** — that is the link mechanism on this backend.
+The body must contain **`Fixes #<id>`** — **always, and step 5 explains why it still matters even
+though it produces no closing reference against a non-default base.** It is what a human reading the
+PR follows back to the card, what release notes pick up, and what makes the cross-reference appear
+on the issue's timeline. Omitting it because it "does not close anything here" removes the human
+half of traceability to save nothing.
 
 ### 5. Verify the link landed — the step that must not be skipped
 
-Read it back:
+Read it back. **What to read depends on the base branch, and getting this wrong makes the step
+unpassable rather than merely wrong:**
 
+```bash
+gh pr view <pr> --repo <o>/<r> --json body,headRefName,baseRefName
 ```
+
+Three things must hold, and they hold on every backend configuration:
+
+1. the body contains **`Fixes #<id>`** — the reference was written;
+2. the head branch is **`delivery/<slug>/<id>`** — this PR belongs to exactly one unit. The branch
+   grammar *is* the link, deterministically;
+3. the issue's timeline carries a **cross-reference** naming this PR:
+
+```bash
 gh api graphql -f query='{ repository(owner:"<o>", name:"<r>") {
-  pullRequest(number: <pr>) { closingIssuesReferences(first:10) { nodes { number } } } } }'
+  issue(number: <id>) { timelineItems(first:50, itemTypes:[CROSS_REFERENCED_EVENT]) {
+    nodes { ... on CrossReferencedEvent { source { ... on PullRequest { number } } } } } } }'
 ```
 
-The unit's id must appear. **If it does not, stop and say so loudly** — do not report the PR as
-done. A PR that is not linked is a card that cannot be traced to its code, and nothing downstream
-will notice.
+**Do NOT verify `closingIssuesReferences` unless `branchPair.dev` is the repository's default
+branch.** GitHub promotes a closing keyword to a *closing reference* only for a PR targeting the
+default branch; against any other base it remains an ordinary cross-reference. This flow always
+targets `dev`, so that read is **empty by construction** — measured 2026-08-02 on a real PR whose
+body carried `Fixes #593`: `base=dev`, default `main`, zero nodes. A skill that gates on it can
+never pass, which is worse than a wrong check: it is a step that always blocks, so it gets removed
+rather than fixed.
 
-One trap worth naming: **`Fixes #N` auto-closes an issue only on a merge to the repository's
-default branch.** This flow merges to the integration branch, so the auto-close never fires here.
-The reference still creates the link, which is what is being verified — but do not read
-"the issue did not close" as "the link failed", and do not read "the link exists" as "the issue
-will close itself".
+If any of the three fails, **stop and say so loudly** — do not report the PR as done. A PR that is
+not traceable to its unit is a card nobody can follow to its code, and nothing downstream notices.
+
+One consequence to state rather than discover: because the closing reference is absent, **the issue
+will not auto-close on merge.** That is not a defect here — `/work-move` moves the state after the
+merge by design, and `/work-sync` catches the ones that get forgotten.
 
 ### 6. Attach the evidence
 
