@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # needs: none
+# touches: cli/internal/dispatch, cli/cmd/atl/commands/work.go
 #
 # work-dispatch — the delivery-team's Go orchestration engine (the hidden
 # `atl work dispatch`). Auth-free + Claude-free: a fake `claude` on PATH stands in

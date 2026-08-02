@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # needs: gh+token
+# touches: teams/delivery-team/skills/request, teams/delivery-team/backends
 #
 # github-request-loop — the delivery-team's /request mid-project intake ceremony, end to end on
 # the GitHub backend with a real `claude -p` ceremony. /request is the front door for a request

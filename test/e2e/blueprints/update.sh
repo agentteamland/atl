@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # needs: none
+# touches: cli/internal/teamupdate, cli/internal/manifest, cli/internal/coreassets, core/
 #
 # update — a global-layer change fans out into an unmodified project copy.
 source /e2e/lib.sh

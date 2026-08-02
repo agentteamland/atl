@@ -22,6 +22,49 @@ Auth is passed into the container only when present on the host:
 A blueprint whose auth is absent is skipped, so the same script is CI-safe (only
 the auth-free core runs) and local-full (everything runs when you're authed).
 
+### Run only what the change can reach
+
+A full run is ~2 hours, and three GitHub delivery blueprints are ~70% of it. A change to
+`internal/guard` or to a core rule cannot reach any of them.
+
+```bash
+test/e2e/run.sh --changed            # vs origin/main
+test/e2e/run.sh --changed v2.15.0    # vs a tag
+```
+
+Each blueprint declares what it exercises on a `# touches:` line; `test/e2e/select.sh`
+intersects those with the changed paths — committed **and** uncommitted, since a selector that
+read only commits would skip the blueprint for the edit you are about to test.
+
+Three fail-safe rules, all erring toward running too much: a blueprint with **no** declaration
+always runs · editing a blueprint runs that blueprint · touching the shared harness (`lib.sh`,
+`run.sh`, `Dockerfile`, fixtures, the mock) runs everything. Forgetting a declaration costs time,
+never coverage.
+
+Measured: a guard-only change selects **one** blueprint; a core-rule change selects the four that
+prove reflection and loop behaviour. Roughly ninety seconds where the full suite is two hours.
+
+**This does not replace the full suite as the pre-tag gate.** The two answer different questions —
+*can this change have broken anything?* versus *is the tree as a whole still green?* — and the
+second earns its keep, since a full run has caught a regression a hand-picked subset missed. Use
+`--changed` per change; run everything before a tag.
+
+`test/e2e/select_test.sh` pins the selector (host-side, sub-second). Run it after touching a
+`# touches:` line — a selector fails in the one direction nothing surfaces, by running *less*
+than it should, which looks exactly like a fast clean run.
+
+### One retry on a transient API failure
+
+`claude_turn` retries **once** when the turn fails with a dropped connection, an overload, a rate
+limit or a 5xx. A dropped connection has cost a 29-minute blueprint outright: the ceremony did its
+work — the Epic, the Feature and the analysis comment all landed, and every assertion after it
+passed — but the envelope never arrived, so the turn returned non-zero.
+
+Retrying is safe because of a property the ceremonies already guarantee: every create is
+check-first by a stable `atl-key`, so a re-run **converges** rather than duplicating. Do not extend
+the retry to a step without that guarantee. Only once, and only on those shapes — a real failure
+must stay a failure.
+
 ### Always watch a full run
 
 **A full suite takes ~2 hours, and `run.sh` reports only once — at the end.** So a

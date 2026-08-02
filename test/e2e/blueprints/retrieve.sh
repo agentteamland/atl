@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # needs: none
+# touches: cli/internal/retrieve, cli/cmd/atl/commands/retrieve.go
 #
 # retrieve — `atl retrieve` (the UserPromptSubmit hook) ranks the project's
 # knowledge pages (BM25 + a local embedder, RRF-fused) and prints the top matches

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # needs: none
+# touches: cli/internal/guard, cli/cmd/atl/commands/guard.go, cli/internal/settings
 #
 # guard — `atl guard` (the PreToolUse hook) reads a hook JSON on stdin and prints
 # a deterministic decision on stdout. The catastrophe layer denies an irreversible

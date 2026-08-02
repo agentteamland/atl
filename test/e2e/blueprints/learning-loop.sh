@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # needs: token
+# touches: cli/internal/queue, cli/internal/marker, cli/internal/drain, cli/internal/transcript, cli/cmd/atl/commands, core/
 #
 # learning-loop — the full real-Claude loop: a `claude -p` session drops a
 # learning marker -> atl tick enqueues it -> /drain folds it into the KB -> ack

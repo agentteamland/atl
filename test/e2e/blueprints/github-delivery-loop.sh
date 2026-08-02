@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # needs: gh+token
+# touches: teams/delivery-team, cli/internal/dispatch
 #
 # github-delivery-loop — the delivery-team's autonomous loop on the REAL GitHub
 # backend (Issues / Projects v2 / Pull Requests). This is the GitHub Layer-B and the

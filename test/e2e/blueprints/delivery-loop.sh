@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # needs: token
+# touches: teams/delivery-team, cli/internal/dispatch
 #
 # delivery-loop — the delivery-team ceremony chain against the mock azureDevOps MCP
 # (stone #9 parts ①+② — the Azure-free half). Installs delivery-team, seeds a

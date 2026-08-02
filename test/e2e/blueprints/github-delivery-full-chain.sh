@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # needs: gh+token
+# touches: teams/delivery-team, cli/internal/dispatch
 #
 # github-delivery-full-chain — the delivery-team's FULL ceremony chain joined into the
 # real Go engine on the GitHub backend: /kickoff -> /refine -> /sprint-plan ->
