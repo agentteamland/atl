@@ -82,6 +82,17 @@ Both halves earn their place. Without the first, the suite passes precisely *bec
 touches the new code — green terminal, untested change, and nothing downstream notices. Without the
 second, a test that calls the code and asserts nothing satisfies the first at 100%.
 
+**Measure the first half, do not estimate it.** After the build and tests pass, run the pack's
+coverage command, then:
+
+```bash
+atl work coverage --json
+```
+
+It exits non-zero below the minimum, names the uncovered lines, and carries its own base ref and
+report path so the number is reviewable. Attach that output to the work item — the measurement is
+the evidence; a percentage written into a comment is a claim.
+
 This is a **gate, not advice, and it does not soften on an existing codebase.** The diff is
 newly-written code whatever the project's age, and relaxing it for a brownfield project would remove
 it exactly where it is needed most. What *does* differ is the project-wide number: it is a ratchet

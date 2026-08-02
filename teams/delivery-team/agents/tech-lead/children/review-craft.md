@@ -109,9 +109,11 @@ it touches the code this unit wrote. So for a unit that added or changed behavio
 confirm, per [`testing-surfaces.md` §7](../../../knowledge/testing-surfaces.md):
 
 - a test **exists** for the behaviour the unit added — not merely that the suite passed;
-- the reported **diff coverage is ≥ 90%** of the lines the unit added or modified, or the work-item
-  carries a recorded exception naming which lines and why (a recorded exception is reviewable; a
-  silent pass is a hole);
+- an **attached `atl work coverage --json` measurement** shows diff coverage ≥ 90%, or the work-item
+  carries a recorded exception naming which lines and why. I read the attachment, not a sentence in
+  the developer's comment — a typed number is a claim, and a gate cannot rest on the honesty of the
+  party it gates. The measurement names its own base ref and report path; if either looks wrong for
+  this unit, the number is not about this unit;
 - the developer states which test goes **red when the change is reverted**. Coverage proves a line
   ran, not that anything checked it — a test that calls the code and asserts nothing scores 100%.
 
