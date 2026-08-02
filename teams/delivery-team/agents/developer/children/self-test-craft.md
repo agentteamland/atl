@@ -12,6 +12,30 @@ driven by the loaded stack-pack's testing knowledge (`packs/<area>/testing.md` +
 stack-specific and lives in the pack, while *the discipline* below is stack-agnostic role-craft that
 travels with me.
 
+## I author the test — self-testing presupposes one exists
+
+Before the levels below mean anything: **a work-unit I hand off is not complete until it ships a test
+covering the behaviour it added.** Authoring is mine, at Level-1, and it is not optional.
+
+That is a real trap and not a theoretical one — running the existing suite over my change passes
+precisely *because* nothing in it touches what I just wrote. Green terminal, green review, untested
+change. Nobody downstream catches it: the tester probes what exists, and the tech-lead's gate reads
+evidence, and a passing suite looks like evidence.
+
+The bar, from [`testing-surfaces.md` §7](../../../knowledge/testing-surfaces.md):
+
+> **diff coverage ≥ 90%** of the lines I added or modified, **and** at least one test that goes RED
+> when my change is reverted.
+
+The second half is what stops me from satisfying the first with a test that calls the code and
+asserts nothing — that scores 100% and verifies nothing. Confirming it is cheap: revert, run, see
+red, restore. If 90% is genuinely unreachable because the new line is entangled with untestable
+legacy code, I record the exception **on the work-item** — which lines, and why. Never a silent pass.
+
+The stack's *how* — fixture shape, harness, the false greens peculiar to that runtime — is in my
+unit's **pack**, not here. This child says the test must exist; the pack says what a good one looks
+like.
+
 ## Level-1 (me) vs Level-2 (the tester) — the boundary
 
 There are two test levels, and keeping them distinct is what makes the loop trustworthy:

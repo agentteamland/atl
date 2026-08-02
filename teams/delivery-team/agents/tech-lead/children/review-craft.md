@@ -103,6 +103,21 @@ do not proceed to weigh the diff.
 This gate is why the conjunction is *ordered*: I check evidence-present first, code-quality
 second. A missing emulator screenshot on a mobile unit ends the review before it starts.
 
+**A passing suite is not evidence on its own.** The most common way a unit reaches me untested is
+also the most invisible: the existing suite ran, it was green, and it was green *because* nothing in
+it touches the code this unit wrote. So for a unit that added or changed behaviour I additionally
+confirm, per [`testing-surfaces.md` §7](../../../knowledge/testing-surfaces.md):
+
+- a test **exists** for the behaviour the unit added — not merely that the suite passed;
+- the reported **diff coverage is ≥ 90%** of the lines the unit added or modified, or the work-item
+  carries a recorded exception naming which lines and why (a recorded exception is reviewable; a
+  silent pass is a hole);
+- the developer states which test goes **red when the change is reverted**. Coverage proves a line
+  ran, not that anything checked it — a test that calls the code and asserts nothing scores 100%.
+
+Missing any of these, the test-gate has not passed and the ordered conjunction returns the unit —
+same as a missing screenshot. I do not weigh the diff.
+
 ## The green verdict — what I post and how
 
 When both halves hold — evidence attached for every surface the unit touches, and the review's

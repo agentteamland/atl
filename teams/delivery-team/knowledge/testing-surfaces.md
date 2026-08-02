@@ -103,6 +103,10 @@ test-gates passed) ∧ (review passed)` trustworthy:
 Both drive the surfaces through the same lease/preflight/evidence mechanism here; the difference is
 independence, not surface.
 
+Both also **presuppose that a test exists** — neither level authors one, and nothing above this line
+says a unit has to produce one. That mandate, the coverage thresholds it is measured by, and why a
+passing suite is not evidence on its own, are **[§7](#7--authoring-the-test-the-gate-presupposes-one-exists)**.
+
 ## §6 — The helper scripts (usage + env)
 
 Both are thin, worker-runnable helpers reflected with the team (the AssetDirs `scripts` set), the same
@@ -124,3 +128,76 @@ stays out of it.
 > simulator / Android AVD actually booting and running a mobile suite — is validated on a **macOS GUI
 > session** (the mobile lane's environment prerequisite); like the stone-#9 Layer-B real-Azure run, it
 > is the one leg that needs its real environment, deferred until that environment is provisioned.
+
+## §7 — Authoring the test (the gate presupposes one exists)
+
+Everything above is about **running** a test and **proving** it ran. None of it says a test has to
+exist — and that silence is a hole large enough to walk a whole unit through. A worker can satisfy
+every gate in §1–§6 by running the existing suite, which passes precisely because nothing in it
+touches the code just written. Green terminal, green review, untested change.
+
+So the mandate, and it is not optional:
+
+> **A work-unit is not complete until it ships a test that covers the behaviour it added.**
+
+### Who authors
+
+**The developer, at Level-1.** Authoring belongs with the author: they know what the unit was
+supposed to do and which seams are worth pinning. The stack-specific craft — the fixture shape, the
+harness, the false greens peculiar to that runtime — lives in the unit's **pack**, not in a separate
+role.
+
+The **tester does not author**. Its whole value is a fresh context that never inherited the author's
+assumptions; giving it the author's job would destroy the independence that makes Level-2 worth
+running at all (§5).
+
+### The two thresholds
+
+| Scope | Rule | Kind |
+|---|---|---|
+| **This unit** | **diff coverage ≥ 90%** — of the lines this change *added or modified* | a gate, always |
+| **The project** | coverage **may not decrease**; target 80% | a ratchet |
+
+Two definitions matter more than the numbers.
+
+**Diff coverage, not file or module coverage.** "90% of the touched files" punishes editing one line
+in a large legacy file; "90% of the new module" has an arguable boundary. The lines the change wrote
+are the lines the change is answerable for.
+
+**The project-wide number is a ratchet, not a door.** A codebase adopting this mid-life sits far
+below any meaningful target, so a threshold gate would block every unit on day one and get switched
+off within a week. "May not decrease" blocks nothing, converges on the target, and cannot be argued
+with. On a project that starts under this policy the ratchet simply never has to climb — the same
+rule, no special case.
+
+The per-unit gate is **unconditional**: it applies identically to a new codebase and an old one,
+because the diff is newly-written code either way and age is not an excuse for the lines you just
+wrote. If it were relaxed for existing projects, it would be absent exactly where it is needed most.
+
+### Coverage proves execution, not verification
+
+A test that calls the code and asserts nothing scores **100%**. Coverage tells you a line *ran*; it
+says nothing about whether anything *checked* the result. So the gate is a conjunction:
+
+> **diff coverage ≥ 90%** ∧ **at least one test that goes RED when the change is reverted**
+
+The first half is mechanical and measurable; the second is what makes it mean something. Together
+they reject both the untested change and the vacuous test. The second half is cheap to confirm —
+revert the change, run the test, see red, restore — and it is the same shape as any assertion worth
+trusting: *what would this report if the thing under test simply had not happened?*
+
+### The escape hatch — recorded, never silent
+
+Occasionally 90% is genuinely unreachable: the new line is entangled with legacy code that cannot be
+exercised (no seam, a static call, an untestable constructor). That is a real situation and pretending
+otherwise just teaches everyone to route around the rule.
+
+The exception is **written on the work-item**: which lines, and why they could not be covered. A
+recorded exception is a decision someone can revisit; a silent pass is a hole nobody knows about.
+
+### Where this is enforced
+
+- The **developer** authors the test as part of the unit and reports coverage with its self-test.
+- The **tech-lead's evidence gate** (`green = (all test-gates passed) ∧ (review passed)`, ordered)
+  reads this section's definition of evidence: a passing suite is *not* evidence on its own.
+- The **pack** supplies the stack's how — see each pack's `production-unit.md`.
