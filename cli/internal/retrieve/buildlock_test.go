@@ -113,3 +113,33 @@ func TestAnUnwritableLockPathStillAllowsTheBuild(t *testing.T) {
 		t.Error("an unwritable lock must not prevent indexing")
 	}
 }
+
+// The lock file may be unwritable — a read-only cache dir, a leftover directory
+// at the path. Every such failure proceeds with the build: an index that
+// silently stops updating is worse than one built twice, and nothing reports
+// that retrieval has gone stale.
+func TestAcquireProceedsWhenTheLockCannotBeWritten(t *testing.T) {
+	dir := t.TempDir()
+	idx := filepath.Join(dir, "index.gob")
+	// A directory where the lock file goes: WriteFile fails, os.Stat succeeds.
+	if err := os.MkdirAll(filepath.Join(dir, "index.lock"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	release, ok := AcquireBuildLock(idx)
+	if !ok {
+		t.Fatal("an unwritable lock must not block the build")
+	}
+	release() // must not panic, and must not remove the directory's contents
+}
+
+// EPERM from signal 0 means the process exists and belongs to someone else —
+// alive, not gone. Reading it as "gone" would free a lock held by a live build
+// running under another user.
+func TestProcessAliveReadsPermissionDeniedAsAlive(t *testing.T) {
+	if os.Getuid() == 0 {
+		t.Skip("running as root: no process is permission-denied to us")
+	}
+	if !processAlive(1) { // pid 1 is root-owned on every unix
+		t.Error("a permission-denied process is alive, not gone")
+	}
+}

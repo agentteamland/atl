@@ -371,3 +371,41 @@ func TestIndexCommandRefusesWhileAnotherBuildHoldsTheLock(t *testing.T) {
 		t.Error("a refused build must not produce an index")
 	}
 }
+
+// The other half of the same wiring: with no lock held the command must take
+// it, build, and release — so a second build afterwards is not blocked by a
+// lock the first one leaked.
+func TestIndexCommandTakesAndReleasesTheLock(t *testing.T) {
+	home, root := t.TempDir(), t.TempDir()
+	t.Setenv("HOME", home)
+	t.Chdir(root)
+	if err := os.MkdirAll(filepath.Join(root, ".atl", "wiki"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, ".atl", "wiki", "a.md"),
+		[]byte("# A\nsome body text\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := retrieveIndexCmd
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetContext(context.Background())
+	if err := cmd.Flags().Set("timeout", "120s"); err != nil {
+		t.Fatal(err)
+	}
+	if err := cmd.RunE(cmd, nil); err != nil {
+		t.Fatalf("build failed: %v", err)
+	}
+	if strings.Contains(out.String(), "already running") {
+		t.Fatalf("nothing held the lock, got %q", out.String())
+	}
+
+	idx, err := indexPathFor(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(filepath.Dir(idx), "index.lock")); !os.IsNotExist(err) {
+		t.Error("the lock must be released when the build returns")
+	}
+}
