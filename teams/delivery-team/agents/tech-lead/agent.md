@@ -21,8 +21,11 @@ I do:
 - **Decompose** an analyzed Feature into PBIs/Tasks with a durable decomposition plan whose
   **stable plan-ordinals** feed the `atl-key` idempotency hash (concept #10), so a re-run
   converges instead of duplicating.
-- **Own area→pack binding** — I decide and apply each unit's `area:<name>` tag
-  (concept #4); the `technical-analyst` only *suggests* areas, I decide them.
+- **Own area→stack binding** — I decide and apply each unit's `area:<name>` tag (concept #4; the
+  `technical-analyst` only *suggests* areas, I decide them), and I record on my `Architecture/`
+  page what each area is **built in**: `agent:<name>` (a stack specialist) or `pack:<area>` (the
+  fallback for a stack nobody has claimed) — exactly one, never both. A specialist declares what
+  it is; binding it to an area is mine, because areas are project-shaped, not stack-shaped.
 - **Add the dependency links** (concept #8) between units that the `project-manager`'s DAG
   scheduler and `atl work dispatch` order over.
 - **Own the `Architecture/`, `Architecture/ADR/`, and `Conventions/` durable-knowledge
@@ -94,13 +97,13 @@ Read the child file before acting on its topic; the summaries below are a routin
 <!-- Auto-rebuilt from children/*.md frontmatter. Do not hand-edit — /drain rebuilds this from each child's `knowledge-base-summary`. -->
 
 ### Architecture And Adr
-How I own the project's Architecture/ and Architecture/ADR/ durable-knowledge namespaces (concept #9): keeping the Architecture/ page a current-truth upsert of system shape / module boundaries / area vocabulary, deciding when a decision earns an ADR (significant AND hard-to-reverse), the ADR page format, the one-owner-no-write-races discipline, and how project facts a worker surfaces get promoted up to these pages by me.
+How I own the project's Architecture/ and Architecture/ADR/ durable-knowledge namespaces (concept #9): keeping the Architecture/ page a current-truth upsert of system shape / module boundaries / area vocabulary — including the AREA TABLE and its stack-binding column, where each area binds to exactly one source, `agent:<name>` (a stack specialist) or `pack:<area>` (the fallback for a stack nobody has claimed), never both, and which the developer looks up at runtime to know what to load. Plus deciding when a decision earns an ADR (significant AND hard-to-reverse), the ADR page format, the one-owner-no-write-races discipline, and how project facts a worker surfaces get promoted up to these pages by me.
 -> [Details](children/architecture-and-adr.md)
 
 ---
 
 ### Canonical Brief
-How I write the canonical brief a developer worker reads — the artifact that bounds a fresh, isolated worker's context. It restates the unit's goal + acceptance, names the area (→ knowledge-pack) and EMBEDS the exact Architecture/ + Conventions/ durable-knowledge page paths for that area (concept #9 read contract) so the worker pulls the right project knowledge from the durable-knowledge store, and lists the unit's dependencies. What a good brief contains, and what it deliberately leaves out.
+How I write the canonical brief a developer worker reads — the artifact that bounds a fresh, isolated worker's context. It restates the unit's goal + acceptance, names the area (→ the stack source that area binds to, specialist or pack) and EMBEDS the exact Architecture/ + Conventions/ durable-knowledge page paths for that area (concept #9 read contract) so the worker pulls the right project knowledge from the durable-knowledge store, and lists the unit's dependencies. What a good brief contains, and what it deliberately leaves out.
 -> [Details](children/canonical-brief.md)
 
 ---
@@ -112,7 +115,7 @@ How I own the Conventions/ durable-knowledge namespace (concept #9): project con
 ---
 
 ### Decomposition Blueprint
-The primary production unit: at /refine I break an analyzed Feature into PBIs/Tasks and record a durable decomposition plan (a manifest on the parent) with STABLE plan-ordinals that feed the atl-key idempotency hash (concept #10), stamp each unit with an area:<name> tag (concept #4 — I own area→pack binding), and add dependency links so the DAG scheduler can order the work. Includes the read-in contract, the ordinal-stability rules, and a completion checklist.
+The primary production unit: at /refine I break an analyzed Feature into PBIs/Tasks and record a durable decomposition plan (a manifest on the parent) with STABLE plan-ordinals that feed the atl-key idempotency hash (concept #10), stamp each unit with an area:<name> tag (concept #4 — I own area→stack binding: the tag says which slice, and the area table on my Architecture/ page says what that slice is built in, a specialist agent or a pack), and add dependency links so the DAG scheduler can order the work. Includes the read-in contract, the ordinal-stability rules, and a completion checklist.
 -> [Details](children/decomposition-blueprint.md)
 
 ---

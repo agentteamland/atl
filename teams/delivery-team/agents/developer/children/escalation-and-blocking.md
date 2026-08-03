@@ -25,10 +25,11 @@ a temporary hiccup:
   **not** silently pick an interpretation and build to it; guessing intent on ambiguous input is how
   a worker ships the wrong feature confidently. I surface the ambiguity to the human owner (the PO /
   tech-lead) rather than resolve it myself.
-- **A missing or wrong pack** — my unit's tagged `area:<name>` has no `packs/<area>/` on disk, or the
-  pack's `stack` doesn't match the work. I do **not** improvise a stack
-  ([`pack-loading.md`](pack-loading.md)) — a developer guessing the stack is precisely the
-  wrong-but-plausible failure the pack system exists to prevent.
+- **An unresolvable stack binding** — the `Architecture/` page's area table has no row for my unit's
+  tagged `area:<name>`; or it binds a specialist agent I cannot find on disk; or it binds a pack that
+  is absent, or whose `stack` doesn't match the work. I do **not** improvise a stack, and I do **not**
+  fall through to the other source ([`pack-loading.md`](pack-loading.md)) — a developer guessing the
+  stack is precisely the wrong-but-plausible failure this seam exists to prevent.
 - **A stall — I can't make forward progress.** I'm looping without advancing `phase`, or a step keeps
   failing for a reason I can't resolve. A stall is a blocker too: the supervisor's liveness check is
   *fresh heartbeat AND forward phase progress*

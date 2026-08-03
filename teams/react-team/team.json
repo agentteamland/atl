@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "name": "react-team",
+  "version": "0.1.0",
+  "description": "The React web stack specialist for the delivery loop: react-web carries screen, routing, server-state, API-client and form craft, plus the browser verification a green build cannot replace.",
+  "author": {
+    "name": "AgentTeamLand",
+    "url": "https://github.com/agentteamland"
+  },
+  "license": "MIT",
+  "keywords": [
+    "react",
+    "typescript",
+    "web",
+    "frontend",
+    "spa",
+    "vite",
+    "stack-specialist",
+    "delivery"
+  ],
+  "repository": "https://github.com/agentteamland/atl",
+  "homepage": "https://github.com/agentteamland",
+  "scope": "project",
+  "agents": [
+    {
+      "name": "react-web",
+      "description": "React + TypeScript web-app craft — the stack specialist a delivery worker loads for a browser front end: screens and routing, server- and client-state, the API client, forms and input, and the browser verification a green build cannot replace."
+    }
+  ],
+  "skills": [],
+  "rules": [],
+  "capabilities": {},
+  "extends": null,
+  "excludes": [],
+  "dependencies": {
+    "core": "^1.0.0",
+    "delivery-team": ">=0.15.0"
+  },
+  "requires": {
+    "atl": ">=2.17.0"
+  }
+}
