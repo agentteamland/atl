@@ -63,7 +63,7 @@ func TestLoadMissingAndCorruptAreAbsent(t *testing.T) {
 
 func TestQueryEmptyIndex(t *testing.T) {
 	ix := &Index{Version: indexFormatVersion}
-	got, err := ix.Query(context.Background(), "anything", nil, 5)
+	got, err := ix.Query(context.Background(), "anything", nil, 5, MinSimDefault)
 	if err != nil || len(got) != 0 {
 		t.Fatalf("empty index query: want no results no error, got %d, %v", len(got), err)
 	}
@@ -85,7 +85,7 @@ func TestBuildQueryLexicalOnly(t *testing.T) {
 	if ix.Vecs != nil {
 		t.Fatalf("lexical-only index should carry no vectors, got %d", len(ix.Vecs))
 	}
-	res, err := ix.Query(ctx, "dispatch merge", nil, 5)
+	res, err := ix.Query(ctx, "dispatch merge", nil, 5, MinSimDefault)
 	if err != nil {
 		t.Fatalf("Query: %v", err)
 	}
@@ -151,7 +151,7 @@ func TestBuildQueryEndToEnd(t *testing.T) {
 
 	// A conceptual query (no shared keyword with the doc's exact wording beyond
 	// "merge") must still surface the merge-verify page first — the hybrid win.
-	res, err := ix.Query(ctx, "how does the dispatch confirm a branch was merged", e, 2)
+	res, err := ix.Query(ctx, "how does the dispatch confirm a branch was merged", e, 2, MinSimDefault)
 	if err != nil {
 		t.Fatalf("Query: %v", err)
 	}

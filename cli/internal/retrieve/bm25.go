@@ -12,6 +12,23 @@ import (
 const (
 	bm25K1 = 1.2
 	bm25B  = 0.75
+
+	// bm25MaxDocRatio drops query terms present in at least this fraction of the
+	// corpus. Without it the lexical arm can never come back empty: sharing the
+	// word "a" with a page is enough to score above zero and rank it, so "no
+	// lexical signal" — the state that lets the retriever stay silent — is
+	// unreachable on any real corpus.
+	//
+	// Expressed as a document-frequency ratio rather than an idf threshold on
+	// purpose. Idf for a term present in every document is a function of corpus
+	// size (0.0123 at 40 docs, 0.0027 at 182), so a fixed idf cut means different
+	// things in different projects; the ratio says exactly what is meant and holds
+	// at any size. Not a stopword list either — that would be language-specific
+	// and would need maintaining, and this corpus is read in two languages.
+	//
+	// Such terms contribute almost nothing to a score anyway, so the effect is on
+	// *whether a document ranks at all*, not on the ordering of genuine matches.
+	bm25MaxDocRatio = 0.9
 )
 
 // bm25Index is a lexical index over a document set — the half of hybrid
@@ -23,6 +40,7 @@ type bm25Index struct {
 	docLen   []int            // token count per doc
 	avgLen   float64
 	idf      map[string]float64
+	docFreq  map[string]int // documents containing each term — the ubiquity cut reads this
 	numDocs  int
 }
 
@@ -57,12 +75,14 @@ func newBM25(docs []Doc) *bm25Index {
 	for t, df := range docFreq {
 		ix.idf[t] = math.Log(1 + (float64(ix.numDocs)-float64(df)+0.5)/(float64(df)+0.5))
 	}
+	ix.docFreq = docFreq
 	return ix
 }
 
-// rank returns the document positions whose BM25 score against the query is > 0
-// (i.e. that share at least one query term), best first. Documents with no
-// lexical overlap are omitted — they contribute nothing to the fused ranking.
+// rank returns the document positions whose BM25 score against the query is > 0,
+// best first. A document with no *informative* term in common scores zero and is
+// omitted — so an empty result means "this corpus has no lexical answer", which
+// is a state the hook needs in order to stay silent.
 func (ix *bm25Index) rank(query string) []int {
 	qterms := tokenize(query)
 	type scored struct {
@@ -96,6 +116,9 @@ func (ix *bm25Index) score(i int, qterms []string) float64 {
 		tf := float64(terms[t])
 		if tf == 0 {
 			continue
+		}
+		if ix.numDocs > 0 && float64(ix.docFreq[t])/float64(ix.numDocs) >= bm25MaxDocRatio {
+			continue // present in nearly every document — matching it is not signal
 		}
 		idf := ix.idf[t]
 		s += idf * (tf * (bm25K1 + 1)) / (tf + bm25K1*(1-bm25B+bm25B*dl/ix.avgLen))

@@ -1,6 +1,7 @@
 package retrieve
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 )
@@ -38,5 +39,31 @@ func TestBM25EmptyCorpus(t *testing.T) {
 	ix := newBM25(nil)
 	if got := ix.rank("anything"); len(got) != 0 {
 		t.Fatalf("empty corpus should rank nothing, got %v", got)
+	}
+}
+
+// A query that shares only ubiquitous words with the corpus must rank nothing.
+// Before the idf cut, sharing "the" or "a" was enough to score above zero, so
+// the lexical arm always returned something and the retriever could never be
+// silent — which is the state the hook needs in order to say "no signal".
+func TestBM25IgnoresTermsPresentInNearlyEveryDoc(t *testing.T) {
+	docs := make([]Doc, 40)
+	for i := range docs {
+		docs[i] = Doc{
+			Path: fmt.Sprintf("p%02d.md", i),
+			Text: fmt.Sprintf("the system has a component number %d for the operator", i),
+		}
+	}
+	docs[7].Text = "the system has a zeppelin component for the operator"
+	ix := newBM25(docs)
+
+	if got := ix.rank("the a for has"); len(got) != 0 {
+		t.Errorf("a stopword-only query must rank nothing, got %d docs", len(got))
+	}
+	// …and a term that is genuinely rare still ranks, so the cut has not simply
+	// disabled the lexical arm.
+	got := ix.rank("zeppelin")
+	if len(got) != 1 || got[0] != 7 {
+		t.Errorf("a rare term must still rank its document, got %v", got)
 	}
 }

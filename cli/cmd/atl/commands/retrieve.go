@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -31,8 +32,23 @@ const envNoAutoIndex = "ATL_NO_RETRIEVE_INDEX"
 // check (not the throttle) is what gates any further rebuild.
 const retrieveAutoIndexThrottle = 10 * time.Minute
 
-// retrieveTopK is how many knowledge pages the hook surfaces per prompt.
+// retrieveTopK is the MAXIMUM number of knowledge pages the hook surfaces. It is
+// a ceiling, not a quota — since the semantic arm gained a floor, a fire may
+// legitimately produce fewer, including none.
+//
+// Deliberately left at 5 rather than tightened: the one refuting page in the
+// measured failure set had a best English rank of 6 of 182, so a smaller ceiling
+// would exclude it even after the ranker is repaired.
 const retrieveTopK = 5
+
+// minPromptRunes is the length below which a prompt is not ranked at all.
+//
+// Counted in RUNES, not bytes. An accented or non-Latin script costs 2-3 bytes
+// per character, so a byte floor admits a short prompt in one language while
+// suppressing an equally short one in another — it would filter unevenly by
+// language, and this corpus is read in two. Set at 12: above one-word
+// acknowledgements, below any real question.
+const minPromptRunes = 12
 
 // retrieveInput is the UserPromptSubmit hook payload atl retrieve reads on stdin.
 type retrieveInput struct {
@@ -85,6 +101,20 @@ func runRetrieveHook(cmd *cobra.Command) {
 		root, _ = os.Getwd()
 	}
 
+	// Two suppressions before any work. Measured over one real session: of 277
+	// fires, 112 ranked machine-injected notification text and 43 ranked a prompt
+	// of a few characters — 155 (56%) carried no question for the corpus to answer.
+	// Ranking those is not merely wasted; it is most of the volume that taught the
+	// reader to skip the channel.
+	if strings.HasPrefix(prompt, "<") {
+		logRetrieveFire(root, "suppressed-machine", nil)
+		return // <task-notification>, <system-reminder>, and friends
+	}
+	if len([]rune(prompt)) < minPromptRunes {
+		logRetrieveFire(root, "suppressed-short", nil)
+		return
+	}
+
 	idxPath, err := indexPathFor(root)
 	if err != nil {
 		return
@@ -103,10 +133,19 @@ func runRetrieveHook(cmd *cobra.Command) {
 		defer e.Close()
 	}
 
-	results, err := ix.Query(ctx, prompt, e, retrieveTopK)
-	if err != nil || len(results) == 0 {
+	results, err := ix.Query(ctx, prompt, e, retrieveTopK, retrieve.MinSimDefault)
+	if err != nil {
 		return
 	}
+	if len(results) == 0 {
+		logRetrieveFire(root, "silent", nil)
+		return // nothing cleared the floor — say nothing, which is now a real outcome
+	}
+	paths := make([]string, len(results))
+	for i, r := range results {
+		paths[i] = r.Path
+	}
+	logRetrieveFire(root, "fired", paths)
 	fmt.Fprint(cmd.OutOrStdout(), formatResults(root, results))
 }
 
@@ -246,6 +285,87 @@ func corpusDirs(projectRoot string) ([]string, error) {
 // indexPathFor is the on-disk index for a project: a global cache keyed by the
 // project path, so it is never committed and each project (and git worktree) has
 // its own — ~/.atl/cache/retrieve/<project-slug>/index.gob.
+// logRetrieveFire appends one line per hook invocation next to the index. It is
+// the subsystem's first denominator: before this, "how often does retrieval have
+// anything to say, and does anyone read it?" could only be answered by a forensic
+// pass over a 30 MB transcript.
+//
+// Strictly best-effort — every error is dropped. A hook that fails open on a
+// missing model must not start failing on a full disk.
+//
+// Deliberately NOT a pruning signal. A page that is never surfaced is not thereby
+// unwanted: in the measured failure set the one indexed refuter sits in the
+// never-surfaced set, so a "delete what never appears" rule would have removed
+// precisely the page whose absence was the failure. That bound holds while the
+// ranker is known-broken for the majority language; re-derive it once it is not.
+func logRetrieveFire(projectRoot, outcome string, paths []string) {
+	idx, err := indexPathFor(projectRoot)
+	if err != nil {
+		return
+	}
+	line := time.Now().UTC().Format(time.RFC3339) + "\t" + outcome
+	if len(paths) > 0 {
+		line += "\t" + strings.Join(paths, " ")
+	}
+	dir := filepath.Dir(idx)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return
+	}
+	f, err := os.OpenFile(filepath.Join(dir, "fires.log"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+	_, _ = f.WriteString(line + "\n")
+}
+
+// retrieveFireStats is the parsed tally behind `atl retrieve stats`.
+type retrieveFireStats struct {
+	Total, Fired, Silent, Machine, Short int
+	Offered                              int
+	Pages                                map[string]int
+}
+
+// readFireStats tallies the fire log. A missing log is an empty tally, not an
+// error — the log only exists once the hook has run since this shipped.
+func readFireStats(logPath string) (retrieveFireStats, error) {
+	st := retrieveFireStats{Pages: map[string]int{}}
+	b, err := os.ReadFile(logPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return st, nil
+		}
+		return st, err
+	}
+	for _, line := range strings.Split(string(b), "\n") {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		f := strings.Split(line, "\t")
+		if len(f) < 2 {
+			continue
+		}
+		st.Total++
+		switch f[1] {
+		case "fired":
+			st.Fired++
+			if len(f) > 2 {
+				for _, p := range strings.Fields(f[2]) {
+					st.Pages[p]++
+					st.Offered++
+				}
+			}
+		case "silent":
+			st.Silent++
+		case "suppressed-machine":
+			st.Machine++
+		case "suppressed-short":
+			st.Short++
+		}
+	}
+	return st, nil
+}
+
 func indexPathFor(projectRoot string) (string, error) {
 	layer, err := scope.LayerDir(scope.Global, "")
 	if err != nil {
@@ -436,5 +556,77 @@ func init() {
 	retrieveIndexCmd.Flags().Duration("timeout", 15*time.Minute, "overall deadline for the index build")
 	retrieveIndexCmd.Flags().Bool("lexical", false, "build a BM25-only index without the semantic embedder")
 	retrieveWarmCmd.Flags().Duration("timeout", 5*time.Minute, "overall deadline for the model download + warm")
-	retrieveCmd.AddCommand(retrieveIndexCmd, retrieveWarmCmd)
+	retrieveCmd.AddCommand(retrieveIndexCmd, retrieveWarmCmd, retrieveStatsCmd)
+}
+
+var retrieveStatsCmd = &cobra.Command{
+	Use:   "stats",
+	Short: "What the retrieval hook has actually done in this project",
+	Long: "Tally the per-fire log the hook writes beside the index: how many prompts it\n" +
+		"ranked, how many produced nothing, how many were suppressed before ranking, and\n" +
+		"which pages it has offered.\n\n" +
+		"This is the subsystem's denominator. A high silent count is not a fault — it is\n" +
+		"the retriever declining to answer a question it has no signal for.",
+	Args:         cobra.NoArgs,
+	SilenceUsage: true,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		root, err := os.Getwd()
+		if err != nil {
+			return err
+		}
+		idx, err := indexPathFor(root)
+		if err != nil {
+			return err
+		}
+		st, err := readFireStats(filepath.Join(filepath.Dir(idx), "fires.log"))
+		if err != nil {
+			return err
+		}
+		fmt.Fprint(cmd.OutOrStdout(), renderFireStats(st))
+		return nil
+	},
+}
+
+// renderFireStats formats the tally. Separated from the command so the numbers a
+// human will act on are asserted rather than eyeballed once — this output is the
+// evidence for whether injected context works as a delivery channel at all, so a
+// wrong denominator here would mis-decide that.
+func renderFireStats(st retrieveFireStats) string {
+	if st.Total == 0 {
+		return "atl retrieve: no fires recorded yet for this project\n"
+	}
+	pct := func(n int) string { return fmt.Sprintf("%5.1f%%", 100*float64(n)/float64(st.Total)) }
+	var b strings.Builder
+	fmt.Fprintf(&b, "fires        %5d\n", st.Total)
+	fmt.Fprintf(&b, "  ranked     %5d  %s\n", st.Fired+st.Silent, pct(st.Fired+st.Silent))
+	fmt.Fprintf(&b, "    offered  %5d  %s   (%d page refs)\n", st.Fired, pct(st.Fired), st.Offered)
+	fmt.Fprintf(&b, "    silent   %5d  %s\n", st.Silent, pct(st.Silent))
+	fmt.Fprintf(&b, "  suppressed %5d  %s   (machine %d, short %d)\n",
+		st.Machine+st.Short, pct(st.Machine+st.Short), st.Machine, st.Short)
+	if len(st.Pages) == 0 {
+		return b.String()
+	}
+	type kv struct {
+		p string
+		n int
+	}
+	top := make([]kv, 0, len(st.Pages))
+	for p, n := range st.Pages {
+		top = append(top, kv{p, n})
+	}
+	sort.Slice(top, func(a, b int) bool {
+		if top[a].n != top[b].n {
+			return top[a].n > top[b].n
+		}
+		return top[a].p < top[b].p
+	})
+	fmt.Fprintf(&b, "\ndistinct pages offered: %d\n", len(top))
+	for i, t := range top {
+		if i == 10 {
+			fmt.Fprintf(&b, "  … %d more\n", len(top)-10)
+			break
+		}
+		fmt.Fprintf(&b, "  %4d  %s  %s\n", t.n, pct(t.n), t.p)
+	}
+	return b.String()
 }

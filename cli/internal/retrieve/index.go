@@ -142,7 +142,32 @@ func normalize(v []float32) {
 // Query returns the top-k documents for a prompt, fusing a BM25 lexical ranking
 // with a semantic (cosine) ranking via RRF. It embeds the prompt once. When the
 // index carries no vectors (an embedder-less build), it degrades to BM25 only.
-func (ix *Index) Query(ctx context.Context, prompt string, e *Embedder, k int) ([]Result, error) {
+// MinSimDefault is the cosine floor the semantic arm applies, below which a
+// document is treated as "no signal" rather than as a weak match.
+//
+// Derived, not guessed — 13 probes against this workspace's live 182-doc index,
+// top-1 cosine by band:
+//
+//	on-topic English   0.298 … 0.631   (mean 0.451)
+//	off-topic English  0.097 … 0.227   (mean 0.152)
+//	machine / 1-word   0.204 … 0.426
+//	on-topic Turkish   0.107 … 0.175   (mean 0.140)
+//
+// 0.25 separates on-topic English from everything else it can separate. The
+// fourth row is the uncomfortable one and must not be filed as a tuning detail:
+// an on-topic question in the user's own language scores BELOW off-topic English,
+// so this model has no signal there at all. The same question in both languages
+// measured 0.631 (en) against 0.138 (tr). Consequence to hold onto: under this
+// floor a non-English prompt correctly yields nothing — honest, and the reason
+// the multilingual model is a fix rather than an optimisation.
+const MinSimDefault = 0.25
+
+// Query ranks the corpus against prompt and returns up to k results. minSim is
+// the semantic arm's cosine floor (MinSimDefault unless a caller is measuring);
+// the lexical arm's floor is inherent — BM25 already drops any document sharing
+// no query term. When both arms come back empty the result is empty, which is
+// the point: the retriever must be able to say it has nothing.
+func (ix *Index) Query(ctx context.Context, prompt string, e *Embedder, k int, minSim float64) ([]Result, error) {
 	if len(ix.Docs) == 0 || k <= 0 {
 		return nil, nil
 	}
@@ -153,7 +178,7 @@ func (ix *Index) Query(ctx context.Context, prompt string, e *Embedder, k int) (
 		// A failed or empty query embed degrades to BM25-only rather than failing
 		// the query — retrieval stays useful (and, for the fail-open hook, alive).
 		if qv, err := e.Embed(ctx, []string{prompt}); err == nil && len(qv) > 0 {
-			semantic = semanticRank(qv[0], ix.Vecs)
+			semantic = semanticRank(qv[0], ix.Vecs, minSim)
 		}
 	}
 
