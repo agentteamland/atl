@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/agentteamland/atl/cli/internal/retrieve"
 	"github.com/spf13/cobra"
@@ -321,5 +322,90 @@ func TestReadFireStatsSkipsMalformedLines(t *testing.T) {
 	}
 	if st.Fired != 1 || st.Total != 2 {
 		t.Errorf("want 1 fired of 2 records, got %+v", st)
+	}
+}
+
+// The lock working and the command CONSULTING it are two different things — a
+// correct guard nothing calls is a shape this codebase has recorded three times.
+// This drives the command with a held lock and asserts it declines.
+func TestIndexCommandRefusesWhileAnotherBuildHoldsTheLock(t *testing.T) {
+	home, root := t.TempDir(), t.TempDir()
+	t.Setenv("HOME", home)
+	t.Chdir(root)
+	if err := os.MkdirAll(filepath.Join(root, ".atl", "wiki"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, ".atl", "wiki", "a.md"), []byte("# A\nbody\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	idx, err := indexPathFor(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Dir(idx), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// Our own pid: unambiguously alive, so the lock is believed.
+	lock := filepath.Join(filepath.Dir(idx), "index.lock")
+	if err := os.WriteFile(lock,
+		[]byte(fmt.Sprintf("%d\n%d\n", os.Getpid(), time.Now().Unix())), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := retrieveIndexCmd
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetContext(context.Background())
+	if err := cmd.Flags().Set("timeout", "30s"); err != nil {
+		t.Fatal(err)
+	}
+	if err := cmd.RunE(cmd, nil); err != nil {
+		t.Fatalf("a duplicate build must not be an error: %v", err)
+	}
+	if !strings.Contains(out.String(), "already running") {
+		t.Errorf("the command must decline and say why, got %q", out.String())
+	}
+	// And it must not have written an index behind the lock.
+	if _, err := os.Stat(idx); err == nil {
+		t.Error("a refused build must not produce an index")
+	}
+}
+
+// The other half of the same wiring: with no lock held the command must take
+// it, build, and release — so a second build afterwards is not blocked by a
+// lock the first one leaked.
+func TestIndexCommandTakesAndReleasesTheLock(t *testing.T) {
+	home, root := t.TempDir(), t.TempDir()
+	t.Setenv("HOME", home)
+	t.Chdir(root)
+	if err := os.MkdirAll(filepath.Join(root, ".atl", "wiki"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, ".atl", "wiki", "a.md"),
+		[]byte("# A\nsome body text\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := retrieveIndexCmd
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetContext(context.Background())
+	if err := cmd.Flags().Set("timeout", "120s"); err != nil {
+		t.Fatal(err)
+	}
+	if err := cmd.RunE(cmd, nil); err != nil {
+		t.Fatalf("build failed: %v", err)
+	}
+	if strings.Contains(out.String(), "already running") {
+		t.Fatalf("nothing held the lock, got %q", out.String())
+	}
+
+	idx, err := indexPathFor(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(filepath.Dir(idx), "index.lock")); !os.IsNotExist(err) {
+		t.Error("the lock must be released when the build returns")
 	}
 }
