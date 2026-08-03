@@ -141,7 +141,7 @@ func TestCorpusStaleDetectsDeletedPage(t *testing.T) {
 
 	// The symptom, until the index is rebuilt: the phantom still ranks, and its
 	// missing excerpt is the only tell.
-	res, err := ix.Query(context.Background(), "zeppelin", nil, retrieveTopK)
+	res, err := ix.Query(context.Background(), "zeppelin", nil, retrieveTopK, retrieve.MinSimDefault)
 	if err != nil || len(res) == 0 || res[0].Path != gone {
 		t.Fatalf("stale index should still rank the deleted page, got %+v (%v)", res, err)
 	}

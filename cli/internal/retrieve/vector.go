@@ -26,15 +26,27 @@ func cosine(a, b []float32) float64 {
 
 // semanticRank returns document positions ordered by cosine similarity to the
 // query vector, best first — a brute-force scan (trivial at the tens-of-pages
-// corpus scale). Every document appears, since every one has a similarity.
-func semanticRank(query []float32, vecs [][]float32) []int {
+// corpus scale) — keeping only those at or above minSim.
+//
+// That floor is the load-bearing part. This function used to return EVERY
+// document ("every one has a similarity"), which meant the semantic arm could
+// never say "nothing here". On a prompt where the lexical arm also finds no
+// overlap, RRF then fused a single all-documents list and the top-k was simply
+// whichever pages sit closest to a query the model cannot encode — a nearly
+// constant set. Measured over one real session: the hook fired 277/277 times,
+// one page appeared in 52% of them, and follow-through was 3 reads per 1,130
+// offers. An arm that always answers is indistinguishable from noise, and a
+// retriever that cannot return nothing teaches its reader to ignore it.
+func semanticRank(query []float32, vecs [][]float32, minSim float64) []int {
 	type scored struct {
 		doc int
 		sim float64
 	}
-	scores := make([]scored, len(vecs))
+	var scores []scored
 	for i, v := range vecs {
-		scores[i] = scored{i, cosine(query, v)}
+		if s := cosine(query, v); s >= minSim {
+			scores = append(scores, scored{i, s})
+		}
 	}
 	sort.SliceStable(scores, func(a, b int) bool { return scores[a].sim > scores[b].sim })
 	docs := make([]int, len(scores))

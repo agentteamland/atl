@@ -28,7 +28,7 @@ func TestSemanticRankOrdersByCloseness(t *testing.T) {
 		{1, 0},     // doc 1: identical (closest)
 		{0.7, 0.7}, // doc 2: 45 degrees (middle)
 	}
-	got := semanticRank(query, vecs)
+	got := semanticRank(query, vecs, -1)
 	want := []int{1, 2, 0}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("semanticRank: got %v want %v", got, want)
