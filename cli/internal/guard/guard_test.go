@@ -296,3 +296,75 @@ func TestCatastropheOutranksPipeNudge(t *testing.T) {
 		t.Errorf("action = %q, want %q", got.Action, Deny)
 	}
 }
+
+// The spec nudge exists for a failure no text pattern can reach: a rationale was
+// authored into a skill, the design record held no such decision, and the turn
+// that wrote it contained no decision-claim vocabulary at all. The claim is
+// undetectable; the ACT — editing a spec — is not, and file_path is the one field
+// this hook already decodes.
+func TestIsSpecFileMatchesWhatAnAgentObeys(t *testing.T) {
+	for _, p := range []string{
+		"/r/teams/delivery-team/skills/work-start/SKILL.md", // the actual failure's file
+		"/r/core/skills/drain/SKILL.md",
+		"/r/teams/delivery-team/knowledge/pack-format.md",
+		"/r/teams/delivery-team/agents/tech-lead/children/decomposition-blueprint.md",
+		"/r/teams/delivery-team/backends/github/adapter.md",
+		"/r/teams/delivery-team/agents/developer/agent.md",
+		"/r/teams/delivery-team/team.json",
+	} {
+		if !IsSpecFile(p) {
+			t.Errorf("%s is a shipped spec — an agent reads it as instruction", p)
+		}
+	}
+	// Documentation ABOUT the system, and ordinary code, get the generic nudge.
+	// Widening this set is how a precise signal becomes the noise it replaced.
+	for _, p := range []string{
+		"/r/.atl/wiki/some-page.md",
+		"/r/.atl/docs/a-decision.md",
+		"/r/docs/site/guide/install.md",
+		"/r/cli/internal/guard/guard.go",
+		"/r/README.md",
+		"/r/CLAUDE.md",
+	} {
+		if IsSpecFile(p) {
+			t.Errorf("%s is not a spec an agent obeys — it must get the generic nudge", p)
+		}
+	}
+}
+
+// Decide must route to the spec text, not merely classify correctly — the
+// classifier being right while the caller ignores it is the "correct body
+// nothing calls" shape this codebase has recorded three times.
+func TestDecideRoutesSpecEditsToTheSpecNudge(t *testing.T) {
+	exists := func(string) bool { return true }
+	first := func(string) bool { return true }
+
+	spec := Decide(Input{ToolName: "Edit", ToolInput: ToolInput{FilePath: "/r/skills/x/SKILL.md"}}, exists, first)
+	if spec.Action != Context || spec.Reason != SpecNudge {
+		t.Errorf("a spec edit must get the spec nudge, got %+v", spec)
+	}
+	other := Decide(Input{ToolName: "Edit", ToolInput: ToolInput{FilePath: "/r/cli/main.go"}}, exists, first)
+	if other.Action != Context || other.Reason != NudgeText {
+		t.Errorf("ordinary code must keep the generic nudge, got %+v", other)
+	}
+	// Still non-blocking, and still once per file: a spec edit must not become a
+	// permission decision, and must not fire on every subsequent edit.
+	if spec.Action == Deny {
+		t.Error("the quality layer never blocks")
+	}
+	again := Decide(Input{ToolName: "Edit", ToolInput: ToolInput{FilePath: "/r/skills/x/SKILL.md"}},
+		exists, func(string) bool { return false })
+	if again.Action != "" {
+		t.Errorf("a repeat edit must stay silent, got %+v", again)
+	}
+}
+
+// A new file has nothing to grep and no prior rationale to contradict, so the
+// spec branch must not fire on creation either.
+func TestSpecNudgeSkipsNewFiles(t *testing.T) {
+	got := Decide(Input{ToolName: "Write", ToolInput: ToolInput{FilePath: "/r/skills/x/SKILL.md"}},
+		func(string) bool { return false }, func(string) bool { return true })
+	if got.Action != "" {
+		t.Errorf("creating a spec must not nudge, got %+v", got)
+	}
+}

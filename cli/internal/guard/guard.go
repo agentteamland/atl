@@ -64,6 +64,40 @@ const NudgeText = "atl guard — first edit of this file this session: before ch
 	"surgical (touch only what the task needs), and verify the blast radius rather than assuming it. " +
 	"(grep-before-edit · surgical-change)"
 
+// SpecNudge replaces the generic reminder when the file is a shipped spec — prose
+// an agent reads as instruction and obeys literally.
+//
+// It exists for a measured failure a lexicon cannot reach. A rationale was
+// authored into a skill defending a behaviour ("that is the whole difference
+// between this and the dispatch engine"), the design record contained no such
+// decision, and the sentence was simply wrong. Nothing about it looked wrong:
+// an authored justification reads as authoritative, and the turn that wrote it
+// contained no decision-claim vocabulary at all — it asserted a property of the
+// artifact and quoted itself. So there is nothing in the TEXT to detect.
+//
+// The act is observable even though the claim is not: a spec file being edited,
+// which is the one field this hook already decodes. Measured over one 4-day
+// session, this fires on 26 files against 112 total first-edits — the generic
+// nudge's own band, so it costs no extra volume; it swaps the message on the
+// quarter of edits where a false justification does the most damage.
+const SpecNudge = "atl guard — this is a shipped spec: prose an agent will obey literally. Beyond the " +
+	"usual grep-before-edit care: if you are writing a RATIONALE — why the behaviour is this way, " +
+	"what it is deliberately not — first check the record actually holds the decision you are about " +
+	"to assert (grep .atl/docs and .atl/brain-storms; an empty result IS the answer). An authored " +
+	"justification reads as authoritative and nothing about it looks wrong, so a claim that no one " +
+	"ever decided survives every review. (a rationale is a claim about the record, not a description " +
+	"of the code)"
+
+// specFileRe matches the artifacts a worker or agent reads as instruction: skill
+// procedures, team knowledge, backend contracts, agent identities and their
+// children, and the manifest. Not documentation about the system — the files the
+// system obeys.
+var specFileRe = regexp.MustCompile(`(SKILL\.md|/knowledge/[^/]+\.md|/children/[^/]+\.md|/backends/[^/]+/adapter\.md|/agent\.md|/team\.json)$`)
+
+// IsSpecFile reports whether a path is a shipped spec. Exported for the test that
+// pins the set, since which files count is the whole precision of the nudge.
+func IsSpecFile(path string) bool { return specFileRe.MatchString(path) }
+
 // PipeExitNudge is the quality-layer text for reading $? after a pipeline. Like
 // the grep-before-edit nudge it never blocks — being wrong costs one line, while
 // being silent costs a measurement nobody knows is wrong.
@@ -137,6 +171,9 @@ func Decide(in Input, fileExists func(string) bool, firstEdit func(path string) 
 			return Result{}
 		}
 		if firstEdit(p) {
+			if IsSpecFile(p) {
+				return Result{Action: Context, Reason: SpecNudge}
+			}
 			return Result{Action: Context, Reason: NudgeText}
 		}
 	}
