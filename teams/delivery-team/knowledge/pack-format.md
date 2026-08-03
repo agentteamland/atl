@@ -155,8 +155,25 @@ decomposition blueprint, areas are functional slices of *this* system (e.g.
 sprint. The reference pack's `web`/`mobile`/`api` (see [§6](#6-the-v1-reference-pack))
 are **concern-based, portable template names** — a real team keeps the area name it
 needs and swaps the pack contents to its own stack; it does not have to adopt those
-three. The binding rule is identical either way: **the tag names the directory, and
-the developer loads exactly that directory.**
+three.
+
+The binding rule is identical either way, and it runs through the area table on the
+`Architecture/` page rather than through the tag's spelling: **the table binds each
+area to exactly one source — an installed stack specialist (`agent:<name>`) or a
+reference pack (`pack:<area>`) — and the developer loads exactly that one.**
+
+A pack is therefore the **fallback for a stack nobody has claimed**, not the only
+option. When a stack team ships a specialist for this project's stack, the tech-lead
+binds the area to it and the pack steps aside; the two are never layered, because a
+specialist read alongside a pack for a different stack gives the worker two
+contradicting documents.
+
+The indirection is what makes the tag portable. A specialist is **stack**-shaped and
+a shipped one cannot know that this project calls its area `api` rather than
+`backend` or `core-service` — that name is project-shaped and belongs to the
+tech-lead. So the specialist declares what it *is*, the table says where it applies,
+and a Node project and a .NET project can both use `area:api` and resolve
+differently.
 
 ## 4. The three-layer read contract (load-bearing)
 

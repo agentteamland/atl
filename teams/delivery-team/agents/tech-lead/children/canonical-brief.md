@@ -1,5 +1,5 @@
 ---
-knowledge-base-summary: "How I write the canonical brief a developer worker reads — the artifact that bounds a fresh, isolated worker's context. It restates the unit's goal + acceptance, names the area (→ knowledge-pack) and EMBEDS the exact Architecture/ + Conventions/ durable-knowledge page paths for that area (concept #9 read contract) so the worker pulls the right project knowledge from the durable-knowledge store, and lists the unit's dependencies. What a good brief contains, and what it deliberately leaves out."
+knowledge-base-summary: "How I write the canonical brief a developer worker reads — the artifact that bounds a fresh, isolated worker's context. It restates the unit's goal + acceptance, names the area (→ the stack source that area binds to, specialist or pack) and EMBEDS the exact Architecture/ + Conventions/ durable-knowledge page paths for that area (concept #9 read contract) so the worker pulls the right project knowledge from the durable-knowledge store, and lists the unit's dependencies. What a good brief contains, and what it deliberately leaves out."
 ---
 
 # Canonical Brief
@@ -29,8 +29,9 @@ store can't.
    traced to the Feature's Acceptance Criteria (which I read from the Feature spec field, concept
    #2, at decomposition). The worker should not have to reconstruct intent from the raw work-item.
 2. **The area** — the `area:<name>` tag I applied at decomposition. This binds the worker to its
-   knowledge-pack (`packs/<area>/`, stone #5) and tells it which slice of the durable-knowledge
-   store to load.
+   stack source — whichever one my `Architecture/` area table names for that area, a specialist
+   agent's `children/` or `packs/<area>/` (from [architecture-and-adr.md](architecture-and-adr.md))
+   — and tells it which slice of the durable-knowledge store to load.
 3. **The embedded durable-knowledge page paths (the load-bearing part).** I name the *exact* pages
    for this unit's area (concept #9 read contract):
    - the `Architecture/` slice relevant to the area (boundaries, the module the unit touches, any
@@ -130,7 +131,8 @@ so the brief and the review criteria come from **one owner**, which keeps "what 
 ## Checklist
 
 - [ ] Goal restated in 1–2 sentences, traced to the Feature's Acceptance Criteria.
-- [ ] `area:<name>` named → binds the knowledge-pack.
+- [ ] `area:<name>` named, and the `Architecture/` area table binds it → a specialist agent, or the
+      reference pack when no specialist owns the stack.
 - [ ] **Exact** `Architecture/` slice + `Conventions/` page paths embedded (concept #9 read
       contract) — not "read the store," specific paths.
 - [ ] Any constraining ADR referenced by number.

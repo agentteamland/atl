@@ -1,5 +1,5 @@
 ---
-knowledge-base-summary: "How I own the project's Architecture/ and Architecture/ADR/ durable-knowledge namespaces (concept #9): keeping the Architecture/ page a current-truth upsert of system shape / module boundaries / area vocabulary, deciding when a decision earns an ADR (significant AND hard-to-reverse), the ADR page format, the one-owner-no-write-races discipline, and how project facts a worker surfaces get promoted up to these pages by me."
+knowledge-base-summary: "How I own the project's Architecture/ and Architecture/ADR/ durable-knowledge namespaces (concept #9): keeping the Architecture/ page a current-truth upsert of system shape / module boundaries / area vocabulary — including the AREA TABLE and its stack-binding column, where each area binds to exactly one source, `agent:<name>` (a stack specialist) or `pack:<area>` (the fallback for a stack nobody has claimed), never both, and which the developer looks up at runtime to know what to load. Plus deciding when a decision earns an ADR (significant AND hard-to-reverse), the ADR page format, the one-owner-no-write-races discipline, and how project facts a worker surfaces get promoted up to these pages by me."
 ---
 
 # Architecture & ADR
@@ -41,6 +41,53 @@ what areas exist, where the boundaries are, what module owns what responsibility
 system-wide decisions constrain a change. My canonical brief
 ([canonical-brief.md](canonical-brief.md)) points each worker at the slice of this page relevant
 to its area.
+
+### The area table — and the stack binding it carries
+
+The area vocabulary is not a bare list: it is a **table**, and one of its columns is the
+**stack binding** — what each area is built in. This is the row a `developer` looks up to know
+what stack knowledge to load for its unit, so the table is a runtime contract, not documentation.
+
+| Area | Responsibility | Stack binding |
+|---|---|---|
+| `area:<name>` | the functional slice — what work lives here, and its boundary | `agent:<agent-name>` **or** `pack:<area>` |
+
+The binding takes one of exactly two forms:
+
+- **`agent:<agent-name>`** — a **stack specialist** shipped by an installed stack team, reflected
+  at `.claude/agents/<agent-name>/` (`agent:dotnet-api`, `agent:react-web`). The worker loads that
+  agent's `children/`. This is the normal binding for any stack a specialist covers, because a
+  specialist's knowledge *matures*: the learning loop writes back into its `children/`, so it
+  thickens with every project that uses it.
+- **`pack:<area>`** — delivery-team's own area-keyed stack pack at `.claude/packs/<area>/`. This is
+  the **fallback for a stack no specialist has claimed**.
+
+**Exactly one binding per area — never both.** Where a specialist is bound it *replaces* that
+area's pack; the two are never layered. A worker told to read both reads two documents written by
+different hands about the same decision, with no rule for which to obey — strictly worse off than
+a worker given only the generic pack.
+
+**Every area I tag must have a row.** The `developer` escalates on a binding it cannot resolve
+rather than guessing a stack ([decomposition-blueprint.md](decomposition-blueprint.md)), so an
+area I tag but never bind is a unit I blocked at decomposition.
+
+### Why the binding is mine
+
+**Areas are project-shaped, not stack-shaped.** A stack specialist ships to every project that
+installs it, so it declares only *what it is* — ".NET API craft" — and never which area it owns:
+this project calls the slice `api`, the next calls it `backend`, the next `core-service`. A
+shipped agent that hardcoded an area name would be wrong in every project but the one it was
+written in.
+
+I already own the area vocabulary and the page it lives on, and the area tag already *is* the
+stack binding — so this is a column on a table I maintain, not a new responsibility. That split
+is what lets a Node project and a .NET project both use `area:api` and resolve to different
+stacks, and what lets a new stack team install without the delivery-team ever learning its name.
+
+I set a binding when I introduce an area, and I change it when the area's stack genuinely changes
+— an upsert on this page like any other current truth. A stack migration that is significant and
+hard-to-reverse also earns an ADR (below); flipping a binding to a specialist that now covers a
+stack the pack was standing in for does not.
 
 ## The `Architecture/ADR/` namespace — one page per decision
 
@@ -128,6 +175,8 @@ on these pages and no divergent "two versions of the truth." Concretely:
 
 - [ ] `Architecture/` page kept current via upsert; stale lines removed, not appended over.
 - [ ] Area vocabulary on the page matches the `area:<name>` tags I apply at decomposition.
+- [ ] Every area row carries a **stack binding** — `agent:<name>` or `pack:<area>`, exactly one,
+      never both — and it resolves to something actually installed.
 - [ ] Durable-knowledge store target read from the `config.json` cache; namespace existence
       ensured before first write.
 - [ ] An ADR written **only** for a significant AND hard-to-reverse decision.

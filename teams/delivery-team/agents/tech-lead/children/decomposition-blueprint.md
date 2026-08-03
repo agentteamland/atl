@@ -1,5 +1,5 @@
 ---
-knowledge-base-summary: "The primary production unit: at /refine I break an analyzed Feature into PBIs/Tasks and record a durable decomposition plan (a manifest on the parent) with STABLE plan-ordinals that feed the atl-key idempotency hash (concept #10), stamp each unit with an area:<name> tag (concept #4 — I own area→pack binding), and add dependency links so the DAG scheduler can order the work. Includes the read-in contract, the ordinal-stability rules, and a completion checklist."
+knowledge-base-summary: "The primary production unit: at /refine I break an analyzed Feature into PBIs/Tasks and record a durable decomposition plan (a manifest on the parent) with STABLE plan-ordinals that feed the atl-key idempotency hash (concept #10), stamp each unit with an area:<name> tag (concept #4 — I own area→stack binding: the tag says which slice, and the area table on my Architecture/ page says what that slice is built in, a specialist agent or a pack), and add dependency links so the DAG scheduler can order the work. Includes the read-in contract, the ordinal-stability rules, and a completion checklist."
 ---
 
 # Decomposition Blueprint
@@ -12,9 +12,10 @@ thing re-runnable. I run as a `subagent` inside the `/refine` ceremony (which st
 describe my contribution, not the orchestration).
 
 Everything downstream depends on getting this right: the `project-manager` schedules over the
-Dependency links I add, the `developer` loads the knowledge-pack keyed by the area tag I apply,
-and the idempotency of a re-run rests on the plan-ordinals I assign. A sloppy decomposition is
-not a local error — it corrupts scheduling, pack-binding, and resumability at once.
+Dependency links I add, the `developer` loads its stack knowledge via the area tag I apply and
+the binding I record for that area, and the idempotency of a re-run rests on the plan-ordinals I
+assign. A sloppy decomposition is not a local error — it corrupts scheduling, stack binding, and
+resumability at once.
 
 ## What I read in first (the analysis read-back contract)
 
@@ -105,12 +106,12 @@ I resolve the concrete work-item **type** at runtime — the `artifactHierarchy`
 (`Product Backlog Item` vs `User Story`, etc.), so I resolve it at runtime (concept #7) and
 **never hardcode a literal type or state string**.
 
-## Area tagging — I own area→pack binding (concept #4)
+## Area tagging — I own area→stack binding (concept #4)
 
 The `technical-analyst` only *suggests* areas (under `## Suggested Areas`); **I decide and
-apply** them, because the area tag binds a unit to the knowledge-pack the `developer` will load
-(`packs/<area>/`, stone #5). I write each unit's area as a tag (concept #4) in the exact
-`area:<name>` convention.
+apply** them, because the area tag is what selects the stack knowledge the `developer` will load
+for that unit. I write each unit's area as a tag (concept #4) in the exact `area:<name>`
+convention.
 
 Discipline for good area binding:
 - **One primary area per unit.** A unit that genuinely spans two areas is usually two units — a
@@ -118,11 +119,34 @@ Discipline for good area binding:
   note the cross-area concern in the unit's description and a Dependency link.
 - **Areas are project-shaped, not stack-shaped.** `area:auth`, `area:reporting`,
   `area:notifications` — a functional slice of *this system*. I keep the area vocabulary stable
-  across a project (I own the `Architecture/` page that lists the areas), so the same
-  `packs/<area>/` binds consistently sprint over sprint.
+  across a project (I own the `Architecture/` page that lists the areas), so the same area binds
+  to the same stack knowledge sprint over sprint.
 - **The suggested areas are input, not law.** If the analyst's suggested split doesn't match the
   system's real module boundaries (which I own — see architecture-and-adr.md), I re-slice and
   record why on the `Architecture/` page.
+
+### The tag is half the binding — the other half is the area table
+
+The `area:<name>` tag says *which slice*. What that slice is **built in** is recorded once, per
+area, in the area table on my `Architecture/` page — a **stack binding** naming either a
+specialist agent or a pack (the format and worked rows are in
+[architecture-and-adr.md](architecture-and-adr.md)). The `developer` reads the tag, looks up the
+row, and loads exactly what the binding names.
+
+This binding is mine because **areas are project-shaped, not stack-shaped**. A stack specialist
+ships to every project that installs it, so it declares only *what it is* — ".NET API craft",
+"React web craft" — and never which area it belongs to: this project calls the slice `api`, the
+next calls it `backend`, the next `core-service`. A shipped agent that named an area would be
+wrong in every project but the one it was written in. I own the area vocabulary, so I own the
+binding — one column on a table I already maintain.
+
+That split is what makes a Node project and a .NET project both use `area:api` and resolve to
+different stacks, and what lets a new stack team install without the delivery-team ever learning
+its name.
+
+So area tagging is not complete until **every area I tag has a row with a binding**. A tag whose
+area has no row leaves the worker unable to resolve its stack, and it escalates rather than
+guessing — a blocked unit I caused at decomposition.
 
 ## Dependency links — the edges the scheduler orders over
 
@@ -166,6 +190,9 @@ one review."
 - [ ] `atl-run:<ceremony>:<sprint-id>` provenance tag stamped alongside `atl-key`.
 - [ ] Concrete type resolved at runtime (concept #7); no hardcoded type/state literal.
 - [ ] Each unit tagged `area:<name>` (I decide; analyst only suggested); one primary area per unit.
+- [ ] **Every area I tagged has a row with a stack binding** on the `Architecture/` page — a
+      specialist agent or a pack. An area with no binding leaves the `developer` unable to resolve
+      its stack, and it escalates rather than guessing.
 - [ ] Dependency links added only for real prerequisites (concept #8); **no cycles**; parent/child
       is containment, not a scheduling edge.
 - [ ] Each Task is worker-sized (one coherent change, one PR, one review).

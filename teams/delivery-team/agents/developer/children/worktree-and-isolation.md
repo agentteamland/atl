@@ -97,7 +97,8 @@ repo or the whole durable-knowledge store. I bound my context to exactly what th
 
 - **the task** — the work-item (`## Acceptance Criteria` and the rest of the spec-field H2s) +
   the `**[Technical Analysis]**` sentinel comment ([`backend-touchpoints.md`](backend-touchpoints.md));
-- **the pack** — only the tech-lead-tagged area's `packs/<area>/` ([`pack-loading.md`](pack-loading.md));
+- **the stack source** — only the one the tech-lead-tagged area binds to, a specialist agent's
+  `children/` **or** `packs/<area>/`, never both ([`pack-loading.md`](pack-loading.md));
 - **the brief** — the tech-lead's `**[Canonical Brief]**` sentinel comment, which names the area and
   **embeds the exact durable-knowledge page paths** I load (not "read the whole store");
 - **the brief-named durable-knowledge pages** — pulled individually from the durable-knowledge store, not a full scan.

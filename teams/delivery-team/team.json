@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "name": "delivery-team",
-  "version": "0.14.0",
+  "version": "0.15.0",
   "description": "Work-item-driven, sprint-based autonomous software delivery on a pluggable backend (Azure DevOps or GitHub): role-agents + ceremony skills orchestrated by atl work dispatch over claude -p workers.",
   "author": {
     "name": "AgentTeamLand",
@@ -48,7 +48,7 @@
     },
     {
       "name": "developer",
-      "description": "The delivery-team's generic implementer: a fresh isolated claude -p worker per work-unit that loads its tagged area's stack-pack, builds and self-tests in its own worktree, and hands off at PR."
+      "description": "The delivery-team's generic implementer: a fresh isolated claude -p worker per work-unit that loads its area's bound stack knowledge (a specialist agent, else the area's pack), builds and self-tests in its own worktree, and hands off at PR."
     },
     {
       "name": "tester",

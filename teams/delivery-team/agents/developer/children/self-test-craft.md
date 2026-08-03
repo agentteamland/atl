@@ -7,10 +7,11 @@ knowledge-base-summary: "My Level-1 self-test (micro-loop step 4): the fast auth
 At micro-loop **step 4** I self-test the change I just implemented
 ([`implementation-blueprint.md`](implementation-blueprint.md)). This is **Level-1** — the fast,
 author-side gate: does the thing I built do what this unit asked, on the surfaces it touches? It is
-driven by the loaded stack-pack's testing knowledge (`packs/<area>/testing.md` +
-`pack.md`'s **Test commands** — [`pack-loading.md`](pack-loading.md)), because *how* to test is
-stack-specific and lives in the pack, while *the discipline* below is stack-agnostic role-craft that
-travels with me.
+driven by the testing knowledge in whichever stack source my area binds to
+([`pack-loading.md`](pack-loading.md)) — a specialist agent's testing/verification `children/` topic,
+or a pack's `packs/<area>/testing.md` + `pack.md`'s **Test commands** — because *how* to test is
+stack-specific and lives in the stack layer, while *the discipline* below is stack-agnostic role-craft
+that travels with me.
 
 ## I author the test — self-testing presupposes one exists
 

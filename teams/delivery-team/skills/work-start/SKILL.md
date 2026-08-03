@@ -235,18 +235,24 @@ point, and a report promising a build that never starts is worse than one that s
 asked for this card by id; a pause here re-asks a question they already answered. Print
 `Next: building it now. /work-finish when it is green.`, then:
 
-1. **Load the area's stack pack** — `.claude/packs/<area>/`, keyed off the unit's `area:<name>`
-   label. Its `production-unit.md` carries the blueprint, the test commands, and the registration
-   step a scaffolded unit needs to exist at runtime. A unit built without its pack is built against
-   the generic conventions instead of this stack's.
+1. **Load the area's stack knowledge — whatever the binding names.** Read the area table on the
+   tech-lead's `Architecture/` page and find the row for the unit's `area:<name>` label. It binds
+   to exactly one of two things:
 
-   **Check the pack matches the project's stack before you obey it.** All reference packs reflect
-   into every project regardless of what it is written in, so `.claude/packs/api/` existing is not
-   evidence that it describes *this* API. Read its opening lines: if it names a stack the repo does
-   not use, the pack is a template that arrived by reflection and its commands, blueprint and
-   registration step are all wrong here. Say so, work from the project's own `docs/conventions/`
-   and `docs/architecture/` instead, and note the gap — a project whose stack has no pack is a real
-   finding, not a thing to route around silently.
+   - **`agent:<name>`** — an installed stack specialist. Load `.claude/agents/<name>/agent.md` and
+     its `children/`. This is the case on any project whose stack has been claimed.
+   - **`pack:<area>`** — the reference pack at `.claude/packs/<area>/`, the fallback for a stack
+     nobody has claimed yet.
+
+   Either way you load **one** of them, never both: a specialist layered on a pack for a different
+   stack makes you read two contradicting documents. Whichever it is carries the same three things —
+   the production-unit blueprint, the test commands, and the registration step a scaffolded unit
+   needs to exist at runtime.
+
+   **If the area has no row, or its row names something not installed, stop and say so** (see the
+   exceptions below). Do not guess, and do not fall back to a pack the binding did not name — all
+   reference packs reflect into every project regardless of what it is written in, so
+   `.claude/packs/api/` existing is not evidence that it describes *this* API.
 2. **Load whatever the Canonical Brief named** (step 9) — that list is the unit's bounded context.
 3. **Plan, implement, and test**, against the acceptance criteria printed in the briefing. The test
    gate is not optional and it is not `/work-finish`'s job to write it for you:
@@ -259,8 +265,11 @@ asked for this card by id; a pause here re-asks a question they already answered
    a resume ambiguous.
 5. **Hand control back**, so the human can review and invoke `/work-finish`.
 
-**Area unset ⇒ ask which pack, do not guess.** Picking a pack by reading the title is how a unit
-gets built against the wrong stack's conventions, and the mistake is invisible until review.
+**Area unset, or unbound ⇒ ask, do not guess.** Choosing by reading a title is how a unit gets
+built against the wrong stack's conventions, and the mistake is invisible until review. A project
+whose area table has no row for this unit is a real finding — surface it rather than routing
+around it silently, since the tech-lead owns that table and an unbound area means the
+decomposition skipped a step.
 
 **Stop after the briefing instead — the exceptions:**
 
@@ -269,6 +278,9 @@ gets built against the wrong stack's conventions, and the mistake is invisible u
   scope step that contradicts the code, a dependency that has not landed. Say which, and stop.
   This is the case the briefing exists to catch; carrying on regardless is how a wrong card becomes
   a wrong PR.
+- The area's binding names a specialist or a pack that **is not installed**. Say which is missing;
+  building against the generic conventions instead is the silent wrong-stack build this step exists
+  to prevent.
 
 Each of those prints its own reason in place of the `Next:` line above, so the report never
 promises a build that is not happening.

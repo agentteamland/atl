@@ -168,10 +168,11 @@ consuming the analysts' just-produced output. This is the ceremony's core write.
      model-dependent) — **never** hardcode a type/state literal (concept #7).
 3. **Apply the area tags — the tech-lead decides (concept #4).** Write each unit's `area:<name>`
    as a tag (concept #4). The `technical-analyst` only *suggested* areas under
-   `## Suggested Areas`; the tech-lead **decides** them, because the tag *is* the pack binding — a
-   `developer` loads exactly `packs/<area>/` for the tagged area (see
+   `## Suggested Areas`; the tech-lead **decides** them, because the tag *is* the stack-knowledge
+   binding — a `developer` loads exactly what the area table binds the tag to, either an installed
+   stack specialist (`agent:<name>`) or the reference pack (`pack:<area>`), never both (see
    [`pack-format.md`](../../knowledge/pack-format.md)). One primary area per unit; keep the area
-   vocabulary stable on the `Architecture/` page.
+   vocabulary — and its bindings — stable on the `Architecture/` page.
 4. **Add the dependency links — the edges the scheduler orders over.** Add a dependency link
    (concept #8) between units only for a real prerequisite (a shared surface, schema, or
    contract another unit produces); **no cycles**; parent/child containment (concept #1) is *not* a
@@ -199,7 +200,8 @@ the `**[Technical Analysis]**` comment uses (concept #3) — keyed to its `atl-k
 in place. A brief bounds context; it does not dump it:
 
 - The unit's **goal** restated in one or two sentences, traced to the Feature's Acceptance Criteria.
-- The **area** (`area:<name>`) — binds the knowledge-pack (`packs/<area>/`).
+- The **area** (`area:<name>`) — binds the unit's stack knowledge through the `Architecture/` area
+  table: a specialist agent, or the reference pack when no specialist owns the stack.
 - The **exact** `Architecture/` slice + `Conventions/` page paths for the unit's area (concept #9
   read contract) — specific paths the worker pulls from the durable-knowledge store (a store search
   is the fallback when a path isn't pre-named), never "read the whole store"; reference any
