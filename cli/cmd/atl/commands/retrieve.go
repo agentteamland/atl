@@ -267,6 +267,14 @@ var retrieveWarmCmd = &cobra.Command{
 // corpus. The agent knowledge base is a deferred corpus expansion (global agent
 // KBs need cross-project relevance gating); v1 surfaces project knowledge, the
 // core of what #140 exists for.
+//
+// .atl/brain-storms is deliberately NOT here, and the reason is not size. A
+// brainstorm records rejected options by mandate — 35 of this workspace's 52 do
+// — and a chunk of one, split from the verdict that rejected it, reads exactly
+// like a decision. That is the shape of the failure this whole change is about
+// (a claim that a decision existed when it did not), so indexing the process
+// layer would feed it. .atl/docs carries the same discussions' *outcomes* and is
+// indexed; brainstorms stay a deliberate read.
 func corpusDirs(projectRoot string) ([]string, error) {
 	atlDir, err := scope.LayerDir(scope.Project, projectRoot)
 	if err != nil {
@@ -275,6 +283,20 @@ func corpusDirs(projectRoot string) ([]string, error) {
 	dirs := []string{
 		filepath.Join(atlDir, "wiki"),
 		filepath.Join(atlDir, "journal"),
+		// Settled decisions. Current truth like the wiki, and the layer most likely
+		// to refute a proposal — a measured failure was refuted by a line in
+		// .atl/docs/atl-v2.md that retrieval could not reach.
+		filepath.Join(atlDir, "docs"),
+		// Installed team knowledge: what actually executes in this project. Two of
+		// the six measured failures were refuted by files under here — one in
+		// knowledge/, one in an agent's children/ — and neither was reachable.
+		// Named subdirectories rather than .claude itself, so worktrees/, settings
+		// and future non-knowledge additions stay out.
+		filepath.Join(projectRoot, ".claude", "agents"),
+		filepath.Join(projectRoot, ".claude", "knowledge"),
+		filepath.Join(projectRoot, ".claude", "skills"),
+		filepath.Join(projectRoot, ".claude", "backends"),
+		filepath.Join(projectRoot, ".claude", "packs"),
 	}
 	if _, err := os.Stat(filepath.Join(projectRoot, ".delivery", "config.json")); err == nil {
 		dirs = append(dirs, filepath.Join(projectRoot, "docs"))

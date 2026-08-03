@@ -209,9 +209,11 @@ func TestInGitWorktreeReal(t *testing.T) {
 func TestCorpusDirsGatesDocsOnDelivery(t *testing.T) {
 	root := t.TempDir()
 
+	// The REPO's docs/, specifically — matching on the base name alone would also
+	// match .atl/docs, which is indexed unconditionally as settled current truth.
 	hasDocs := func(dirs []string) bool {
 		for _, d := range dirs {
-			if filepath.Base(d) == "docs" {
+			if d == filepath.Join(root, "docs") {
 				return true
 			}
 		}
