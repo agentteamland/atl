@@ -7,6 +7,7 @@ import (
 	"github.com/agentteamland/atl/cli/internal/coverage"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func touch(t *testing.T, root, rel string) string {
@@ -304,3 +305,91 @@ func TestMeasureDefaultsTheBaseToTheConfiguredDevBranch(t *testing.T) {
 }
 
 var errBadRev = fmt.Errorf("fatal: bad revision")
+
+// --- stale profile ----------------------------------------------------------
+
+// The failure this exists for, reproduced: `go test -coverprofile` writes a
+// profile even when the test result is CACHED, and that profile carries the
+// cached run's line numbers. Measured on a real change, a stale profile put
+// three comment lines inside an "uncovered block" and reported a 100% change as
+// 63.6%. The other direction is worse — a stale profile can mark newly-added
+// lines as covered, which is a false green on the gate that decides done.
+func TestMeasureWarnsWhenTheProfileIsOlderThanTheSource(t *testing.T) {
+	root := t.TempDir()
+	rp := filepath.Join(root, "cover.out")
+	if err := os.WriteFile(rp, []byte("mode: set\nsrc/app.ts:1.1,1.9 1 1\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	src := touch(t, root, "src/app.ts")
+	// The source is newer than the profile by a clear margin.
+	old := time.Now().Add(-time.Hour)
+	if err := os.Chtimes(rp, old, old); err != nil {
+		t.Fatal(err)
+	}
+
+	var warned []string
+	if _, err := measureCoverage(root, "main", rp, 90,
+		fakeRun("", "--- a/"+src+"\n+++ b/"+src+"\n@@ -0,0 +1 @@\n+const a = 1;\n"),
+		func(m string) { warned = append(warned, m) }); err != nil {
+		t.Fatal(err)
+	}
+	var found bool
+	for _, w := range warned {
+		if contains(w, "older than") && contains(w, "-count=1") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("a profile older than its source must be surfaced, got %v", warned)
+	}
+}
+
+// The converse, so the warning stays worth reading: a fresh profile is silent.
+// A caution that fires on every run is how a real one stops being read — the
+// same lesson this whole change set is about.
+func TestMeasureIsQuietWhenTheProfileIsFresh(t *testing.T) {
+	root := t.TempDir()
+	src := touch(t, root, "src/app.ts")
+	old := time.Now().Add(-time.Hour)
+	if err := os.Chtimes(src, old, old); err != nil {
+		t.Fatal(err)
+	}
+	rp := filepath.Join(root, "cover.out")
+	if err := os.WriteFile(rp, []byte("mode: set\nsrc/app.ts:1.1,1.9 1 1\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var warned []string
+	if _, err := measureCoverage(root, "main", rp, 90,
+		fakeRun("", "--- a/"+src+"\n+++ b/"+src+"\n@@ -0,0 +1 @@\n+const a = 1;\n"),
+		func(m string) { warned = append(warned, m) }); err != nil {
+		t.Fatal(err)
+	}
+	for _, w := range warned {
+		if contains(w, "older than") {
+			t.Errorf("a fresh profile must not warn, got %q", w)
+		}
+	}
+}
+
+// A source file the diff names but that is not on disk (deleted in the change,
+// or outside the working tree) is not staleness. A staleness check that cries
+// wolf on every deletion would be switched off within a week.
+func TestStaleProfileIgnoresMissingSources(t *testing.T) {
+	root := t.TempDir()
+	rp := filepath.Join(root, "cover.out")
+	if err := os.WriteFile(rp, []byte("mode: set\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if stale, _ := staleProfile(rp, []string{filepath.Join(root, "gone.go")}); stale {
+		t.Error("a missing source must not read as a stale profile")
+	}
+}
+
+// And a missing report is not staleness either — findReport already errors on
+// that path, and reporting it twice in different words helps nobody.
+func TestStaleProfileIgnoresMissingReport(t *testing.T) {
+	if stale, _ := staleProfile(filepath.Join(t.TempDir(), "nope.out"), []string{"x.go"}); stale {
+		t.Error("a missing report must not read as stale")
+	}
+}

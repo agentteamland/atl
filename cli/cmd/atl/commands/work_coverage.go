@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 
 	"github.com/agentteamland/atl/cli/internal/coverage"
 	"github.com/agentteamland/atl/cli/internal/dispatch"
@@ -97,6 +98,22 @@ func measureCoverage(root, base, report string, min float64, run coverage.Runner
 	if err != nil {
 		return zero, err
 	}
+	// A profile older than the source it describes carries line numbers from a
+	// different file, so every line in it is attributed to the wrong statement.
+	// This is not hypothetical: `go test -coverprofile` writes a profile even when
+	// the test result is CACHED, and that profile is the cached run's — measured
+	// here, a stale profile put three comment lines inside an "uncovered block"
+	// and reported a 100% change as 63.6%.
+	//
+	// It fails in both directions, and the other one is worse: a stale profile can
+	// mark newly-added lines as covered, which is a false green on the gate that
+	// decides whether a unit is done.
+	if stale, src := staleProfile(report, sortedFiles(diffFilesOf(diff))); stale {
+		warn("warning: " + report + " is older than " + src + " — it may describe different " +
+			"source. `go test` writes a coverage profile even when the result is cached; " +
+			"re-run with -count=1.")
+	}
+
 	measurable, covered, err := coverage.Covered(report)
 	if err != nil {
 		return zero, err
@@ -182,4 +199,44 @@ func init() {
 	workCoverageCmd.Flags().Float64Var(&workCoverageMin, "min", 90, "minimum diff coverage percent")
 	workCoverageCmd.Flags().BoolVar(&workCoverageJSON, "json", false, "emit the machine-readable measurement (the form to attach as evidence)")
 	workCmd.AddCommand(workCoverageCmd)
+}
+
+// diffFilesOf lists the files a diff touched.
+func diffFilesOf(diff coverage.Lines) []string {
+	out := make([]string, 0, len(diff))
+	for f := range diff {
+		out = append(out, f)
+	}
+	return out
+}
+
+// sortedFiles returns paths in a stable order, so the staleness warning names the
+// same file run to run rather than whichever the map iteration happened to yield.
+func sortedFiles(files []string) []string {
+	sort.Strings(files)
+	return files
+}
+
+// staleProfile reports whether the coverage report predates any of the source
+// files it is being measured against, returning the first offender.
+//
+// Deliberately conservative — a missing file or an unreadable stat is not
+// staleness, because a false warning on every run is how a real one stops being
+// read. Compares against the files in the DIFF rather than every file in the
+// profile: those are the ones whose line numbers this measurement depends on.
+func staleProfile(report string, sources []string) (bool, string) {
+	ri, err := os.Stat(report)
+	if err != nil {
+		return false, ""
+	}
+	for _, f := range sources {
+		si, err := os.Stat(f)
+		if err != nil {
+			continue // deleted, or outside the working tree
+		}
+		if si.ModTime().After(ri.ModTime()) {
+			return true, f
+		}
+	}
+	return false, ""
 }
