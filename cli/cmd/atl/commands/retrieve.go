@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"time"
@@ -26,10 +27,15 @@ import (
 // pattern.
 const envNoAutoIndex = "ATL_NO_RETRIEVE_INDEX"
 
-// retrieveAutoIndexThrottle bounds how often session-start fires a rebuild. It is
-// set above the cold-build time (minutes) so a session restarted mid-build does
-// not spawn a second, overlapping build; once a build lands, the corpus-freshness
-// check (not the throttle) is what gates any further rebuild.
+// retrieveAutoIndexThrottle bounds how often session-start fires a rebuild.
+//
+// It does NOT prevent overlapping builds, and used to be relied on for that: the
+// window was set above the then-current cold-build time so a restart mid-build
+// could not spawn a second. That assumption broke silently when the corpus grew
+// — a build now outlasts the window, so a session-start behind it sees a corpus
+// still stale and spawns another. retrieve.AcquireBuildLock is what actually
+// guarantees single-flight; this only keeps the cheap checks from running on
+// every session.
 const retrieveAutoIndexThrottle = 10 * time.Minute
 
 // retrieveTopK is the MAXIMUM number of knowledge pages the hook surfaces. It is
@@ -213,6 +219,27 @@ var retrieveIndexCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
+		// Single-flight. A full build outlasts the auto-index throttle on a large
+		// corpus, so without this a second spawn starts behind the first and both
+		// saturate the machine — measured at 832% CPU with two running.
+		release, ok := retrieve.AcquireBuildLock(idxPath)
+		if !ok {
+			fmt.Fprintln(out, "atl retrieve: another index build is already running for this project")
+			return nil // a duplicate is not a failure
+		}
+		defer release()
+
+		// Bound the build to half the machine. This is a background nicety that
+		// nobody asked for at this moment: the pure-Go backend parallelises across
+		// GOMAXPROCS, and left unbounded it takes every core and spins the fans on a
+		// laptop whose owner is doing something else. Halving roughly doubles the
+		// wall clock of a job already measured in minutes, which costs a background
+		// job nothing and costs an interactive machine a great deal.
+		if n := runtime.NumCPU() / 2; n >= 1 {
+			defer runtime.GOMAXPROCS(runtime.GOMAXPROCS(n))
+		}
+
 		old, _ := retrieve.Load(idxPath) // reuse unchanged pages; nil on first build
 
 		t0 := time.Now()
