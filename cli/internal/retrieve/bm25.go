@@ -76,6 +76,40 @@ const (
 	// 0.02 of margin on the on-topic side — and false silence is the worse
 	// failure, since a channel that drops real answers is not worth reading either.
 	bm25MinCoverage = 0.6
+
+	// bm25MinVocab is the corpus vocabulary below which the coverage floor is not
+	// applied at all.
+	//
+	// Coverage's denominator counts query terms the corpus lacks, which is the
+	// whole point — but it only means "off-topic" if the corpus is rich enough
+	// that an ordinary English question is made of words it already has. In a
+	// small corpus the ubiquity cut above cannot fire either (a term must appear
+	// in 90% of documents, which almost nothing does at n=3), so words like "how",
+	// "does" and "on" are neither cut nor matched: they sit in the denominator and
+	// silence a question the corpus genuinely answers.
+	//
+	// This was not predicted; a real run found it. The e2e's 3-page fixture asks
+	// "how does the supervisor confirm a merge landed on the branch" of a page
+	// that answers it exactly, and scored 0.44 — the floor turned a correct hit
+	// into silence. Measured across every real index on the machine, the break is
+	// against VOCABULARY, not document count:
+	//
+	//	docs  vocab   fn-words present   on-topic coverage
+	//	   1    551     14 of 20          0.00
+	//	   3    308     14 of 20          0.00
+	//	   7     52      5 of 20          0.42
+	//	  18   1905     19 of 20          0.91
+	//	  31   3248     20 of 20          1.00
+	//	 187  10008     20 of 20          1.00
+	//	 327  10410     20 of 20          1.00
+	//
+	// 2000 sits above the largest corpus that failed (551) and above the one
+	// borderline case (1905, still only 0.91), and below every corpus that held.
+	// Under it the arm behaves exactly as it did before this floor existed —
+	// which is the right default for a new project: a handful of pages is a
+	// corpus with little to say, and saying a little too often is a smaller harm
+	// than a knowledge base that answers nothing while it fills up.
+	bm25MinVocab = 2000
 )
 
 // bm25Index is a lexical index over a document set — the half of hybrid
@@ -133,7 +167,14 @@ func newBM25(docs []Doc) *bm25Index {
 // to stay silent.
 func (ix *bm25Index) rank(query string) []int {
 	qterms := tokenize(query)
-	need := ix.informative(qterms)
+	// A corpus too small to contain ordinary English cannot support the coverage
+	// floor: its denominator is noise, so the floor silences questions the corpus
+	// answers. Below the vocabulary threshold the arm keeps its pre-floor
+	// behavior — see bm25MinVocab for the measurement.
+	need := 0
+	if len(ix.docFreq) >= bm25MinVocab {
+		need = ix.informative(qterms)
+	}
 	type scored struct {
 		doc   int
 		score float64

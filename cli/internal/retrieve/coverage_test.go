@@ -5,22 +5,65 @@ import (
 	"testing"
 )
 
-// corpusOf builds a corpus large enough that the ubiquity cut behaves as it does
-// in production (a term must appear in >=90% of documents to be cut), with the
-// caller's documents at the front.
+// corpusOf builds a corpus that behaves like a real one on both counts the
+// coverage floor depends on: the ubiquity cut can actually fire (the filler
+// shares a frame, so its function words appear in ~every document), and the
+// vocabulary clears bm25MinVocab so the floor is applied at all.
+//
+// Both halves are load-bearing. A corpus of a few short documents leaves
+// ordinary English in the denominator with nothing to match — which is the
+// production failure bm25MinVocab exists for, and it would make every test here
+// pass for the wrong reason: the floor would simply never run.
 func corpusOf(t *testing.T, front ...string) []Doc {
 	t.Helper()
-	docs := make([]Doc, 0, 40)
+	docs := make([]Doc, 0, 64)
 	for _, text := range front {
 		docs = append(docs, Doc{Path: fmt.Sprintf("front%02d.md", len(docs)), Text: text})
 	}
-	for i := len(docs); i < 40; i++ {
-		docs = append(docs, Doc{
-			Path: fmt.Sprintf("filler%02d.md", i),
-			Text: fmt.Sprintf("an unrelated page about widget number %d and its assembly", i),
-		})
+	for i := len(docs); i < 64; i++ {
+		// A shared natural-language frame (so "the", "a", "how", "does", "on" are
+		// ubiquitous and get cut) plus 40 terms unique to this page (so the
+		// vocabulary grows past bm25MinVocab).
+		text := "how does the operator handle a request on the system when it arrives"
+		for j := 0; j < 40; j++ {
+			text += fmt.Sprintf(" topic%03dterm%02d", i, j)
+		}
+		docs = append(docs, Doc{Path: fmt.Sprintf("filler%02d.md", i), Text: text})
 	}
 	return docs
+}
+
+// The fixtures must exercise the floor, not sneak under it. Without this, a
+// later edit that shrinks the corpus would turn every test below into a silent
+// no-op that still reports PASS.
+func TestCoverageFixtureActuallyEngagesTheFloor(t *testing.T) {
+	ix := newBM25(corpusOf(t, "the promotion gate binds the approval record to the commit"))
+	if len(ix.docFreq) < bm25MinVocab {
+		t.Fatalf("fixture vocabulary %d is below bm25MinVocab %d — the floor would never run and these tests would pass vacuously",
+			len(ix.docFreq), bm25MinVocab)
+	}
+	if ix.docFreq["the"] == 0 || float64(ix.docFreq["the"])/float64(ix.numDocs) < bm25MaxDocRatio {
+		t.Fatalf("fixture does not make function words ubiquitous (the: %d/%d) — the denominator would not behave as production's does",
+			ix.docFreq["the"], ix.numDocs)
+	}
+}
+
+// Below the vocabulary threshold the floor must not apply. This is the e2e's
+// 3-page fixture, and the exact query a real run found the floor silencing: the
+// page answers it, and the answer must come back.
+func TestASmallCorpusKeepsItsPreFloorBehavior(t *testing.T) {
+	ix := newBM25([]Doc{
+		{Path: "merge-verify.md", Text: "Verify durable state not worker exit-code. A deterministic supervisor confirms a git merge by reading the durable branch state, never trusting an LLM worker exit code."},
+		{Path: "pr-merge.md", Text: "PR merge discipline. Never merge pull requests from Claude; surface the URL and stop."},
+		{Path: "architecture.md", Text: "Architecture store. The GitHub backend keeps its durable knowledge in the in-repo docs tree."},
+	})
+	if len(ix.docFreq) >= bm25MinVocab {
+		t.Fatalf("this fixture is meant to be below the vocabulary threshold, got %d", len(ix.docFreq))
+	}
+	got := ix.rank("how does the supervisor confirm a merge landed on the branch")
+	if len(got) == 0 || got[0] != 0 {
+		t.Fatalf("a small corpus must still answer a question it covers — coverage here is 0.44 and the floor must not apply; got %v", got)
+	}
 }
 
 // The defect: a rare term has a high idf, so ONE incidental match kept the
