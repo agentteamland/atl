@@ -254,6 +254,22 @@ func fuseArms(lexical, semantic []int, k int) []int {
 	return fused
 }
 
+// LexicalHits reports how many documents the lexical arm ranks for a prompt —
+// the signal a caller needs to decide whether a query can reach this corpus at
+// all. Zero means BM25 shares no informative term with any page, which is the
+// permanent state of a query written in a language the corpus is not in.
+//
+// Exposed rather than inferred from Query's output because the two answer
+// different questions: Query can return results from the semantic arm alone
+// while the lexical arm is empty — which is exactly the non-English case, where
+// retrieval looks alive and is running on one leg.
+func (ix *Index) LexicalHits(prompt string) int {
+	if len(ix.Docs) == 0 {
+		return 0
+	}
+	return len(newBM25(ix.Docs).rank(prompt))
+}
+
 // Save writes the index to path via a same-dir temp file + atomic rename, so a
 // concurrent reader never sees a half-written index.
 func (ix *Index) Save(path string) error {
