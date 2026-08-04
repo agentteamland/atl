@@ -25,11 +25,22 @@ written is invisible to the whole pipeline: the queue only ever holds what someo
 remembered to mark, so the marker is the one non-deterministic link and this step is
 its safety net.
 
-Read the recent conversation flow (prose only — tool calls/results are stripped):
+Sweep the conversation flow (prose only — tool calls/results are stripped):
 
 ```
-atl learnings transcript
+atl learnings transcript --channel profile-fact
 ```
+
+**Always pass `--channel profile-fact`.** That is what makes this a *sweep*: it
+resumes from where the last profile drain stopped and moves this channel's own
+cursor forward. Two things depend on it. Without the flag the command is a plain
+read of the most recent prose, so a fact that arrived between two drains is read
+by neither. And the cursor is **per channel** precisely because core `/drain`
+sweeps the same transcript for `learning` and both can run off the same turn — the
+wrong flag, or none, means one drain consumes the window the other still needed.
+
+If it reports transcript still unmined, sweep again in the same run until the
+backlog clears; nothing is lost in between, the cursor holds the place.
 
 Scan it for **durable** facts about entities in the user's inner world that no marker
 recorded — the same bar the `profile-capture` rule sets: a person, org, animal, place,

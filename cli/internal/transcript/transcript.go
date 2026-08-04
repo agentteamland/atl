@@ -13,6 +13,7 @@ package transcript
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"io"
 	"os"
@@ -56,10 +57,13 @@ func ProjectDir(projectRoot string) (string, error) {
 	return filepath.Join(home, ".claude", "projects", SlugForPath(projectRoot)), nil
 }
 
-// File is a discovered transcript.
+// File is a discovered transcript. Size comes from the same stat the walk
+// already does, so a resuming mine can tell "nothing appended" from "unread
+// bytes" without opening the file.
 type File struct {
 	Path    string
 	ModTime time.Time
+	Size    int64
 }
 
 // Find returns .jsonl transcripts in dir modified strictly after since, oldest
@@ -86,7 +90,7 @@ func Find(dir string, since time.Time) ([]File, error) {
 		if !since.IsZero() && !info.ModTime().After(since) {
 			continue
 		}
-		files = append(files, File{Path: filepath.Join(dir, e.Name()), ModTime: info.ModTime()})
+		files = append(files, File{Path: filepath.Join(dir, e.Name()), ModTime: info.ModTime(), Size: info.Size()})
 	}
 	sort.Slice(files, func(i, j int) bool {
 		return files[i].ModTime.Before(files[j].ModTime)
@@ -127,7 +131,8 @@ const (
 )
 
 // scanLines calls fn for each non-empty newline-delimited record in r, and
-// returns how many records were skipped for exceeding maxRecordBytes.
+// returns how many records were skipped for exceeding maxRecordBytes plus the
+// offset of the last complete record boundary (see below).
 //
 // Skipping is the point. An over-long record used to abort the whole file
 // (bufio.Scanner cannot resume after a too-long token), which took out the
@@ -136,50 +141,68 @@ const (
 // shape the watchdog exists to remove, one layer down. One pathological line
 // costs that one record instead, and the count makes the loss reportable.
 //
+// start is the byte offset r begins at, so a caller that seeked can resume its
+// accounting; each fn call receives the offset just past that record's newline.
+// The returned offset is that of the last NEWLINE-TERMINATED record — a trailing
+// record with no newline is still handed to fn (the file is being appended to, or
+// a write was cut short) but never counted as consumed, because the writer may
+// still be extending it. A resuming caller must re-read it rather than skip past
+// a half-written line: re-reading is safe (the queue dedups by content hash),
+// skipping is the silent loss this reader exists to remove.
+//
+// It reads with ReadSlice rather than ReadLine because ReadSlice keeps the
+// delimiter, and only a byte count that includes every terminator can produce an
+// offset a later run can seek to. ReadLine strips "\n" — and a preceding "\r" —
+// leaving no way to tell how many bytes it consumed.
+//
 // The slice passed to fn is only valid until the next record (the same contract
 // bufio.Scanner's Bytes had); callers unmarshal it immediately.
-func scanLines(r io.Reader, fn func(record []byte)) (int, error) {
+func scanLines(r io.Reader, start int64, fn func(record []byte, end int64)) (int, int64, error) {
 	br := bufio.NewReaderSize(r, readBufBytes)
 	var rec []byte
 	over := false // this record is already past the cap: consume it, don't buffer it
 	skipped := 0
+	pos := start      // bytes consumed, terminators included
+	complete := start // pos after the last newline-terminated record
+	emit := func() {
+		if over {
+			skipped++
+			over = false
+		} else if r := trimEOL(rec); len(r) > 0 {
+			fn(r, pos)
+		}
+		rec = rec[:0]
+	}
 	for {
-		chunk, isPrefix, err := br.ReadLine()
-		if err == io.EOF {
-			// Flush the tail. A last record with no trailing newline — the file is
-			// still being appended to, or a write was cut short — is handed over in
-			// full only if it ends inside a read window; one whose length lands
-			// exactly on the boundary ends on an isPrefix chunk and its terminator
-			// never comes, so the record arrives here instead. Returning without
-			// flushing would drop it with no error and no count, which is the silent
-			// loss this reader exists to remove (bufio.Scanner emitted it).
-			if over {
-				skipped++
-			} else if len(rec) > 0 {
-				fn(rec)
-			}
-			return skipped, nil
-		}
-		if err != nil {
-			return skipped, err
-		}
+		chunk, err := br.ReadSlice('\n')
+		pos += int64(len(chunk))
 		if !over && len(rec)+len(chunk) > maxRecordBytes {
 			over, rec = true, nil
 		}
 		if !over {
 			rec = append(rec, chunk...)
 		}
-		if isPrefix {
-			continue // the record continues past the read window
+		switch err {
+		case nil:
+			emit()
+			complete = pos
+		case bufio.ErrBufferFull:
+			// the record continues past the read window
+		case io.EOF:
+			emit() // the trailing record, if any — deliberately not counted in complete
+			return skipped, complete, nil
+		default:
+			return skipped, complete, err
 		}
-		if over {
-			skipped++
-			over = false
-		} else if len(rec) > 0 {
-			fn(rec)
-		}
-		rec = rec[:0]
 	}
+}
+
+// trimEOL drops a record's trailing newline (and a preceding carriage return),
+// which ReadSlice keeps. A blank line trims to empty and is therefore skipped,
+// matching the old ReadLine-based behavior.
+func trimEOL(rec []byte) []byte {
+	rec = bytes.TrimSuffix(rec, []byte("\n"))
+	return bytes.TrimSuffix(rec, []byte("\r"))
 }
 
 // ExtractText reads a transcript file and returns the concatenated assistant
@@ -195,7 +218,7 @@ func ExtractText(path string) (string, int, error) {
 	defer f.Close()
 
 	var sb strings.Builder
-	skipped, err := scanLines(f, func(record []byte) {
+	skipped, _, err := scanLines(f, 0, func(record []byte, _ int64) {
 		var ev transcriptEvent
 		if err := json.Unmarshal(record, &ev); err != nil {
 			return
@@ -228,14 +251,54 @@ type Turn struct {
 // turns are skipped; malformed lines — and over-long ones — are skipped rather
 // than failing the whole read.
 func ExtractFlow(path string) ([]Turn, int, error) {
+	fl, err := ExtractFlowFrom(path, 0, 0)
+	return fl.Turns, fl.Skipped, err
+}
+
+// Flow is one resumable read of a transcript's prose: the turns extracted, the
+// offset a following read should resume from, and whether the byte budget cut
+// the read short.
+type Flow struct {
+	Turns   []Turn
+	Next    int64 // resume offset — the boundary after the last turn returned
+	Pending bool  // the budget ran out with records left in this file
+	Skipped int   // over-long records dropped
+}
+
+// ExtractFlowFrom reads a transcript's prose forward from a byte offset, which
+// is what lets a mine resume where the last one stopped instead of re-reading a
+// tail. offset must be a boundary a previous call returned in Next (0 for the
+// whole file); an offset past the end yields nothing.
+//
+// maxProseBytes budgets the prose returned (0 = unbudgeted). The budget is
+// enforced against the turns collected, and Next tracks the collected turns
+// exactly, so a caller that stops early resumes at the first turn it did NOT
+// receive — the property that makes several bounded mines add up to full
+// coverage of a session rather than repeated samples of its tail.
+//
+// The remaining semantics are ExtractFlow's: only type:"text" content
+// contributes (tool calls and results are noise for correction-mining), empty
+// turns are skipped, and malformed or over-long records are skipped rather than
+// failing the read.
+func ExtractFlowFrom(path string, offset int64, maxProseBytes int) (Flow, error) {
 	f, err := os.Open(path)
 	if err != nil {
-		return nil, 0, err
+		return Flow{Next: offset}, err
 	}
 	defer f.Close()
 
-	var turns []Turn
-	skipped, err := scanLines(f, func(record []byte) {
+	if offset > 0 {
+		if _, err := f.Seek(offset, io.SeekStart); err != nil {
+			return Flow{Next: offset}, err
+		}
+	}
+
+	fl := Flow{Next: offset}
+	prose := 0
+	skipped, complete, err := scanLines(f, offset, func(record []byte, end int64) {
+		if fl.Pending {
+			return // budget already spent — consume the rest without collecting it
+		}
 		var ev transcriptEvent
 		if err := json.Unmarshal(record, &ev); err != nil {
 			return
@@ -254,12 +317,29 @@ func ExtractFlow(path string) ([]Turn, int, error) {
 		if role == "user" && strings.HasPrefix(text, interruptMarker) {
 			return // the harness's own cancellation notice, not something the user typed
 		}
-		turns = append(turns, Turn{Role: role, Text: text})
+		// The budget is checked before appending, but the FIRST turn is always
+		// taken: one oversized turn must not return an empty read forever, which
+		// would wedge the cursor at that record.
+		if maxProseBytes > 0 && len(fl.Turns) > 0 && prose+len(text) > maxProseBytes {
+			fl.Pending = true
+			return
+		}
+		prose += len(text)
+		fl.Turns = append(fl.Turns, Turn{Role: role, Text: text})
+		fl.Next = end
 	})
+	fl.Skipped = skipped
 	if err != nil {
-		return nil, skipped, err
+		return fl, err
 	}
-	return turns, skipped, nil
+	if !fl.Pending {
+		// Nothing was cut short, so everything up to the last complete record has
+		// been seen — including records that contributed no turn (tool traffic,
+		// harness injections). Without this the cursor would stall on a stretch
+		// that produced no prose at all.
+		fl.Next = complete
+	}
+	return fl, nil
 }
 
 // contentText extracts text from a message content field, which may be a plain

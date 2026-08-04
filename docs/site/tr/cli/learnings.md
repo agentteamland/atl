@@ -13,7 +13,7 @@ Bunları elle pek nadiren çalıştırırsın — döngü onları kendiliğinden
 - **`status`** — bilgi tabanına katlanmak üzere ne kadar öğenin beklediğine bir göz atmak için (bu, `SessionStart` hook'unun yüzeye çıkardığı sayının aynısıdır).
 - **`peek`** — bekleyen öğeleri gerçekten görmek ya da makine-okunur listeyi bir betiğe vermek için. Bu, [`/drain`](/tr/skills/drain) skill'inin tükettiği belirlenimci okuma yüzeyidir.
 - **`ack`** — döngünün normalde katlayacağı bir şeyi atlamak istiyorsan bir öğeyi elle işlenmiş olarak işaretlemek (silmek) için.
-- **`transcript`** — son konuşma akışını (yalnızca düz metin) yazdırmak için. Bu, [`/drain`](/tr/skills/drain) skill'inin düzeltme-madenleme adımının, ajanın işaretlemeyi unuttuğu öğrenmeleri geri kazanmak için kullandığı okuma yüzeyidir.
+- **`transcript`** — konuşma akışını (yalnızca düz metin) yazdırmak için. Bu, bir drain'in madenleme adımının, ajanın işaretlemeyi unuttuğu öğrenmeleri geri kazanmak için kullandığı okuma yüzeyidir; `--channel` ile o kanalın kaldığı yerden devam eden ileri taramasına dönüşür.
 
 ## Kullanım
 
@@ -24,8 +24,9 @@ atl learnings peek                   # bekleyen öğeleri listele (insan-okunur)
 atl learnings peek --json            # tam makine-okunur liste
 atl learnings peek --channel learning  # tek bir kanala filtrele
 atl learnings ack <id>               # bir öğeyi işlenmiş işaretle (sil)
-atl learnings transcript             # son konuşma akışı (/drain madenlemesi için)
+atl learnings transcript             # son konuşma akışı (düz bir okuma)
 atl learnings transcript --json      # aynı akış, rol/metin kayıtları olarak
+atl learnings transcript --channel learning   # ileri tara, o kanalın imlecini ilerlet
 ```
 
 ## Alt komutlar
@@ -82,14 +83,29 @@ acked a1b2c3d4e5f6...
 
 ### `atl learnings transcript`
 
-Mevcut proje için son **kullanıcı + asistan konuşma akışını** yazdırır — yalnızca düz metin; araç çağrıları ve sonuçları gürültü olarak ayıklanır. Bu, [`/drain`](/tr/skills/drain) skill'inin düzeltme-madenleme adımının üstünde çalıştığı okuma yüzeyidir: akışı, ajanın hiç işaretlemediği kullanıcı düzeltmeleri, geri almaları ve tekrarlanan hataları için tarar, sonra her birini bir öğrenme olarak kuyruğa ekler (kuyruğun içerik özetiyle yinelemesi ayıklanır; yani ilerletilecek bir imleci olmayan düz bir okumadır).
+Mevcut proje için **kullanıcı + asistan konuşma akışını** yazdırır — yalnızca düz metin; araç çağrıları ve sonuçları gürültü olarak ayıklanır. Bu, bir drain'in madenleme adımının üstünde çalıştığı okuma yüzeyidir: akışı, ajanın hiç işaretlemediği düzeltmeler, geri almalar ve kalıcı olgular için tarar, sonra her birini kuyruğa ekler (kuyruğun içerik özetiyle yinelemesi ayıklandığı için yeniden okumak her zaman güvenlidir).
+
+**İki kipi** vardır ve aradaki fark, bir imleç tutup tutmadığıdır.
 
 | Bayrak | Tip | Varsayılan | Ne yapar |
 |---|---|---|---|
-| `--limit <n>` | int | `2` | Bu proje için en son N transkripti okur. |
+| `--channel <ad>` | string | *(yok)* | Bu yakalama kanalı için ileri tarar ve kanalın imlecini ilerletir. Etkin bir kanal olmalıdır. |
+| `--limit <n>` | int | `2` | En son N transkripti okur. Yalnızca imleçsiz okuma için geçerlidir. |
 | `--json` | bool | `false` | Turları `[rol] metin` satırları yerine JSON olarak (`role`, `text`) verir. |
 
-Akış ayrıca **en son 256 KB düz metinle** sınırlanır — `--limit` kaç dosyanın okunacağını sınırlar, o dosyaların ne kadar metin taşıdığını değil; uzun bir oturumun yalnızca düz metni bile madenleme alt-ajanının tüm bağlamını aşabilir. Daha eski turlar kesildiğinde bunu bildiren bir not yazılır (stderr'e, böylece `--json` ayrıştırılabilir bir dizi olarak kalır) ve madenleme, olduğu gibi kısmi bir tarama olarak raporlanmalıdır. Aynı kanal, aşırı uzun olduğu için atlanan transkript kayıtlarını da bildirir; böylece akışta eksik kalan turlar hiçbir zaman sessiz kalmaz.
+**Çıplak hâli — düz bir okuma.** En son `--limit` transkriptten en son 256 KB düz metni verir ve hiçbir şey kaydetmez; dolayısıyla göz atmak için çalıştırmak bir drain'in henüz madenlenmemiş malzemesini asla tüketemez. Daha eski turlar kesildiğinde bunu bildiren bir not yazılır (stderr'e, böylece `--json` ayrıştırılabilir bir dizi olarak kalır).
+
+**`--channel <ad>` — o kanalın taraması.** Kanalın en son madenlediği yerden devam eder, sonraki 256 KB düz metni **ileri** doğru verir, imleci ilerletir ve hâlâ bekleyeni raporlar:
+
+```
+atl: 12.4 MB of transcript still unmined for channel "learning" — sweep again to continue
+```
+
+Böylece ardışık taramalar bir oturumu baştan sona kapsar; kuyruğun ucunu tekrar tekrar okuyup iki çalıştırma arasında biriken her şeyi ikisine de okutmamak yerine. `--limit` burada geçerli değildir: madenlenmemiş turu olan bir transkript, eski olduğu için asla atlanmaz.
+
+İmleç **kanal başına** tutulur (`~/.atl/mine-cursor/` altında), çünkü madenlemenin birden çok tüketicisi vardır — [`/drain`](/tr/skills/drain) `learning` için, profile-team'in `/profile-drain`'i `profile-fact` için tarar ve ikisi aynı turda çalışabilir. Tek bir ortak konum, önce çalışanın diğerinin hâlâ ihtiyaç duyduğu pencereyi tüketmesine izin verirdi. Bir kanalın **ilk** taramasında devam edecek bir konum yoktur; bu yüzden son kuyruğu okur ve mevcut her transkripti o anki sonundan işaretler — imleci benimsemek, projenin şimdiye kadarki tüm oturumlarını yeniden oynatmaz.
+
+Her iki kip de aşırı uzun olduğu için atlanan transkript kayıtlarını bildirir; böylece akışta eksik kalan turlar hiçbir zaman sessiz kalmaz.
 
 İnsan-okunur çıktı, tur başına bir satırdır:
 

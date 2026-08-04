@@ -127,7 +127,9 @@ the user actually knows. **When genuinely uncertain whether a new entity is real
 (create it, source-flagged): a wrongly-created profile self-corrects (source flag +
 next-conversation overwrite), whereas the gate exists to catch *clear* illustrations, not to
 adjudicate borderline-real people. Corroboration in the drained conversation
-(`atl learnings transcript`) may only **rescue** a would-be-Drop (an entity that turns out to
+(`atl learnings transcript`, bare — this is a look, not a sweep, so it must never
+carry `--channel`, which would advance a drain's cursor over material nothing
+mined) may only **rescue** a would-be-Drop (an entity that turns out to
 be a discussed real person → Proceed); its *absence* is never itself grounds to Drop — a fact
 mined from a prior session is legitimately absent from the current conversation.
 

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -198,21 +199,32 @@ var learningsEnqueueCmd = &cobra.Command{
 	},
 }
 
-// learningsTranscriptCmd prints the recent user+assistant conversation flow so
-// the /drain skill's correction-mining step can spot user corrections, reverts,
-// and repeated mistakes the agent never marked — the missing input side of the
-// marker-only capture. Anything mined from this is enqueued like a marker, so
-// dedup lives in the queue (content hash); this is a plain read with no cursor
-// to advance.
+// learningsTranscriptCmd prints the user+assistant conversation flow so a drain
+// skill's mining step can spot corrections, reverts, and durable facts the agent
+// never marked — the missing input side of the marker-only capture. Anything
+// mined from it is enqueued like a marker, so dedup lives in the queue (content
+// hash) and re-reading is always safe.
+//
+// It has two modes, and the difference is the cursor:
+//
+//   - Bare, it is a plain read of the most recent prose — no state, safe to run
+//     for a look, and the mode the profile curator's corroboration lookup wants.
+//   - With --channel, it is that channel's SWEEP: it resumes where that channel's
+//     last sweep stopped and advances the cursor. Only a sweep may advance, so an
+//     ad-hoc read can never consume a drain's unmined window.
 var learningsTranscriptCmd = &cobra.Command{
 	Use:   "transcript",
-	Short: "Print recent conversation flow (for /drain correction-mining)",
-	Long: "Emit the recent user+assistant conversation flow for the current project so\n" +
-		"the /drain skill can mine user corrections, reverts, and repeated mistakes the\n" +
-		"agent never marked. Tool calls/results are dropped — prose only. --limit N reads\n" +
-		"the most recent N transcripts (default 2); --json emits role/text records. The\n" +
-		"flow is capped at the most recent 256 KB of prose — when older turns are cut,\n" +
-		"a note says so, so the mine can be reported as the partial sweep it was.",
+	Short: "Print conversation flow (for a drain's mining step)",
+	Long: "Emit the user+assistant conversation flow for the current project so a drain\n" +
+		"skill can mine corrections, reverts, and durable facts the agent never marked.\n" +
+		"Tool calls/results are dropped — prose only; --json emits role/text records.\n\n" +
+		"Bare, it reads the most recent 256 KB of prose from the most recent --limit\n" +
+		"transcripts (default 2) and records nothing.\n\n" +
+		"--channel <name> makes it that channel's sweep instead: it resumes from where\n" +
+		"that channel last mined, emits the next 256 KB of prose FORWARD, advances the\n" +
+		"channel's cursor, and reports what is still pending. Successive sweeps then\n" +
+		"cover a session completely instead of re-reading its tail; --limit does not\n" +
+		"apply, since a transcript with unmined turns is never skipped for being old.",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		project, err := os.Getwd()
 		if err != nil {
@@ -226,47 +238,147 @@ var learningsTranscriptCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		limit, _ := cmd.Flags().GetInt("limit")
-		if limit > 0 && len(files) > limit {
-			files = files[len(files)-limit:] // Find returns oldest-first → keep the most recent N
-		}
+
+		channel, _ := cmd.Flags().GetString("channel")
 		var turns []transcript.Turn
 		var overLong int
-		for _, fl := range files {
-			t, dropped, err := transcript.ExtractFlow(fl.Path)
-			overLong += dropped
-			if err != nil {
-				continue // a single unreadable transcript shouldn't fail the mine
+		if channel == "" {
+			turns, overLong = readFlowTail(cmd, files)
+		} else {
+			if chans := declaredChannels(project); !isDeclaredChannel(chans, channel) {
+				return fmt.Errorf("unknown channel %q (active: %s)", channel, strings.Join(channelNames(chans), ", "))
 			}
-			turns = append(turns, t...)
+			turns, overLong, err = sweepFlow(cmd, project, channel, files)
+			if err != nil {
+				return err
+			}
 		}
-		turns, truncated := tailByBytes(turns, maxFlowBytes)
-		// Both notes go to stderr: --json must stay a parseable array (the whole
-		// point of the flag), and an agent's shell shows both streams anyway, so
-		// the skill still reads them and can report an honest partial sweep.
-		if truncated {
-			fmt.Fprintf(os.Stderr, "atl: flow truncated to the most recent %d KB of prose — older turns were not emitted; report this mine as a partial sweep\n", maxFlowBytes/1024)
-		}
+
 		if overLong > 0 {
-			fmt.Fprintf(os.Stderr, "atl: skipped %d over-long transcript record(s) — their turns are missing from this flow\n", overLong)
+			fmt.Fprintf(cmd.ErrOrStderr(), "atl: skipped %d over-long transcript record(s) — their turns are missing from this flow\n", overLong)
 		}
 		if jsonOut, _ := cmd.Flags().GetBool("json"); jsonOut {
 			b, err := json.MarshalIndent(turns, "", "  ")
 			if err != nil {
 				return err
 			}
-			fmt.Println(string(b))
+			fmt.Fprintln(cmd.OutOrStdout(), string(b))
 			return nil
 		}
 		if len(turns) == 0 {
-			fmt.Println("no recent conversation flow")
+			fmt.Fprintln(cmd.OutOrStdout(), "no recent conversation flow")
 			return nil
 		}
 		for _, t := range turns {
-			fmt.Printf("[%s] %s\n", t.Role, t.Text)
+			fmt.Fprintf(cmd.OutOrStdout(), "[%s] %s\n", t.Role, t.Text)
 		}
 		return nil
 	},
+}
+
+// readFlowTail is the cursorless read: the most recent maxFlowBytes of prose
+// from the most recent --limit transcripts. It records nothing, so running it
+// cannot move any channel's sweep.
+func readFlowTail(cmd *cobra.Command, files []transcript.File) ([]transcript.Turn, int) {
+	limit, _ := cmd.Flags().GetInt("limit")
+	if limit > 0 && len(files) > limit {
+		files = files[len(files)-limit:] // Find returns oldest-first → keep the most recent N
+	}
+	var turns []transcript.Turn
+	var overLong int
+	for _, fl := range files {
+		t, dropped, err := transcript.ExtractFlow(fl.Path)
+		overLong += dropped
+		if err != nil {
+			continue // a single unreadable transcript shouldn't fail the mine
+		}
+		turns = append(turns, t...)
+	}
+	turns, truncated := tailByBytes(turns, maxFlowBytes)
+	// The notes go to stderr: --json must stay a parseable array (the whole point
+	// of the flag), and an agent's shell shows both streams anyway, so the skill
+	// still reads them and can report an honest partial sweep.
+	if truncated {
+		fmt.Fprintf(cmd.ErrOrStderr(), "atl: flow truncated to the most recent %d KB of prose — older turns were not emitted; report this mine as a partial sweep\n", maxFlowBytes/1024)
+	}
+	return turns, overLong
+}
+
+// sweepFlow is the cursored read: it walks the project's transcripts oldest-first,
+// resumes each from where this channel last mined, and spends one maxFlowBytes
+// budget going FORWARD. Whatever does not fit stays pending and is reported —
+// the difference between a bounded sweep and a silent gap.
+//
+// The cursor advances only over turns actually emitted, and only for a file that
+// read cleanly, so a read error re-reads rather than skips. On the first sweep a
+// channel has no baseline: every existing transcript is stamped at its current
+// end and the run falls back to the tail read, so adopting the cursor does not
+// replay every session the project has ever had.
+func sweepFlow(cmd *cobra.Command, project, channel string, files []transcript.File) ([]transcript.Turn, int, error) {
+	cur, err := transcript.LoadCursor(project)
+	if err != nil {
+		return nil, 0, err
+	}
+	keep := make(map[string]bool, len(files))
+	for _, fl := range files {
+		keep[filepath.Base(fl.Path)] = true
+	}
+
+	if !cur.Known(channel) {
+		for _, fl := range files {
+			cur.SetOffset(channel, filepath.Base(fl.Path), fl.Size)
+		}
+		if err := cur.Save(project); err != nil {
+			return nil, 0, err
+		}
+		fmt.Fprintf(cmd.ErrOrStderr(), "atl: first sweep for channel %q — read the recent tail and baselined %d transcript(s); the next sweep resumes forward from here\n", channel, len(files))
+		turns, overLong := readFlowTail(cmd, files)
+		return turns, overLong, nil
+	}
+
+	var turns []transcript.Turn
+	var overLong int
+	budget := maxFlowBytes
+	for _, fl := range files {
+		base := filepath.Base(fl.Path)
+		off, _ := cur.Offset(channel, base) // absent in a known channel = new transcript, mine from 0
+		if off > fl.Size {
+			off = 0 // truncated or replaced under the same name — re-read it whole
+			cur.SetOffset(channel, base, 0)
+		}
+		if off >= fl.Size || budget <= 0 {
+			continue
+		}
+		flow, err := transcript.ExtractFlowFrom(fl.Path, off, budget)
+		overLong += flow.Skipped
+		if err != nil {
+			continue // leave the cursor where it was: a failed read is retried, never skipped
+		}
+		for _, t := range flow.Turns {
+			budget -= len(t.Text)
+		}
+		turns = append(turns, flow.Turns...)
+		cur.SetOffset(channel, base, flow.Next)
+		if flow.Pending {
+			budget = 0
+		}
+	}
+
+	cur.Prune(channel, keep)
+	if err := cur.Save(project); err != nil {
+		return nil, 0, err
+	}
+
+	var pending int64
+	for _, fl := range files {
+		if off, _ := cur.Offset(channel, filepath.Base(fl.Path)); fl.Size > off {
+			pending += fl.Size - off
+		}
+	}
+	if pending > 0 {
+		fmt.Fprintf(cmd.ErrOrStderr(), "atl: %s of transcript still unmined for channel %q — sweep again to continue (nothing is lost; the cursor holds the place)\n", humanBytes(pending), channel)
+	}
+	return turns, overLong, nil
 }
 
 // maxFlowBytes caps the prose `transcript` emits. Its only other bound is a file
@@ -381,6 +493,7 @@ func init() {
 	learningsPeekCmd.Flags().Bool("json", false, "emit pending items as JSON")
 	learningsPeekCmd.Flags().String("channel", "", "filter to one channel (e.g. learning)")
 	learningsTranscriptCmd.Flags().Bool("json", false, "emit turns as JSON")
-	learningsTranscriptCmd.Flags().Int("limit", 2, "read the most recent N transcripts")
+	learningsTranscriptCmd.Flags().Int("limit", 2, "read the most recent N transcripts (cursorless read only)")
+	learningsTranscriptCmd.Flags().String("channel", "", "sweep forward for this capture channel, advancing its cursor")
 	learningsCmd.AddCommand(learningsStatusCmd, learningsPeekCmd, learningsAckCmd, learningsEnqueueCmd, learningsTranscriptCmd)
 }
