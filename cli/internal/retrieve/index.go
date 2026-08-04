@@ -167,8 +167,8 @@ func normalize(v []float32) {
 // so no single threshold separates them cleanly, and the two outliers are the
 // model's limit rather than a tuning error:
 //
-//   - 0.480, "tırmanış için en sağlam düğüm hangisi" (climbing knots) matching a
-//     page about shipping discipline. The same question in English scores 0.235:
+//   - 0.480, a Turkish off-topic probe about climbing knots, matching a page
+//     about shipping discipline. The same question asked in English scores 0.235:
 //     the model is looser in Turkish, and a threshold cannot tell those apart.
 //   - 0.165, "brownfield onboarding has no path through kickoff", whose answer IS
 //     in the corpus. Not a loss in practice — those terms appear in the page, so
