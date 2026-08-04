@@ -227,17 +227,27 @@ test('subtract', () => { assert.strictEqual(subtract(5, 3), 2); });
 EOF
 git add -A && git commit -q -m "feat: add a subtract helper" 2>/dev/null
 
-# BASELINE before the turn — a PR count is meaningless without one. "at least one PR"
-# is satisfied by leftovers AND by nothing happening at all.
-PR_BEFORE=$(gh pr list --repo "$REPO" --state all --limit 200 --json number -q 'length' 2>/dev/null || echo 0)
+# BASELINE before the turn — "at least one PR" is satisfied by leftovers AND by
+# nothing happening at all, so the assertion has to be a delta.
+#
+# Scoped to THIS UNIT'S BRANCH, not to the repo. A repo-wide count was the obvious
+# way to write it and it expires: every run adds a PR, and once the fixture passed
+# `--limit 200` both reads returned the ceiling instead of a count, so the delta
+# went to zero while the PR was created normally (209 PRs, seen on the v2.21.1
+# pre-tag run — atl#412). When a delta is computed from a paginated read, the
+# limit is part of the assertion's correctness, not a performance knob.
+#
+# Branch-scoped is also the stronger claim: "a PR was opened for this unit",
+# rather than "the repo's PR total went up".
+PR_BEFORE=$(gh pr list --repo "$REPO" --head "$BR" --state all --json number -q 'length' 2>/dev/null || echo 0)
 
 gturn "/work-finish. You are the human driver for this headless run — answer any prompt from these facts and do not wait for interactive input: the work is complete and committed on this branch." || bad "work-finish turn errored"
 
-PR_AFTER=$(gh pr list --repo "$REPO" --state all --limit 200 --json number -q 'length' 2>/dev/null || echo 0)
+PR_AFTER=$(gh pr list --repo "$REPO" --head "$BR" --state all --json number -q 'length' 2>/dev/null || echo 0)
 if [ "${PR_AFTER:-0}" -gt "${PR_BEFORE:-0}" ]; then
-  ok "/work-finish opened a NEW PR (${PR_BEFORE} → ${PR_AFTER})"
+  ok "/work-finish opened a NEW PR for this unit (${PR_BEFORE} → ${PR_AFTER} on $BR)"
 else
-  bad "no new PR (${PR_BEFORE} → ${PR_AFTER}) — an absolute count would have passed here"
+  bad "no new PR on $BR (${PR_BEFORE} → ${PR_AFTER}) — an absolute count would have passed here"
 fi
 
 PR=$(gh pr list --repo "$REPO" --head "$BR" --state all --json number -q '.[0].number' 2>/dev/null)
