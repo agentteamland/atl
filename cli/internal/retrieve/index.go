@@ -201,15 +201,57 @@ func (ix *Index) Query(ctx context.Context, prompt string, e *Embedder, k int, m
 		}
 	}
 
-	fused := rrf(lexical, semantic)
-	if len(fused) > k {
-		fused = fused[:k]
-	}
+	fused := fuseArms(lexical, semantic, k)
 	out := make([]Result, len(fused))
 	for i, doc := range fused {
 		out[i] = Result{Path: ix.Docs[doc].Path, Title: ix.Docs[doc].Title}
 	}
 	return out, nil
+}
+
+// semanticFusionCap bounds how many documents the semantic arm contributes to
+// the fusion. It is NOT a quality floor — that is minSim — it is a balance
+// between the two arms' list LENGTHS, which is what RRF is actually sensitive to.
+//
+// Found by measuring recall, which the separation metric that chose the model
+// cannot see. A question whose answer BM25 ranked first was not in the fused
+// top-5 at all: the lexical arm returned 16 documents with the answer at
+// position 0, the semantic arm returned 65 with the answer nowhere (its cosine
+// 0.249, one thousandth under the floor), and RRF gave a page appearing
+// mid-list in BOTH arms a higher score than one first in a single arm. That is
+// RRF working as designed; the defect is feeding it two lists of wildly
+// different lengths, so the longer one's tail outvotes the shorter one's head.
+//
+// 12 questions, each asked in English and Turkish, scored on whether the page
+// that IS the answer appears in the top-5 the hook surfaces:
+//
+//	semantic arm      EN r@1   EN r@5   TR r@1   TR r@5
+//	unbounded (was)      33%      58%      17%      25%
+//	capped at 20         33%      67%      17%      25%
+//	capped at 10         33%      75%      17%      25%   <- this
+//	capped at 5          25%      67%      17%      25%
+//	lexical only         50%      75%       0%       0%
+//
+// 10 is the peak, and 2x retrieveTopK is a defensible shape for it. Two honest
+// readings of the rest of that table: on English the semantic arm is a net
+// NEGATIVE even capped (lexical-only beats every hybrid variant at r@1), and on
+// Turkish it is the only arm that works at all — the lexical arm scores zero
+// there, which is why the hybrid stays. Turkish recall is unchanged by this cap
+// and remains low; that is the multilingual model's limit, tracked separately.
+const semanticFusionCap = 10
+
+// fuseArms caps the semantic arm, fuses the two rankings, and truncates to k.
+// Extracted from Query so the cap is reachable by a test without an embedder —
+// the defect it fixes is a property of the two lists, not of the model.
+func fuseArms(lexical, semantic []int, k int) []int {
+	if len(semantic) > semanticFusionCap {
+		semantic = semantic[:semanticFusionCap]
+	}
+	fused := rrf(lexical, semantic)
+	if k > 0 && len(fused) > k {
+		fused = fused[:k]
+	}
+	return fused
 }
 
 // Save writes the index to path via a same-dir temp file + atomic rename, so a
