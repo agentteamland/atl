@@ -23,11 +23,13 @@ The queue guarantees exactly-once delivery and dedup by content hash. An acked i
 
 ### 1. Mine the conversation for unmarked learnings
 
-Before peeking the queue, harvest what the agent forgot to mark. Read the recent conversation flow (prose only — tool calls and results are stripped):
+Before peeking the queue, harvest what the agent forgot to mark. Sweep the conversation flow (prose only — tool calls and results are stripped):
 
 ```bash
-atl learnings transcript
+atl learnings transcript --channel learning
 ```
+
+The `--channel` flag is what makes this a **sweep**: it resumes from where the last drain stopped and moves the `learning` cursor forward, so successive drains cover a session completely. Without it the command is a plain read of the most recent prose, and whatever accumulated between two drains is read by neither. If it reports transcript still unmined, the drain reports that in its summary; a large backlog drains across successive runs rather than in one, since the 256 KB budget exists to fit the mining subagent's context.
 
 Scan it for **durable** learnings that were never captured as a marker: **user corrections** (the user said the agent was wrong and how to fix it), **reverts** (an approach was tried, rejected, replaced), and **repeated mistakes** (the same class of error recurred). For each, write a one-line learning stating the lesson **with its why**, and enqueue it exactly like a marker:
 
@@ -96,7 +98,7 @@ Summarize what landed where: per item, topic → destination; list any new files
 `/drain` drives deterministic verbs under [`atl learnings`](/cli/learnings):
 
 ```bash
-atl learnings transcript      # recent conversation flow for the mining step (step 1)
+atl learnings transcript --channel learning   # resume the mining sweep (step 1)
 atl learnings status          # pending counts per channel for this project
 atl learnings peek            # list pending items (human-readable)
 atl learnings peek --json     # the full machine-readable list the skill consumes

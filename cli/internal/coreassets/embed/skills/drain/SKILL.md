@@ -25,12 +25,24 @@ structurally gone).
 ## Procedure
 
 ### 1. Mine the conversation for unmarked learnings
-Before peeking the queue, harvest what the agent forgot to mark. Read the recent
+Before peeking the queue, harvest what the agent forgot to mark. Sweep the
 conversation flow (prose only — tool calls/results are stripped):
 
 ```
-atl learnings transcript
+atl learnings transcript --channel learning
 ```
+
+**Always pass `--channel learning`.** That is what makes this a *sweep*: it
+resumes from where the last drain stopped and moves the `learning` cursor
+forward. Without it the command is a plain read of the most recent prose, so
+whatever accumulated between one drain's window and the next is read by neither —
+and a lost learning looks exactly like a session that had nothing to learn.
+
+If it reports transcript still unmined, **say so in the run's summary**. One more
+sweep is fine if the backlog is small and you have context to spare, but do not
+loop until it clears: the 256 KB budget exists because your context is bounded,
+and a large backlog is meant to drain across successive runs. Nothing is lost in
+between — the cursor holds the place.
 
 Scan it for **durable** learnings the agent never captured as a marker:
 

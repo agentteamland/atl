@@ -131,6 +131,10 @@ adjudicate borderline-real people. Corroboration in the drained conversation
 be a discussed real person → Proceed); its *absence* is never itself grounds to Drop — a fact
 mined from a prior session is legitimately absent from the current conversation.
 
+> Read that corroboration with the **bare** command. `--channel` turns it into a sweep that
+> advances a drain's cursor, and a lookup is not a sweep — it would move the mine past
+> material nothing actually mined.
+
 This gate owns exactly one case — **not-a-real-entity** (illustration/placeholder → Drop,
 write nothing). It does not touch the two cases `type-detection.md` already owns: a
 real-but-untypeable entity still becomes a minimal `unknown` stub, and a public figure /

@@ -13,7 +13,7 @@ You will rarely run these by hand — the loop drives them automatically. Reach 
 - **`status`** — glance at how much is waiting to be folded into your knowledge base (this is the same count the `SessionStart` hook surfaces).
 - **`peek`** — see the actual pending items, or feed the machine-readable list to a script. This is the deterministic read surface the [`/drain`](/skills/drain) skill consumes.
 - **`ack`** — manually mark an item processed (delete it) if you want to skip something the loop would otherwise fold in.
-- **`transcript`** — print the recent conversation flow (prose only). This is the read surface the [`/drain`](/skills/drain) skill's correction-mining step uses to recover learnings the agent forgot to mark.
+- **`transcript`** — print the conversation flow (prose only). This is the read surface a drain's mining step uses to recover learnings the agent forgot to mark; with `--channel` it becomes that channel's resumable forward sweep.
 
 ## Usage
 
@@ -24,8 +24,9 @@ atl learnings peek                   # list pending items (human-readable)
 atl learnings peek --json            # full machine-readable list
 atl learnings peek --channel learning  # filter to one channel
 atl learnings ack <id>               # mark an item processed (delete it)
-atl learnings transcript             # recent conversation flow (for /drain mining)
+atl learnings transcript             # recent conversation flow (a plain read)
 atl learnings transcript --json      # the same flow as role/text records
+atl learnings transcript --channel learning   # sweep forward, advancing that channel's cursor
 ```
 
 ## Subcommands
@@ -82,14 +83,29 @@ acked a1b2c3d4e5f6...
 
 ### `atl learnings transcript`
 
-Prints the recent **user + assistant conversation flow** for the current project — prose only; tool calls and tool results are stripped as noise. This is the read surface the [`/drain`](/skills/drain) skill's correction-mining step works from: it scans the flow for user corrections, reverts, and repeated mistakes the agent never marked, then enqueues each as a learning (deduped by the queue's content hash, so it's a plain read with no cursor to advance).
+Prints the **user + assistant conversation flow** for the current project — prose only; tool calls and tool results are stripped as noise. This is the read surface a drain's mining step works from: it scans the flow for corrections, reverts, and durable facts the agent never marked, then enqueues each (deduped by the queue's content hash, so re-reading is always safe).
+
+It has **two modes**, and the difference is whether it keeps a cursor.
 
 | Flag | Type | Default | What it does |
 |---|---|---|---|
-| `--limit <n>` | int | `2` | Read the most recent N transcripts for this project. |
+| `--channel <name>` | string | *(none)* | Sweep forward for this capture channel, advancing its cursor. Must be an active channel. |
+| `--limit <n>` | int | `2` | Read the most recent N transcripts. Applies to the cursorless read only. |
 | `--json` | bool | `false` | Emit the turns as JSON (`role`, `text`) instead of `[role] text` lines. |
 
-The flow is also capped at the **most recent 256 KB of prose** — `--limit` bounds how many files are read, not how much text they hold, and a long session's prose alone can exceed the mining subagent's whole context. When older turns are cut, a note says so (on stderr, so `--json` stays a parseable array), and the mine should be reported as the partial sweep it was. The same channel reports any transcript record skipped for being over-long, so turns missing from the flow are never silent.
+**Bare — a plain read.** It emits the most recent 256 KB of prose from the most recent `--limit` transcripts and records nothing, so running it to have a look can never consume a drain's unmined material. When older turns are cut, a note says so (on stderr, so `--json` stays a parseable array).
+
+**`--channel <name>` — that channel's sweep.** It resumes from where the channel last mined, emits the next 256 KB of prose going **forward**, advances the cursor, and reports what is still pending:
+
+```
+atl: 12.4 MB of transcript still unmined for channel "learning" — sweep again to continue
+```
+
+Successive sweeps therefore cover a session completely, instead of re-reading its tail while whatever arrived between two runs is read by neither. The budget is per invocation and deliberately sized to a mining subagent's context, so a large backlog drains across several runs rather than in one. `--limit` does not apply: a transcript with unmined turns is never skipped for being old.
+
+The cursor is kept **per channel** (at `~/.atl/mine-cursor/`) because the mine has more than one consumer — [`/drain`](/skills/drain) sweeps for `learning`, profile-team's `/profile-drain` for `profile-fact`, and both can run off the same turn. A single shared position would let whichever ran first consume the window the other still needed. A channel's **first** sweep has no position to resume from, so it reads the recent tail and baselines every existing transcript at its current end — adopting the cursor does not replay every session the project has ever had.
+
+Either mode reports any transcript record skipped for being over-long, so turns missing from the flow are never silent.
 
 Human-readable output is one line per turn:
 
