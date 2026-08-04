@@ -101,7 +101,7 @@ It has **two modes**, and the difference is whether it keeps a cursor.
 atl: 12.4 MB of transcript still unmined for channel "learning" — sweep again to continue
 ```
 
-Successive sweeps therefore cover a session completely, instead of re-reading its tail while whatever arrived between two runs is read by neither. `--limit` does not apply: a transcript with unmined turns is never skipped for being old.
+Successive sweeps therefore cover a session completely, instead of re-reading its tail while whatever arrived between two runs is read by neither. The budget is per invocation and deliberately sized to a mining subagent's context, so a large backlog drains across several runs rather than in one. `--limit` does not apply: a transcript with unmined turns is never skipped for being old.
 
 The cursor is kept **per channel** (at `~/.atl/mine-cursor/`) because the mine has more than one consumer — [`/drain`](/skills/drain) sweeps for `learning`, profile-team's `/profile-drain` for `profile-fact`, and both can run off the same turn. A single shared position would let whichever ran first consume the window the other still needed. A channel's **first** sweep has no position to resume from, so it reads the recent tail and baselines every existing transcript at its current end — adopting the cursor does not replay every session the project has ever had.
 

@@ -29,7 +29,7 @@ Before peeking the queue, harvest what the agent forgot to mark. Sweep the conve
 atl learnings transcript --channel learning
 ```
 
-The `--channel` flag is what makes this a **sweep**: it resumes from where the last drain stopped and moves the `learning` cursor forward, so successive drains cover a session completely. Without it the command is a plain read of the most recent prose, and whatever accumulated between two drains is read by neither. If it reports transcript still unmined, sweep again until the backlog clears.
+The `--channel` flag is what makes this a **sweep**: it resumes from where the last drain stopped and moves the `learning` cursor forward, so successive drains cover a session completely. Without it the command is a plain read of the most recent prose, and whatever accumulated between two drains is read by neither. If it reports transcript still unmined, the drain reports that in its summary; a large backlog drains across successive runs rather than in one, since the 256 KB budget exists to fit the mining subagent's context.
 
 Scan it for **durable** learnings that were never captured as a marker: **user corrections** (the user said the agent was wrong and how to fix it), **reverts** (an approach was tried, rejected, replaced), and **repeated mistakes** (the same class of error recurred). For each, write a one-line learning stating the lesson **with its why**, and enqueue it exactly like a marker:
 

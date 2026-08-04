@@ -39,8 +39,10 @@ by neither. And the cursor is **per channel** precisely because core `/drain`
 sweeps the same transcript for `learning` and both can run off the same turn — the
 wrong flag, or none, means one drain consumes the window the other still needed.
 
-If it reports transcript still unmined, sweep again in the same run until the
-backlog clears; nothing is lost in between, the cursor holds the place.
+If it reports transcript still unmined, say so in the run's summary. One more
+sweep is fine if the backlog is small, but do not loop until it clears — the
+budget exists because your context is bounded, and a large backlog drains across
+successive runs. Nothing is lost in between; the cursor holds the place.
 
 Scan it for **durable** facts about entities in the user's inner world that no marker
 recorded — the same bar the `profile-capture` rule sets: a person, org, animal, place,

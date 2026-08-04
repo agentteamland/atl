@@ -101,7 +101,7 @@ Mevcut proje için **kullanıcı + asistan konuşma akışını** yazdırır —
 atl: 12.4 MB of transcript still unmined for channel "learning" — sweep again to continue
 ```
 
-Böylece ardışık taramalar bir oturumu baştan sona kapsar; kuyruğun ucunu tekrar tekrar okuyup iki çalıştırma arasında biriken her şeyi ikisine de okutmamak yerine. `--limit` burada geçerli değildir: madenlenmemiş turu olan bir transkript, eski olduğu için asla atlanmaz.
+Böylece ardışık taramalar bir oturumu baştan sona kapsar; kuyruğun ucunu tekrar tekrar okuyup iki çalıştırma arasında biriken her şeyi ikisine de okutmamak yerine. Bütçe çağrı başınadır ve bilinçli olarak bir madenleme alt-ajanının bağlamına göre boyutlanmıştır; bu yüzden büyük bir birikim tek seferde değil, birkaç çalıştırmada erir. `--limit` burada geçerli değildir: madenlenmemiş turu olan bir transkript, eski olduğu için asla atlanmaz.
 
 İmleç **kanal başına** tutulur (`~/.atl/mine-cursor/` altında), çünkü madenlemenin birden çok tüketicisi vardır — [`/drain`](/tr/skills/drain) `learning` için, profile-team'in `/profile-drain`'i `profile-fact` için tarar ve ikisi aynı turda çalışabilir. Tek bir ortak konum, önce çalışanın diğerinin hâlâ ihtiyaç duyduğu pencereyi tüketmesine izin verirdi. Bir kanalın **ilk** taramasında devam edecek bir konum yoktur; bu yüzden son kuyruğu okur ve mevcut her transkripti o anki sonundan işaretler — imleci benimsemek, projenin şimdiye kadarki tüm oturumlarını yeniden oynatmaz.
 

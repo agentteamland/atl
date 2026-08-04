@@ -29,7 +29,7 @@ Kuyruğa gözatmadan önce, ajanın işaretlemeyi unuttuğunu derle. Konuşma ak
 atl learnings transcript --channel learning
 ```
 
-Bunu bir **tarama** yapan şey `--channel` bayrağıdır: son drain'in bıraktığı yerden devam eder ve `learning` imlecini ileri taşır; böylece ardışık drain'ler bir oturumu baştan sona kapsar. Bayrak olmadan komut, yalnızca en son düz metnin düz bir okumasıdır ve iki drain arasında biriken her şey ikisi tarafından da okunmaz. Hâlâ madenlenmemiş transkript bildirirse, birikim bitene kadar taramayı yinele.
+Bunu bir **tarama** yapan şey `--channel` bayrağıdır: son drain'in bıraktığı yerden devam eder ve `learning` imlecini ileri taşır; böylece ardışık drain'ler bir oturumu baştan sona kapsar. Bayrak olmadan komut, yalnızca en son düz metnin düz bir okumasıdır ve iki drain arasında biriken her şey ikisi tarafından da okunmaz. Hâlâ madenlenmemiş transkript bildirirse, drain bunu özetinde raporlar; büyük bir birikim tek seferde değil ardışık çalıştırmalarda erir, çünkü 256 KB bütçesi madenleme alt-ajanının bağlamına sığmak için vardır.
 
 Onu, işaretçi olarak hiç yakalanmamış **kalıcı** öğrenmeler için tara: **kullanıcı düzeltmeleri** (kullanıcı ajanın yanlış olduğunu ve nasıl düzeltileceğini söyledi), **geri almalar** (bir yaklaşım denendi, reddedildi, değiştirildi) ve **tekrarlanan hatalar** (aynı sınıf hata yeniden ortaya çıktı). Her biri için dersi **gerekçesiyle** belirten tek satırlık bir öğrenme yaz ve onu tıpkı bir işaretçi gibi kuyruğa ekle:
 
