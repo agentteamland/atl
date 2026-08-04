@@ -31,7 +31,7 @@ type modelSpec struct {
 	files []modelFile
 }
 
-// miniLMInt8 is the default embedder model: all-MiniLM-L6-v2 int8 (384-dim,
+// miniLMInt8 is the PREVIOUS embedder model, kept for the record: all-MiniLM-L6-v2 int8 (384-dim,
 // ~22 MB) — the cold-start and concurrency winner from the #140 spike (~74-90 ms
 // cold on an M2 Max, 2x headroom under the 200 ms budget; int8 is lossless for
 // ranking). Sourced from Xenova/all-MiniLM-L6-v2 (its quantized ONNX export) and
@@ -60,6 +60,67 @@ var miniLMInt8 = modelSpec{
 	},
 }
 
+// multilingualInt8 is the ACTIVE embedder model: paraphrase-multilingual-MiniLM-L12-v2
+// int8 (384-dim, ~135 MB), replacing the English-only miniLMInt8 above.
+//
+// The English model had no signal at all on this user's majority language — not
+// "weaker", none. Top-1 cosine by band against the live corpus put on-topic
+// Turkish (mean 0.140) BELOW off-topic English (0.152): the same question
+// measured 0.631 in English against 0.138 in Turkish. The lexical arm is dead
+// there too (Turkish coverage 0.00-0.17 against English 0.67-1.00), so both
+// halves of the hybrid ranker were failing together on ~87% of prompts.
+//
+// Chosen by measurement, not by reputation. Four candidates were screened over a
+// real-corpus sample, and the quantity that decides it is the GAP between
+// on-topic and off-topic — not the absolute score, which is not comparable
+// across models:
+//
+//	model                          sep EN   sep TR   ms/chunk
+//	all-MiniLM-L6-v2 (was)          0.264    0.091      535
+//	paraphrase-multilingual-L12     0.250    0.274     1457   <- this
+//	multilingual-e5-small           0.059    0.029     1160
+//	granite-97m (fp32 + CLS)        0.083    0.060      596
+//
+// e5-small is 20% faster and its absolute scores look far better (on-topic 0.837
+// vs L12's 0.382) — and it is rejected, because 0.837 against an off-topic 0.808
+// is a 0.029 gap. What a threshold consumes is the gap. granite-97m is 2.4×
+// faster and loses by 4.5×; its usable weights are fp32 at 372 MB, and its int8
+// export is silently wrong on the pure-Go backend (0.003 separation, no error) —
+// which is why a quantized export is only accepted when it preserves separation
+// against its fp32 twin.
+//
+// Same 384 dimensions, so the stored vector format is unchanged — but the
+// vectors themselves are not comparable across models, which is what
+// indexFormatVersion guards.
+var multilingualInt8 = modelSpec{
+	dir: "paraphrase-multilingual-MiniLM-L12-v2-int8",
+	files: []modelFile{
+		{
+			url:    "https://huggingface.co/Xenova/paraphrase-multilingual-MiniLM-L12-v2/resolve/main/onnx/model_quantized.onnx",
+			name:   "model.onnx",
+			size:   118308126,
+			sha256: "66fc00f5f29afcaff34092e1bdd20008ca3918265a82fb9695a551e510cc4ebc",
+		},
+		{
+			url:    "https://huggingface.co/Xenova/paraphrase-multilingual-MiniLM-L12-v2/resolve/main/tokenizer.json",
+			name:   "tokenizer.json",
+			size:   17082913,
+			sha256: "b60b6b43406a48bf3638526314f3d232d97058bc93472ff2de930d43686fa441",
+		},
+		{
+			url:    "https://huggingface.co/Xenova/paraphrase-multilingual-MiniLM-L12-v2/resolve/main/config.json",
+			name:   "config.json",
+			size:   673,
+			sha256: "05b570bff786faa5c4604152aa16f19f77ed6dfc31e47dd0f3dd987078693ac7",
+		},
+	},
+}
+
+// activeModel is the one model the retriever uses. Everything reads it rather
+// than a spec directly, so a swap is one line here and cannot leave the download
+// path and the presence check pointing at different models.
+var activeModel = multilingualInt8
+
 // modelsRoot is ~/.atl/models — the global cache for downloaded embedder models
 // (shared across projects, never committed, and untouched by gc, which only
 // scans the .claude asset dirs).
@@ -75,7 +136,7 @@ func modelsRoot() (string, error) {
 // downloading and sha256-verifying its files on first use. Idempotent: when
 // every file is already present and verifies, it makes no network call.
 func EnsureModel(ctx context.Context) (string, error) {
-	return ensureModel(ctx, miniLMInt8)
+	return ensureModel(ctx, activeModel)
 }
 
 // ModelDirIfPresent returns the default model's local directory and true only if
@@ -87,8 +148,8 @@ func ModelDirIfPresent() (string, bool) {
 	if err != nil {
 		return "", false
 	}
-	dir := filepath.Join(root, miniLMInt8.dir)
-	for _, f := range miniLMInt8.files {
+	dir := filepath.Join(root, activeModel.dir)
+	for _, f := range activeModel.files {
 		if !hasFile(filepath.Join(dir, f.name), f.size) {
 			return "", false
 		}

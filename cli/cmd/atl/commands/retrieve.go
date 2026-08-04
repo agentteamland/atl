@@ -511,11 +511,53 @@ func autoIndexRetrieval(project string) {
 	if err != nil {
 		return
 	}
-	if !corpusStale(dirs, idxPath) {
+	migrating := indexUnusable(idxPath)
+	if !migrating && !corpusStale(dirs, idxPath) {
 		return
 	}
 	_ = throttle.Touch(stamp)
+	if migrating {
+		announceMigration(dirs)
+	}
 	_ = detach.Spawn("retrieve", "index") // detached: inherits cwd (= project)
+}
+
+// indexUnusable reports whether an index FILE exists that this binary cannot
+// read — the signature of an embedder swap (indexFormatVersion moved), and also
+// of a corrupt cache.
+//
+// It exists because corpusStale cannot see this case: it compares modtimes, and
+// an embedder swap makes no corpus file newer. Over a quiet corpus the index
+// would stay "fresh" forever while Load reports "no index", so retrieval would
+// go silently dead until something happened to touch a page. That gap was known
+// and documented as pre-existing; a model swap is what makes it load-bearing.
+func indexUnusable(idxPath string) bool {
+	if _, err := os.Stat(idxPath); err != nil {
+		return false // no index at all — the modtime pass already handles that
+	}
+	ix, err := retrieve.Load(idxPath)
+	return err == nil && ix == nil
+}
+
+// announceMigration tells the user a full rebuild is starting and why.
+//
+// Not decoration: the rebuild is detached, invisible to the task panel, and on a
+// large corpus runs for tens of minutes — the exact shape of the incident where
+// two index builds saturated the machine and the only channel to the user was
+// the fans. A one-time cost is acceptable; an unannounced one is not.
+func announceMigration(dirs []string) {
+	pages := 0
+	for _, dir := range dirs {
+		_ = filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
+			if err == nil && !d.IsDir() && strings.HasSuffix(p, ".md") {
+				pages++
+			}
+			return nil
+		})
+	}
+	fmt.Printf("atl: the embedding model changed — rebuilding the retrieval index from scratch "+
+		"in the background (~%d pages). This is a one-time cost per project, bounded to half "+
+		"your cores; set %s=1 to skip it.\n", pages, envNoAutoIndex)
 }
 
 // corpusStale reports whether any corpus Markdown file is newer than the index
