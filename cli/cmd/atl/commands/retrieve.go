@@ -388,8 +388,12 @@ func logRetrieveFire(projectRoot, outcome string, paths []string) {
 }
 
 // retrieveFireStats is the parsed tally behind `atl retrieve stats`.
+//
+// Total counts PROMPTS, and every percentage this command prints is computed
+// against it — so only an outcome that represents one prompt may increment it.
 type retrieveFireStats struct {
 	Total, Fired, Silent, Machine, Short int
+	Translated                           int
 	Offered                              int
 	Pages                                map[string]int
 }
@@ -411,6 +415,16 @@ func readFireStats(logPath string) (retrieveFireStats, error) {
 		}
 		f := strings.Split(line, "\t")
 		if len(f) < 2 {
+			continue
+		}
+		// "translated" is written BEFORE the search and the search then writes its
+		// own outcome, so a translated prompt produces two lines. It is a modifier
+		// on the fire that follows, not a fire of its own: counting it would inflate
+		// the denominator every percentage below is computed against — and inflate
+		// it further the more the feature is used, so the instrument would degrade
+		// exactly as the thing it measures gets adopted.
+		if f[1] == "translated" {
+			st.Translated++
 			continue
 		}
 		st.Total++
@@ -713,6 +727,10 @@ func renderFireStats(st retrieveFireStats) string {
 	fmt.Fprintf(&b, "    silent   %5d  %s\n", st.Silent, pct(st.Silent))
 	fmt.Fprintf(&b, "  suppressed %5d  %s   (machine %d, short %d)\n",
 		st.Machine+st.Short, pct(st.Machine+st.Short), st.Machine, st.Short)
+	if st.Translated > 0 {
+		fmt.Fprintf(&b, "  translated %5d  %s   (of the above — a query with no lexical hit)\n",
+			st.Translated, pct(st.Translated))
+	}
 	if len(st.Pages) == 0 {
 		return b.String()
 	}
