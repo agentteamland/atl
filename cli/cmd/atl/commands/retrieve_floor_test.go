@@ -409,3 +409,34 @@ func TestIndexCommandTakesAndReleasesTheLock(t *testing.T) {
 		t.Error("the lock must be released when the build returns")
 	}
 }
+
+// A translated prompt writes TWO lines — "translated" before the search, then the
+// search's own outcome — so counting the first as a fire inflates the denominator
+// every percentage in this report is computed against, and inflates it further the
+// more translation is used. The report exists to decide whether injected context
+// works as a delivery channel at all; a denominator that drifts with adoption
+// would mis-decide exactly that.
+func TestFireStatsDoesNotCountATranslationAsAPrompt(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "fires.log")
+	if err := os.WriteFile(p, []byte(
+		"t\ttranslated\n"+
+			"t\tfired\ta.md\n"+
+			"t\tsuppressed-machine\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	st, err := readFireStats(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st.Total != 2 {
+		t.Fatalf("Total = %d, want 2 — the translation line is not a prompt", st.Total)
+	}
+	if st.Translated != 1 {
+		t.Fatalf("Translated = %d, want 1 — it must still be reported, just not as a fire", st.Translated)
+	}
+	// The rendered percentages must agree with the corrected denominator: one
+	// ranked fire out of two prompts is 50%, not the 33% an inflated Total gives.
+	if out := renderFireStats(st); !strings.Contains(out, " 50.0%") {
+		t.Fatalf("percentages still use the inflated denominator:\n%s", out)
+	}
+}
