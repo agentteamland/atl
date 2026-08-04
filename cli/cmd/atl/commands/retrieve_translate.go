@@ -132,7 +132,13 @@ func cleanTranslation(raw, original string) (string, bool) {
 // claudeAvailable reports whether the translator can run at all: the binary
 // exists and a credential is present. It does NOT spend an API call to find out
 // — the hook fires on every prompt and must not pay for a liveness probe.
-func claudeAvailable() bool {
+//
+// A variable rather than a plain function so a test can state the condition it
+// means. It probes the SYSTEM (a binary on PATH), which makes the developer's
+// machine a richer environment than CI: locally `claude` is installed and a test
+// that assumes so passes, while on a bare runner it cannot be true no matter
+// what the environment says. That difference cost a red CI run.
+var claudeAvailable = func() bool {
 	if _, err := exec.LookPath("claude"); err != nil {
 		return false
 	}

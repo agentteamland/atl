@@ -76,12 +76,6 @@ func TestClaudeAvailableRequiresACredential(t *testing.T) {
 	if claudeAvailable() {
 		t.Fatal("reported available with no credential in the environment")
 	}
-	t.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "sk-ant-oat01-whatever")
-	if _, err := os.Stat("/usr/bin/false"); err == nil {
-		// only meaningful where a `claude` binary may exist; the credential half
-		// is what this asserts, and it must flip with the variable.
-		_ = claudeAvailable()
-	}
 }
 
 // The notice is information, not a gate — but it must not appear where it would
@@ -90,9 +84,15 @@ func TestClaudeAvailableRequiresACredential(t *testing.T) {
 func TestTranslationNoticeOnlyWhereItWouldChangeSomething(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
-	t.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "")
-	t.Setenv("ANTHROPIC_API_KEY", "")
 	project := t.TempDir()
+
+	// Stated, not inherited: the real probe needs a `claude` binary on PATH, which
+	// CI does not have — so an environment-driven version of this test asserts a
+	// state the runner cannot reach, and passes only on a developer's machine.
+	available := false
+	orig := claudeAvailable
+	claudeAvailable = func() bool { return available }
+	t.Cleanup(func() { claudeAvailable = orig })
 
 	if _, ok := retrievalTranslationNotice(project); ok {
 		t.Fatal("shown in a project with no index — nothing to translate against")
@@ -124,7 +124,7 @@ func TestTranslationNoticeOnlyWhereItWouldChangeSomething(t *testing.T) {
 		t.Error("notice does not say it is optional")
 	}
 
-	t.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "sk-ant-oat01-configured")
+	available = true
 	if _, ok := retrievalTranslationNotice(project); ok {
 		t.Fatal("still shown after the credential is configured — that is noise")
 	}
