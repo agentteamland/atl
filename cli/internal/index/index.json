@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-08-04T00:00:00Z",
+  "generatedAt": "2026-08-04T08:24:45Z",
   "teams": [
     {
       "handle": "agentteamland",
       "name": "profile-team",
-      "version": "1.9.1",
+      "version": "1.9.2",
       "description": "Curates a cross-project profile of the entities in your world: drains profile-fact markers into entity profiles at ~/.atl/profiles, each grown through a self-describing, versioned interface.",
       "keywords": [
         "profile",
@@ -21,7 +21,7 @@
       "source": {
         "repo": "agentteamland/atl",
         "subpath": "teams/profile-team",
-        "ref": "v2.15.0"
+        "ref": "v2.21.0"
       }
     },
     {
