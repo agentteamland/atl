@@ -100,6 +100,16 @@ The model is **multilingual** on purpose. The earlier English-only model had no 
 An index's vectors are only comparable to others from the same model, so changing the embedder invalidates every stored index. The first session in each project after such an upgrade rebuilds that project's index **from scratch in the background** — minutes on a small corpus, longer on a large one. It announces itself when it starts, is bounded to half your cores, and `ATL_NO_RETRIEVE_INDEX=1` skips it. Retrieval simply stays quiet until it finishes.
 :::
 
+### Non-English prompts are translated before searching
+
+Retrieval has two halves and they fail differently outside English. The semantic half is multilingual and works. The **lexical half matches whole words**, so a query written in a language your knowledge base is not in shares no token with any page and scores a mathematical zero — retrieval runs on one half instead of two. Measured against a fixed answer key: **75%** recall for English questions, **25%** for the same questions in Turkish, with the semantic half scoring *identically* in both.
+
+So when the lexical half returns nothing, ATL rewrites the query in English and searches again. Technical identifiers — file names, commands, flags, symbols — are kept verbatim, because those are exactly what the lexical half matches best.
+
+This needs its own credential: a session's login is held by the host and is not visible to the tools it starts. Run `claude setup-token` and export the value as `CLAUDE_CODE_OAUTH_TOKEN`. Without it nothing breaks — the notice at session start tells you what you are missing, and retrieval keeps working on one half. It is also **fail-open** end to end: a missing credential, a timeout, or an answer that does not look like a query all fall back to searching with your original words.
+
+An English prompt never pays for any of this — the translation only runs when the lexical half came back empty.
+
 ### Automatic, incremental, background
 
 The index rebuilds itself whenever a drain changes the knowledge base. [`atl session-start`](/cli/setup-hooks) notices the corpus changed and spawns the build **in the background** (detached), so it never blocks the session, and the build is **incremental** — only pages whose text actually changed are re-embedded, so a routine drain refreshes in seconds. What you drain this session is retrievable the next. (Under `atl work dispatch`, per-worktree workers skip the auto-build to avoid a rebuild storm.)

@@ -175,6 +175,16 @@ var sessionStartCmd = &cobra.Command{
 		// never-fail; ATL_NO_RETRIEVE_INDEX opts out.
 		autoIndexRetrieval(project)
 
+		// Non-blocking notice when retrieval could translate non-English prompts
+		// but has no credential to do it with. Information, never a gate — it can
+		// be ignored forever and retrieval keeps working, just on one arm for a
+		// non-English prompt. Printed every session precisely because it is
+		// skippable: a setup step that announces itself once is a setup step that
+		// gets missed, and this one fails silently by construction.
+		if msg, ok := retrievalTranslationNotice(project); ok {
+			fmt.Println(msg)
+		}
+
 		return nil
 	},
 }

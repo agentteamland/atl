@@ -130,6 +130,25 @@ func runRetrieveHook(cmd *cobra.Command) {
 		return // no index yet (built on drain) — nothing to inject
 	}
 
+	// Translate before searching when the query cannot reach this corpus lexically.
+	//
+	// The trigger is the lexical arm returning NOTHING — not a language check.
+	// That is deliberate: it is language-agnostic, it costs nothing on an English
+	// query (which always has lexical hits on a topic the corpus covers), and it
+	// fires precisely in the case translation exists for. Retrieval on a
+	// non-English prompt otherwise runs on the semantic arm alone, which measures
+	// 25% against 75% for the same questions in English.
+	//
+	// The budget is separate from the 5s search budget below, because this is the
+	// one part the decision explicitly agreed to pay time for.
+	query := prompt
+	if ix.LexicalHits(prompt) == 0 && claudeAvailable() {
+		if translated, ok := translatePrompt(cmd.Context(), prompt); ok {
+			query = translated
+			logRetrieveFire(root, "translated", nil)
+		}
+	}
+
 	// The embedder is best-effort: if the model isn't downloaded or fails to load,
 	// query with a nil embedder (BM25-only) rather than skipping retrieval entirely.
 	ctx, cancel := context.WithTimeout(cmd.Context(), 5*time.Second)
@@ -139,7 +158,7 @@ func runRetrieveHook(cmd *cobra.Command) {
 		defer e.Close()
 	}
 
-	results, err := ix.Query(ctx, prompt, e, retrieveTopK, retrieve.MinSimDefault)
+	results, err := ix.Query(ctx, query, e, retrieveTopK, retrieve.MinSimDefault)
 	if err != nil {
 		return
 	}

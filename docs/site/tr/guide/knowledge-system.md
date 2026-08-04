@@ -100,6 +100,16 @@ Model bilinçli olarak **çok dillidir**. Önceki yalnızca-İngilizce model, İ
 Bir dizinin vektörleri yalnızca aynı modelden gelen vektörlerle karşılaştırılabilir; bu yüzden gömme modelini değiştirmek saklı bütün dizinleri geçersiz kılar. Böyle bir yükseltmeden sonra her projedeki ilk oturum, o projenin dizinini **arka planda sıfırdan** yeniden derler — küçük bir korpusta dakikalar, büyükte daha uzun. Başlarken kendini duyurur, çekirdeklerinizin yarısıyla sınırlıdır ve `ATL_NO_RETRIEVE_INDEX=1` ile atlanır. Bitene kadar getirme yalnızca sessiz kalır.
 :::
 
+### İngilizce olmayan istemler, arama öncesi çevrilir
+
+Getirmenin iki yarısı var ve İngilizce dışında farklı biçimde başarısız oluyorlar. Anlamsal yarı çok dillidir ve çalışır. **Sözcüksel yarı ise tam kelime eşler**, yani bilgi tabanınızın dilinde olmayan bir sorgu hiçbir sayfayla ortak simge taşımaz ve matematiksel olarak sıfır alır — getirme iki yarı yerine tek yarıyla koşar. Sabit bir cevap anahtarına karşı ölçüldü: İngilizce sorularda **%75**, aynı soruların Türkçesinde **%25**; anlamsal yarı ise iki dilde *birebir aynı* puanı alıyor.
+
+Bu yüzden sözcüksel yarı hiçbir şey döndürmediğinde ATL sorguyu İngilizce olarak yeniden yazar ve aramayı tekrarlar. Teknik tanımlayıcılar — dosya adları, komutlar, bayraklar, semboller — olduğu gibi korunur; çünkü sözcüksel yarının en iyi eşlediği şey tam olarak onlardır.
+
+Bunun kendi kimlik bilgisine ihtiyacı var: bir oturumun girişi ana uygulamada tutulur ve başlattığı araçlara görünmez. `claude setup-token` çalıştırıp değeri `CLAUDE_CODE_OAUTH_TOKEN` olarak dışa aktarın. Bu olmadan hiçbir şey bozulmaz — oturum başındaki bilgilendirme neyin eksik olduğunu söyler, getirme tek yarıyla çalışmaya devam eder. Uçtan uca **hataya-açıktır**: eksik kimlik bilgisi, zaman aşımı ya da sorguya benzemeyen bir cevap, hepsi sizin özgün kelimelerinizle aramaya geri döner.
+
+İngilizce bir istem bunun bedelini hiç ödemez — çeviri yalnızca sözcüksel yarı boş döndüğünde çalışır.
+
 ### Otomatik, artımlı, arka planda
 
 Bir drain bilgi tabanını değiştirdiğinde dizin kendini yeniden kurar. [`atl session-start`](/cli/setup-hooks) korpusun değiştiğini fark eder ve derlemeyi **arka planda** (ayrık/detached) başlatır, böylece oturumu asla bloklamaz; ve derleme **artımlıdır** — yalnızca metni gerçekten değişen sayfalar yeniden gömülür, dolayısıyla rutin bir drain saniyeler içinde tazelenir. Bu oturumda drain ettiğiniz, bir sonraki oturumda erişilebilir. (`atl work dispatch` altında, worktree başına worker'lar yeniden-derleme fırtınasını önlemek için otomatik derlemeyi atlar.)
