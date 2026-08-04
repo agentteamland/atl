@@ -151,21 +151,34 @@ func normalize(v []float32) {
 // MinSimDefault is the cosine floor the semantic arm applies, below which a
 // document is treated as "no signal" rather than as a weak match.
 //
-// Derived, not guessed — 13 probes against this workspace's live 182-doc index,
-// top-1 cosine by band:
+// Derived, not guessed. Re-measured 2026-08-04 against the FULL 328-doc index
+// after the multilingual embedder swap, 28 probes, top-1 cosine by band:
 //
-//	on-topic English   0.298 … 0.631   (mean 0.451)
-//	off-topic English  0.097 … 0.227   (mean 0.152)
-//	machine / 1-word   0.204 … 0.426
-//	on-topic Turkish   0.107 … 0.175   (mean 0.140)
+//	on-topic English   0.165 … 0.564   (median 0.386)
+//	on-topic Turkish   0.322 … 0.542   (median 0.454)
+//	off-topic English  0.079 … 0.235
+//	off-topic Turkish  0.103 … 0.480
 //
-// 0.25 separates on-topic English from everything else it can separate. The
-// fourth row is the uncomfortable one and must not be filed as a tuning detail:
-// an on-topic question in the user's own language scores BELOW off-topic English,
-// so this model has no signal there at all. The same question in both languages
-// measured 0.631 (en) against 0.138 (tr). Consequence to hold onto: under this
-// floor a non-English prompt correctly yields nothing — honest, and the reason
-// the multilingual model is a fix rather than an optimisation.
+// 0.25 is unchanged, and it now does the job it could not do before: ALL 8
+// on-topic Turkish probes clear it, where under the English-only model Turkish
+// scored ~0.140 and none did.
+//
+// The bands OVERLAP — lowest on-topic 0.165 sits below highest off-topic 0.480 —
+// so no single threshold separates them cleanly, and the two outliers are the
+// model's limit rather than a tuning error:
+//
+//   - 0.480, "tırmanış için en sağlam düğüm hangisi" (climbing knots) matching a
+//     page about shipping discipline. The same question in English scores 0.235:
+//     the model is looser in Turkish, and a threshold cannot tell those apart.
+//   - 0.165, "brownfield onboarding has no path through kickoff", whose answer IS
+//     in the corpus. Not a loss in practice — those terms appear in the page, so
+//     the lexical arm carries it. The floor gates the semantic arm only; the
+//     hybrid is what the user sees.
+//
+// Raising to 0.30 would drop 2 of 8 on-topic English probes to gain one
+// off-topic rejection — the wrong trade, since silence on a real question is the
+// worse failure. At 0.25: 15 of 16 on-topic probes clear, 11 of 12 off-topic are
+// rejected.
 const MinSimDefault = 0.25
 
 // Query ranks the corpus against prompt and returns up to k results. minSim is
