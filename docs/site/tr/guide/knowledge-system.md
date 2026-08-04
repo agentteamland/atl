@@ -92,7 +92,13 @@ Wiki dizinini konuşmanın başında bir kez okumak yeterli değildir. Konular k
 
 ### Yerel model — harici servis yok
 
-Semantik yarı, küçük bir ONNX modelini (**all-MiniLM-L6-v2**, ~22 MB) tamamen yerelde, saf-Go bir çalışma zamanıyla çalıştırır. İlk kullanımda **bir kez indirilir** (sha256 doğrulamalı), `~/.atl/models` altına konur, ikiliye (binary) gömülmez ve asla harici bir servise çağrı yapmaz — istemleriniz ve bilginiz makineden çıkmaz. Bu, size cevap veren ikinci bir model değil, bir metin→vektör aracıdır; ajan hâlâ Claude'dur. Arka plan dizinlemesini kapatmak için `ATL_NO_RETRIEVE_INDEX` ayarlayın.
+Semantik yarı, küçük bir ONNX modelini (**paraphrase-multilingual-MiniLM-L12-v2**, ~135 MB) tamamen yerelde, saf-Go bir çalışma zamanıyla çalıştırır. İlk kullanımda **bir kez indirilir** (sha256 doğrulamalı), `~/.atl/models` altına konur, ikiliye (binary) gömülmez ve asla harici bir servise çağrı yapmaz — istemleriniz ve bilginiz makineden çıkmaz. Bu, size cevap veren ikinci bir model değil, bir metin→vektör aracıdır; ajan hâlâ Claude'dur. Arka plan dizinlemesini kapatmak için `ATL_NO_RETRIEVE_INDEX` ayarlayın.
+
+Model bilinçli olarak **çok dillidir**. Önceki yalnızca-İngilizce model, İngilizce olmayan bir istemde hiç sinyal üretmiyordu — "daha zayıf" değil, sıfır: başka bir dildeki konu-içi bir soru, konu-dışı İngilizce bir sorunun *altında* puan alıyordu; yani sıralayıcının iki yarısı birden çöküyor ve İngilizce çalışmayan biri için getirme fiilen kapalı oluyordu.
+
+::: warning Model değişince bir kerelik yeniden derleme
+Bir dizinin vektörleri yalnızca aynı modelden gelen vektörlerle karşılaştırılabilir; bu yüzden gömme modelini değiştirmek saklı bütün dizinleri geçersiz kılar. Böyle bir yükseltmeden sonra her projedeki ilk oturum, o projenin dizinini **arka planda sıfırdan** yeniden derler — küçük bir korpusta dakikalar, büyükte daha uzun. Başlarken kendini duyurur, çekirdeklerinizin yarısıyla sınırlıdır ve `ATL_NO_RETRIEVE_INDEX=1` ile atlanır. Bitene kadar getirme yalnızca sessiz kalır.
+:::
 
 ### Otomatik, artımlı, arka planda
 

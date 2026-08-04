@@ -17,8 +17,8 @@ func modelDirIfPresent(t *testing.T) string {
 	if err != nil {
 		t.Skipf("no models root: %v", err)
 	}
-	dir := filepath.Join(root, miniLMInt8.dir)
-	for _, f := range miniLMInt8.files {
+	dir := filepath.Join(root, activeModel.dir)
+	for _, f := range activeModel.files {
 		if verifyFile(filepath.Join(dir, f.name), f.sha256) != nil {
 			t.Skip("embedding model not present locally; run `atl retrieve warm` first")
 		}

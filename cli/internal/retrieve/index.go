@@ -14,7 +14,13 @@ import (
 // (old-model vectors on unchanged docs, new-model on changed ones). The index is
 // a rebuildable cache, so a version mismatch is treated as "no index yet" (a full
 // rebuild) rather than an error.
-const indexFormatVersion = 1
+//
+//	1 -> 2: the embedder moved from all-MiniLM-L6-v2 (English-only) to
+//	        paraphrase-multilingual-MiniLM-L12-v2. Same 384 dimensions, so the
+//	        gob layout is untouched and only the vectors' meaning changed — which
+//	        is exactly the case an unbumped version would hide, leaving a silently
+//	        mixed index that ranks old and new pages against each other.
+const indexFormatVersion = 2
 
 // Index is the persisted retrieval index for one corpus: the documents plus one
 // embedding vector per document. BM25 is rebuilt in memory from the documents at

@@ -92,7 +92,13 @@ It is **fail-open**: a missing index, an absent model, or any error prints nothi
 
 ### The local model — no external service
 
-The semantic half runs a small ONNX model (**all-MiniLM-L6-v2**, ~22 MB) entirely locally, through a pure-Go runtime. It is **downloaded once on first use** (sha256-verified) into `~/.atl/models`, never embedded in the binary, and never calls out to an external service — your prompts and knowledge never leave the machine. It is a text→vector utility, not a second model answering you; Claude remains the agent. Set `ATL_NO_RETRIEVE_INDEX` to turn the background indexing off.
+The semantic half runs a small ONNX model (**paraphrase-multilingual-MiniLM-L12-v2**, ~135 MB) entirely locally, through a pure-Go runtime. It is **downloaded once on first use** (sha256-verified) into `~/.atl/models`, never embedded in the binary, and never calls out to an external service — your prompts and knowledge never leave the machine. It is a text→vector utility, not a second model answering you; Claude remains the agent. Set `ATL_NO_RETRIEVE_INDEX` to turn the background indexing off.
+
+The model is **multilingual** on purpose. The earlier English-only model had no signal at all on a non-English prompt — not "weaker", none: an on-topic question in another language scored *below* an off-topic English one, so both halves of the ranker failed together and retrieval was effectively off for anyone not working in English.
+
+::: warning One-time rebuild when the model changes
+An index's vectors are only comparable to others from the same model, so changing the embedder invalidates every stored index. The first session in each project after such an upgrade rebuilds that project's index **from scratch in the background** — minutes on a small corpus, longer on a large one. It announces itself when it starts, is bounded to half your cores, and `ATL_NO_RETRIEVE_INDEX=1` skips it. Retrieval simply stays quiet until it finishes.
+:::
 
 ### Automatic, incremental, background
 
