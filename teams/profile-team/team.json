@@ -37,7 +37,7 @@
     },
     {
       "name": "profile-restore",
-      "description": "/profile-restore - bring a profile snapshot from the repo back into the global store, as a diffed dry-run-by-default overlay that requires explicit --apply and never clobbers newer memory."
+      "description": "/profile-restore - bring the global profile store back from its private remote onto this machine: create ~/.atl/profiles if missing, attach the remote you supply, fast-forward only."
     }
   ],
   "rules": [

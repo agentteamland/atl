@@ -1,152 +1,125 @@
 ---
 name: profile-restore
-description: Restore a profile snapshot from this repo's profile-backup/ back into the global store at ~/.atl/profiles — a diffed, dry-run-by-default overlay that requires an explicit --apply and never deletes memory accumulated since the snapshot.
+description: "/profile-restore — bring your profile store back from its private remote onto this machine: create ~/.atl/profiles if missing, attach the remote you supply, and fast-forward from it. Never overwrites memory this machine already has."
 ---
 
-# /profile-restore — bring a profile snapshot back into the global store
+# /profile-restore — bring your profile back onto this machine
 
-The inverse of `/profile-backup`. Backup snapshots the authoritative global store
-(`~/.atl/profiles/`) into this repo's `profile-backup/` so it's git-trackable, versioned,
-and portable; restore copies that snapshot **back into global**. The store stays
-global-authoritative — the repo is a versioned mirror, not the source of truth.
+The inverse of `/profile-backup`. Backup pushes the store's own history to a private remote
+you supply; restore fetches it back — onto a new machine, or onto one that has fallen behind.
 
-Restore is **deterministic** (`diff` + `git` + `cp`), not fuzzy copying. And it obeys the
-one non-negotiable rule of this system: **it never silently clobbers global data that is
-newer than the snapshot.** Losing accumulated memory is the single unacceptable failure, so
-restore is an **overlay** (it adds and overwrites, it never deletes global-only data),
-**dry-run by default**, and it **only writes when you pass `--apply` after seeing the diff.**
+Like backup, it needs exactly one thing from you: **the remote.** Git holds it from then on.
+
+The one non-negotiable rule of this system is unchanged: **it never silently overwrites memory
+this machine has and the remote does not.** What changed is who enforces it. This used to be a
+file overlay with a hand-written timestamp comparison; now the pull is `--ff-only`, so git
+itself refuses the moment the two histories have diverged. A guarantee the tool enforces beats
+one a script has to remember to check.
 
 ## Procedure
 
-### 1. Preview — always first (dry run, writes nothing)
-
-Run this from the repo that holds the snapshot. It prints exactly what a restore would
-change and stops. Read the output *with the user* before doing anything else.
+If the user has already given you a remote URL in this conversation, export it first as
+`ATL_PROFILE_REMOTE` — otherwise run the block as-is and it will tell you one is needed.
 
 ```bash
-set -euo pipefail
+# `set -eu`, not `-euo pipefail`: `-o pipefail` is non-POSIX and aborts under dash. The
+# body is pasted into whatever shell the agent runs — sh, bash or zsh.
+set -eu
 
-MODE="${1:-preview}"                  # preview (default) | --apply
-SNAP="$(git rev-parse --show-toplevel 2>/dev/null || pwd)/profile-backup"  # snapshot at the repo root (mirror /profile-backup's anchor), not the cwd
-GLOBAL="$HOME/.atl/profiles"          # the authoritative global store (restore target)
+GLOBAL="$HOME/.atl/profiles"
 
-# No snapshot here → nothing to restore.
-[ -d "$SNAP" ] || { echo "No profile-backup/ in $(pwd) — nothing to restore (take one with /profile-backup)."; exit 0; }
-
-# Provenance + the snapshot's reference time. CRITICAL: derive the snapshot's age
-# from its git COMMIT time, never from file mtimes — git does not preserve mtimes
-# across clone/checkout, so a checked-out snapshot file always looks freshly modified
-# and an mtime comparison would silently fail to flag genuinely-newer global memory on
-# another machine (the one unacceptable failure this skill exists to prevent).
-SNAP_EPOCH=""
-if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  echo "Snapshot: $(git log -1 --format='%h  %ci  %s' -- "$SNAP" 2>/dev/null || echo 'present but untracked in git')"
-  SNAP_EPOCH=$(git log -1 --format=%ct -- "$SNAP" 2>/dev/null || echo "")
-else
-  echo "Note: not inside a git repo — provenance (commit/date) is unknown; restoring profile-backup/ as-is."
-  echo "      Newer-than-snapshot detection is UNAVAILABLE without git; absence of a !! flag below does NOT mean 'safe to overwrite'."
-fi
-
-# Diff the snapshot (source) against global (target).
+# 1. The store directory. Restore is the one skill that legitimately runs before anything
+#    else exists — a brand-new machine — so it creates rather than complains.
 if [ ! -d "$GLOBAL" ]; then
-  echo "No global store at $GLOBAL yet — restore would be a pure create, no overwrite."
-else
-  DIFF=$(diff -rq "$SNAP" "$GLOBAL" 2>/dev/null || true)
-  echo
-  echo "ADD  (in snapshot, missing from global — restore brings these back):"
-  echo "$DIFF" | grep "^Only in $SNAP" || echo "  (none)"
-  echo "KEEP (global-only — memory accumulated SINCE the snapshot; restore PRESERVES these, never deletes):"
-  echo "$DIFF" | grep "^Only in $GLOBAL" || echo "  (none)"
-  echo "OVERWRITE (differ — the snapshot's version would replace global's):"
-  # Anchor to the real 'Files X and Y differ' lines (they end in ' differ'); a bare
-  # grep 'differ' would also catch an 'Only in ...' line for a slug containing 'differ'.
-  D=$(echo "$DIFF" | grep " differ$" || true)
-  if [ -z "$D" ]; then
-    echo "  (none — shared files already match the snapshot)"
-  else
-    echo "$D" | while read -r _ f _ g _; do
-      # GNU first, BSD second — the order is load-bearing, not cosmetic. `stat -f` means
-      # --file-system on GNU coreutils, so `stat -f %m FILE` PRINTS a filesystem report on
-      # STDOUT and only then fails on `%m` as a missing operand: with BSD first, $GEP is a
-      # multi-line dump on every Linux machine, the numeric compare below errors, and the
-      # !! branch becomes unreachable — the newer-guard silently off, exactly where the loss
-      # is irreversible. BSD `stat -c` fails cleanly with no stdout, so this order is safe
-      # both ways. The numeric gate then makes any other partial read fail CLOSED (??)
-      # instead of falling through to the unflagged branch.
-      GEP=$(stat -c %Y "$g" 2>/dev/null || stat -f %m "$g" 2>/dev/null || echo "")
-      case "$GEP" in *[!0-9]*|"") GEP="" ;; esac
-      if [ -z "$SNAP_EPOCH" ] || [ -z "$GEP" ]; then
-        echo "  ?? $g — age comparison unavailable (snapshot not in git, or this file's timestamp is unreadable); cannot tell if global is newer — do NOT assume safe"
-      elif [ "$GEP" -gt "$SNAP_EPOCH" ]; then
-        echo "  !! $g is NEWER than the snapshot (modified after the snapshot commit) — applying would overwrite newer memory with older data"
-      else
-        echo "     $g"
-      fi
-    done
-  fi
+  mkdir -p "$GLOBAL"
 fi
 
-# Preview stops here; --apply performs the overlay.
-if [ "$MODE" != "--apply" ]; then
-  echo
-  echo "DRY RUN — nothing written. If this is what you want, confirm, then re-run with --apply."
-  exit 0
+# 2. Under git. `atl session-start` normally does this, but it only versions a store that
+#    already has content, and on a new machine there is none yet — so restore cannot assume
+#    the repo is there.
+if ! git -C "$GLOBAL" rev-parse --git-dir >/dev/null 2>&1; then
+  git -C "$GLOBAL" init -q
 fi
 
-# APPLY — reversible seatbelt first, then overlay (add + overwrite, never a delete).
-SAFETY=""
-if [ -d "$GLOBAL" ]; then
-  SAFETY="$HOME/.atl/profiles.pre-restore-$(date +%Y%m%d-%H%M%S)"
-  cp -R "$GLOBAL" "$SAFETY"
-  echo "Safety copy of current global → $SAFETY"
+# 3. Where from? The remote is the record; nothing else stores it.
+if [ -z "$(git -C "$GLOBAL" remote 2>/dev/null)" ]; then
+  if [ -z "${ATL_PROFILE_REMOTE:-}" ]; then echo "no-remote"; exit 0; fi
+  git -C "$GLOBAL" remote add origin "$ATL_PROFILE_REMOTE"
 fi
-mkdir -p "$GLOBAL"
-cp -R "$SNAP"/. "$GLOBAL"/
-if [ -n "$SAFETY" ]; then
-  echo "Restored (overlay: snapshot applied, global-only files preserved). Undo: rm -rf \"$GLOBAL\" && mv \"$SAFETY\" \"$GLOBAL\""
+
+if ! git -C "$GLOBAL" fetch -q origin; then echo "fetch-failed"; exit 1; fi
+
+# 4. Which branch is the remote's? Ask the remote rather than guessing: a store created by
+#    `git init` is on whatever that git's init.defaultBranch says, which differs by machine
+#    and by git version, so "it is master here" proves nothing about the other end.
+BRANCH="$(git -C "$GLOBAL" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || true)"
+BRANCH="${BRANCH#origin/}"
+if [ -z "$BRANCH" ]; then
+  for candidate in main master; do
+    if git -C "$GLOBAL" show-ref --verify --quiet "refs/remotes/origin/$candidate"; then
+      BRANCH="$candidate"; break
+    fi
+  done
+fi
+if [ -z "$BRANCH" ]; then echo "no-branch"; exit 1; fi
+
+# 5. A dirty tree means uncommitted memory. Pulling over it is the one irreversible mistake
+#    available here, so stop instead — `atl session-start` commits it on the next session.
+if [ -n "$(git -C "$GLOBAL" status --porcelain 2>/dev/null)" ]; then
+  echo "dirty-store"; exit 1
+fi
+
+# 6. Fast-forward only. If this machine holds commits the remote does not, git refuses and
+#    nothing is lost — which is the whole safety property, enforced rather than checked.
+if git -C "$GLOBAL" pull -q --ff-only origin "$BRANCH"; then
+  echo "restored"
 else
-  echo "Restored — created $GLOBAL from the snapshot."
+  echo "diverged"; exit 1
 fi
 ```
 
-### 2. Confirm, then apply — only on explicit yes
+## Report
 
-Never pass `--apply` on your own. After the user has seen the preview and **explicitly
-confirms** (a clear "yes" / "apply"), re-run the same script with `--apply`. If the preview
-showed any `!!` line — a global file newer than the snapshot — call it out plainly and make
-sure the user means to overwrite it before you proceed.
+Relay the outcome plainly, mapped from the marker the script printed:
 
-```bash
-# only after the user has seen the diff and said yes:
-bash <the script above> --apply
-```
-
-If the preview showed nothing under OVERWRITE/ADD, there is nothing to restore — say so and
-stop.
+- **`restored`** — "Your profile store is now up to date with the remote."
+- **`no-remote`** (exit 0) — **this is the one that needs the user.** Say: *"I don't know where
+  your profile backup lives. Give me the URL of the private repo you push it to and I'll
+  attach it and pull."* Then **stop and wait.** Never invent a URL and never guess from a repo
+  you happen to see on disk — pulling from the wrong remote writes someone else's data into
+  their memory. When they answer, re-run the block with `ATL_PROFILE_REMOTE` set.
+- **`fetch-failed`** (exit 1) — the remote could not be reached. Report git's error as-is; it
+  is usually authentication or a wrong URL.
+- **`no-branch`** (exit 1) — the remote has no `main` or `master` and publishes no default.
+  Ask which branch holds the store rather than trying others.
+- **`dirty-store`** (exit 1) — "This machine has profile changes that aren't committed yet, so
+  I stopped rather than pull over them." `atl session-start` commits them next session; then
+  restore is safe.
+- **`diverged`** (exit 1) — **do not work around this.** It means this machine holds memory the
+  remote does not. Say so plainly: *"Your local profile has entries the backup doesn't — a pull
+  would need a merge, and that's your call, not mine."* Never suggest `--force`, never suggest
+  `reset --hard`, and never re-run without `--ff-only`. The likely right move is
+  `/profile-backup` first, to push what this machine has.
 
 ## Safety
 
-- **Dry-run by default, write only on `--apply`.** No path writes to global without an
-  explicit flag *and* an explicit user confirmation.
-- **Overlay, never mirror.** Restore adds snapshot files and overwrites matching ones; files
-  present in global but absent from the snapshot (memory accumulated since it was taken) are
-  **preserved**. Restore contains no delete. If the user truly wants an exact mirror, that is
-  a separate, deliberate act — not this skill.
-- **Newer-than-snapshot is flagged loudly.** Any shared file where global was modified *after
-  the snapshot's git commit time* is marked `!!` in the preview — the exact case where
-  restoring would trade newer memory for older data. The check keys off the commit time, not
-  file mtimes: git does not preserve mtimes across a clone, so an mtime check would miss this
-  on another machine. When the comparison cannot be made at all — the snapshot is outside a git
-  repo, or a file's timestamp is unreadable — the file is marked `??` instead, never left
-  unflagged; and an absent flag must never be read as "safe".
-- **`--apply` is itself reversible.** Before overwriting, restore copies the current global
-  to `~/.atl/profiles.pre-restore-<timestamp>/` and prints the one-line undo.
+- **Fast-forward only.** The one unacceptable failure is losing accumulated memory, and
+  `--ff-only` makes it unreachable: git refuses the moment local holds anything the remote does
+  not. This replaces a hand-written timestamp comparison, which had to be correct on every
+  path to work; a refusal is correct by construction.
+- **Never pulls over uncommitted work.** A dirty store stops the skill.
+- **One-way, remote-as-source.** Restore reads from the remote and never writes to it. Pushing
+  is `/profile-backup`.
+- **It never chooses the remote.** No inference from a repo on disk, no reuse of a URL seen
+  elsewhere. Where a person's memory lives is theirs to state.
 
 ## Boundaries
 
-- **No snapshot present** (`profile-backup/` missing) → report it and stop; nothing to do.
-- **Not in a git repo** → provenance (which commit/when) can't be shown, but the folder can
-  still be restored; the skill notes the missing provenance and proceeds under the same gate.
-- This skill only moves files between the repo snapshot and the global store. It does not
-  parse, curate, or privacy-gate profile content — that is the `profile-curator`'s job via
-  `/profile-drain`.
+- **A new machine is the normal case**, which is why this skill creates the store directory and
+  its git repo rather than requiring them. Everywhere else in ATL an absent store means the
+  feature is not in use; here it means the user has just arrived.
+- This skill only moves history between the remote and the store. It does not parse, curate, or
+  privacy-gate profile content — that is the `profile-curator`'s job via `/profile-drain`.
+- **The remote's visibility is `/profile-backup`'s gate, not this one's.** Restore only reads,
+  so it publishes nothing; the check that a remote is private runs on every push, which is
+  where the irreversible direction is.
