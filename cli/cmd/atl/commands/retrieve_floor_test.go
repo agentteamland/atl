@@ -473,3 +473,92 @@ func TestInternalSessionWritesNoFireAtAll(t *testing.T) {
 		t.Fatalf("ordinary session logged %v, want exactly one suppressed-machine fire", lines)
 	}
 }
+
+// The counter and the observer ship with the skill rather than after it, because
+// a model-invoked mechanism fails SILENTLY — a turn that consulted nothing is
+// indistinguishable from a good answer. Today's hook is intrusive but countable;
+// replacing it with something unmeasurable would be a regression by construction.
+// These tests are what make the replacement measurable.
+
+// Total counts PROMPTS. A turn is the denominator itself and a consult is
+// something the AGENT did, so neither may increment it — the same defect the
+// translated line was patched for, arriving from two more directions.
+func TestFireStatsKeepsAgentEventsOutOfThePromptDenominator(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "fires.log")
+	if err := os.WriteFile(p, []byte(
+		"t\tfired\ta.md b.md\n"+
+			"t\tconsulted\tc.md\n"+
+			"t\tconsulted-empty\n"+
+			"t\tturn\n"+
+			"t\tturn\n"+
+			"t\tsuppressed-machine\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	st, err := readFireStats(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st.Total != 2 {
+		t.Fatalf("Total = %d, want 2 (one fired + one suppressed) — agent events leaked into the denominator", st.Total)
+	}
+	if st.Turns != 2 || st.Consulted != 1 || st.ConsultedEmpty != 1 {
+		t.Fatalf("turns=%d consulted=%d empty=%d, want 2/1/1", st.Turns, st.Consulted, st.ConsultedEmpty)
+	}
+	// A consulted page IS an offer that reached the agent — it must count, or the
+	// page tally silently under-reports exactly the pages the agent chose.
+	if st.Offered != 3 || st.Pages["c.md"] != 1 {
+		t.Fatalf("offered=%d pages=%v, want the consulted page counted too", st.Offered, st.Pages)
+	}
+}
+
+// The rate a human wants is "in how many turns did the agent check the record?".
+// Rendering it against fires instead of turns would reproduce the meaningless
+// denominator this whole change exists to replace.
+func TestFireStatsRendersConsultationAgainstTurns(t *testing.T) {
+	st := retrieveFireStats{Total: 10, Fired: 10, Turns: 4, Consulted: 1, Pages: map[string]int{}}
+	out := renderFireStats(st)
+	if !strings.Contains(out, "turns") {
+		t.Fatalf("no turn line:\n%s", out)
+	}
+	if !strings.Contains(out, " 25.0%") {
+		t.Fatalf("consultation not rated against turns (1 of 4 = 25%%):\n%s", out)
+	}
+	// And it must not appear at all when nothing has been recorded — an empty
+	// section reads as "measured zero" when the truth is "not installed".
+	if out2 := renderFireStats(retrieveFireStats{Total: 3, Fired: 3, Pages: map[string]int{}}); strings.Contains(out2, "turns") {
+		t.Fatalf("turn section shown with no turn data:\n%s", out2)
+	}
+}
+
+// The observer must not count the turns of a session ATL started for a mechanical
+// purpose — those have no agent deciding anything, so they would dilute the
+// denominator with turns that could never consult.
+func TestTurnEndIsSilentInAnInternalSession(t *testing.T) {
+	home, root := t.TempDir(), t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv(atlInternalSessionEnv, "1")
+
+	orig, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(root); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(orig) })
+
+	// The command logs against os.Getwd(), and on macOS t.TempDir() hands back a
+	// path through /var -> /private/var, so the resolved cwd is NOT the string we
+	// chdir'd to. Reading the log at `root` looks at a directory nothing writes to,
+	// which made this test pass with the guard REMOVED — green for the wrong reason.
+	here, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := retrieveTurnEndCmd.RunE(retrieveTurnEndCmd, nil); err != nil {
+		t.Fatalf("turn-end returned an error — it must never fail a turn: %v", err)
+	}
+	if lines := fireLog(t, home, here); len(lines) != 0 {
+		t.Fatalf("recorded %d turn(s) for an internal session: %v", len(lines), lines)
+	}
+}

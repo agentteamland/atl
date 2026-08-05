@@ -18,7 +18,10 @@ func fullInstallWithThrottle(t *testing.T, throttle string, withRetrieve bool) {
 	if withRetrieve {
 		hooks = append(hooks, settings.Hook{Event: "UserPromptSubmit", Command: "atl retrieve"})
 	}
-	hooks = append(hooks, settings.Hook{Event: "PreToolUse", Matcher: "Bash|Edit|Write", Command: "atl guard"})
+	hooks = append(hooks,
+		settings.Hook{Event: "PreToolUse", Matcher: "Bash|Edit|Write", Command: "atl guard"},
+		settings.Hook{Event: "Stop", Command: "atl retrieve turn-end"},
+	)
 	if _, err := settings.InstallHooks(hooks); err != nil {
 		t.Fatal(err)
 	}

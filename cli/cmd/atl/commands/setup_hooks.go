@@ -33,6 +33,7 @@ var setupHooksCmd = &cobra.Command{
 			{Event: "UserPromptSubmit", Command: "atl tick --throttle=" + interval},
 			{Event: "UserPromptSubmit", Command: "atl retrieve"},
 			{Event: "PreToolUse", Matcher: "Bash|Edit|Write", Command: "atl guard"},
+			{Event: "Stop", Command: "atl retrieve turn-end"},
 		})
 		if err != nil {
 			return err
