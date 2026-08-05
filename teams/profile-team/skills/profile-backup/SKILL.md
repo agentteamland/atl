@@ -74,8 +74,14 @@ case "$PRIVATE" in
   # feature simply does not exist for those users. So unknown stops and asks, and the
   # user's spoken "yes, it is private" is what sets the variable below — the same shape
   # as the old --apply gate. The agent must never set it on its own; see Report.
-  *)     if [ "${ATL_PROFILE_REMOTE_CONFIRMED_PRIVATE:-}" = "1" ]; then
-           :
+  #    The answer is recorded against the exact URL, in the store's own git config — the same
+  #    reasoning that put the destination in `git remote`: the record lives with the thing it
+  #    describes and cannot drift from it. Re-asking every run would buy nothing here, because
+  #    an unverifiable host is unverifiable every time; it would just make the feature unusable
+  #    for anyone not on GitHub. Change the URL and the confirmation does not come with it.
+  *)     CONFIRMED="$(git -C "$SRC" config --get atl.confirmedPrivateRemote 2>/dev/null || true)"
+         if [ "${ATL_PROFILE_REMOTE_CONFIRMED_PRIVATE:-}" = "1" ] || [ "$CONFIRMED" = "$REMOTE" ]; then
+           git -C "$SRC" config atl.confirmedPrivateRemote "$REMOTE"
          else
            echo "visibility-unknown"; exit 1
          fi ;;
@@ -137,7 +143,9 @@ Relay the outcome plainly, mapped from the marker the script printed:
   they say yes, re-run with `ATL_PROFILE_REMOTE_CONFIRMED_PRIVATE=1` set. **Setting that
   variable without having asked is the one unrecoverable mistake available in this skill** —
   it is the user's statement, not your assessment, and a wrong one publishes their profile
-  permanently. A `public-remote` result can never be overridden this way.
+  permanently. A `public-remote` result can never be overridden this way. Their answer is
+  recorded against that exact URL, so they are asked once and not again; point the store at a
+  different remote and it asks afresh.
 - **`push-failed`** (exit 1) — the remote was confirmed private but the push was rejected.
   Report the git error as-is; do not retry with force, ever.
 

@@ -80,10 +80,20 @@ seed_store() {
   printf 'type-id: person\nschema-version: 1.0.0\n' > "$STORE/_interfaces/person.md"
   printf -- '---\nmeta: {type-id: person}\n---\nE2E-SENTINEL-KEEPER\n'  > "$STORE/people/keeper/profile.md"
   printf -- '---\nmeta: {type-id: person}\n---\nE2E-SENTINEL-SUBJECT\n' > "$STORE/people/testsubject/profile.md"
-  ( cd "$STORE" && git init -q \
-    && git config user.email e2e@atl.local && git config user.name atl-e2e \
-    && git config core.hooksPath "$NOPUSH" \
-    && git add -A && git commit -qm "store baseline" ) >/dev/null 2>&1
+  commit_store
+}
+
+# commit_store versions whatever is in the store THE REAL WAY — `atl session-start`, which is
+# what creates the repo, writes the ownership marker and commits on a user's machine.
+#
+# A hand-rolled `git init` here was the first version of this helper and it produced a store
+# with no `.git/atl-store` marker, which storegit deliberately ignores as "a repo the user made
+# themselves". Every session-start assertion below then passed by being silent about a store
+# the report was never going to mention — a vacuous green in the very section that exists to
+# check the detector. Use the real path; a lookalike is not the thing.
+commit_store() {
+  ( cd "$PROJ" && atl session-start >/dev/null 2>&1 )
+  git -C "$STORE" config core.hooksPath "$NOPUSH" 2>/dev/null || true
 }
 
 NOPUSH="$HOME/.nopush"
@@ -151,6 +161,13 @@ out=$( bash "$BS" 2>&1 ); rc=$?
   || bad "not-versioned path: rc=$rc out=[$out]"
 
 seed_store
+# The instrument's own health, asserted rather than assumed: storegit only reports on stores it
+# created, keyed on this marker. Without it every session-start assertion below would pass by
+# being silent about a store the report was never going to mention.
+[ -f "$STORE/.git/atl-store" ] \
+  && ok "the store was created by atl itself (ownership marker present — the signal can see it)" \
+  || bad "no ownership marker: session-start assertions below would be vacuous"
+
 out=$( bash "$BS" 2>&1 ); rc=$?
 { marker "$out" 'no-remote' && [ "$rc" -eq 0 ] && [ -z "$(git -C "$STORE" remote)" ]; } \
   && ok "no remote and none supplied → 'no-remote', exit 0, nothing attached" \
@@ -206,10 +223,28 @@ git -C "$OFF" show "$BR:people/keeper/profile.md" 2>/dev/null | grep -qF 'E2E-SE
   && ok "nothing is left unpushed after a successful backup" \
   || bad "commits remain unpushed after 'pushed'"
 
+# The confirmation is recorded against the URL, so the user is asked once and not again. The
+# first version of this design kept it only in the environment, and the re-run below refused
+# every time — which would have made the feature unusable for exactly the non-GitHub users the
+# escape hatch exists for. Note this run passes NO environment at all.
+[ "$(git -C "$STORE" config --get atl.confirmedPrivateRemote)" = "$OFF" ] \
+  && ok "the confirmation was recorded against the remote URL" \
+  || bad "no confirmation recorded — every later run would ask again"
+
 # idempotency: a second run with an unchanged store pushes nothing and says so.
 out=$( bash "$BS" 2>&1 ); rc=$?
 marker "$out" 'already-current' && ok "re-run with an unchanged store → 'already-current'" \
                                 || bad "re-run was not a no-op: rc=$rc out=[$out]"
+
+# …and the record is bound to THAT url. Point the store somewhere else unverifiable and the
+# confirmation must not carry over — otherwise one yes would authorise every future remote.
+git init -q --bare "$HOME/other.git"
+git -C "$STORE" remote set-url origin "$HOME/other.git"
+out=$( bash "$BS" 2>&1 ); rc=$?
+{ marker "$out" 'visibility-unknown' && [ "$rc" -ne 0 ]; } \
+  && ok "a DIFFERENT unverifiable remote asks again (the confirmation is bound to one URL)" \
+  || bad "the confirmation carried over to a remote the user never approved: rc=$rc out=[$out]"
+git -C "$STORE" remote set-url origin "$OFF"
 
 # a mid-session write is committed and pushed by the backup itself, not left for session-start.
 printf -- '---\nmeta: {type-id: person}\n---\nE2E-SENTINEL-LATE\n' > "$STORE/people/late.md"
