@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "name": "profile-team",
-  "version": "1.9.2",
+  "version": "1.10.0",
   "description": "Curates a cross-project profile of the entities in your world: drains profile-fact markers into entity profiles at ~/.atl/profiles, each grown through a self-describing, versioned interface.",
   "author": {
     "name": "AgentTeamLand",
@@ -33,17 +33,21 @@
     },
     {
       "name": "profile-backup",
-      "description": "/profile-backup - snapshot the global profile store (~/.atl/profiles) into the current git repo and commit it, so accumulated memory is versioned and portable; global stays authoritative."
+      "description": "/profile-backup - push the global profile store (~/.atl/profiles) to a private remote the user supplies, so their accumulated memory survives losing the machine."
     },
     {
       "name": "profile-restore",
-      "description": "/profile-restore - bring a profile snapshot from the repo back into the global store, as a diffed dry-run-by-default overlay that requires explicit --apply and never clobbers newer memory."
+      "description": "/profile-restore - bring the global profile store back from its private remote onto this machine: create ~/.atl/profiles if missing, attach the remote you supply, fast-forward only."
     }
   ],
   "rules": [
     {
       "name": "profile-capture",
       "description": "The capture reflex: drop profile-fact markers inline when a durable fact about a person the user cares about comes up; atl tick queues them for /profile-drain."
+    },
+    {
+      "name": "store-backup",
+      "description": "What to do when atl reports the profile store has no remote: raise it with the user and run /profile-backup; never choose the destination or infer that a remote is private."
     }
   ],
   "capabilities": {

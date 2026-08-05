@@ -95,6 +95,12 @@ var sessionStartCmd = &cobra.Command{
 			fmt.Printf("atl: snapshotted %d durable store(s) to local git — previous values stay recoverable\n", n)
 		}
 
+		// The other half of retention, and the one that had no mechanism: local git
+		// makes an overwritten value recoverable and does nothing about the disk
+		// failing. Reported AFTER the snapshot above so the count it quotes is the
+		// current one rather than one commit stale.
+		reportUnbackedStores(project)
+
 		// Reclamation awareness — surface only high-signal orphans (gains/edits
 		// beside an installed unit), not wholly-unowned dirs (usually the user's own
 		// non-ATL Claude Code assets — noise). Awareness only; `atl gc` is the action.
