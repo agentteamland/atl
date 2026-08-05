@@ -62,8 +62,7 @@ func translatePrompt(ctx context.Context, prompt string) (string, bool) {
 	ctx, cancel := context.WithTimeout(ctx, translateTimeout)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "claude", "-p", translationInstruction(prompt))
-	cmd.Stdin = strings.NewReader("") // never inherit the hook's stdin
+	cmd := translateCommand(ctx, prompt)
 	var out, discard bytes.Buffer
 	cmd.Stdout = &out
 	// stderr is captured and dropped on purpose: this runs inside a hook whose
@@ -74,6 +73,23 @@ func translatePrompt(ctx context.Context, prompt string) (string, bool) {
 		return "", false
 	}
 	return cleanTranslation(out.String(), prompt)
+}
+
+// translateCommand builds the translator subprocess. Separated from
+// translatePrompt so the marking below is asserted by a test rather than only by
+// reading — running the real binary is not an option in a unit test, and a
+// mutation that dropped the marking left every other test green.
+func translateCommand(ctx context.Context, prompt string) *exec.Cmd {
+	cmd := exec.CommandContext(ctx, "claude", "-p", translationInstruction(prompt))
+	cmd.Stdin = strings.NewReader("") // never inherit the hook's stdin
+	// The child is a real Claude session, so it fires the SAME UserPromptSubmit
+	// hook we are running inside — `atl retrieve` would search again (against this
+	// instruction text) and `atl tick` would sweep for markers. Neither has a human
+	// reader here. Left unmarked it costs a second full hybrid search on exactly
+	// the prompts this feature exists to serve, and writes a phantom fire whose
+	// page refs inflate the offer count the follow-through metric divides by.
+	cmd.Env = append(os.Environ(), atlInternalSessionEnv+"=1")
+	return cmd
 }
 
 // translationInstruction builds the prompt sent to the translator.
@@ -128,6 +144,19 @@ func cleanTranslation(raw, original string) (string, bool) {
 	}
 	return s, true
 }
+
+// atlInternalSessionEnv marks a `claude -p` that ATL itself started for a
+// mechanical purpose, so the hook commands that run inside it can tell they have
+// no human reader and do nothing.
+//
+// It is deliberately NOT set on the delivery engine's workers: those are real
+// sessions doing real work, and retrieval and capture belong there.
+const atlInternalSessionEnv = "ATL_INTERNAL_SESSION"
+
+// isATLInternalSession reports whether this process is running inside such a
+// session. Any hook body that would otherwise recurse or write a phantom event
+// checks it first.
+func isATLInternalSession() bool { return os.Getenv(atlInternalSessionEnv) != "" }
 
 // claudeAvailable reports whether the translator can run at all: the binary
 // exists and a credential is present. It does NOT spend an API call to find out

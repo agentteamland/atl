@@ -440,3 +440,36 @@ func TestFireStatsDoesNotCountATranslationAsAPrompt(t *testing.T) {
 		t.Fatalf("percentages still use the inflated denominator:\n%s", out)
 	}
 }
+
+// The translator is a real `claude -p` session, so it fires the SAME
+// UserPromptSubmit hook this code runs inside. Unmarked, a non-English prompt
+// searched twice — once against the translation instruction — and the extra fire
+// carried its own page refs, inflating the offer count that the follow-through
+// metric divides by. Proven in the wild by line count: one prompt wrote
+// fired/translated/fired with a credential present and a bare fired without one.
+//
+// The probe is a machine prompt because that path logs unconditionally, without
+// needing an index. That isolates the new guard from the no-index early return —
+// the first version of this test used an ordinary prompt and its control failed,
+// because in a throwaway project nothing is logged for one anyway.
+func TestInternalSessionWritesNoFireAtAll(t *testing.T) {
+	const machine = "<task-notification>a background task finished</task-notification>"
+
+	home, root := t.TempDir(), t.TempDir()
+	t.Setenv(atlInternalSessionEnv, "1")
+	if out := hookOut(t, home, root, machine); out != "" {
+		t.Fatalf("injected context into an internal session: %q", out)
+	}
+	if lines := fireLog(t, home, root); len(lines) != 0 {
+		t.Fatalf("recorded %d fire(s) for a session with no human reader: %v", len(lines), lines)
+	}
+
+	// The control. Without it this passes just as well against a hook that stopped
+	// logging entirely — the guard has to be narrow, not merely present.
+	home2, root2 := t.TempDir(), t.TempDir()
+	t.Setenv(atlInternalSessionEnv, "")
+	hookOut(t, home2, root2, machine)
+	if lines := fireLog(t, home2, root2); len(lines) != 1 {
+		t.Fatalf("ordinary session logged %v, want exactly one suppressed-machine fire", lines)
+	}
+}

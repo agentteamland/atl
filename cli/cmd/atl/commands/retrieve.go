@@ -89,6 +89,9 @@ var retrieveCmd = &cobra.Command{
 // the single final write, so recovering here cleanly drops the retrieval instead.
 func runRetrieveHook(cmd *cobra.Command) {
 	defer func() { _ = recover() }()
+	if isATLInternalSession() {
+		return
+	}
 
 	data, err := io.ReadAll(cmd.InOrStdin())
 	if err != nil {
