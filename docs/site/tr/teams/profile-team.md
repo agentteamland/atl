@@ -12,17 +12,26 @@ atl install agentteamland/profile-team
 ```
 
 Varsayılan olarak global kurulur (`team.json`'ı `scope: global` bildirir); `profile-curator`
-ajanını, `/profile-drain`, `/profile-backup` ve `/profile-restore` becerilerini ve
-`profile-capture` kuralını `~/.claude`'a yerleştirir, profilleri `~/.atl/profiles/` altında
-saklar.
+ajanını, `/profile-drain`, `/profile-backup` ve `/profile-restore` becerilerini,
+`profile-capture` ve `store-backup` kurallarını `~/.claude`'a yerleştirir, profilleri
+`~/.atl/profiles/` altında saklar.
 
-::: warning `/profile-backup` yalnızca özel bir depoya yazar
-Anlık görüntü, **hangi git deposundan çalıştırırsan** oraya gider ve `git add -f` ile eklenir —
-yani `.gitignore` onu tutmaz. Depo, hayatındaki insanlar hakkında söylediklerini ve tier-4
-bilgilerini taşıdığı için beceri, **hiçbir şey kopyalamadan önce** deponun görünürlüğünü
-denetler ve herkese açık bir depoda reddeder. Görünürlüğü doğrulayamadığında da (GitHub remote
-yoksa ya da `gh` kullanılamıyorsa) tahmin etmek yerine reddeder: yanlış bir ret bir komuta mal
-olur, yanlış bir yazma geri alınamaz.
+::: warning `/profile-backup` yalnızca özel bir uzak depoya gönderir
+`atl session-start` zaten `~/.atl/profiles` dizinini **yerel** git altında tutar; böylece üzerine
+yazılan bir değer kurtarılabilir kalır. Bu seni hatalı bir yazmadan korur, diski kaybetmekten
+korumaz — yerel geçmiş, anlattığı dosyalarla birlikte ölür. `/profile-backup` bu boşluğu, depo
+geçmişini **senin verdiğin** bir uzak depoya göndererek kapatır; hedefi git'in kendisi tuttuğu
+için hiçbir şey kopyalanmaz ve yedeğin nerede olduğunu başka hiçbir yerin hatırlaması gerekmez.
+
+Depo, hayatındaki insanlar hakkında söylediklerini ve tier-4 bilgilerini taşıdığı için beceri,
+uzak deponun özel olduğunu **eklemeden ve göndermeden önce** doğrular ve bunu her çalıştırmada
+yeniden yapar — haziranda kaydettiğin bir depo ağustosta herkese açık olabilir. Doğrulayamadığında
+(GitHub adresi değilse ya da `gh` kullanılamıyorsa) tahmin etmek yerine reddeder: yanlış bir ret
+bir komuta mal olur, yanlış bir gönderim geri alınamaz. Depoyu senin yerine asla seçmez ve
+oluşturmaz.
+
+`atl session-start`, uzak deposu olmayan bir depoyu ve yerel geçmişi uzak deponun önüne geçmiş
+bir depoyu bildirir; böylece boşluk hatırlanmayı beklemek yerine kendiliğinden görünür olur.
 :::
 
 ## Profil dünyası

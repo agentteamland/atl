@@ -13,16 +13,25 @@ atl install agentteamland/profile-team
 
 It installs globally by default (its `team.json` declares `scope: global`), landing the
 `profile-curator` agent, the `/profile-drain`, `/profile-backup`, and `/profile-restore`
-skills, and the `profile-capture` rule in `~/.claude`, with profiles stored under
-`~/.atl/profiles/`.
+skills, and the `profile-capture` and `store-backup` rules in `~/.claude`, with profiles
+stored under `~/.atl/profiles/`.
 
-::: warning `/profile-backup` only writes to a private repo
-The snapshot goes into **whichever git repo you run it from**, staged with `git add -f` — so a
-`.gitignore` will not hold it back. Because the store carries what you have said about the
-people in your life and your tier-4 facts, the skill checks the repo's visibility **before it
-copies anything** and refuses on a public repo. It also refuses when it cannot confirm
-visibility (no GitHub remote, or `gh` unavailable) rather than guessing: a wrong refusal costs
-one command, a wrong write is irreversible.
+::: warning `/profile-backup` only pushes to a private remote
+`atl session-start` already keeps `~/.atl/profiles` under **local** git, so an overwritten
+value stays recoverable. That protects you from a bad write and not from losing the disk —
+local history dies with the files it describes. `/profile-backup` closes that gap by pushing
+the store's own history to a remote **you supply**; git then holds the destination, so
+nothing is copied anywhere and nothing else has to remember where the backup lives.
+
+Because the store carries what you have said about the people in your life and your tier-4
+facts, the skill confirms the remote is private **before attaching it and before pushing**,
+and re-confirms on every run — a repo you recorded in June can be public in August. It
+refuses when it cannot confirm (not a GitHub URL, or `gh` unavailable) rather than guessing:
+a wrong refusal costs one command, a wrong push is irreversible. It never chooses or creates
+the repo for you.
+
+`atl session-start` reports a store with no remote, and one whose local history has moved
+ahead of it, so the gap surfaces on its own instead of waiting to be remembered.
 :::
 
 ## The profile world

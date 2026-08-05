@@ -2,7 +2,9 @@ package commands
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/agentteamland/atl/cli/internal/manifest"
@@ -94,5 +96,73 @@ func TestVersionDeclaredStoresSkipsAnUnresolvedProject(t *testing.T) {
 
 	if n := versionDeclaredStores(""); n != 0 {
 		t.Fatalf("versionDeclaredStores = %d, want 0 — it read a relative project layer", n)
+	}
+}
+
+// reportUnbackedStores is the half of retention that had no mechanism: local git
+// makes an overwritten value recoverable and says nothing about the disk failing.
+// These three cases are the whole contract — it speaks when the history has
+// nowhere else to be, it speaks when the copy is behind, and it goes silent the
+// moment the user has acted. The third is what keeps it from becoming the
+// constant advisory channel this codebase has measured as unread.
+func TestReportUnbackedStoresSpeaksThenGoesQuiet(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	project := t.TempDir()
+
+	dir := filepath.Join(home, ".atl", "profiles")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "a.md"), []byte("x\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := (&manifest.Manifest{Handle: "acme", Name: "global-team", Stores: []string{"~/.atl/profiles"}}).
+		Write(filepath.Join(home, ".atl")); err != nil {
+		t.Fatal(err)
+	}
+	if n := versionDeclaredStores(project); n != 1 {
+		t.Skip("git unavailable — the store was never versioned, so there is nothing to report on")
+	}
+
+	out := captureStdout(t, func() { reportUnbackedStores(project) })
+	if !strings.Contains(out, "has no remote") {
+		t.Fatalf("no-remote case said %q, want it to report the missing remote", out)
+	}
+	// The account name must never reach a terminal transcript or a pasted report.
+	if strings.Contains(out, home) {
+		t.Fatalf("the signal leaked the home path: %q", out)
+	}
+
+	// The user acts: a remote is attached and the history is pushed.
+	remote := filepath.Join(t.TempDir(), "off.git")
+	gitInStore := func(args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", args...)
+		cmd.Dir = dir
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	if out, err := exec.Command("git", "init", "--bare", "-q", remote).CombinedOutput(); err != nil {
+		t.Fatalf("git init --bare: %v\n%s", err, out)
+	}
+	gitInStore("remote", "add", "origin", remote)
+	gitInStore("push", "-q", "origin", "HEAD:refs/heads/main")
+	gitInStore("fetch", "-q", "origin")
+
+	if out := captureStdout(t, func() { reportUnbackedStores(project) }); out != "" {
+		t.Fatalf("after the push the report said %q, want silence — a signal that cannot go quiet is wallpaper", out)
+	}
+
+	// A later session writes more, and nothing pushes it.
+	if err := os.WriteFile(filepath.Join(dir, "b.md"), []byte("y\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	versionDeclaredStores(project)
+
+	out = captureStdout(t, func() { reportUnbackedStores(project) })
+	if !strings.Contains(out, "1 commit(s) ahead") {
+		t.Fatalf("drift case said %q, want the unpushed count", out)
 	}
 }

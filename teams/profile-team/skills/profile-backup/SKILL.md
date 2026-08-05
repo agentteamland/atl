@@ -1,89 +1,103 @@
 ---
 name: profile-backup
-description: "/profile-backup — snapshot the global profile store (~/.atl/profiles) into the current git repo and commit it, so your accumulated memory is versioned, portable, and recoverable. Deterministic cp + git; global stays authoritative."
+description: "/profile-backup — push the global profile store (~/.atl/profiles) to a private remote you supply, so your accumulated memory survives losing the machine. Deterministic git; the store stays authoritative and never moves."
 ---
 
-# /profile-backup — snapshot your global profile into this repo
+# /profile-backup — get your profile off this machine
 
-Your profiles live **globally** at `~/.atl/profiles/` — that is the single source of truth,
-known in every project and every conversation. This skill does **not** move them. It takes a
-snapshot of whatever is in global **right now** and copies it into the current git repo (a
-`profile-backup/` directory at the repo root), then commits it — so your accumulating memory
-becomes git-tracked, versioned, and portable to another machine.
+Your profiles live **globally** at `~/.atl/profiles/`, and `atl session-start` already keeps
+that directory under local git — so an overwritten value stays recoverable. That protects you
+from a bad write. It does **not** protect you from losing the disk: local history and the
+files it describes die together.
 
-One direction only: **global → repo**. The inverse (repo → global) is `/profile-restore`, and
-it is guarded so it never clobbers newer global data. The curation loop is `/profile-drain`.
+This skill closes that gap, and it needs exactly one thing from you: **a private remote.**
+Git then holds the destination itself, so nothing else has to record it — and because the
+store's own repo is what gets pushed, nothing is ever copied anywhere, which is what keeps
+this simple.
 
-The procedure below is **exact and deterministic** — a `cp` + `git` sequence, not fuzzy
-LLM-copying. This skill is the conversational *home*; its body runs verbatim.
+One direction only: **the store's history → your remote.** The store is never moved, never
+edited, and never read *from* the remote. The inverse is `/profile-restore`; the curation
+loop is `/profile-drain`.
+
+The procedure below is **exact and deterministic** — a `git` sequence, not fuzzy LLM-copying.
+This skill is the conversational *home*; its body runs verbatim.
 
 ## Procedure
 
-Run this from **inside the git repo you want to version your profile in**. It self-guards on
-three conditions — not a git repo, **a repo that isn't demonstrably private**, and an
-empty/absent profile store — and reports which of the six outcomes happened:
+If the user has already given you a remote URL in this conversation, export it first as
+`ATL_PROFILE_REMOTE` — otherwise run the block as-is and it will tell you one is needed.
 
 ```bash
-# `set -eu`, not `-euo pipefail`: this script contains no pipes, and `-o pipefail`
-# is the one non-POSIX construct here — under dash (Debian's /bin/sh) it aborts on
-# line 1 with "Illegal option -o pipefail". The body is pasted into whatever shell
-# the agent runs, so it has to be portable.
+# `set -eu`, not `-euo pipefail`: `-o pipefail` is the one non-POSIX construct here and
+# aborts under dash with "Illegal option -o pipefail". The body is pasted into whatever
+# shell the agent runs — sh, bash or zsh — so it has to be portable.
 set -eu
 
-# 1. Must be inside a git repo — the snapshot has nowhere to live otherwise.
-REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || { echo "not-a-git-repo"; exit 1; }
-
-# 2. Must be a PRIVATE repo — checked BEFORE anything is copied.
-#    The profile store is the most sensitive data ATL holds: perception-flagged records
-#    about other people, state.emotional, and a consent-gated Tier-4 state.financial.
-#    Publishing it is irreversible — git history keeps it after a delete, and a public
-#    repo may already be cloned or indexed. So this fails CLOSED: proceed only on a
-#    definite "private". `gh` resolves the repo from the current directory, so a missing
-#    remote, a non-GitHub remote, or an unavailable/unauthenticated `gh` all land in
-#    visibility-unknown rather than a guess.
-PRIVATE="$(cd "$REPO_ROOT" && gh repo view --json isPrivate -q .isPrivate 2>/dev/null || true)"
-case "$PRIVATE" in
-  true)  : ;;                                  # private — the only case that proceeds
-  false) echo "public-repo"; exit 1 ;;
-  *)     echo "visibility-unknown"; exit 1 ;;
-esac
-
-# 3. Must have something to back up.
 SRC="$HOME/.atl/profiles"
+
+# 1. Must have something to back up.
 if [ ! -d "$SRC" ] || [ -z "$(ls -A "$SRC" 2>/dev/null)" ]; then
   echo "nothing-to-back-up"; exit 0
 fi
 
-# 4. Snapshot global → repo. Clear then copy, so the backup is a true mirror
-#    (a profile deleted in global disappears from the snapshot too).
-#    The store is itself a git repo (ATL versions it locally so an overwritten value
-#    stays recoverable), and its .git MUST NOT be copied: `git add` on a directory
-#    that contains a nested .git records a GITLINK instead of the files — it exits 0,
-#    the emptiness check below sees a change, and the user is told the backup
-#    succeeded while the snapshot holds no profile content at all.
-#    Copy everything, then remove the .git — rather than filtering during the copy.
-#    A glob-and-skip loop would be shell-dependent: zsh errors on an unmatched glob
-#    (its default `nomatch`), which aborts under `set -e` AFTER the rm -rf above, so
-#    the snapshot is wiped and no outcome marker is ever printed. This form runs the
-#    same under sh, bash and zsh, and it also preserves dangling symlinks.
-DEST="$REPO_ROOT/profile-backup"
-rm -rf "$DEST"
-mkdir -p "$DEST"
-cp -R "$SRC/." "$DEST/"
-rm -rf "$DEST/.git"
+# 2. The store is versioned by `atl session-start`, not here. If it is not a repo, that
+#    path has not run or is disabled — report it rather than quietly creating a second
+#    mechanism that versions the same directory on different terms.
+git -C "$SRC" rev-parse --git-dir >/dev/null 2>&1 || { echo "not-versioned"; exit 1; }
 
-# 5. Version it with a dated commit. -f: profile-backup/ is this skill's own managed
-#    artifact, so stage it even if the repo gitignores it (a plain `add` would exit 1
-#    under set -e and abort here, after the copy, with no outcome marker printed).
-git -C "$REPO_ROOT" add -f profile-backup
-# Scope the emptiness check AND the commit to the snapshot path only, so a user's
-# unrelated pre-staged changes are neither counted here nor swept into a commit
-# labelled as a profile snapshot.
-if git -C "$REPO_ROOT" diff --cached --quiet -- profile-backup; then
+# 3. Where would it go? A remote IS the recorded destination — git already holds it, so no
+#    config file, no path to vet, and no way for the record to drift from reality.
+REMOTE="$(git -C "$SRC" remote get-url origin 2>/dev/null || true)"
+if [ -z "$REMOTE" ]; then
+  if [ -z "${ATL_PROFILE_REMOTE:-}" ]; then echo "no-remote"; exit 0; fi
+  REMOTE="$ATL_PROFILE_REMOTE"
+fi
+
+# 4. The remote must be PRIVATE — checked BEFORE it is attached and BEFORE anything is
+#    pushed, and re-checked on every run, because the repo you recorded in June can be
+#    public in August. Fails closed: only a definite "private" proceeds, so a non-GitHub
+#    remote or an unavailable `gh` stops and asks rather than guessing.
+SLUG="$REMOTE"
+case "$SLUG" in
+  git@github.com:*)       SLUG="${SLUG#git@github.com:}" ;;
+  ssh://git@github.com/*) SLUG="${SLUG#ssh://git@github.com/}" ;;
+  https://github.com/*)   SLUG="${SLUG#https://github.com/}" ;;
+esac
+SLUG="${SLUG%.git}"
+PRIVATE="$(gh repo view "$SLUG" --json isPrivate -q .isPrivate 2>/dev/null || true)"
+case "$PRIVATE" in
+  true)  : ;;
+  false) echo "public-remote"; exit 1 ;;
+  *)     echo "visibility-unknown"; exit 1 ;;
+esac
+
+# 5. Only now is it safe to attach.
+if [ -z "$(git -C "$SRC" remote 2>/dev/null)" ]; then
+  git -C "$SRC" remote add origin "$REMOTE"
+fi
+
+# 6. Commit anything written since the last session-start snapshot, so a backup taken
+#    mid-session carries this session's work rather than yesterday's.
+git -C "$SRC" add -A
+if git -C "$SRC" diff --cached --quiet; then
+  :
+else
+  git -C "$SRC" -c user.name=atl -c user.email=atl@localhost -c commit.gpgsign=false \
+    commit -q -m "chore(profile): snapshot $(date +%F)"
+fi
+
+# 7. Push. The count is over commits no remote-tracking branch holds, which is the same
+#    question `atl session-start` reports on — so "already-current" here and silence there
+#    can never disagree.
+if [ "$(git -C "$SRC" rev-list --count HEAD --not --remotes)" = "0" ]; then
   echo "already-current"
 else
-  git -C "$REPO_ROOT" commit -m "chore(profile): snapshot ~/.atl/profiles ($(date +%F))" -- profile-backup
-  echo "committed"
+  BRANCH="$(git -C "$SRC" rev-parse --abbrev-ref HEAD)"
+  if git -C "$SRC" push -q -u origin "$BRANCH"; then
+    echo "pushed"
+  else
+    echo "push-failed"; exit 1
+  fi
 fi
 ```
 
@@ -91,42 +105,47 @@ fi
 
 Relay the outcome plainly, mapped from the marker the script printed:
 
-- **`committed`** — "Backed up your profile into `profile-backup/` and committed it." Mention
-  they can push the repo to carry the snapshot to another machine.
-- **`already-current`** — "Your profile is already snapshotted here — nothing changed, nothing
-  to commit."
-- **`nothing-to-back-up`** — "There's no profile to back up yet. Talk to `/advisor` first, then
-  run this again." (Stop — do not create an empty snapshot.)
-- **`not-a-git-repo`** (exit 1) — "This folder isn't a git repo, so there's nowhere to version
-  the snapshot. Run `/profile-backup` from inside the git repo you keep your profile in."
-  (Stop.)
-- **`public-repo`** (exit 1) — **"This repo is public, so I didn't copy anything.** Your profile
-  holds what you've said about the people in your life and your tier-4 facts; committing it here
-  would publish all of it, and git history keeps it even after a delete. Run `/profile-backup`
-  from a **private** repo instead." (Stop. Nothing was copied — the guard runs before the `cp`.)
-  **Do not offer a workaround**, and never suggest making the repo private just to proceed; if
-  they have no private repo, say so plainly and leave the choice with them.
-- **`visibility-unknown`** (exit 1) — "I couldn't confirm this repo is private (no GitHub remote,
-  or `gh` isn't available here), so I stopped rather than guess." Then **ask**: is this repo
-  private? Proceed only on an explicit yes from them — never on your own inference from the path,
-  the name, or the absence of a remote. (Stop until answered.)
+- **`pushed`** — "Your profile is now on the remote — it survives losing this machine."
+- **`already-current`** — "Already pushed; nothing has changed since."
+- **`no-remote`** (exit 0) — **this is the one that needs you.** Say: *"Your profile store has
+  no remote, so it exists only on this disk. Give me the URL of a **private** repo and I'll
+  attach it and push."* Then **stop and wait.** Never invent a URL, never pick a repo for
+  them, and never create one on their behalf — where their memory is stored is theirs to
+  decide. When they answer, re-run the block with `ATL_PROFILE_REMOTE` set to what they gave.
+- **`nothing-to-back-up`** — "There's no profile to back up yet. Talk to `/advisor` first."
+- **`not-versioned`** (exit 1) — "The store isn't under git, which `atl session-start`
+  normally handles — it may be disabled (`ATL_NO_STORE_GIT`) or it has not run here."
+- **`public-remote`** (exit 1) — **"That repo is public, so I pushed nothing.** Your profile
+  holds what you've said about the people in your life and your tier-4 facts; pushing it
+  there would publish all of it, and git history keeps it after a delete. Give me a
+  **private** repo instead." (Stop. Nothing was attached — the guard runs first.) **Do not
+  offer a workaround**, and never suggest making the repo private just to proceed.
+- **`visibility-unknown`** (exit 1) — "I couldn't confirm that remote is private (not a
+  GitHub URL, or `gh` isn't available here), so I stopped rather than guess." Then **ask**:
+  is it private? Proceed only on an explicit yes from them — never on your own inference
+  from the URL, the name, or the account it sits under. (Stop until answered.)
+- **`push-failed`** (exit 1) — the remote was confirmed private but the push was rejected.
+  Report the git error as-is; do not retry with force, ever.
 
 ## Boundaries
 
-- **One-way, global-authoritative.** This only ever copies global → repo. It never reads *from*
-  the repo, never edits global, and never changes what `/advisor` or `/profile-drain` see —
-  those always work off the live global store.
-- **The snapshot is a mirror, not an append.** The destination is cleared before each copy, so
-  the committed backup always equals the current global state, deletions included. Prior
-  snapshots stay recoverable through git history.
-- **Deterministic body.** No judgement calls in the copy — the `cp`/`git` block runs as
-  written. The LLM's only job is running it and relaying which of the six outcomes occurred.
-- **The visibility guard fails closed, and it is not advisory.** This skill is cwd-relative: it
-  writes into *whatever* repo you happen to be standing in, with `git add -f`, so a `.gitignore`
-  is no protection. One directory too high is enough to publish everything. Guidance ("run this
-  from the right repo") is what fails when a skill is invoked from the wrong place, so the check
-  is a hard stop, it runs **before** any copy, and only a definite `isPrivate: true` proceeds —
-  unknown is treated as unsafe. The asymmetry is the reason: a wrong refusal costs one command,
-  a wrong proceed is irreversible.
-- **Restore is the guarded inverse.** Bringing a snapshot back into global is `/profile-restore`,
-  which diffs and confirms first so newer global memory is never silently lost.
+- **The remote is the destination, and the user supplies it.** Nothing else records where
+  the backup goes, which means the record cannot go stale — and it means this skill has no
+  opinion about *which* repo. It never creates one and never guesses.
+- **The visibility guard fails closed, and it is not advisory.** It runs before the remote is
+  attached and before any push, and only a definite `isPrivate: true` proceeds — unknown is
+  treated as unsafe. The asymmetry is the reason: a wrong refusal costs one command, a wrong
+  push is irreversible. It re-runs every time, because a repo's visibility can change after
+  you recorded it.
+- **Nothing is copied.** Earlier versions of this skill mirrored the store into another
+  repo's `profile-backup/` directory, which required deleting the nested `.git` first — a
+  copy of a repo into a repo records a *gitlink* and reports success over zero content.
+  Pushing the store's own history has no such edge, because there is no second copy.
+- **This does not version the store.** `atl session-start` does, on every session. Step 6
+  only catches writes made since that snapshot, so a backup taken mid-session is current.
+- **One-way, store-authoritative.** The remote is a destination, never a source. Bringing a
+  snapshot back is `/profile-restore`, which diffs and confirms first so newer memory in the
+  store is never silently lost.
+- **`atl session-start` tells you when this is needed.** It reports a store with no remote,
+  and a store whose local history is ahead of it — so the gap surfaces on its own rather than
+  waiting to be remembered.
