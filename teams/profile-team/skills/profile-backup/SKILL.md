@@ -67,8 +67,18 @@ SLUG="${SLUG%.git}"
 PRIVATE="$(gh repo view "$SLUG" --json isPrivate -q .isPrivate 2>/dev/null || true)"
 case "$PRIVATE" in
   true)  : ;;
+  # A definite "public" is never overridable. This branch has no escape hatch on purpose.
   false) echo "public-remote"; exit 1 ;;
-  *)     echo "visibility-unknown"; exit 1 ;;
+  # Unknown is a different thing from public: a self-hosted git, a GitLab, or an
+  # unauthenticated `gh` all land here, and refusing them outright would mean the
+  # feature simply does not exist for those users. So unknown stops and asks, and the
+  # user's spoken "yes, it is private" is what sets the variable below — the same shape
+  # as the old --apply gate. The agent must never set it on its own; see Report.
+  *)     if [ "${ATL_PROFILE_REMOTE_CONFIRMED_PRIVATE:-}" = "1" ]; then
+           :
+         else
+           echo "visibility-unknown"; exit 1
+         fi ;;
 esac
 
 # 5. Only now is it safe to attach.
@@ -123,7 +133,11 @@ Relay the outcome plainly, mapped from the marker the script printed:
 - **`visibility-unknown`** (exit 1) — "I couldn't confirm that remote is private (not a
   GitHub URL, or `gh` isn't available here), so I stopped rather than guess." Then **ask**:
   is it private? Proceed only on an explicit yes from them — never on your own inference
-  from the URL, the name, or the account it sits under. (Stop until answered.)
+  from the URL, the name, or the account it sits under. (Stop until answered.) Only after
+  they say yes, re-run with `ATL_PROFILE_REMOTE_CONFIRMED_PRIVATE=1` set. **Setting that
+  variable without having asked is the one unrecoverable mistake available in this skill** —
+  it is the user's statement, not your assessment, and a wrong one publishes their profile
+  permanently. A `public-remote` result can never be overridden this way.
 - **`push-failed`** (exit 1) — the remote was confirmed private but the push was rejected.
   Report the git error as-is; do not retry with force, ever.
 
