@@ -113,6 +113,7 @@ export default defineConfig({
             {
               text: 'Global Skills',
               items: [
+                { text: '/consult', link: '/skills/consult' },
                 { text: '/drain', link: '/skills/drain' },
                 { text: '/brainstorm', link: '/skills/brainstorm' },
                 { text: '/rule', link: '/skills/rule' },
@@ -259,6 +260,7 @@ export default defineConfig({
             {
               text: 'Global Skill\'ler',
               items: [
+                { text: '/consult', link: '/tr/skills/consult' },
                 { text: '/drain', link: '/tr/skills/drain' },
                 { text: '/brainstorm', link: '/tr/skills/brainstorm' },
                 { text: '/rule', link: '/tr/skills/rule' },

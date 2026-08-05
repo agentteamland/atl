@@ -71,14 +71,77 @@ var retrieveCmd = &cobra.Command{
 		"on stdin, ranks the project's knowledge pages (BM25 + a local semantic embedder,\n" +
 		"RRF-fused), and prints the top matches as context. Fail-open — any error prints\n" +
 		"nothing and never blocks the prompt.\n\n" +
-		"  atl retrieve index   (re)build the index for the current project\n" +
-		"  atl retrieve warm    download the embedding model and warm the pipeline",
+		"  atl retrieve --query <terms>   search with a query you wrote yourself\n" +
+		"  atl retrieve index             (re)build the index for the current project\n" +
+		"  atl retrieve warm              download the embedding model and warm the pipeline",
 	SilenceUsage: true,
-	// The bare `atl retrieve` is the hook body.
+	// The bare `atl retrieve` is the hook body; --query is the agent-initiated path.
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if q, _ := cmd.Flags().GetString("query"); strings.TrimSpace(q) != "" {
+			return runConsult(cmd, q)
+		}
 		runRetrieveHook(cmd)
 		return nil // fail-open: never surface an error that would break the prompt
 	},
+}
+
+// runConsult is the agent-initiated read: the model wrote the query itself,
+// rather than the hook embedding whatever sentence the user happened to type.
+//
+// Measured on `.atl/eval/retrieval-answer-key.json` (12 questions, both
+// languages, the real Query path): the raw prompt scores 83% English / 75%
+// Turkish at recall@5, a model-written query scores 100%, and English and
+// Turkish become IDENTICAL because the query is born in the corpus's language.
+//
+// Unlike the hook this is NOT silent on failure — the agent asked, so it gets an
+// answer or a reason. Fail-open is a property of something that fires
+// uninvited; a tool the agent chose to call should say when it found nothing.
+func runConsult(cmd *cobra.Command, query string) error {
+	root, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	results, err := queryIndex(cmd.Context(), root, query)
+	if err != nil {
+		return err
+	}
+	if len(results) == 0 {
+		// Logged, because "the agent asked and the corpus had nothing" is a
+		// different and more interesting event than "the agent never asked".
+		logRetrieveFire(root, "consulted-empty", nil)
+		fmt.Fprintf(cmd.OutOrStdout(), "No page in this project's knowledge base matched %q.\n", query)
+		return nil
+	}
+	paths := make([]string, len(results))
+	for i, r := range results {
+		paths[i] = r.Path
+	}
+	logRetrieveFire(root, "consulted", paths)
+	fmt.Fprint(cmd.OutOrStdout(), formatResultsWithHeader(root, results,
+		fmt.Sprintf("[atl] %d page(s) for your query %q — open the path for the full page.\n", len(results), query)))
+	return nil
+}
+
+// queryIndex is the search itself, shared by the hook and the agent-initiated
+// path so the two can never diverge on ranking, floors or topK — a consult that
+// scored differently from the hook would make every comparison between them
+// meaningless.
+func queryIndex(parent context.Context, root, query string) ([]retrieve.Result, error) {
+	idxPath, err := indexPathFor(root)
+	if err != nil {
+		return nil, err
+	}
+	ix, err := retrieve.Load(idxPath)
+	if err != nil || ix == nil {
+		return nil, fmt.Errorf("no retrieval index for this project yet — run `atl retrieve index`")
+	}
+	ctx, cancel := context.WithTimeout(parent, 30*time.Second)
+	defer cancel()
+	e := embedderIfModelPresent(ctx)
+	if e != nil {
+		defer e.Close()
+	}
+	return ix.Query(ctx, query, e, retrieveTopK, retrieve.MinSimDefault)
 }
 
 // runRetrieveHook is the UserPromptSubmit hook. It is exhaustively fail-open:
@@ -397,6 +460,7 @@ func logRetrieveFire(projectRoot, outcome string, paths []string) {
 type retrieveFireStats struct {
 	Total, Fired, Silent, Machine, Short int
 	Translated                           int
+	Turns, Consulted, ConsultedEmpty     int
 	Offered                              int
 	Pages                                map[string]int
 }
@@ -428,6 +492,27 @@ func readFireStats(logPath string) (retrieveFireStats, error) {
 		// exactly as the thing it measures gets adopted.
 		if f[1] == "translated" {
 			st.Translated++
+			continue
+		}
+		// Turns and consults are not prompts either. A turn is the denominator
+		// itself, and a consult is something the AGENT did — counting either as a
+		// fire would inflate the number every percentage below divides by, the
+		// exact defect the translated line above exists to prevent.
+		switch f[1] {
+		case "turn":
+			st.Turns++
+			continue
+		case "consulted":
+			st.Consulted++
+			if len(f) > 2 {
+				st.Offered += len(strings.Fields(f[2]))
+				for _, p := range strings.Fields(f[2]) {
+					st.Pages[p]++
+				}
+			}
+			continue
+		case "consulted-empty":
+			st.ConsultedEmpty++
 			continue
 		}
 		st.Total++
@@ -468,9 +553,20 @@ func indexPathFor(projectRoot string) (string, error) {
 // title, project-relative path, and a short excerpt — so the agent knows which
 // pages to open, without flooding the prompt with full page bodies.
 func formatResults(projectRoot string, results []retrieve.Result) string {
+	return formatResultsWithHeader(projectRoot, results,
+		"[atl] Knowledge pages that may be relevant to this prompt (atl#140 retrieval).\n"+
+			"Consult any that match the topic before answering; open the path for the full page.\n")
+}
+
+// formatResultsWithHeader exists because the two readers are in different
+// positions. The hook speaks to an agent that did not ask and may not care, so
+// it hedges ("may be relevant") and tells it what to do. A consult answers an
+// agent that asked a specific question, so hedging is noise and the instruction
+// is already obeyed — what it needs instead is its own query echoed back, since
+// a wrong query is the most likely reason a consult returns the wrong pages.
+func formatResultsWithHeader(projectRoot string, results []retrieve.Result, header string) string {
 	var b strings.Builder
-	b.WriteString("[atl] Knowledge pages that may be relevant to this prompt (atl#140 retrieval).\n")
-	b.WriteString("Consult any that match the topic before answering; open the path for the full page.\n")
+	b.WriteString(header)
 	for i, r := range results {
 		rel := r.Path
 		if p, err := filepath.Rel(projectRoot, r.Path); err == nil && !strings.HasPrefix(p, "..") {
@@ -683,7 +779,41 @@ func init() {
 	retrieveIndexCmd.Flags().Duration("timeout", 15*time.Minute, "overall deadline for the index build")
 	retrieveIndexCmd.Flags().Bool("lexical", false, "build a BM25-only index without the semantic embedder")
 	retrieveWarmCmd.Flags().Duration("timeout", 5*time.Minute, "overall deadline for the model download + warm")
-	retrieveCmd.AddCommand(retrieveIndexCmd, retrieveWarmCmd, retrieveStatsCmd)
+	retrieveCmd.Flags().String("query", "", "search with this query instead of reading a hook payload on stdin")
+	retrieveCmd.AddCommand(retrieveIndexCmd, retrieveWarmCmd, retrieveStatsCmd, retrieveTurnEndCmd)
+}
+
+// retrieveTurnEndCmd is a Stop hook that writes one line per completed turn and
+// prints nothing. It exists to give consultation an honest DENOMINATOR.
+//
+// Without it the only available rate is "reads per offered page", which is
+// meaningless: the hook offers 5 pages on every prompt including the ~95% that
+// carry no question for the corpus, so a low rate says nothing about whether
+// consultation is working. Turns are the denominator a human would actually use
+// — "in how many turns did the agent check the record?" — and nothing else in
+// the system records that a turn ended.
+//
+// Log-only by decision. A Stop hook's stdout does not reach the model anyway
+// (this repo has a page on which hook events inject context), and the blocking
+// variant — refusing to end a turn that consulted nothing — stays on the shelf
+// until a measured miss rate justifies paying for a re-turn. Observing first is
+// also the cheaper half: it replaces a forensic pass over a 30 MB transcript,
+// which is how the 3.3% consultation rate had to be recovered.
+var retrieveTurnEndCmd = &cobra.Command{
+	Use:          "turn-end",
+	Short:        "Record that a turn completed (Stop hook; writes to the fire log, prints nothing)",
+	Hidden:       true,
+	SilenceUsage: true,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		defer func() { _ = recover() }()
+		if isATLInternalSession() {
+			return nil
+		}
+		if root, err := os.Getwd(); err == nil {
+			logRetrieveFire(root, "turn", nil)
+		}
+		return nil // never fail a turn over bookkeeping
+	},
 }
 
 var retrieveStatsCmd = &cobra.Command{
@@ -733,6 +863,23 @@ func renderFireStats(st retrieveFireStats) string {
 	if st.Translated > 0 {
 		fmt.Fprintf(&b, "  translated %5d  %s   (of the above — a query with no lexical hit)\n",
 			st.Translated, pct(st.Translated))
+	}
+	// The agent-initiated half, reported against TURNS rather than against fires.
+	// "Reads per offered page" is the wrong rate — the hook offers pages on every
+	// prompt including the ones carrying no question — so the number that answers
+	// "is the agent checking the record?" needs turns underneath it.
+	if st.Turns > 0 || st.Consulted > 0 || st.ConsultedEmpty > 0 {
+		asked := st.Consulted + st.ConsultedEmpty
+		fmt.Fprintf(&b, "\nturns        %5d\n", st.Turns)
+		if st.Turns > 0 {
+			fmt.Fprintf(&b, "  consulted  %5d  %5.1f%%   (agent wrote its own query)\n",
+				asked, 100*float64(asked)/float64(st.Turns))
+		} else {
+			fmt.Fprintf(&b, "  consulted  %5d          (no turn recorded yet — is the Stop hook installed?)\n", asked)
+		}
+		if st.ConsultedEmpty > 0 {
+			fmt.Fprintf(&b, "    no match %5d          (asked, corpus had nothing — a gap, not a miss)\n", st.ConsultedEmpty)
+		}
 	}
 	if len(st.Pages) == 0 {
 		return b.String()

@@ -278,6 +278,7 @@ func defaultHooks() []settings.Hook {
 		{Event: "UserPromptSubmit", Command: "atl tick --throttle=10m"},
 		{Event: "UserPromptSubmit", Command: "atl retrieve"},
 		{Event: "PreToolUse", Matcher: "Bash|Edit|Write", Command: "atl guard"},
+		{Event: "Stop", Command: "atl retrieve turn-end"},
 	}
 }
 
