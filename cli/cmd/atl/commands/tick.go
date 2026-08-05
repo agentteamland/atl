@@ -34,6 +34,13 @@ var tickCmd = &cobra.Command{
 		"per-prompt hook stays cheap); the fan-out still runs (it's already ~free).\n" +
 		"--file drains a single file instead (manual/debug).",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// A `claude -p` ATL started for a mechanical purpose is a real session and
+		// fires this hook, but its transcript holds an instruction we wrote — not a
+		// conversation anyone had. Sweeping it would mine our own prompt text, and
+		// advancing the mine cursor over it consumes ground a real drain needs.
+		if isATLInternalSession() {
+			return nil
+		}
 		st, project, err := openQueue()
 		if err != nil {
 			return err

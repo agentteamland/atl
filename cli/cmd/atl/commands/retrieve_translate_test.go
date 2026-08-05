@@ -137,3 +137,29 @@ func TestTranslateSkipsAnOversizedPrompt(t *testing.T) {
 		t.Fatal("attempted to translate a prompt past the cap")
 	}
 }
+
+// The subprocess must carry the internal-session mark, or the child session's own
+// UserPromptSubmit hook searches the corpus again and records a fire nobody read.
+//
+// Asserted on the constructed command rather than on behaviour, because the
+// behaviour needs a real `claude` binary. That matters: a mutation removing the
+// marking left every other test in this package green — the guard that CONSUMES
+// the mark was covered, the wiring that SETS it was not.
+func TestTranslateCommandMarksTheChildAsInternal(t *testing.T) {
+	cmd := translateCommand(t.Context(), "ogrenme kuyrugu isaretcileri")
+
+	var found bool
+	for _, kv := range cmd.Env {
+		if kv == atlInternalSessionEnv+"=1" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("child not marked internal — its hook will fire; env had %d entries", len(cmd.Env))
+	}
+	// The mark is an addition, not a replacement: the child still needs the
+	// credential and PATH it inherits, so a bare one-entry Env would break it.
+	if len(cmd.Env) < 2 {
+		t.Fatalf("child env replaced rather than extended: %v", cmd.Env)
+	}
+}
