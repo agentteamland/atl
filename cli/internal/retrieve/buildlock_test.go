@@ -42,22 +42,114 @@ func TestReleasingTheLockLetsTheNextBuildIn(t *testing.T) {
 	}
 }
 
-// A build killed without releasing must not wedge indexing forever. Age is one
-// of the two staleness tests, and it is the one that covers a recycled pid — a
-// lock naming a pid that now belongs to an unrelated live process.
-func TestAnAgedLockIsIgnoredEvenIfItsPidIsAlive(t *testing.T) {
-	idx := lockFor(t)
+// stamped writes a lock naming a specific pid and time, for the cases that have
+// to construct a state no ordinary acquire produces.
+func stamped(t *testing.T, idx string, pid int, at time.Time) string {
+	t.Helper()
 	lock := filepath.Join(filepath.Dir(idx), "index.lock")
 	if err := os.MkdirAll(filepath.Dir(lock), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	// Our own pid: unambiguously alive, so only the age test can free this.
-	old := time.Now().Add(-2 * buildLockMaxAge).Unix()
-	if err := os.WriteFile(lock, []byte(fmt.Sprintf("%d\n%d\n", os.Getpid(), old)), 0o644); err != nil {
+	if err := os.WriteFile(lock, []byte(fmt.Sprintf("%d\n%d\n", pid, at.Unix())), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	return lock
+}
+
+// A build killed without releasing must not wedge indexing forever, and the pid
+// check alone cannot say so: pids are recycled, so a lock can name a pid that
+// now belongs to an unrelated live process. The heartbeat is what separates
+// them — a real build refreshes its lock, an inheritor of its pid never does.
+func TestALockThatStoppedHeartbeatingIsIgnoredEvenIfItsPidIsAlive(t *testing.T) {
+	idx := lockFor(t)
+	// Our own pid: unambiguously alive, so only the heartbeat test can free this.
+	stamped(t, idx, os.Getpid(), time.Now().Add(-2*buildLockStaleAfter))
+
 	if _, ok := AcquireBuildLock(idx); !ok {
-		t.Error("a lock older than the max age must be treated as stale")
+		t.Error("a lock nobody has refreshed must be treated as abandoned")
+	}
+}
+
+// The regression this fix exists for. The previous version tested age FIRST and
+// freed any lock past a fixed max age whatever its pid was doing, so a build
+// running longer than that guess was declared dead while demonstrably alive —
+// and a second build started on top of it, which is the failure the lock exists
+// to prevent. Held now for as long as the holder keeps saying so, which is why
+// no constant here encodes "how long a build takes".
+func TestAHeartbeatingBuildKeepsItsLockHoweverLongItRuns(t *testing.T) {
+	idx := lockFor(t)
+	lock := stamped(t, idx, os.Getpid(), time.Now().Add(-99*time.Hour))
+
+	if _, held := readBuildLock(lock); held {
+		t.Fatal("precondition: a lock left unrefreshed for 99 hours must read as free")
+	}
+	// The holder is still working and says so. Nothing about the 99 hours it has
+	// been building may override that.
+	if err := writeBuildLock(lock); err != nil {
+		t.Fatal(err)
+	}
+	if _, held := readBuildLock(lock); !held {
+		t.Error("a build that is still heartbeating must keep its lock regardless of elapsed time")
+	}
+	if _, ok := AcquireBuildLock(idx); ok {
+		t.Error("a second build must be refused while the first is still heartbeating")
+	}
+}
+
+// The heartbeat itself, which is the actual fix — everything else here only
+// checks the predicate that reads its output. A refresh that silently stopped
+// firing would leave every other test in this file green while a long build lost
+// its lock exactly as before.
+func TestTheHolderRefreshesItsLockWhileItBuilds(t *testing.T) {
+	prev := buildLockHeartbeat
+	buildLockHeartbeat = 5 * time.Millisecond
+	t.Cleanup(func() { buildLockHeartbeat = prev })
+
+	idx := lockFor(t)
+	release, ok := AcquireBuildLock(idx)
+	if !ok {
+		t.Fatal("first acquire")
+	}
+	defer release()
+
+	lock := filepath.Join(filepath.Dir(idx), "index.lock")
+	// Age the lock behind the holder's back. A live heartbeat must undo this.
+	stamped(t, idx, os.Getpid(), time.Now().Add(-2*buildLockStaleAfter))
+	if _, held := readBuildLock(lock); held {
+		t.Fatal("precondition: the back-dated lock must read as abandoned")
+	}
+
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if _, held := readBuildLock(lock); held {
+			return // the heartbeat refreshed it
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	t.Error("the holder never refreshed its lock — a long build would lose it")
+}
+
+// Release must not delete a lock this process does not hold. Without the
+// ownership check, the first build finishing removes whichever lock is on disk —
+// including one a later build has since taken, handing it to a third.
+func TestReleaseDoesNotRemoveAnotherBuildsLock(t *testing.T) {
+	idx := lockFor(t)
+	release, ok := AcquireBuildLock(idx)
+	if !ok {
+		t.Fatal("first acquire")
+	}
+	// Another build takes the lock over while this one is still running.
+	other := os.Getpid() + 1
+	lock := stamped(t, idx, other, time.Now())
+
+	release()
+
+	pid, _, parsed := parseBuildLock(lock)
+	if !parsed {
+		t.Fatal("release removed a lock held by another build")
+	}
+	if pid != other {
+		t.Errorf("lock holder = %d, want the other build %d", pid, other)
 	}
 }
 
