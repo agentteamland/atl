@@ -70,10 +70,16 @@ func updateTeams(projectRoot string) (int, error) {
 // migrateTeamManifest brings an already-current install forward to the current
 // manifest schema, without touching a single reflected file.
 //
-// Schema v2 added `stores` — the durable-store paths the team declared — and v3
-// `channels`, the capture channels it owns. Both values live in the team's own
+// Schema v2 added `stores` — the durable-store paths the team declared — v3
+// `channels`, the capture channels it owns, and v4 `reviewer`, the agent it
+// offers /create-pr for domain review. All three live in the team's own
 // team.json, which install does not reflect onto disk, so the only way to learn
-// them is to re-fetch the pinned source. This runs at most once per install (a
+// them is to re-fetch the pinned source.
+//
+// Bumping SchemaVersion is what makes a new field reach installs that already
+// exist — this runs only while `m.SchemaVersion < manifest.SchemaVersion`. Add a
+// declaration-derived field without the bump and the population code is correct,
+// unreachable, and silent: every current install keeps the zero value forever. This runs at most once per install (a
 // successful run stamps the new schema version), and only for installs that
 // predate a field. The source is re-fetched from the MANIFEST's pin, not the
 // index entry's: the manifest records the repo, subpath and ref this install
@@ -97,6 +103,7 @@ func migrateTeamManifest(m *manifest.Manifest, layer string, fetch fetchFunc) er
 	}
 	m.Stores = tm.DeclaredStores()
 	m.Channels = tm.DeclaredChannels()
+	m.Reviewer = tm.DeclaredReviewer()
 	m.SchemaVersion = manifest.SchemaVersion
 	return m.Write(layer)
 }
@@ -126,6 +133,7 @@ func upgradeTeam(m *manifest.Manifest, entry *index.Entry, layer, claude string)
 	if tm, terr := teampkg.ReadManifest(srcDir); terr == nil {
 		m.Stores = tm.DeclaredStores()
 		m.Channels = tm.DeclaredChannels()
+		m.Reviewer = tm.DeclaredReviewer()
 		m.SchemaVersion = manifest.SchemaVersion
 	}
 	return m.Write(layer)

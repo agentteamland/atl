@@ -62,7 +62,15 @@ Boring diffs cost nothing (the pre-flight skips them). If `atl docs check` isn't
 
 **5a — Generic reviewer (always).** Spawn a fresh-context agent over the staged diff. Fresh context so the review isn't biased by the model that wrote the diff. Prompt it to apply the four Karpathy guidelines (think-before-coding, simplicity, surgical changes, goal-driven) plus general quality: naming clarity, scope creep, security smells (secrets in logs, injection, hardcoded credentials), dead code, and test coverage. Ask for `🔴 issues` / `🟡 concerns` / `🟢 good`, terse.
 
-**5b — Team specialists.** For each installed team (look under `.claude/agents/` then `~/.claude/agents/` — project shadows global), read its `team.json` `capabilities.review`; if it names an agent, spawn that agent over the same diff for a domain-specific review. A team with no `capabilities.review` is skipped — 5a is the baseline.
+**5b — Team specialists.** Ask which installed teams offer a domain reviewer:
+
+```bash
+atl list --json
+```
+
+For every entry with a non-empty `reviewer`, spawn that agent over the same diff for a domain-specific review. A team with no `reviewer` is skipped — 5a is the baseline, and most teams declare none.
+
+> Do **not** go looking for `team.json` under `.claude/`. It is not an installable asset — `teampkg.AssetDirs` lists directories only, and has in every revision — so the path this step used to name is never present, whatever a team declares. The declaration travels in the installed manifest instead, which `atl list --json` reports. If a team you expect shows no `reviewer`, its manifest predates the field and `atl update` backfills it.
 
 **5c — Adversarial verify (always).** The finders are author-adjacent optimists; don't present raw findings. Spawn one fresh-context agent over the *consolidated 5a + 5b findings* (the findings list, not the whole diff again) with two jobs:
 - **Evidence gate (drop):** every finding must cite concrete evidence — a `file:line`, a grep pattern, or a failing test/command. A finding that names none is dropped, not shown (the `/docs-audit` "no claim without a verbatim quote" discipline, applied to code review).

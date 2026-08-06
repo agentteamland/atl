@@ -5,10 +5,11 @@ Show the teams installed at each scope.
 ## Usage
 
 ```bash
-atl list
+atl list          # human-readable, grouped by scope
+atl list --json   # the same set as JSON, for a script or a skill
 ```
 
-`atl list` takes no flags or arguments. It reads the install manifests under each layer's `.atl/installed/` directory — no network access.
+`atl list` takes no arguments. It reads the install manifests under each layer's `.atl/installed/` directory — no network access.
 
 ## Output
 
@@ -22,6 +23,37 @@ project:
 ```
 
 A team installed at both scopes appears under each. The `<handle>` is the team's GitHub owner, `<name>` and `<version>` come from its `team.json`.
+
+A team that declares a **review agent** (`capabilities.review` in its `team.json`) shows it alongside its version:
+
+```
+project:
+  acme/delivery-team@0.15.0  (review: tech-lead)
+```
+
+## `--json`
+
+Emits the same set as an array, which is how [`/create-pr`](/skills/create-pr) discovers which teams offer a domain reviewer for its review chain:
+
+```json
+[
+  {
+    "handle": "acme",
+    "name": "delivery-team",
+    "version": "0.15.0",
+    "scope": "project",
+    "reviewer": "tech-lead"
+  }
+]
+```
+
+`reviewer` is omitted for a team that declares none, which is the common case. With no teams installed the output is `[]`, never `null`.
+
+This is deliberately **not** the raw manifest: a manifest also carries a per-file checksum map running to hundreds of entries, and a caller asking *which teams are installed, and what does each declare?* should not have to read past it.
+
+::: tip A team installed before v2.26.0
+`reviewer` is recorded at install time, so a team installed before the field existed shows none until [`atl update`](/cli/update) refreshes its manifest.
+:::
 
 ## When nothing is installed
 
