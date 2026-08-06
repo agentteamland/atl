@@ -16,7 +16,7 @@ atl setup-hooks --throttle=1h      # less aggressive
 
 ## What it does
 
-Writes four entries into `~/.claude/settings.json`:
+Writes five entries into `~/.claude/settings.json`:
 
 ```json
 {
@@ -38,6 +38,11 @@ Writes four entries into `~/.claude/settings.json`:
       { "matcher": "Bash|Edit|Write",
         "hooks": [
           { "type": "command", "command": "atl guard" }
+      ]}
+    ],
+    "Stop": [
+      { "hooks": [
+          { "type": "command", "command": "atl retrieve turn-end" }
       ]}
     ]
   }
@@ -72,6 +77,16 @@ When something surfaces, Claude sees the corresponding line in its context and c
 ### `UserPromptSubmit` — per-prompt knowledge retrieval
 
 Alongside the tick, a second `UserPromptSubmit` entry runs `atl retrieve`: it ranks this project's knowledge pages (wiki + journal) against each prompt — BM25 fused with a local semantic embedder — and surfaces the top matches as context, so Claude consults the most relevant pages before answering. A delivery project (one with a `.delivery/config.json`) also indexes its in-repo `docs/` tree alongside wiki + journal. It's fail-open: any error prints nothing and never blocks the prompt. See the [knowledge-system guide](/guide/knowledge-system).
+
+### `Stop` — record that the turn completed
+
+Runs when a turn ends. `atl retrieve turn-end` writes one line to the retrieval fire log and
+prints nothing, so it never reaches Claude's context and never affects a reply.
+
+It exists to make one question answerable: **does anyone act on what retrieval surfaces?**
+Without a turn marker the fire log records what was offered and nothing about what happened
+next, so "is this channel worth improving?" can only be answered by a forensic pass over the
+whole transcript. `atl retrieve stats` reads this to report the consult rate.
 
 ### `PreToolUse` — the enforcement guard
 
