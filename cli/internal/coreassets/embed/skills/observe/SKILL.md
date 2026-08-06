@@ -103,14 +103,34 @@ For each surviving candidate from (a) and (b), try to **refute** it before keepi
 - **Default to dropping** unless the finding survives the challenge. Re-weigh severity on
   what survives. Verify each independently (a fresh, skeptical pass), not as a batch.
 
-### 5. Surface — a ranked digest of verified flags
-Present what survived, most-actionable first. For each: a one-line claim, its grounded
+### 5. Record — a ranked digest of verified flags
+Rank what survived, most-actionable first. For each: a one-line claim, its grounded
 evidence (the quote / file:line), why it matters, and a suggested next step (open a
-brainstorm? a board item? a fix?). Ripe triggers and latent gaps in one ranked list. If
-nothing survived, say so plainly — an empty sweep is a real, valid result, not a failure to
-try harder. **Do not** auto-open PRs or auto-create work items from (b) — a latent-gap
-finding often needs a decision (a brainstorm), so surface it and let the user choose; a
-genuinely ripe (a) trigger can be offered as "want a board item / to pull this forward?"
+brainstorm? a board item? a fix?). If nothing survived, say so plainly — an empty sweep is
+a real, valid result, not a failure to try harder.
+
+**Write each finding to the digest, do not just say it.** Under `sweep-dispatch` this skill
+usually runs as a background subagent, so there is no live turn to present into: a finding
+spoken here reaches nobody, and a sweep that ran while the user was away would simply be
+lost. Per finding:
+
+```bash
+printf '<evidence, why it matters, suggested next step>' \
+  | atl digest add --sweep observe --title '<the one-line claim>'
+```
+
+Idempotent by `(sweep, title)` — re-reporting refreshes the body and leaves the read state
+alone, so running daily converges instead of re-interrupting about the same thing. The
+session-start signal then tells the next session how many are waiting, and the rule says
+what to do about them.
+
+**Do not** auto-open PRs or auto-create work items from (b) — a latent-gap finding often
+needs a decision (a brainstorm), so record it and let the user choose; a genuinely ripe (a)
+trigger can be offered as "want a board item / to pull this forward?"
+
+If you *are* running in a live turn (the user invoked `/observe` directly), present the
+ranked list as well — but still write it to the digest, so a finding they do not act on
+this turn is not gone by the next one.
 
 ### 6. Record the sweep
 ```bash
