@@ -212,6 +212,14 @@ func runRetrieveHook(cmd *cobra.Command) {
 		if translated, ok := translatePrompt(cmd.Context(), prompt); ok {
 			query = translated
 			logRetrieveFire(root, "translated", nil)
+		} else {
+			// Record the failure too. Translation is fail-open and silent by
+			// design, so without this line a credential that has EXPIRED is
+			// indistinguishable from one that is working: the env var is still
+			// set, the notice stays suppressed, and every non-English prompt
+			// quietly searches on one arm. This is the only evidence of that
+			// state that costs nothing to collect.
+			logRetrieveFire(root, "translate-failed", nil)
 		}
 	}
 

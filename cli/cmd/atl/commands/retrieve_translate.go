@@ -5,6 +5,7 @@ import (
 	"context"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -199,7 +200,7 @@ func translationNotice() string {
 // to be told — silence in both cases keeps the notice meaningful when it does
 // appear, which is the whole difference between a signal and noise.
 func retrievalTranslationNotice(project string) (string, bool) {
-	if project == "" || claudeAvailable() {
+	if project == "" {
 		return "", false
 	}
 	idxPath, err := indexPathFor(project)
@@ -209,5 +210,56 @@ func retrievalTranslationNotice(project string) (string, bool) {
 	if _, err := os.Stat(idxPath); err != nil {
 		return "", false // no index here — retrieval is not running in this project
 	}
-	return translationNotice(), true
+	if !claudeAvailable() {
+		return translationNotice(), true
+	}
+	// A credential can be PRESENT and dead. `claudeAvailable` reads the env var and
+	// deliberately spends no API call to check it — the hook fires on every prompt
+	// and must not pay for a liveness probe. So expiry is detected the only way that
+	// costs nothing: from the record of what actually happened.
+	if translationFailing(idxPath) {
+		return expiredTranslationNotice(), true
+	}
+	return "", false
+}
+
+// translationFailing reports whether recent translation attempts have all failed
+// — the signature of a credential that is set but no longer valid.
+//
+// Three consecutive failures, not one: a single failure is a timeout or a blip,
+// and a notice that fires on those is the constant channel this project has
+// measured. Reads only the tail, and any read error means silence: this decides
+// whether to PRINT something, so being wrong must cost nothing.
+func translationFailing(idxPath string) bool {
+	b, err := os.ReadFile(filepath.Join(filepath.Dir(idxPath), "fires.log"))
+	if err != nil {
+		return false
+	}
+	lines := strings.Split(strings.TrimRight(string(b), "\n"), "\n")
+	seen := 0
+	for i := len(lines) - 1; i >= 0 && seen < 3; i-- {
+		f := strings.Split(lines[i], "\t")
+		if len(f) < 2 {
+			continue
+		}
+		switch f[1] {
+		case "translated":
+			return false // the most recent outcome is a success
+		case "translate-failed":
+			seen++
+		}
+	}
+	return seen >= 3
+}
+
+// expiredTranslationNotice is the credential-is-set-but-dead variant. It says
+// something different from the missing-credential notice on purpose: a user who
+// has already run `setup-token` and exported the value reads "you need a
+// credential" as wrong and stops reading.
+func expiredTranslationNotice() string {
+	return "atl: retrieval translation is configured but its last three attempts all failed —\n" +
+		"     the credential is probably expired. A non-English prompt is searching on one arm\n" +
+		"     instead of two (measured: 25% vs 75% recall) and failing silently, because\n" +
+		"     translation is fail-open by design.\n" +
+		"     Re-run `claude setup-token` and export the new value as CLAUDE_CODE_OAUTH_TOKEN."
 }
