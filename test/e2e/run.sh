@@ -104,6 +104,26 @@ else
   echo ">> running ALL blueprints (full suite — the default; pass names to run a subset)"
 fi
 
+# GraphQL budget preflight — above the image build, because a suite that will run
+# out of budget should say so in seconds rather than after an hour.
+#
+# This is not hypothetical: the first full parallel run exhausted the 5000/hr
+# GraphQL budget at ~30 minutes and took down two blueprints that never touch
+# Projects at all. The delivery lanes burn it (a Project is deleted and recreated
+# per blueprint); the failure lands on whoever asks GitHub for anything next, with
+# an assertion message — "no tag in output" — that says nothing about rate limits.
+# Compressing 132 minutes of calls into 40 does not change the total, but the limit
+# is a RATE, so the compression is exactly what broke it.
+if command -v gh >/dev/null 2>&1; then
+  gql_left="$(gh api rate_limit --jq '.resources.graphql.remaining' 2>/dev/null || echo "")"
+  if [ -n "$gql_left" ] && [ "$gql_left" -lt 2000 ] 2>/dev/null; then
+    echo "!! GraphQL budget is ${gql_left}/5000 — the GitHub delivery blueprints will exhaust it" >&2
+    echo "   and the failures will surface on UNRELATED blueprints. Wait for the hourly reset," >&2
+    echo "   or run a subset that excludes the github-delivery-* lanes." >&2
+    [ "${ATL_E2E_IGNORE_BUDGET:-0}" = 1 ] || exit 4
+  fi
+fi
+
 SUITE_START=$SECONDS
 echo ">> building atl-e2e image"
 docker build -f test/e2e/Dockerfile -t atl-e2e . >/dev/null
@@ -121,7 +141,7 @@ API_KEY="${ANTHROPIC_API_KEY:-}"
 # blueprints run many minutes each while the auth-free ones finish in seconds, so the
 # progress fraction misleads badly -- a LONGER run can mean the suite got FURTHER, not
 # that it slowed down -- and "is this normal?" can only be answered by hand-timing it.
-pass=0; fail=0; skip=0
+pass=0; fail=0; skip=0; ratelimited=0
 timings=()
 
 # ---- lane partitioning ------------------------------------------------------
@@ -240,7 +260,15 @@ run_lane() {
     rc="${PIPESTATUS[0]}"
     set -e
     bp_secs=$((SECONDS - bp_start))
-    if [ "$rc" -eq 0 ]; then verdict=PASSED; else verdict=FAILED; fi
+    if [ "$rc" -eq 0 ]; then
+      verdict=PASSED
+    elif grep -qi 'rate limit' "$WORK/out.$name"; then
+      # Name it. A rate-limited run is not evidence about the product, and an
+      # assertion message like "no tag in output" reads exactly like one.
+      verdict=RATELIMIT
+    else
+      verdict=FAILED
+    fi
     echo "<< $name $verdict (${bp_secs}s)" | tee -a "$lanelog" >> "$WORK/out.$name"
     # The lane log is the watcher's per-lane liveness surface: with several lanes
     # running, "no output for N seconds" is meaningless on the aggregate, because
@@ -268,7 +296,11 @@ if [ "$got" -ne "$attempted" ]; then
 fi
 while IFS='|' read -r s n v d; do
   timings+=("$s|$n|$v|$d")
-  [ "$v" = PASSED ] && pass=$((pass + 1)) || fail=$((fail + 1))
+  case "$v" in
+    PASSED)    pass=$((pass + 1)) ;;
+    RATELIMIT) ratelimited=$((ratelimited + 1)) ;;
+    *)         fail=$((fail + 1)) ;;
+  esac
 done < "$WORK/results"
 
 SUITE_SECS=$((SECONDS - SUITE_START))
@@ -285,5 +317,14 @@ if [ "${#timings[@]}" -gt 0 ]; then
 fi
 
 echo ""
-echo "===== harness: $pass passed, $fail failed, $skip skipped — $((SUITE_SECS / 60))m$((SUITE_SECS % 60))s total ====="
-[ "$fail" -eq 0 ]
+rl_note=""
+if [ "$ratelimited" -gt 0 ]; then
+  rl_note=", $ratelimited RATE-LIMITED"
+  echo ""
+  echo "!! $ratelimited blueprint(s) hit the GitHub rate limit. Those verdicts say NOTHING about"
+  echo "   the product — re-run them after the hourly reset before drawing any conclusion."
+fi
+echo ""
+echo "===== harness: $pass passed, $fail failed$rl_note, $skip skipped — $((SUITE_SECS / 60))m$((SUITE_SECS % 60))s total ====="
+# A rate-limited blueprint fails the suite: an unverified result is not a pass.
+[ "$fail" -eq 0 ] && [ "$ratelimited" -eq 0 ]
