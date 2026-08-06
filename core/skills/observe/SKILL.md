@@ -65,6 +65,28 @@ Fan out finders across these lenses; each is blind to the others (a multi-modal 
   (The lens for "the profile will pass the read window and truncate unnoticed.")
 - **Decided-but-unshipped** — a `CLAUDE.md` pending-implementation entry or a completed
   brainstorm whose decision never landed in code.
+- **Current-truth staleness** — is a `.atl/wiki` page still TRUE? The wiki is the layer that
+  answers "what is the case now", and `/consult` retrieves from it — so a wrong page is worse
+  than a missing one: a mechanism now puts it in front of the agent with confidence.
+  Run `atl wiki check` first; it is deterministic and its job here is to hand you a target
+  list, not to find staleness (it cannot — see below). Then judge claims in this order:
+  **code-checkable** (a `file:line` or symbol claim — grep it; 111 of 166 pages carry one, and
+  that is the high-yield slice) · **issue-state-checkable** (a page calling `atl#N` shipped or
+  resolved — `gh issue view` it) · **internally contradictory** (an at-a-glance summary
+  contradicting its own body; this corpus has had a table stale for two weeks while a RESOLVED
+  note sat two screens below it) · **unverifiable** (judgment, narrative, rationale — report as
+  unverifiable, never guess).
+  Two things that decide whether this lens finds anything. **Ask per section, not per page** —
+  one question per file returns about one finding per file, because an LLM summarises rather
+  than enumerates; demand a verdict for every section so coverage is checkable arithmetic. And
+  **read the tail**: these pages grow by appending, so the newest and most-likely-stale claims
+  are at the end of the longest ones, exactly where a skim stops.
+  ⚠ **The dominant false positive here is a page DOCUMENTING that something is dead being read
+  as ASSERTING it is alive.** A path-existence check over this corpus measures 76-90% false
+  positive for that reason alone, which is why no such check is deterministic. So quote the
+  page's own sentence verbatim beside the contradicting source — if you cannot show both, the
+  finding does not survive.
+
 - **User global setup** — audit `~/.atl/` from the **outside**: `~/.atl/profiles/` (is what
   the design intends to be captured actually being captured?), config, the advisor install.
   **Never enter or impersonate the advisor conversation to do this** — you inspect its

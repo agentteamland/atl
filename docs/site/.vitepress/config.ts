@@ -104,6 +104,7 @@ export default defineConfig({
                 { text: 'atl skills', link: '/cli/skills' },
                 { text: 'atl rules', link: '/cli/rules' },
                 { text: 'atl observe', link: '/cli/observe' },
+                { text: 'atl wiki', link: '/cli/wiki' },
                 { text: 'atl publish', link: '/cli/publish' },
                 { text: 'atl setup-hooks', link: '/cli/setup-hooks' }
               ]
@@ -251,6 +252,7 @@ export default defineConfig({
                 { text: 'atl skills', link: '/tr/cli/skills' },
                 { text: 'atl rules', link: '/tr/cli/rules' },
                 { text: 'atl observe', link: '/tr/cli/observe' },
+                { text: 'atl wiki', link: '/tr/cli/wiki' },
                 { text: 'atl publish', link: '/tr/cli/publish' },
                 { text: 'atl setup-hooks', link: '/tr/cli/setup-hooks' }
               ]
