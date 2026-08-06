@@ -201,17 +201,29 @@ fi
 # Which gives the real bound: a full suite costs approximately ONE HOURLY QUOTA, so
 # its runtime cannot be compressed far below an hour however many lanes there are.
 # The requirement scales with what was SELECTED, not with what a full suite costs.
-# A flat full-suite threshold refuses a single delivery blueprint that needs ~800
-# points because the budget is at 3300 — the same over-reach as checking at all for
-# a `needs: none` subset, one level down. ~800 per delivery blueprint is the
-# suite's ~5000 over its six of them.
+# A flat full-suite threshold refuses a single delivery blueprint because the budget
+# is mid-recovery — the same over-reach as checking at all for a `needs: none`
+# subset, one level down.
+#
+# 400 per delivery blueprint, and where that number comes from matters. The first
+# estimate was 800, drawn from the run that EXHAUSTED the budget — a corrupted
+# three-lane run whose draw included its own re-runs. It then refused the FULL
+# SUITE at 4891/5000: the guard blocking the exact case it exists to protect.
+#
+# Grounded on the clean two-lane run instead: 4659 -> 2397 across its first twenty
+# minutes for seven delivery blueprints, so a peak draw near 2300, ~325 each. 400
+# rounds that up without inventing headroom.
+#
+# Note this is PEAK draw, not total. A run longer than an hour crosses a reset and
+# is refilled while it works, which is why what a suite CONSUMES is not what a
+# preflight should ask for — asking for the total is what produced the 800.
 delivery_n=0
 for k in ${LANE_KEYS[@]+"${LANE_KEYS[@]}"}; do
   [ "$k" = free ] && continue
   delivery_n=$((delivery_n + $(wc -l < "$WORK/lane.$k")))
 done
 if [ "$delivery_n" -gt 0 ] && command -v gh >/dev/null 2>&1; then
-  need=$((delivery_n * 800))
+  need=$((delivery_n * 400))
   gql_left="$(gh api rate_limit --jq '.resources.graphql.remaining' 2>/dev/null || echo "")"
   if [ -n "$gql_left" ] && [ "$gql_left" -lt "$need" ] 2>/dev/null; then
     echo "!! GraphQL budget is ${gql_left}/5000 and $delivery_n delivery blueprint(s) need about ${need}" >&2
