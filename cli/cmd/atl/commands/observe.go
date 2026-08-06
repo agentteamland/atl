@@ -82,7 +82,7 @@ func observeSessionSignal(projectRoot string) {
 		return // no ATL decision surface here — the observer is dormant
 	}
 	if sweepstate.Observe.ForProject(projectRoot).Due(projectRoot) {
-		fmt.Println("atl: a proactive observer sweep is due — run /observe to surface ripe backlog triggers and latent gaps (shipped-vs-designed, growth/scale risks, unshipped decisions, your setup)")
+		fmt.Println(sweepNotice("atl: a proactive observer sweep is due", "/observe", "surface ripe backlog triggers and latent gaps"))
 	}
 }
 
