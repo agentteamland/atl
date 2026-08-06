@@ -163,3 +163,75 @@ func TestTranslateCommandMarksTheChildAsInternal(t *testing.T) {
 		t.Fatalf("child env replaced rather than extended: %v", cmd.Env)
 	}
 }
+
+// writeFires lays down a fire log with the given outcomes, oldest first.
+func writeFires(t *testing.T, idxPath string, outcomes ...string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(idxPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	var b strings.Builder
+	for _, o := range outcomes {
+		b.WriteString("2026-08-06T00:00:00Z\t" + o + "\n")
+	}
+	if err := os.WriteFile(filepath.Join(filepath.Dir(idxPath), "fires.log"), []byte(b.String()), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// The state this exists to detect: a credential that is SET and no longer valid.
+// Without it the env var is present, the notice stays suppressed, and every
+// non-English prompt silently searches on one arm.
+func TestThreeConsecutiveFailuresReadAsAnExpiredCredential(t *testing.T) {
+	idx := filepath.Join(t.TempDir(), "index.gob")
+	writeFires(t, idx, "fired", "translate-failed", "translate-failed", "translate-failed")
+	if !translationFailing(idx) {
+		t.Error("three consecutive translation failures must read as a dead credential")
+	}
+}
+
+// One or two failures must stay silent. A timeout is not an expiry, and a notice
+// that fires on a blip is the constant channel this project has measured.
+func TestAFewFailuresAreNotAnExpiry(t *testing.T) {
+	for _, n := range []int{1, 2} {
+		idx := filepath.Join(t.TempDir(), "index.gob")
+		out := []string{"translated"}
+		for i := 0; i < n; i++ {
+			out = append(out, "translate-failed")
+		}
+		if translationFailing(idx) {
+			t.Errorf("%d failure(s) must not read as an expiry", n)
+		}
+		writeFires(t, idx, out...)
+		if translationFailing(idx) {
+			t.Errorf("%d failure(s) after a success must not read as an expiry", n)
+		}
+	}
+}
+
+// A success anywhere in the recent window clears it — the credential works.
+func TestARecentSuccessClearsTheSignal(t *testing.T) {
+	idx := filepath.Join(t.TempDir(), "index.gob")
+	writeFires(t, idx, "translate-failed", "translate-failed", "translate-failed", "translated")
+	if translationFailing(idx) {
+		t.Error("a success after the failures means the credential works")
+	}
+}
+
+// Unrelated outcomes between failures must not break the run: the log is shared
+// with every retrieval fire, and translation attempts are a minority of it.
+func TestUnrelatedFiresDoNotInterruptTheCount(t *testing.T) {
+	idx := filepath.Join(t.TempDir(), "index.gob")
+	writeFires(t, idx, "translate-failed", "fired", "translate-failed", "fired", "translate-failed")
+	if !translationFailing(idx) {
+		t.Error("interleaved unrelated fires must not hide three consecutive failures")
+	}
+}
+
+// No log, no signal. This decides whether to PRINT something, so being wrong
+// must cost nothing.
+func TestNoFireLogIsSilent(t *testing.T) {
+	if translationFailing(filepath.Join(t.TempDir(), "index.gob")) {
+		t.Error("a missing fire log must not produce a notice")
+	}
+}
