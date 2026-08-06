@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # needs: gh+token
-# fixture: atl-e2e-delivery-3
+# fixture: atl-e2e-delivery-2
 # touches: cli/internal/dispatch, teams/delivery-team/backends
 #
 # github-delivery-engine — the delivery-team's Go orchestration engine (`atl work

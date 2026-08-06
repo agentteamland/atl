@@ -108,16 +108,24 @@ fi
 # out of budget should say so in seconds rather than after an hour.
 #
 # This is not hypothetical: the first full parallel run exhausted the 5000/hr
-# GraphQL budget at ~30 minutes and took down two blueprints that never touch
-# Projects at all. The delivery lanes burn it (a Project is deleted and recreated
-# per blueprint); the failure lands on whoever asks GitHub for anything next, with
-# an assertion message — "no tag in output" — that says nothing about rate limits.
-# Compressing 132 minutes of calls into 40 does not change the total, but the limit
-# is a RATE, so the compression is exactly what broke it.
+# GraphQL budget at ~30 minutes and took down two blueprints in the FREE lane that
+# never touch Projects at all — with assertion messages ("no tag in output") that
+# say nothing about rate limits.
+#
+# Measured afterwards, because the obvious culprit was wrong: the fixture reset
+# (delete + create a Project, two field-creates) costs 15 points, i.e. 90 across a
+# whole suite — 1.8% of the budget. The consumption is in the CEREMONY TURNS, where
+# each `claude -p` agent queries and mutates the board. That is the work under test,
+# so it cannot be optimised away.
+#
+# Which gives the real bound: a full suite costs approximately ONE HOURLY QUOTA, so
+# its runtime cannot be compressed far below an hour without exhausting the budget
+# regardless of how many lanes there are. Two delivery lanes (~58 min) sit just
+# above that floor; three (~40 min) do not, which is what the first run measured.
 if command -v gh >/dev/null 2>&1; then
   gql_left="$(gh api rate_limit --jq '.resources.graphql.remaining' 2>/dev/null || echo "")"
-  if [ -n "$gql_left" ] && [ "$gql_left" -lt 2000 ] 2>/dev/null; then
-    echo "!! GraphQL budget is ${gql_left}/5000 — the GitHub delivery blueprints will exhaust it" >&2
+  if [ -n "$gql_left" ] && [ "$gql_left" -lt 4000 ] 2>/dev/null; then
+    echo "!! GraphQL budget is ${gql_left}/5000 — a full suite needs roughly all of it" >&2
     echo "   and the failures will surface on UNRELATED blueprints. Wait for the hourly reset," >&2
     echo "   or run a subset that excludes the github-delivery-* lanes." >&2
     [ "${ATL_E2E_IGNORE_BUDGET:-0}" = 1 ] || exit 4

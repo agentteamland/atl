@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # needs: gh+token
-# fixture: atl-e2e-delivery-3
+# fixture: atl-e2e-delivery-2
 # touches: teams/delivery-team/skills/request, teams/delivery-team/backends
 #
 # github-request-loop — the delivery-team's /request mid-project intake ceremony, end to end on

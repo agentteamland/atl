@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # needs: gh+token
-# fixture: atl-e2e-delivery-3
+# fixture: atl-e2e-delivery-2
 # touches: teams/profile-team, cli/internal/teampkg, cli/internal/storegit, cli/cmd/atl/commands
 #
 # profile-backup-restore — the two skills that touch the user's most sensitive data, and the

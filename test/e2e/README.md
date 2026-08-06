@@ -142,8 +142,12 @@ publish blueprints exercise actual GitHub:
   same title, so the loop is repeatable. **That is also why there are three.** Two
   blueprints on one fixture cannot overlap: the second one's reset destroys the
   first's board mid-run, and the loser fails an assertion that says nothing about
-  concurrency. Three fixtures means three lanes, which is what takes the suite from
-  ~132 min to ~40. The mapping is declared per blueprint on its `# fixture:` line;
+  concurrency. Separate fixtures mean separate lanes, which is what takes the suite from ~132 min
+  to ~58. **Two** delivery lanes, not three, and the limit is not the fixtures: a full
+  suite costs roughly one hourly GitHub GraphQL quota (the ceremony turns, not the
+  fixture resets — those are 15 points each), so compressing it far below an hour
+  exhausts the budget and the failures land on unrelated blueprints. `atl-e2e-delivery-3`
+  exists and is unused; a third lane becomes viable if that consumption ever drops. The mapping is declared per blueprint on its `# fixture:` line;
   `test/e2e/run.sh --lanes` prints the partition without running anything.
 
   Adding a fourth is a repo plus a `# fixture:` line — no harness change. The runner's

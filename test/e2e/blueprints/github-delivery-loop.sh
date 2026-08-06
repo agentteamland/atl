@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # needs: gh+token
-# fixture: atl-e2e-delivery-3
+# fixture: atl-e2e-delivery
 # touches: teams/delivery-team, cli/internal/dispatch
 #
 # github-delivery-loop — the delivery-team's autonomous loop on the REAL GitHub
