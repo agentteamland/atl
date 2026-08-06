@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/agentteamland/atl/cli/internal/digest"
 	"github.com/agentteamland/atl/cli/internal/sweepstate"
 	"github.com/spf13/cobra"
 )
@@ -84,6 +85,29 @@ func observeSessionSignal(projectRoot string) {
 	if sweepstate.Observe.ForProject(projectRoot).Due(projectRoot) {
 		fmt.Println(sweepNotice("atl: a proactive observer sweep is due", "/observe", "surface ripe backlog triggers and latent gaps"))
 	}
+	digestSessionSignal(projectRoot)
+}
+
+// digestSessionSignal reports how many sweep findings are waiting for a human
+// decision — and nothing else about them.
+//
+// The count is deliberately the whole payload. A sweep's judgement-half cannot
+// go to the board (a finding that needs a decision needs it before it needs a
+// ticket) and it cannot be spoken on the sweep's own schedule either: that is
+// the constant-channel shape this project has measured, where a mechanism that
+// speaks every time it runs teaches the reader to skip it. Restating the
+// findings here every session would be exactly that failure, arriving through
+// the mechanism built to avoid it.
+//
+// So this says how many, names the action, and cites the rule that owns the
+// response — the same three properties the sweep signals above are pinned on.
+func digestSessionSignal(projectRoot string) {
+	n := digest.UnreadCount(projectRoot)
+	if n == 0 {
+		return
+	}
+	fmt.Printf("atl: %d sweep finding(s) waiting for a decision — show them to the user with `atl digest` "+
+		"(per the sweep-dispatch rule); they need a human call, not a card\n", n)
 }
 
 func init() {

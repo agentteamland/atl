@@ -47,6 +47,34 @@ The split is the point. The board already carries actionable work through to clo
 needs no new surface; and because the actionable half leaves, the digest shrinks to only what a human
 must actually decide — which is the only version short enough to get read.
 
+### The digest, concretely
+
+A sweep records each judgement-call finding with:
+
+```bash
+printf '<the evidence and why it matters>' | atl digest add --sweep observe --title '<one line>'
+```
+
+Idempotent by `(sweep, title)`: re-reporting refreshes the body and **leaves the read state alone**,
+so a sweep that fires whenever its paths move converges instead of re-interrupting about the same
+thing.
+
+**When a session starts with findings waiting**, `atl session-start` prints how many — and only how
+many. On that signal:
+
+- **Show them to the user, in your own words**: run `atl digest`, read what comes back, and present
+  it. This is a foreground, in-turn action, not a background subagent — the whole category is
+  *things a human must decide*, so there is nobody for a subagent to hand them to. (Same boundary as
+  a store with no remote, above.)
+- **Do not card them.** `/observe`'s own rule that latent-gap findings are never auto-carded is not
+  overridden here. Offer to open a brainstorm or a board item once the user has decided; that is
+  their call to make, and making it for them is what the split exists to prevent.
+- **Drop what gets settled** — `atl digest drop <id>` — so the count means what it says.
+
+The count is the entire payload of the signal on purpose. A signal that restated its findings every
+session would be the constant channel this design exists to avoid, arriving through the mechanism
+built to avoid it.
+
 ## What this rule does NOT cover
 
 **A signal whose remedy needs a person cannot be dispatched.** Some conditions are reported by
