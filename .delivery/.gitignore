@@ -1,0 +1,16 @@
+# .delivery/ is committed, but ONLY these two source files belong in git:
+#   config.json, methodology.json  (written by /delivery-init).
+# Everything below is engine-derived scratch — regenerated each run; never commit it.
+
+# per-unit git worktrees, incl. the nested .quarantine/ (atl work dispatch)
+worktrees/
+# supervisor run state (atl work dispatch)
+runstate.json
+# materialized sprint DAG, derived from the backend (/sprint-start)
+plan.json
+# blocked-unit reports, drained back to the board by /sprint-review
+blocked/
+# generated worker MCP config — may embed a credential (atl work dispatch)
+mcp/
+# single-dispatch mutex
+dispatch.lock

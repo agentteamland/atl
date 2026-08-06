@@ -1,0 +1,70 @@
+{
+  "id": "scrum",
+  "displayName": "Scrum",
+  "mode": "flow",
+  "roles": [
+    {
+      "name": "intake",
+      "binding": "agent",
+      "dispatch": "in-session"
+    },
+    {
+      "name": "business-analyst",
+      "binding": "agent",
+      "dispatch": "subagent"
+    },
+    {
+      "name": "technical-analyst",
+      "binding": "agent",
+      "dispatch": "subagent"
+    },
+    {
+      "name": "project-manager",
+      "binding": "agent",
+      "dispatch": "subagent"
+    },
+    {
+      "name": "tech-lead",
+      "binding": "agent",
+      "dispatch": "subagent"
+    },
+    {
+      "name": "tester",
+      "binding": "agent",
+      "dispatch": "worker"
+    },
+    {
+      "name": "developer",
+      "binding": "agent",
+      "dispatch": "worker",
+      "instances": "dynamic"
+    },
+    {
+      "name": "product-owner",
+      "binding": "human"
+    }
+  ],
+  "artifactHierarchy": [
+    "Epic",
+    "Feature",
+    "Pbi",
+    "Task"
+  ],
+  "workItemTypeMap": {
+    "Pbi": null,
+    "Task": null,
+    "Bug": null
+  },
+  "cadence": {
+    "unit": "sprint",
+    "planningCeremonies": [
+      "sprint-plan",
+      "sprint-start"
+    ],
+    "reviewCeremony": "sprint-review"
+  },
+  "branches": {
+    "dev": "dev",
+    "release": "release"
+  }
+}
