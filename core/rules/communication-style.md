@@ -51,3 +51,38 @@ stretch — follow it, and do not smuggle the omitted substance into the next an
 (Numbered 6 rather than inserted near its siblings on purpose: §4 is cited by number in several
 places, and renumbering would silently falsify them — including historical records that were
 correct when written.)
+
+## 7. Close a long answer with a summary the reader can act on
+
+When an answer is long enough that finding the actionable part costs real reading — a multi-part
+investigation, a ranked list, a set of findings, a report on work done while the reader was away —
+**end it with a short summary section.**
+
+The reason is what the body actually is. Everything above the summary is your *working-out*: the
+evidence, the verification, the reasoning that earns the conclusion. It has to be there — §6 is
+right that dropping it is the more expensive failure — but the reader did not ask for your process,
+they asked for its result. Without a closing summary the only way to extract that result is to read
+the whole thing, which spends their time on a reconstruction you could have handed them.
+
+What belongs in it:
+
+- **What you concluded or decided**, in plain language — no jargon that first appeared in the body,
+  no internal identifiers standing in for their meaning.
+- **What you did**, if you changed anything. One line each.
+- **What is waiting on them** — the decisions only they can make, stated as questions.
+
+What must not:
+
+- **Anything that appears nowhere else.** A summary is a second path to the same content, never the
+  only path to some of it. A reader who skips it must not lose a fact.
+- **A recap of your reasoning.** Compress to the outcome, not to a shorter version of the argument.
+
+**This does not contradict §6, and the boundary is worth stating** because the two look opposed.
+§6 forbids *restating what you just said as you go* — preamble, announcing your next move,
+re-summarising a paragraph you have not finished making. That is filler inside the argument. §7 is
+a *terminal* section serving a different reader on a different pass: the one who needs the outcome
+now and the evidence only if they doubt it. One is padding the body, the other is an index to it.
+
+Match its length to the body — a summary that is itself long has failed at the one thing it exists
+to do. And when the whole answer is already short, there is nothing to index: adding a summary to a
+three-line reply is the padding §6 forbids.
