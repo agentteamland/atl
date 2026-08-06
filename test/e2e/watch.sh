@@ -43,7 +43,16 @@ while [ ! -f "$LOG" ]; do
 done
 
 reported=""          # blueprint names already reported, so a failure notifies ONCE
-declare -A last_size=() quiet=()
+
+# Per-lane counters live in a temp dir rather than an associative array, because
+# macOS ships bash 3.2 and `declare -A` is bash 4+. The first version used one and
+# died on the shebang line with exit 0 — armed-looking and watching nothing, which
+# is the failure mode this whole script exists to prevent, in the script itself.
+STATE="$(mktemp -d)"
+trap 'rm -rf "$STATE"' EXIT
+slot() { printf '%s' "$1" | tr -c 'A-Za-z0-9' '_'; }
+get() { cat "$STATE/$1.$2" 2>/dev/null || echo 0; }
+set_() { echo "$3" > "$STATE/$1.$2"; }
 
 # The suite runs its blueprints in LANES — blueprints that force-reset the same
 # external fixture share one and run serially, and lanes run concurrently. That
@@ -97,11 +106,13 @@ while :; do
 
   # --- stalled, per lane ---------------------------------------------------------------
   while IFS= read -r lane; do
+    k="$(slot "$lane")"
     lcur=$(size_of "$lane")
-    if [ "${last_size[$lane]:-0}" = "$lcur" ] && [ "$lcur" != 0 ]; then
-      quiet[$lane]=$(( ${quiet[$lane]:-0} + INTERVAL ))
-      if [ "${quiet[$lane]}" -ge "$STALL" ]; then
-        echo "e2e STALLED: lane $(basename "$lane") silent for ${quiet[$lane]}s (threshold ${STALL}s), last blueprint: $(grep -E '^========= blueprint' "$lane" | tail -1 | sed 's/.*blueprint: //;s/ (needs.*//')"
+    if [ "$(get "$k" size)" = "$lcur" ] && [ "$lcur" != 0 ]; then
+      q=$(( $(get "$k" quiet) + INTERVAL ))
+      set_ "$k" quiet "$q"
+      if [ "$q" -ge "$STALL" ]; then
+        echo "e2e STALLED: lane $(basename "$lane") silent for ${q}s (threshold ${STALL}s), last blueprint: $(grep -E '^========= blueprint' "$lane" | tail -1 | sed 's/.*blueprint: //;s/ (needs.*//')"
         echo "   Other lanes may still be running — the aggregate log keeps growing, which is"
         echo "   exactly why this is measured per lane. A hung turn leaves no FAIL line and no"
         echo "   summary, so this is the only tell."
@@ -109,9 +120,9 @@ while :; do
         exit 2
       fi
     else
-      quiet[$lane]=0
+      set_ "$k" quiet 0
     fi
-    last_size[$lane]="$lcur"
+    set_ "$k" size "$lcur"
   done < <(lane_logs)
 
   sleep "$INTERVAL"

@@ -208,22 +208,44 @@ run_lane() {
     {
       echo ""
       echo "========= blueprint: $name (needs: $needs, lane: $key) ========="
-    } > "$WORK/out.$name"
+    } | tee -a "$lanelog" > "$WORK/out.$name"
     bp_start=$SECONDS
     rc=0
+    # Live to the lane log, buffered to the temp file. Both halves are load-bearing
+    # and they pull in opposite directions:
+    #
+    #   - the AGGREGATE must stay block-contiguous, or a block torn between two
+    #     lanes breaks the watcher's `<< name VERDICT` and `========= blueprint:`
+    #     greps — hence the buffer, flushed under a mutex when the blueprint ends.
+    #   - the LANE log must grow CONTINUOUSLY, or liveness is unmeasurable: with
+    #     output buffered to the end, a lane holding a 34-minute blueprint looks
+    #     silent for 34 minutes and the stall detector false-fires at 20. Growth
+    #     only at blueprint boundaries is not a heartbeat, it is a completion
+    #     signal wearing one.
+    #
+    # tee gives both from one stream. PIPESTATUS carries docker's real status
+    # through — $? would report tee's.
+    # errexit off across the pipeline. A FAILING blueprint is the normal case this
+    # loop exists to record, but under `set -e` a non-zero pipeline kills the whole
+    # lane before its result line is written — so one red blueprint would silently
+    # take every later blueprint in its lane with it. `|| true` cannot be used
+    # here: it makes PIPESTATUS describe `true` rather than the pipeline.
+    set +e
     docker run --rm \
       -e BLUEPRINT="$name" \
       -e ATL_E2E_TEAM_REF="$ATL_E2E_TEAM_REF" \
       ${secret_env[@]+"${secret_env[@]}"} \
       ${fixture_env[@]+"${fixture_env[@]}"} \
-      atl-e2e bash "/e2e/blueprints/$name.sh" >> "$WORK/out.$name" 2>&1 || rc=$?
+      atl-e2e bash "/e2e/blueprints/$name.sh" 2>&1 | tee -a "$lanelog" >> "$WORK/out.$name"
+    rc="${PIPESTATUS[0]}"
+    set -e
     bp_secs=$((SECONDS - bp_start))
     if [ "$rc" -eq 0 ]; then verdict=PASSED; else verdict=FAILED; fi
-    echo "<< $name $verdict (${bp_secs}s)" >> "$WORK/out.$name"
+    echo "<< $name $verdict (${bp_secs}s)" | tee -a "$lanelog" >> "$WORK/out.$name"
     # The lane log is the watcher's per-lane liveness surface: with several lanes
     # running, "no output for N seconds" is meaningless on the aggregate, because
-    # a stalled lane is hidden by a busy one.
-    cat "$WORK/out.$name" >> "$lanelog"
+    # a stalled lane is hidden by a busy one. It was written live above; the
+    # aggregate gets the whole block now, atomically.
     emit "$WORK/out.$name"
     echo "$bp_secs|$name|$verdict|$needs" >> "$WORK/results"
   done < "$WORK/lane.$key"

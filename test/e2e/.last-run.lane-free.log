@@ -1,28 +1,12 @@
 
-========= blueprint: guard (needs: none, lane: free) =========
-  ok   - force-push is denied
-  ok   - force-with-lease passes
-  ok   - ordinary command passes
-  ok   - first edit injects a nudge
-  ok   - nudge omits a permission decision
-  ok   - second edit is silent
-  ok   - new-file write is exempt
-  ok   - malformed input is a safe no-op
-
-guard: 8 passed, 0 failed
-<< guard PASSED (0s)
-
-========= blueprint: init (needs: none, lane: free) =========
-  ok   - init created a project CLAUDE.md
-  ok   - project skeleton has the owned sections
-  ok   - init created .atl/backlog.md
-  ok   - init created .atl/tasks.md
-  ok   - backlog skeleton has content
-  ok   - re-run left the existing CLAUDE.md untouched
-  ok   - re-run left .atl/backlog.md untouched
-  ok   - init --global created ~/.claude/CLAUDE.md
-  ok   - global persona has no managed blocks
-  ok   - mutually exclusive flags rejected
-
-init: 10 passed, 0 failed
-<< init PASSED (0s)
+========= blueprint: zz-live (needs: none, lane: free) =========
+  tick 1
+  tick 2
+  tick 3
+  tick 4
+  tick 5
+  tick 6
+  tick 7
+  tick 8
+zz-live: 1 passed, 0 failed
+<< zz-live PASSED (16s)
