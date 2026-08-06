@@ -16,7 +16,7 @@ atl setup-hooks --throttle=1h      # daha seyrek tick
 
 ## Ne yapar?
 
-`~/.claude/settings.json` dosyasına dört giriş yazar:
+`~/.claude/settings.json` dosyasına beş giriş yazar:
 
 ```json
 {
@@ -38,6 +38,11 @@ atl setup-hooks --throttle=1h      # daha seyrek tick
       { "matcher": "Bash|Edit|Write",
         "hooks": [
           { "type": "command", "command": "atl guard" }
+      ]}
+    ],
+    "Stop": [
+      { "hooks": [
+          { "type": "command", "command": "atl retrieve turn-end" }
       ]}
     ]
   }
@@ -72,6 +77,17 @@ Bir şey yüzeye çıktığında Claude bağlamında ilgili satırı görür ve 
 ### `UserPromptSubmit` — istem başına bilgi getirme
 
 Tick'in yanı sıra ikinci bir `UserPromptSubmit` girişi `atl retrieve` çalıştırır: bu projenin bilgi sayfalarını (wiki + journal) her isteme karşı sıralar — BM25 ile yerel bir anlamsal gömücü (embedder) birleştirilerek — ve en iyi eşleşmeleri bağlam olarak yüzeye çıkarır; böylece Claude yanıtlamadan önce en ilgili sayfalara başvurur. Bir delivery projesi (bir `.delivery/config.json` içeren) ayrıca depo içi `docs/` ağacını wiki + journal ile birlikte dizinler. Hataya-açık (fail-open) çalışır: herhangi bir hata hiçbir şey yazdırmaz ve istemi asla engellemez. [Bilgi sistemi kılavuzuna](/tr/guide/knowledge-system) bak.
+
+### `Stop` — turun tamamlandığını kaydeder
+
+Bir tur bittiğinde çalışır. `atl retrieve turn-end` retrieval ateşleme günlüğüne tek satır yazar
+ve hiçbir şey yazdırmaz; dolayısıyla Claude'un bağlamına ulaşmaz ve bir yanıtı etkilemez.
+
+Tek bir sorunun cevaplanabilir olması için vardır: **retrieval'ın yüzeye çıkardığı şeye kimse
+göre hareket ediyor mu?** Bir tur işareti olmadan ateşleme günlüğü neyin sunulduğunu kaydeder,
+sonrasında ne olduğuna dair hiçbir şey kaydetmez; böylece "bu kanalı iyileştirmeye değer mi?"
+sorusu ancak tüm transkript üzerinde adli bir taramayla cevaplanabilir. `atl retrieve stats`
+danışma oranını buradan okur.
 
 ### `PreToolUse` — uygulama muhafızı
 
