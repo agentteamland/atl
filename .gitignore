@@ -10,3 +10,5 @@ coverage.out
 
 # e2e run mirror (stable path for test/e2e/watch.sh)
 test/e2e/.last-run.log
+# per-lane logs, written beside the aggregate by the lane runner (watch.sh reads them)
+test/e2e/.last-run.lane-*.log
