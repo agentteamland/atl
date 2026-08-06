@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # needs: gh+token
+# fixture: atl-e2e-delivery-2
 # touches: teams/delivery-team/skills/request, teams/delivery-team/backends
 #
 # github-request-loop — the delivery-team's /request mid-project intake ceremony, end to end on
@@ -41,7 +42,7 @@ gh auth setup-git >/dev/null 2>&1 || true
 LOGIN=$(gh_login)
 [ -n "$LOGIN" ] || { bad "gh not authenticated"; finish; exit 1; }
 OWNER="${ATL_E2E_DELIVERY_OWNER:-agentteamland}"
-REPO="$OWNER/atl-e2e-delivery"
+REPO="$OWNER/$(delivery_fixture)"
 
 reset_delivery_repo "$OWNER" \
   && ok "reset delivery fixture repo to baseline (main/dev/release)" \
@@ -67,7 +68,7 @@ mkdir -p "$PROJ/.delivery"
 cat > "$PROJ/.delivery/config.json" <<EOF
 {
   "owner": "$OWNER",
-  "repo": "atl-e2e-delivery",
+  "repo": "$(delivery_fixture)",
   "projectNumber": $PROJNUM,
   "branchPair": { "dev": "dev", "release": "release" },
   "backend": "github",
