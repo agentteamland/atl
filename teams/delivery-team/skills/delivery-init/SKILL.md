@@ -28,8 +28,8 @@ territory under the CLI/Skill boundary.
 
 ## When to run
 
-- **Once per project**, before `/kickoff` — a greenfield project's cold-start ceremony
-  requires `config.json` present and a live connectivity probe.
+- **Once per project**, before `/kickoff` — that ceremony's cold-start, greenfield or
+  brownfield alike, requires `config.json` present and a live connectivity probe.
 - **Re-run** to update the connection (a new repo, a corrected board, a rotated credential
   reference). Re-running is idempotent — see [Idempotent re-run](#idempotent-re-run). Switching
   the *backend* on a re-run is an explicit re-scope, not a silent field edit — see that section.
@@ -370,8 +370,13 @@ Summarize what was written — the backend, its coordinates (Azure: org/project/
 any field the user must still add in the UI), the branch pair, the **mode** (and, when it is
 `flow`, that sprints are carried by a `sprint:<slug>` label and that no `Iteration` or
 `Story Points` field is needed), and the credential **reference name** (never a value). Point the
-user to the next step: `/kickoff` for a brand-new project, or
-`/refine` / `/sprint-plan` for a project that already has a backlog.
+user to the next step: **`/kickoff`, whatever the project's age.**
+
+Do **not** route a project that already has a backlog straight to `/refine` — that was the
+bypass, and it is what left every brownfield project without the `Domain/` + `Architecture/`
+pages, since `/kickoff` is their only seeder and `/refine`'s tech-lead has no other durable
+input. `/kickoff` now has a brownfield **mode** that reads the existing record instead of
+eliciting it, so the route is the same for both.
 
 ## Security: the credential is never stored
 
