@@ -31,7 +31,7 @@ import (
 //	3 — adds `channels`, the capture channels the team declared. Like `stores`,
 //	    the value lives only in the team's team.json, so an install written at
 //	    v2 must re-fetch its pinned source once to learn it.
-const SchemaVersion = 3
+const SchemaVersion = 4
 
 // Source mirrors the index source an install resolved from, pinned to the ref
 // actually fetched, so doctor/update can re-fetch the exact same bytes.
@@ -96,6 +96,13 @@ type Manifest struct {
 	// channel's signal without knowing which team owns it. Omitted for teams that
 	// declare none.
 	Channels []Channel `json:"channels,omitempty"`
+	// Reviewer is the agent this team declared under `capabilities.review` — the
+	// domain specialist /create-pr spawns over a diff alongside its generic
+	// reviewer. Recorded here for the same reason as Stores and Channels: the
+	// declaration lives in team.json, which is NOT an installable asset, so a
+	// consumer that only sees the installed tree cannot read it from disk.
+	// Empty for teams that declare none, which is the common case.
+	Reviewer string `json:"reviewer,omitempty"`
 }
 
 // dirName is the installed-manifests directory under a layer root.

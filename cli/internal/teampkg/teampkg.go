@@ -119,6 +119,26 @@ func (t *TeamManifest) DeclaredChannels() []manifest.Channel {
 	return out
 }
 
+// DeclaredReviewer returns the agent this team declares under
+// `capabilities.review`, or "" when it declares none.
+//
+// Note the shape difference from its two siblings, which is why this is not a
+// third copy of the same loop: `store` and `channel` are fields INSIDE a named
+// capability object (`capabilities.profile.store`), while `review` IS a
+// capability whose value is the agent name — a bare string, exactly as
+// team.json's own comment on the Capabilities field records.
+func (t *TeamManifest) DeclaredReviewer() string {
+	raw, ok := t.Capabilities["review"]
+	if !ok {
+		return ""
+	}
+	var name string
+	if err := json.Unmarshal(raw, &name); err != nil {
+		return "" // not a string — tolerate it, as the other readers do
+	}
+	return strings.TrimSpace(name)
+}
+
 func sortedKeys(m map[string]json.RawMessage) []string {
 	keys := make([]string, 0, len(m))
 	for k := range m {

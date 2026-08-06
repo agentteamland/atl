@@ -207,3 +207,51 @@ func TestMigrateTeamManifestHandlesNoDeclaredChannel(t *testing.T) {
 		t.Fatalf("schemaVersion = %d, want %d", got.SchemaVersion, manifest.SchemaVersion)
 	}
 }
+
+// The only path by which an install that predates the `reviewer` field ever
+// gains it. Without this, /create-pr's specialist review stays silent for every
+// team already on disk — the population code would be correct and unreachable.
+func TestMigrateTeamManifestBackfillsReviewer(t *testing.T) {
+	layer := t.TempDir()
+	fetch, calls := teamSource(t, `{"name":"demo","version":"1.0.0","capabilities":{"review":"tech-lead"}}`)
+
+	m := preV2Manifest()
+	if err := migrateTeamManifest(m, layer, fetch); err != nil {
+		t.Fatalf("migrateTeamManifest: %v", err)
+	}
+	if *calls != 1 {
+		t.Errorf("fetched %d times, want exactly 1", *calls)
+	}
+
+	got, err := manifest.Read(layer, "acme", "demo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Reviewer != "tech-lead" {
+		t.Errorf("Reviewer = %q, want %q", got.Reviewer, "tech-lead")
+	}
+	// The schema must be stamped, or the migration repeats a network fetch on
+	// every update forever.
+	if got.SchemaVersion != manifest.SchemaVersion {
+		t.Errorf("SchemaVersion = %d, want %d", got.SchemaVersion, manifest.SchemaVersion)
+	}
+}
+
+// The bump is what makes the field reach existing installs: the caller only
+// migrates while `m.SchemaVersion < manifest.SchemaVersion`. A manifest already
+// at the current schema is left alone, which is correct — and is exactly why
+// adding a declaration-derived field without bumping the constant would ship
+// population code that never runs.
+func TestAManifestAlreadyAtTheCurrentSchemaIsNotMigratedAgain(t *testing.T) {
+	m := preV2Manifest()
+	m.SchemaVersion = manifest.SchemaVersion
+	if m.SchemaVersion < manifest.SchemaVersion {
+		t.Fatal("a manifest at the current schema must not qualify for migration")
+	}
+	// And the reviewer field must be new in the CURRENT schema, not an older one:
+	// if this constant had not moved, every install on disk would already be at
+	// the current schema and would never be offered the backfill above.
+	if manifest.SchemaVersion < 4 {
+		t.Errorf("SchemaVersion = %d — the reviewer field needs its own bump to reach existing installs", manifest.SchemaVersion)
+	}
+}
