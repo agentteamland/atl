@@ -30,7 +30,14 @@ INTERVAL="${ATL_E2E_WATCH_INTERVAL:-300}"
 # grandchild holding the pipes, or a dead reaper all show up here and nowhere else: a hung
 # turn produces no FAIL line AND no summary line, so without this check it is
 # indistinguishable from "still working".
-STALL="${ATL_E2E_WATCH_STALL:-1200}"
+# Per LANE, which needs a different number from the aggregate. On the aggregate a
+# quiet stretch was bounded by the per-turn cap, because some other blueprint kept
+# writing; a lane holds ONE blueprint at a time, and a blueprint can be legitimately
+# silent for its whole run — github-delivery-autonomous-refine's dispatch phase
+# writes nothing until its real `claude -p` workers finish. Measured on a green
+# run: 2137s for that one, 2231s for the longest. So the floor is the longest
+# blueprint, not the longest turn. 1200s false-fired on exactly that case.
+STALL="${ATL_E2E_WATCH_STALL:-2700}"
 
 # Wait for the log to appear — the watcher is usually armed a beat before the suite writes.
 waited=0
@@ -69,6 +76,8 @@ lane_logs() {
   local found=0 f
   for f in "$base".lane-*.log; do
     [ -e "$f" ] || continue
+    # A finished lane stops growing on purpose; only a RUNNING lane can stall.
+    grep -q '^===== lane .* complete =====' "$f" && continue
     echo "$f"; found=1
   done
   [ "$found" -eq 1 ] || echo "$LOG"

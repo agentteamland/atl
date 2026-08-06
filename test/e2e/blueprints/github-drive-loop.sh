@@ -139,15 +139,30 @@ EOF
   || bad "the tree is still dirty; /work-start will refuse and the run measures the harness, not the skill"
 
 # ---- seed two units: one to drive, one the engine owns ------------------------------
+#
+# Create the labels first. `gh issue create --label X` FAILS outright when X does
+# not exist on the repo ("could not add label: 'sprint:1' not found"), so seeding
+# depended on labels this blueprint never creates: `type:pbi` and `area:web` come
+# from github-delivery-engine, and `sprint:1` from a `/sprint-plan` run in some
+# earlier blueprint. That is a hidden ordering dependency between blueprints — it
+# held while the suite ran serially in one fixed order, and a lane layout that
+# reorders them exposes it. A blueprint must create the state it seeds with.
+for L in "type:pbi" "area:web" "sprint:1"; do
+  gh label create "$L" --repo "$REPO" -c "#0969da" -d "e2e fixture label" >/dev/null 2>&1 || true
+done
+
+# stderr is captured rather than discarded: `2>/dev/null` here turned a named
+# failure into "could not seed the drive unit", which says nothing about why and
+# cost a full suite run to diagnose.
 DRIVE=$(gh issue create --repo "$REPO" --title "e2e drive: add a subtract helper" \
   --body $'## Problem\nCallers need subtraction.\n\n## Acceptance Criteria\n- a `subtract(a,b)` export in app.js\n- a passing node --test case' \
-  --label "type:pbi" --label "area:web" --label "sprint:1" 2>/dev/null | grep -oE '[0-9]+$')
-[ -n "$DRIVE" ] && ok "seeded the unit to drive (#$DRIVE, sprint:1)" || bad "could not seed the drive unit"
+  --label "type:pbi" --label "area:web" --label "sprint:1" 2>/tmp/seed-drive.err | grep -oE '[0-9]+$')
+[ -n "$DRIVE" ] && ok "seeded the unit to drive (#$DRIVE, sprint:1)" || bad "could not seed the drive unit: $(head -1 /tmp/seed-drive.err 2>/dev/null)"
 
 OWNED=$(gh issue create --repo "$REPO" --title "e2e drive: a unit the engine owns" \
   --body $'## Problem\nThe engine is driving this one.\n\n## Acceptance Criteria\n- untouched by the drive loop' \
-  --label "type:pbi" --label "area:web" --label "sprint:1" 2>/dev/null | grep -oE '[0-9]+$')
-[ -n "$OWNED" ] && ok "seeded the engine-owned unit (#$OWNED)" || bad "could not seed the engine-owned unit"
+  --label "type:pbi" --label "area:web" --label "sprint:1" 2>/tmp/seed-owned.err | grep -oE '[0-9]+$')
+[ -n "$OWNED" ] && ok "seeded the engine-owned unit (#$OWNED)" || bad "could not seed the engine-owned unit: $(head -1 /tmp/seed-owned.err 2>/dev/null)"
 
 # A plan naming ONLY the engine-owned unit. This is the boundary: dispatch admits from the plan
 # and nothing else, so #DRIVE is the human's and #OWNED is not.

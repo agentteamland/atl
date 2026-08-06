@@ -104,34 +104,6 @@ else
   echo ">> running ALL blueprints (full suite — the default; pass names to run a subset)"
 fi
 
-# GraphQL budget preflight — above the image build, because a suite that will run
-# out of budget should say so in seconds rather than after an hour.
-#
-# This is not hypothetical: the first full parallel run exhausted the 5000/hr
-# GraphQL budget at ~30 minutes and took down two blueprints in the FREE lane that
-# never touch Projects at all — with assertion messages ("no tag in output") that
-# say nothing about rate limits.
-#
-# Measured afterwards, because the obvious culprit was wrong: the fixture reset
-# (delete + create a Project, two field-creates) costs 15 points, i.e. 90 across a
-# whole suite — 1.8% of the budget. The consumption is in the CEREMONY TURNS, where
-# each `claude -p` agent queries and mutates the board. That is the work under test,
-# so it cannot be optimised away.
-#
-# Which gives the real bound: a full suite costs approximately ONE HOURLY QUOTA, so
-# its runtime cannot be compressed far below an hour without exhausting the budget
-# regardless of how many lanes there are. Two delivery lanes (~58 min) sit just
-# above that floor; three (~40 min) do not, which is what the first run measured.
-if command -v gh >/dev/null 2>&1; then
-  gql_left="$(gh api rate_limit --jq '.resources.graphql.remaining' 2>/dev/null || echo "")"
-  if [ -n "$gql_left" ] && [ "$gql_left" -lt 4000 ] 2>/dev/null; then
-    echo "!! GraphQL budget is ${gql_left}/5000 — a full suite needs roughly all of it" >&2
-    echo "   and the failures will surface on UNRELATED blueprints. Wait for the hourly reset," >&2
-    echo "   or run a subset that excludes the github-delivery-* lanes." >&2
-    [ "${ATL_E2E_IGNORE_BUDGET:-0}" = 1 ] || exit 4
-  fi
-fi
-
 SUITE_START=$SECONDS
 echo ">> building atl-e2e image"
 docker build -f test/e2e/Dockerfile -t atl-e2e . >/dev/null
@@ -186,6 +158,14 @@ done
 
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
+
+# Clear every lane log before writing the ones this run needs. A lane that ran
+# LAST time and not this time would otherwise leave a file nobody is writing, and
+# watch.sh globs them all to measure per-lane liveness — so a stale log never
+# grows, and after the stall threshold the watcher reports a stall on a lane that
+# is not running. A watcher that cries wolf is worse than none: the next real
+# stall is the one nobody believes.
+rm -f "${RUNLOG%.log}".lane-*.log
 attempted=0
 for name in $runnable; do
   key="$(lane_of "$BPDIR/$name.sh")"; key="${key:-free}"
@@ -202,6 +182,34 @@ fi
 # suite, which matters because a wrong declaration is not a slow run — it is two
 # lanes force-resetting one fixture, and the failure surfaces as an unrelated
 # assertion in whichever lane lost.
+# GraphQL budget preflight — only when a delivery lane is actually selected.
+#
+# The budget only matters to the GitHub delivery blueprints; a subset of auth-free
+# ones has nothing to do with it, and an unconditional check blocks work that could
+# not spend a point. (Caught by using it: a `needs: none` blueprint was refused.)
+#
+# The first full parallel run exhausted the 5000/hr budget at ~30 minutes and took
+# down two blueprints in the FREE lane that never touch Projects at all — with
+# assertion messages ("no tag in output") that say nothing about rate limits.
+#
+# Measured afterwards, because the obvious culprit was wrong: the fixture reset
+# (delete + create a Project, two field-creates) costs 15 points, i.e. 90 across a
+# whole suite — 1.8% of the budget. The consumption is in the CEREMONY TURNS, where
+# each `claude -p` agent queries and mutates the board. That is the work under test,
+# so it cannot be optimised away.
+#
+# Which gives the real bound: a full suite costs approximately ONE HOURLY QUOTA, so
+# its runtime cannot be compressed far below an hour however many lanes there are.
+if [ "${#LANE_KEYS[@]}" -gt 0 ] && [ "${LANE_KEYS[*]}" != "free" ] && command -v gh >/dev/null 2>&1; then
+  gql_left="$(gh api rate_limit --jq '.resources.graphql.remaining' 2>/dev/null || echo "")"
+  if [ -n "$gql_left" ] && [ "$gql_left" -lt 4000 ] 2>/dev/null; then
+    echo "!! GraphQL budget is ${gql_left}/5000 — a full suite needs roughly all of it" >&2
+    echo "   and the failures surface on UNRELATED blueprints. Wait for the hourly reset," >&2
+    echo "   or run a subset that excludes the github-delivery-* lanes." >&2
+    [ "${ATL_E2E_IGNORE_BUDGET:-0}" = 1 ] || exit 4
+  fi
+fi
+
 if [ "${SHOW_LANES:-0}" = 1 ]; then
   for k in ${LANE_KEYS[@]+"${LANE_KEYS[@]}"}; do
     echo "lane $k:"; sed 's/^/  /' "$WORK/lane.$k"
@@ -285,6 +293,10 @@ run_lane() {
     emit "$WORK/out.$name"
     echo "$bp_secs|$name|$verdict|$needs" >> "$WORK/results"
   done < "$WORK/lane.$key"
+  # Mark the lane finished. Without this a lane that has COMPLETED is
+  # indistinguishable from one that is wedged: both stop growing, and the watcher
+  # reports a stall on work that is already done.
+  echo "===== lane $key complete =====" >> "$lanelog"
 }
 
 : > "$WORK/results"
