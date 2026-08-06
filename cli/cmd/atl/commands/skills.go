@@ -121,7 +121,7 @@ func skillsSessionSignal() {
 		fmt.Printf("atl skills: %d asset quality item(s) — run `atl skills check`\n", fails)
 	}
 	if sweepstate.Skills.Due(root) {
-		fmt.Println("atl skills: a stocktake is due — run /skill-stocktake to sweep skills for obedience + redundancy")
+		fmt.Println(sweepNotice("atl skills: a stocktake is due", "/skill-stocktake", "sweep skills for obedience and redundancy"))
 	}
 }
 

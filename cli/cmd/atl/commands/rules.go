@@ -80,7 +80,7 @@ func rulesSessionSignal() {
 		return
 	}
 	if sweepstate.Rules.Due(root) {
-		fmt.Println("atl rules: a distill is due — run /rules-distill to mine recurring principles into core rules")
+		fmt.Println(sweepNotice("atl rules: a distill is due", "/rules-distill", "mine recurring principles into core rules"))
 	}
 }
 

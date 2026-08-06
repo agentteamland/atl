@@ -146,7 +146,7 @@ func docsSessionSignal() {
 		fmt.Printf("atl docs: %d drift item(s) on the docs site — run `atl docs check`\n", len(fails))
 	}
 	if sweepstate.Docs.Due(repoRoot) {
-		fmt.Println("atl docs: a full audit is due — run /docs-audit to sweep the docs site for semantic drift")
+		fmt.Println(sweepNotice("atl docs: a full audit is due", "/docs-audit", "sweep the docs site for semantic drift"))
 	}
 }
 
