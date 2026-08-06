@@ -1,0 +1,9 @@
+{
+  "owner": "agentteamland",
+  "repo": "atl",
+  "projectNumber": 1,
+  "branchPair": { "dev": "dev", "release": "release" },
+  "backend": "github",
+  "methodology": "flow",
+  "credential": { "ref": "GH_TOKEN" }
+}
