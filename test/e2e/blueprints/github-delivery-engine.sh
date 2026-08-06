@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # needs: gh+token
+# fixture: atl-e2e-delivery-2
 # touches: cli/internal/dispatch, teams/delivery-team/backends
 #
 # github-delivery-engine — the delivery-team's Go orchestration engine (`atl work
@@ -35,7 +36,7 @@ gh auth setup-git >/dev/null 2>&1 || true
 LOGIN=$(gh_login)
 [ -n "$LOGIN" ] || { bad "gh not authenticated"; finish; exit 1; }
 OWNER="${ATL_E2E_DELIVERY_OWNER:-agentteamland}"
-REPO="$OWNER/atl-e2e-delivery"
+REPO="$OWNER/$(delivery_fixture)"
 
 reset_delivery_repo "$OWNER" \
   && ok "reset delivery fixture repo to baseline (main/dev/release)" \
@@ -64,7 +65,7 @@ mkdir -p "$PROJ/.delivery"
 cat > "$PROJ/.delivery/config.json" <<EOF
 {
   "owner": "$OWNER",
-  "repo": "atl-e2e-delivery",
+  "repo": "$(delivery_fixture)",
   "projectNumber": $PROJNUM,
   "branchPair": { "dev": "dev", "release": "release" },
   "backend": "github",
