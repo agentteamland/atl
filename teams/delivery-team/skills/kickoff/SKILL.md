@@ -1,6 +1,6 @@
 ---
 name: kickoff
-description: /kickoff — greenfield cold-start for the delivery-team. A once-per-project ceremony that turns a brand-new project's vision into its first backlog on the active backend: it runs live intake with the human PO, then adopts the business-analyst + technical-analyst (sequentially, in shared context) to create the first Epic + Feature(s) — business framing into the spec field, technical analysis into a sentinel comment — seeds the first Domain/ and Architecture/ durable-knowledge pages, and optionally seeds sprint-0. Requires .delivery/config.json + .delivery/methodology.json from /delivery-init; re-run converges (never blind re-creates) via the atl-key check-first query. Run once, after /delivery-init, before the recurring ceremonies.
+description: /kickoff — cold-start for the delivery-team, greenfield or brownfield. A once-per-project ceremony that turns a project's intent into its first backlog on the active backend. Greenfield: live intake with the human PO. Brownfield: read the work and knowledge the project already records, report the coverage — what was read, what maps where, what could not be placed, what would have to be invented — and ask the PO only the gaps, with no acceptance criterion shipping inferred. Either way it then adopts the business-analyst + technical-analyst (sequentially, in shared context) to create the first Epic + Feature(s) — business framing into the spec field, technical analysis into a sentinel comment — seeds the first Domain/ and Architecture/ durable-knowledge pages, and optionally seeds sprint-0. Requires .delivery/config.json + .delivery/methodology.json from /delivery-init; re-run converges (never blind re-creates) via the atl-key check-first query. Run once, after /delivery-init, before the recurring ceremonies.
 ---
 
 # /kickoff — greenfield cold-start
@@ -34,9 +34,17 @@ All backend access is through the active backend's adapter; the credential is re
 
 ## When to run
 
-- **Once, cold-start, per greenfield project** — a brand-new project with an empty (or
-  never-planned) backlog, immediately **after** `/delivery-init` and **before** the recurring
-  ceremonies. This is not a `methodology.cadence` ceremony (it is neither a `planningCeremonies`
+- **Once, cold-start, per project — greenfield OR brownfield.** Immediately **after**
+  `/delivery-init` and **before** the recurring ceremonies. A project that already has code, notes
+  and a backlog runs the *same* ceremony in **brownfield mode** (step 2b): same output, different
+  input source — artifacts instead of a conversation.
+
+  There is no separate brownfield ceremony, and that is the point. `/kickoff` is the **sole**
+  seeder of the `Domain/` + `Architecture/` durable pages that `/refine` and every worker read, so
+  a project routed *past* it arrives at decomposition with the tech-lead's only durable input
+  missing. A parallel ceremony would leave that bypass in place; a mode removes it.
+
+  Either way this is not a `methodology.cadence` ceremony (it is neither a `planningCeremonies`
   nor the `reviewCeremony` slot) — it is the **one-time bootstrap** that produces the backlog the
   cadence ceremonies then plan and review.
 - **Re-run (idempotency at t=0)** — a second `/kickoff` against a project that already has
@@ -81,6 +89,19 @@ files exist at the project root **before** touching the backend or the PO:
 This preflight is the first gate: nothing is created until the config is present and the
 connection is proven.
 
+### 1b. Resolve the mode — ask, do not infer
+
+Before intake, settle which mode this run is in. **Ask the PO**; the artifacts only tell you what
+to ask about:
+
+> Does this project already have work recorded somewhere — a task list, a backlog, notes, issues —
+> and knowledge worth carrying in (a wiki, `docs/`, ADRs, a README that explains the domain)?
+
+A repo with code and a `.atl/wiki/` is a strong hint, and it is only a hint: a project can have
+months of code and no recorded intent, which is greenfield for this ceremony's purposes. **Yes →
+step 2b. No → step 2.** Say which mode you are in and why, so the PO can correct you before any
+reading starts.
+
 ### 2. Intake — live discovery with the PO (`intake`, in-session)
 
 Adopt the `intake` role (read [`../../agents/intake/agent.md`](../../agents/intake/agent.md) + its
@@ -94,6 +115,74 @@ pages. It frames; the analysts persist (step 3). Do **not** create work-items (c
 comments (concept #3), or write the durable-knowledge store (concept #9) in this phase. This phase
 gates the next: a thin framing means the analysts analyze the wrong thing thoroughly, so hand off
 only when the intake handoff checklist is complete.
+
+### 2b. Brownfield intake — read the record, report the coverage, ask only the gaps
+
+The brownfield replacement for step 2. Same role (`intake`), same output (the structured framing
+the analysts consume), and the same prohibition on creating backend state. What changes is where
+the answers come from: the project has already been thought about, often for months, and most of
+what intake would elicit is written down.
+
+That inverts intake's usual discipline in a way worth stating, because it is the failure mode
+here. `/kickoff`'s reflex is *do not assume, ask*; against a pile of notes the risk is the
+opposite — forty notes yield a clean hierarchy with every gap quietly inference-filled, and
+nobody notices because the result **looks** complete. The work is noticing what the notes do
+**not** say.
+
+**1. Read the record.** Two sources, both required:
+
+- **Existing work** — the task list, backlog, notes, or issues the project actually uses.
+- **Existing knowledge** — its wiki, `docs/`, ADRs, READMEs, and the code's own structure.
+
+**Read per-item detail as authoritative and treat any index or summary as a hint.** In a
+hand-maintained two-level record the summary rots first, because updating it is the step with no
+immediate consequence: an index marked `todo` against an item whose own file says three of four
+sub-items shipped is the normal case, not a broken one. Believing the index creates cards for work
+already done.
+
+**2. Report the coverage — before creating anything.** This report is the deliverable of step 2b;
+creation does not begin until the PO has answered it. Four parts:
+
+- **What was read** — sources and counts, so the PO can say "you missed the folder that matters".
+- **What maps where** — per item, the level you propose and why. Name **every** level of the
+  hierarchy the mapping touches, or say explicitly where it stops. "These become PBIs" with no
+  parent named is malformed by construction and still reads as complete. The honest boundary is
+  usually **PBIs here, Tasks via `/refine`** — that is also the smaller job, since `/refine`
+  decomposes PBI→Task already.
+- **What could not be placed** — items you could not map, and why. An unplaceable item is a
+  finding, not a failure.
+- **What would have to be invented** — the fields no source answers. Expect this list to be
+  dominated by **acceptance criteria**: measured on a real brownfield project, the notes were rich
+  — current state, why-this-first, a to-do list, out-of-scope, mapping almost 1:1 onto the spec
+  field's fixed headings — and every one of them was missing exactly that. A note is written to
+  remind its author what to **do**, never to tell a stranger when to **stop**.
+
+**3. The PO answers only the gaps.** Do not re-elicit what the record already says; that is the
+redundancy this mode exists to remove. Ask about what could not be placed and what would have to
+be invented, and nothing else.
+
+**4. Then create, with every field stamped by source.** Each field carries `from-notes` (with the
+quote it came from) or `inferred`.
+
+> **Gate: no acceptance criterion ships `inferred`.** This is the one field a work-item cannot be
+> honestly guessed into, and it is precisely the field the notes do not carry. Refuse to invent it
+> — the same reflex `/sprint-plan` already applies to velocity — and either ask, or leave the item
+> at a level that does not require one yet.
+
+**Granularity is a judgement you make and justify, not a template.** One Epic is a legitimate
+answer for a small project; so is three. State the reasoning in the coverage report.
+
+**Two things that are not cards.** Work already done does not become a card — the board records
+what is happening, not what happened. And a **deferred** item keeps its trigger: write it into the
+card body as a labelled line (`Trigger: <condition>`), which needs no board schema change on
+either backend, greps cleanly, and survives the round-trip.
+
+**5. The durable pages are a mapping pass, not a copy.** The `Domain/` + `Architecture/` pages
+step 3 seeds are written **from** the existing knowledge, deciding per source page what is domain,
+what is architecture, and what is convention — then writing real content under those headings and
+cross-linking back to the original for depth. Copying the existing pages across forks them: two
+copies of the same fact, one of which stops receiving updates and neither of which announces which
+one that is.
 
 ### 3. First Epic + Feature(s) — analysis line (`business-analyst` → `technical-analyst`, sequential, shared context)
 
