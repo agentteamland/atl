@@ -200,10 +200,21 @@ fi
 #
 # Which gives the real bound: a full suite costs approximately ONE HOURLY QUOTA, so
 # its runtime cannot be compressed far below an hour however many lanes there are.
-if [ "${#LANE_KEYS[@]}" -gt 0 ] && [ "${LANE_KEYS[*]}" != "free" ] && command -v gh >/dev/null 2>&1; then
+# The requirement scales with what was SELECTED, not with what a full suite costs.
+# A flat full-suite threshold refuses a single delivery blueprint that needs ~800
+# points because the budget is at 3300 — the same over-reach as checking at all for
+# a `needs: none` subset, one level down. ~800 per delivery blueprint is the
+# suite's ~5000 over its six of them.
+delivery_n=0
+for k in ${LANE_KEYS[@]+"${LANE_KEYS[@]}"}; do
+  [ "$k" = free ] && continue
+  delivery_n=$((delivery_n + $(wc -l < "$WORK/lane.$k")))
+done
+if [ "$delivery_n" -gt 0 ] && command -v gh >/dev/null 2>&1; then
+  need=$((delivery_n * 800))
   gql_left="$(gh api rate_limit --jq '.resources.graphql.remaining' 2>/dev/null || echo "")"
-  if [ -n "$gql_left" ] && [ "$gql_left" -lt 4000 ] 2>/dev/null; then
-    echo "!! GraphQL budget is ${gql_left}/5000 — a full suite needs roughly all of it" >&2
+  if [ -n "$gql_left" ] && [ "$gql_left" -lt "$need" ] 2>/dev/null; then
+    echo "!! GraphQL budget is ${gql_left}/5000 and $delivery_n delivery blueprint(s) need about ${need}" >&2
     echo "   and the failures surface on UNRELATED blueprints. Wait for the hourly reset," >&2
     echo "   or run a subset that excludes the github-delivery-* lanes." >&2
     [ "${ATL_E2E_IGNORE_BUDGET:-0}" = 1 ] || exit 4
