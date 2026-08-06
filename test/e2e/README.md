@@ -131,13 +131,24 @@ publish blueprints exercise actual GitHub:
 - `agentteamland/atl-e2e-team` — propose-upstream upstream (not owned by the tester)
 - `<your-login>/atl-e2e-owned` — own-team re-publish target (the `publish-own`
   blueprint force-resets it to the fixture baseline each run, so it's repeatable)
-- `agentteamland/atl-e2e-delivery` — the GitHub-backend delivery fixture, in the org
-  (ATL's own infra, alongside `atl-e2e-team`; override for a fork with
-  `ATL_E2E_DELIVERY_OWNER`). Create it once. The `github-delivery-loop` +
-  `github-delivery-engine` blueprints force-reset it to the `fixtures/delivery-repo/`
-  baseline (main/dev/release, no stale issues/PRs) and create a fresh `atl-e2e-delivery`
-  Project each run, so the loop is repeatable. The runner's token needs `repo` + `project` rights on the owner;
-  the container ships a modern `gh` for Projects v2 (`field-create`/`item-edit`).
+- `agentteamland/atl-e2e-delivery`, `-2`, `-3` — **three** GitHub-backend delivery
+  fixtures, in the org (ATL's own infra, alongside `atl-e2e-team`; override the owner
+  for a fork with `ATL_E2E_DELIVERY_OWNER`). Create each once, private, with merge
+  commits allowed and at least one commit so `git clone` succeeds — the content does
+  not matter, because every run wipes it and copies `fixtures/delivery-repo/` in.
+
+  Each GitHub delivery blueprint force-resets its fixture to that baseline
+  (main/dev/release, no stale issues/PRs) and deletes and recreates a Project of the
+  same title, so the loop is repeatable. **That is also why there are three.** Two
+  blueprints on one fixture cannot overlap: the second one's reset destroys the
+  first's board mid-run, and the loser fails an assertion that says nothing about
+  concurrency. Three fixtures means three lanes, which is what takes the suite from
+  ~132 min to ~40. The mapping is declared per blueprint on its `# fixture:` line;
+  `test/e2e/run.sh --lanes` prints the partition without running anything.
+
+  Adding a fourth is a repo plus a `# fixture:` line — no harness change. The runner's
+  token needs `repo` + `project` rights on the owner; the container ships a modern `gh`
+  for Projects v2 (`field-create`/`item-edit`).
 
 The blueprints inject a test-only `~/.atl/index.json` (via `write_test_index` in
 `lib.sh`) so `atl install` resolves the fixtures offline — the production index is

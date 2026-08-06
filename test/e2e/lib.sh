@@ -183,13 +183,23 @@ reset_owned_repo() {
   rm -rf "$tmp"
 }
 
-# reset_delivery_repo force-restores <owner>/atl-e2e-delivery to the fixture baseline
+# delivery_fixture echoes the delivery fixture's repo/project NAME. One name is
+# used for both, and it is a variable rather than a constant because it is the
+# only thing standing between the six GitHub delivery blueprints and running
+# concurrently: they all force-reset this repo AND delete/recreate a Project of
+# this title, so two of them at once is not slow, it is destructive — the loser
+# sees a board that vanished mid-run and fails an assertion that says nothing
+# about concurrency. Point separate blueprints at separate names and the same
+# runner parallelises them safely.
+delivery_fixture() { echo "${ATL_E2E_DELIVERY_REPO:-atl-e2e-delivery}"; }
+
+# reset_delivery_repo force-restores <owner>/$(delivery_fixture) to the fixture baseline
 # and rebuilds the two-branch flow, so the github-delivery-loop blueprint starts from a
 # clean repo even after a prior run left issues, PRs, feature branches, or tags behind.
 # The owner is the org (agentteamland by default). The twin of reset_owned_repo.
 reset_delivery_repo() {
   local owner="$1"
-  local repo="$owner/atl-e2e-delivery"
+  local repo="$owner/$(delivery_fixture)"
   # Delete every prior issue — idempotency labels would otherwise converge onto them,
   # and (unlike PRs) issues CAN be removed, so a truly empty baseline is achievable.
   for n in $(gh issue list --repo "$repo" --state all --limit 200 --json number -q '.[].number' 2>/dev/null); do
@@ -230,7 +240,7 @@ reset_delivery_repo() {
   return $rc
 }
 
-# reset_delivery_project deletes any prior "atl-e2e-delivery" GitHub Project for the
+# reset_delivery_project deletes any prior Project titled $(delivery_fixture) for the
 # owner, creates a fresh one, sets up the autonomous-loop custom fields, and echoes
 # its NUMBER (its only stdout — all gh diagnostics go to /dev/null). Status exists by
 # default (Todo/In Progress/Done); Iteration is UI-only (gh cannot create it), so the
@@ -238,10 +248,11 @@ reset_delivery_repo() {
 reset_delivery_project() {
   local owner="$1"
   local existing
-  existing=$(gh project list --owner "$owner" --format json --limit 100 -q '.projects[] | select(.title=="atl-e2e-delivery") | .number' 2>/dev/null | head -1)
+  local title; title="$(delivery_fixture)"
+  existing=$(gh project list --owner "$owner" --format json --limit 100 -q ".projects[] | select(.title==\"$title\") | .number" 2>/dev/null | head -1)
   [ -n "$existing" ] && gh project delete "$existing" --owner "$owner" >/dev/null 2>&1 || true
   local num
-  num=$(gh project create --owner "$owner" --title "atl-e2e-delivery" --format json -q '.number' 2>/dev/null)
+  num=$(gh project create --owner "$owner" --title "$title" --format json -q '.number' 2>/dev/null)
   [ -z "$num" ] && return 1
   gh project field-create "$num" --owner "$owner" --name "Story Points" --data-type NUMBER >/dev/null 2>&1 || true
   gh project field-create "$num" --owner "$owner" --name "Priority" --data-type SINGLE_SELECT --single-select-options "P0,P1,P2,P3" >/dev/null 2>&1 || true

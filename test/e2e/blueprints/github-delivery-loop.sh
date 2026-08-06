@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # needs: gh+token
+# fixture: atl-e2e-delivery-3
 # touches: teams/delivery-team, cli/internal/dispatch
 #
 # github-delivery-loop — the delivery-team's autonomous loop on the REAL GitHub
@@ -45,7 +46,7 @@ LOGIN=$(gh_login)
 # runner's personal namespace — overridable for a fork via ATL_E2E_DELIVERY_OWNER. The
 # runner's token still authenticates; it just needs repo+project rights on the owner.
 OWNER="${ATL_E2E_DELIVERY_OWNER:-agentteamland}"
-REPO="$OWNER/atl-e2e-delivery"
+REPO="$OWNER/$(delivery_fixture)"
 
 reset_delivery_repo "$OWNER" \
   && ok "reset delivery fixture repo to baseline (main/dev/release)" \
@@ -73,7 +74,7 @@ mkdir -p "$PROJ/.delivery"
 cat > "$PROJ/.delivery/config.json" <<EOF
 {
   "owner": "$OWNER",
-  "repo": "atl-e2e-delivery",
+  "repo": "$(delivery_fixture)",
   "projectNumber": $PROJNUM,
   "branchPair": { "dev": "dev", "release": "release" },
   "backend": "github",

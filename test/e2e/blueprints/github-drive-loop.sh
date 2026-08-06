@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # needs: gh+token
+# fixture: atl-e2e-delivery-2
 # touches: teams/delivery-team/skills/work-start, teams/delivery-team/skills/work-finish, teams/delivery-team/skills/work-move, teams/delivery-team/backends
 #
 # github-drive-loop — the MANUAL drive loop end to end on the GitHub backend: the mode a person
@@ -48,7 +49,7 @@ gh auth setup-git >/dev/null 2>&1 || true
 LOGIN=$(gh_login)
 [ -n "$LOGIN" ] || { bad "gh not authenticated"; finish; exit 1; }
 OWNER="${ATL_E2E_DELIVERY_OWNER:-agentteamland}"
-REPO="$OWNER/atl-e2e-delivery"
+REPO="$OWNER/$(delivery_fixture)"
 
 reset_delivery_repo "$OWNER" \
   && ok "reset delivery fixture repo to baseline (main/dev/release)" \
@@ -75,7 +76,7 @@ mkdir -p "$PROJ/.delivery"
 cat > "$PROJ/.delivery/config.json" <<EOF
 {
   "owner": "$OWNER",
-  "repo": "atl-e2e-delivery",
+  "repo": "$(delivery_fixture)",
   "projectNumber": $PROJNUM,
   "branchPair": { "dev": "dev", "release": "release" },
   "backend": "github",
@@ -274,7 +275,7 @@ if [ -n "$PR" ]; then
     && ok "the PR head is $BR — the branch grammar ties it to exactly one unit" \
     || bad "PR head is '$head', expected $BR"
 
-  xref=$(gh api graphql -f query="{ repository(owner:\"$OWNER\", name:\"atl-e2e-delivery\") { issue(number: $DRIVE) { timelineItems(first:50, itemTypes:[CROSS_REFERENCED_EVENT]) { nodes { ... on CrossReferencedEvent { source { ... on PullRequest { number } } } } } } } }" \
+  xref=$(gh api graphql -f query="{ repository(owner:\"$OWNER\", name:\"$(delivery_fixture)\") { issue(number: $DRIVE) { timelineItems(first:50, itemTypes:[CROSS_REFERENCED_EVENT]) { nodes { ... on CrossReferencedEvent { source { ... on PullRequest { number } } } } } } } }" \
     --jq "[.data.repository.issue.timelineItems.nodes[]?.source.number] | index($PR) // -1" 2>/dev/null || echo -1)
   { [ "${xref:--1}" != "-1" ] && [ -n "$xref" ]; } 2>/dev/null \
     && ok "GitHub registered the cross-reference from PR #$PR on #$DRIVE" \

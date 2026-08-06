@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # needs: gh+token
+# fixture: atl-e2e-delivery-3
 # touches: teams/profile-team, cli/internal/teampkg, cli/internal/storegit, cli/cmd/atl/commands
 #
 # profile-backup-restore — the two skills that touch the user's most sensitive data, and the
@@ -40,7 +41,7 @@ source /e2e/lib.sh
 note() { echo "  note - $1"; }
 
 PUB_REPO="${ATL_E2E_PUBLIC_REPO:-agentteamland/atl-e2e-team}"
-PRIV_REPO="${ATL_E2E_PRIVATE_REPO:-agentteamland/atl-e2e-delivery}"
+PRIV_REPO="${ATL_E2E_PRIVATE_REPO:-agentteamland/$(delivery_fixture)}"
 
 PUB="$HOME/pub"                 # clone of the PUBLIC fixture — only for its URL
 PRIV="$HOME/priv"               # clone of the PRIVATE fixture — only for its URL

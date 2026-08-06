@@ -43,8 +43,27 @@ while [ ! -f "$LOG" ]; do
 done
 
 reported=""          # blueprint names already reported, so a failure notifies ONCE
-last_size=0
-quiet=0
+declare -A last_size=() quiet=()
+
+# The suite runs its blueprints in LANES — blueprints that force-reset the same
+# external fixture share one and run serially, and lanes run concurrently. That
+# makes the aggregate log useless for stall detection: a wedged lane produces no
+# output while a busy one keeps the file growing, so "no output for N seconds" on
+# the aggregate can never fire, and if it did it would name whichever blueprint
+# happened to start last in ANY lane.
+#
+# So liveness is measured PER LANE, off the per-lane logs the runner writes
+# beside the aggregate. Falls back to the aggregate when there are none (a serial
+# run, or an older log), which keeps this script correct against both shapes.
+lane_logs() {
+  local base="${LOG%.log}"
+  local found=0 f
+  for f in "$base".lane-*.log; do
+    [ -e "$f" ] || continue
+    echo "$f"; found=1
+  done
+  [ "$found" -eq 1 ] || echo "$LOG"
+}
 
 # mtime is not enough on its own: some editors/filesystems touch without appending, and a
 # suite that is truly wedged may still have its file touched. Growth in BYTES is the
@@ -53,7 +72,6 @@ quiet=0
 size_of() { wc -c < "$1" 2>/dev/null | tr -d ' ' || echo 0; }
 
 while :; do
-  cur=$(size_of "$LOG")
 
   # --- failures, one notification each, as they land -------------------------------
   while IFS= read -r line; do
@@ -77,19 +95,24 @@ while :; do
     exit 1
   fi
 
-  # --- stalled -----------------------------------------------------------------------
-  if [ "$cur" -eq "$last_size" ]; then
-    quiet=$((quiet + INTERVAL))
-    if [ "$quiet" -ge "$STALL" ]; then
-      echo "e2e STALLED: no output for ${quiet}s (threshold ${STALL}s) in $(grep -E '^========= blueprint' "$LOG" | tail -1 | sed 's/.*blueprint: //;s/ (needs.*//')"
-      echo "   A hung turn leaves no FAIL line and no summary, so this is the only tell."
-      echo "   Check: docker ps, and the tail of $LOG"
-      exit 2
+  # --- stalled, per lane ---------------------------------------------------------------
+  while IFS= read -r lane; do
+    lcur=$(size_of "$lane")
+    if [ "${last_size[$lane]:-0}" = "$lcur" ] && [ "$lcur" != 0 ]; then
+      quiet[$lane]=$(( ${quiet[$lane]:-0} + INTERVAL ))
+      if [ "${quiet[$lane]}" -ge "$STALL" ]; then
+        echo "e2e STALLED: lane $(basename "$lane") silent for ${quiet[$lane]}s (threshold ${STALL}s), last blueprint: $(grep -E '^========= blueprint' "$lane" | tail -1 | sed 's/.*blueprint: //;s/ (needs.*//')"
+        echo "   Other lanes may still be running — the aggregate log keeps growing, which is"
+        echo "   exactly why this is measured per lane. A hung turn leaves no FAIL line and no"
+        echo "   summary, so this is the only tell."
+        echo "   Check: docker ps, and the tail of $lane"
+        exit 2
+      fi
+    else
+      quiet[$lane]=0
     fi
-  else
-    quiet=0
-  fi
-  last_size="$cur"
+    last_size[$lane]="$lcur"
+  done < <(lane_logs)
 
   sleep "$INTERVAL"
 done

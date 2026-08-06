@@ -6,6 +6,14 @@
 #
 #   test/e2e/run.sh                       # every blueprint (auth-gated; missing-auth ones skip)
 #   test/e2e/run.sh install publish-own   # named blueprints only
+#   test/e2e/run.sh --changed             # only what the diff can reach
+#   test/e2e/run.sh --lanes               # print the lane partition and stop
+#
+# Blueprints run in LANES. A blueprint that force-resets a shared external fixture
+# declares it on a `# fixture:` line; blueprints sharing one run serially, and lanes
+# run concurrently. Parallelism is therefore DERIVED from the declaration rather than
+# chosen, so two blueprints can only overlap if they named different fixtures — the
+# unsafe case is unreachable rather than merely avoided.
 #
 # Auth is passed into the container only when present on the host:
 #   - gh:     GH_TOKEN (from your `gh auth token`)            — publish blueprints
@@ -76,6 +84,9 @@ echo ">>   test/e2e/watch.sh          (under the Monitor tool, persistent)"
 # Pick the blueprints BEFORE the image build: --changed can legitimately select
 # nothing, and paying a docker build to discover that is the same "expensive setup
 # above the precondition" mistake the ref check above exists to avoid.
+SHOW_LANES=0
+if [ "${1:-}" = "--lanes" ]; then SHOW_LANES=1; shift; fi
+export SHOW_LANES
 if [ "${1:-}" = "--changed" ]; then
   shift
   names="$(test/e2e/select.sh "$@" | tr '\n' ' ')"
@@ -112,42 +123,131 @@ API_KEY="${ANTHROPIC_API_KEY:-}"
 # that it slowed down -- and "is this normal?" can only be answered by hand-timing it.
 pass=0; fail=0; skip=0
 timings=()
+
+# ---- lane partitioning ------------------------------------------------------
+#
+# Blueprints that force-reset the SAME external fixture cannot overlap: the six
+# GitHub delivery blueprints each restore a fixture repo to a baseline AND delete
+# and recreate a Project of a fixed title, so two at once is not slow, it is
+# destructive — the loser sees a board that vanished mid-run and fails an
+# assertion that says nothing about concurrency.
+#
+# So parallelism is DERIVED from a declaration rather than chosen: a blueprint
+# names the fixture it mutates on a `# fixture:` line, blueprints sharing one run
+# serially in a lane, and lanes run concurrently. Two blueprints can only overlap
+# if they declared different fixtures, which makes the unsafe case unreachable
+# rather than merely avoided. A blueprint that declares none joins the `free`
+# lane, which is also serial — parallelism is bounded by the number of declared
+# fixtures, so it cannot grow into N concurrent LLM sessions by accident.
+declare -a LANE_KEYS=()
+lane_of() { sed -n 's/^# fixture: //p' "$1" | head -1; }
+
+runnable=""
 for name in $names; do
   bp="$BPDIR/$name.sh"
   if [ ! -f "$bp" ]; then echo "!! no such blueprint: $name" >&2; exit 2; fi
-  needs="$(sed -n 's/^# needs: //p' "$bp" | head -1)"
-  needs="${needs:-none}"
-
-  # A blueprint may need gh, a Claude token, or (github-delivery-loop) BOTH.
+  needs="$(sed -n 's/^# needs: //p' "$bp" | head -1)"; needs="${needs:-none}"
   case "$needs" in gh|gh+token)
     [ -z "$GH_TOKEN_VAL" ] && { echo ">> skip $name (needs gh — run 'gh auth login')"; skip=$((skip + 1)); continue; } ;;
   esac
   case "$needs" in token|gh+token)
     { [ -z "$CLAUDE_TOK" ] && [ -z "$API_KEY" ]; } && { echo ">> skip $name (needs a Claude token — CLAUDE_CODE_OAUTH_TOKEN)"; skip=$((skip + 1)); continue; } ;;
   esac
+  runnable="$runnable $name"
+done
 
-  echo ""
-  echo "========= blueprint: $name (needs: $needs) ========="
-  # Least-privilege: inject ONLY the secret this blueprint declares it needs, so a
-  # token-tier autonomous `claude -p` blueprint never receives the GH_TOKEN (and a
-  # gh blueprint never receives the Claude token). Nothing is exported into a
-  # blueprint that declared `needs: none`.
-  secret_env=()
-  case "$needs" in gh|gh+token)    secret_env+=(-e "GH_TOKEN=$GH_TOKEN_VAL") ;; esac
-  case "$needs" in token|gh+token) secret_env+=(-e "CLAUDE_CODE_OAUTH_TOKEN=$CLAUDE_TOK" -e "ANTHROPIC_API_KEY=$API_KEY") ;; esac
-  bp_start=$SECONDS
-  if docker run --rm \
+WORK="$(mktemp -d)"
+trap 'rm -rf "$WORK"' EXIT
+attempted=0
+for name in $runnable; do
+  key="$(lane_of "$BPDIR/$name.sh")"; key="${key:-free}"
+  echo "$name" >> "$WORK/lane.$key"
+  case " ${LANE_KEYS[*]-} " in *" $key "*) ;; *) LANE_KEYS+=("$key") ;; esac
+  attempted=$((attempted + 1))
+done
+
+if [ "$attempted" -gt 0 ]; then
+  echo ">> ${#LANE_KEYS[@]} lane(s): $(for k in "${LANE_KEYS[@]}"; do printf '%s(%s) ' "$k" "$(wc -l < "$WORK/lane.$k" | tr -d ' ')"; done)"
+fi
+
+# --lanes prints the partition and stops. Cheap enough to run before every real
+# suite, which matters because a wrong declaration is not a slow run — it is two
+# lanes force-resetting one fixture, and the failure surfaces as an unrelated
+# assertion in whichever lane lost.
+if [ "${SHOW_LANES:-0}" = 1 ]; then
+  for k in ${LANE_KEYS[@]+"${LANE_KEYS[@]}"}; do
+    echo "lane $k:"; sed 's/^/  /' "$WORK/lane.$k"
+  done
+  exit 0
+fi
+
+# Emitting a finished blueprint's output takes a mutex so a block from one lane is
+# never interleaved into another's. The watcher greps whole `<< name VERDICT`
+# lines and the `========= blueprint:` header, and a torn block would break both.
+LOCK="$WORK/emit.lock"
+emit() {
+  while ! mkdir "$LOCK" 2>/dev/null; do sleep 0.2; done
+  cat "$1"
+  rmdir "$LOCK"
+}
+
+run_lane() {
+  local key="$1" name bp needs bp_start bp_secs verdict rc
+  local lanelog="${RUNLOG%.log}.lane-$key.log"
+  : > "$lanelog"
+  while read -r name; do
+    bp="$BPDIR/$name.sh"
+    needs="$(sed -n 's/^# needs: //p' "$bp" | head -1)"; needs="${needs:-none}"
+    local secret_env=()
+    case "$needs" in gh|gh+token)    secret_env+=(-e "GH_TOKEN=$GH_TOKEN_VAL") ;; esac
+    case "$needs" in token|gh+token) secret_env+=(-e "CLAUDE_CODE_OAUTH_TOKEN=$CLAUDE_TOK" -e "ANTHROPIC_API_KEY=$API_KEY") ;; esac
+    # The lane key IS the fixture name, so a lane can only ever touch its own.
+    local fixture_env=()
+    [ "$key" != "free" ] && fixture_env+=(-e "ATL_E2E_DELIVERY_REPO=$key")
+
+    {
+      echo ""
+      echo "========= blueprint: $name (needs: $needs, lane: $key) ========="
+    } > "$WORK/out.$name"
+    bp_start=$SECONDS
+    rc=0
+    docker run --rm \
       -e BLUEPRINT="$name" \
       -e ATL_E2E_TEAM_REF="$ATL_E2E_TEAM_REF" \
       ${secret_env[@]+"${secret_env[@]}"} \
-      atl-e2e bash "/e2e/blueprints/$name.sh"; then
-    bp_secs=$((SECONDS - bp_start)); verdict=PASSED; pass=$((pass + 1))
-  else
-    bp_secs=$((SECONDS - bp_start)); verdict=FAILED; fail=$((fail + 1))
-  fi
-  echo "<< $name $verdict (${bp_secs}s)"
-  timings+=("$bp_secs|$name|$verdict|$needs")
+      ${fixture_env[@]+"${fixture_env[@]}"} \
+      atl-e2e bash "/e2e/blueprints/$name.sh" >> "$WORK/out.$name" 2>&1 || rc=$?
+    bp_secs=$((SECONDS - bp_start))
+    if [ "$rc" -eq 0 ]; then verdict=PASSED; else verdict=FAILED; fi
+    echo "<< $name $verdict (${bp_secs}s)" >> "$WORK/out.$name"
+    # The lane log is the watcher's per-lane liveness surface: with several lanes
+    # running, "no output for N seconds" is meaningless on the aggregate, because
+    # a stalled lane is hidden by a busy one.
+    cat "$WORK/out.$name" >> "$lanelog"
+    emit "$WORK/out.$name"
+    echo "$bp_secs|$name|$verdict|$needs" >> "$WORK/results"
+  done < "$WORK/lane.$key"
+}
+
+: > "$WORK/results"
+for key in ${LANE_KEYS[@]+"${LANE_KEYS[@]}"}; do
+  run_lane "$key" &
 done
+wait
+
+# No silent truncation. A lane that died without reporting would otherwise shrink
+# the tally to something that still reads clean — the failure direction a runner
+# must never take, because a short green run is indistinguishable from a correct
+# one. (Same discipline the --changed selector is built on.)
+got=$(wc -l < "$WORK/results" | tr -d ' ')
+if [ "$got" -ne "$attempted" ]; then
+  echo "!! harness bug: $attempted blueprint(s) attempted but $got result(s) recorded — a lane died silently" >&2
+  exit 3
+fi
+while IFS='|' read -r s n v d; do
+  timings+=("$s|$n|$v|$d")
+  [ "$v" = PASSED ] && pass=$((pass + 1)) || fail=$((fail + 1))
+done < "$WORK/results"
 
 SUITE_SECS=$((SECONDS - SUITE_START))
 
