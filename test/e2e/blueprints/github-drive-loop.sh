@@ -47,7 +47,7 @@ command -v node >/dev/null 2>&1 && ok "node present" || bad "node missing in the
 
 gh auth setup-git >/dev/null 2>&1 || true
 LOGIN=$(gh_login)
-[ -n "$LOGIN" ] || { bad "gh not authenticated"; finish; exit 1; }
+[ -n "$LOGIN" ] || { bad "could not resolve the gh login: $(why)"; finish; exit 1; }
 OWNER="${ATL_E2E_DELIVERY_OWNER:-agentteamland}"
 REPO="$OWNER/$(delivery_fixture)"
 

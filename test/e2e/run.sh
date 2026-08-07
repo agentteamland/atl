@@ -42,6 +42,26 @@ if [ -z "${ATL_E2E_TEED:-}" ]; then
   exit "${PIPESTATUS[0]}"
 fi
 
+# Refuse an unrecognised flag rather than reinterpreting it — and do it HERE,
+# above the ref resolution, because everything below this line costs network
+# fetches and then a docker build.
+#
+# Both routes an invented flag can take end somewhere the caller did not ask for.
+# A bare `--dry-run` becomes a blueprint NAME and dies with a confusing "no such
+# blueprint"; `--changed --dry-run` is forwarded to select.sh, where it is read
+# as a base REF and silently falls back to main — so an invented flag starts a
+# real two-hour run, image build and all, while the caller believes they asked
+# for a preview. Neither a blueprint name nor a git ref begins with `-`, so this
+# rejects exactly the mistaken case and nothing else.
+for arg in "$@"; do
+  case "$arg" in
+    --lanes|--changed) ;;
+    -*) echo "!! unknown flag: $arg" >&2
+        echo "!! usage: run.sh [--lanes] [--changed [<base-ref>] | <blueprint>...]" >&2
+        exit 2 ;;
+  esac
+done
+
 # Resolve the ref the CONTAINER installs TEAM content from (host side).
 #
 # The test index pins `source.ref` and the container fetches that ref from

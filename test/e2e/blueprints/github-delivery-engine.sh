@@ -34,7 +34,7 @@ command -v node >/dev/null 2>&1 && ok "node present (workers run node --test)" |
 
 gh auth setup-git >/dev/null 2>&1 || true
 LOGIN=$(gh_login)
-[ -n "$LOGIN" ] || { bad "gh not authenticated"; finish; exit 1; }
+[ -n "$LOGIN" ] || { bad "could not resolve the gh login: $(why)"; finish; exit 1; }
 OWNER="${ATL_E2E_DELIVERY_OWNER:-agentteamland}"
 REPO="$OWNER/$(delivery_fixture)"
 
@@ -121,12 +121,18 @@ Add `subtract(a, b)` to `app.js` and export it; cover it in `app.test.js`.
 ## Out of Scope
 Anything beyond `subtract` (no CLI, no formatting, no refactor of `add`).
 EOF
-ISSUE_URL=$(gh issue create --repo "$REPO" \
-  --title "Add a subtract(a,b) function to app.js" \
-  --label "area:web" --label "type:pbi" \
-  --body-file "$HOME/issue-body.md" 2>/dev/null)
-ISSUE=$(echo "$ISSUE_URL" | grep -oE '[0-9]+$')
-[ -n "$ISSUE" ] && ok "seeded a buildable PBI (#$ISSUE, area:web)" || { bad "could not seed the PBI"; finish; exit 1; }
+# Seeded through gh_seed_issue, which keeps the failure attributable and retries
+# ONCE (converging by title, so a lost response is adopted rather than
+# duplicated). This exact call is what died 40s into a release gate with
+# `FAIL - could not seed the PBI` as its entire diagnostic.
+ISSUE=$(gh_seed_issue "$REPO" "Add a subtract(a,b) function to app.js" \
+  "$HOME/issue-body.md" "area:web" "type:pbi")
+[ -n "$ISSUE" ] && ok "seeded a buildable PBI (#$ISSUE, area:web)" \
+  || { bad "could not seed the PBI: $(why)"; finish; exit 1; }
+# Derived rather than returned: gh_seed_issue echoes the NUMBER (the only thing a
+# retry that adopted an existing issue can know), and the URL is a pure function
+# of repo + number.
+ISSUE_URL="https://github.com/$REPO/issues/$ISSUE"
 
 # The technical-analyst's sentinel comment (so the worker's "read [Technical Analysis]"
 # step finds it and does not block on a missing analysis).

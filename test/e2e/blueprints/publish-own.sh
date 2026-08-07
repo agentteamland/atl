@@ -9,7 +9,7 @@ source /e2e/lib.sh
 
 gh auth setup-git >/dev/null 2>&1 || true
 LOGIN=$(gh_login)
-[ -n "$LOGIN" ] || { bad "gh not authenticated"; finish; exit 1; }
+[ -n "$LOGIN" ] || { bad "could not resolve the gh login: $(why)"; finish; exit 1; }
 reset_owned_repo "$LOGIN" && ok "reset owned repo to baseline" || bad "could not reset owned repo"
 
 fresh

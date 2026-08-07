@@ -41,7 +41,7 @@ note() { echo "  note - $1"; }
 
 gh auth setup-git >/dev/null 2>&1 || true
 LOGIN=$(gh_login)
-[ -n "$LOGIN" ] || { bad "gh not authenticated"; finish; exit 1; }
+[ -n "$LOGIN" ] || { bad "could not resolve the gh login: $(why)"; finish; exit 1; }
 # The fixture repo + Project live in the agentteamland org (ATL's own infra), NOT the
 # runner's personal namespace — overridable for a fork via ATL_E2E_DELIVERY_OWNER. The
 # runner's token still authenticates; it just needs repo+project rights on the owner.

@@ -67,7 +67,7 @@ command -v node >/dev/null 2>&1 && ok "node present (workers run node --test)" |
 
 gh auth setup-git >/dev/null 2>&1 || true
 LOGIN=$(gh_login)
-[ -n "$LOGIN" ] || { bad "gh not authenticated"; finish; exit 1; }
+[ -n "$LOGIN" ] || { bad "could not resolve the gh login: $(why)"; finish; exit 1; }
 OWNER="${ATL_E2E_DELIVERY_OWNER:-agentteamland}"
 REPO="$OWNER/$(delivery_fixture)"
 
@@ -173,11 +173,11 @@ ic()    { gh issue list --repo "$REPO" "$@" --json number -q 'length' 2>/dev/nul
 gturn "/kickoff. You are ALSO acting as the human product owner for this headless run — answer intake from these facts, do not wait for interactive input. Project 'Calc': a tiny arithmetic helper library (Node.js; the repo already has add(a,b) in app.js). Problem: teams need difference-based helpers built on a shared subtract primitive. Goal — ONE Feature, deliberately decomposable into 3 slices: (1) a foundation subtract(a,b) added to app.js and exported; (2) an absDiff(a,b) = Math.abs(subtract(a,b)) helper that BUILDS ON subtract and lives in its OWN NEW module file 'absdiff.js' which requires './app'; (3) an isZeroDiff(a,b) = (subtract(a,b) === 0) helper that ALSO builds on subtract and lives in its OWN NEW module file 'iszero.js' which requires './app'. This module-per-helper layout is a REQUIREMENT of the design, not an implementation detail: each helper ships as its own module so the two can be built independently without both editing app.js. Do NOT write an acceptance criterion or an NFR that requires the helpers to live inside app.js. Out of scope: mobile, UI, CLI. Create ONE Epic and ONE Feature as GitHub issues (gh issue create); label them 'type:epic' / 'type:feature'. Put the business framing in the FEATURE issue BODY under the fixed H2s — ## Problem, ## Business Value, ## Scope (enumerate the 3 slices above as distinct capability slices, naming each helper's own module file), ## Acceptance Criteria (one independently-verifiable criterion per slice, consistent with the module-per-helper layout), ## Out of Scope. Add ONE comment ON THE FEATURE issue whose FIRST LINE is the exact sentinel '**[Technical Analysis]**', with ## Approach (subtract is the shared foundation in app.js, established FIRST; absDiff and isZeroDiff each ship as their own module requiring './app', so they depend on subtract's contract but not on each other's files), ## Feasibility & Risks, ## NFRs, ## Dependencies (absDiff and isZeroDiff each require subtract first), ## Suggested Areas (web). Stamp each created issue with an 'atl-key:<shorthash>' label. Skip sprint-0." || bad "kickoff turn errored"
 
 ge "$(ic --label type:epic --state all)" && ok "kickoff created a type:epic issue" || bad "no type:epic issue in $REPO"
-FEAT=$(gh issue list --repo "$REPO" --label type:feature --state all --limit 5 --json number -q '.[0].number' 2>/dev/null)
+FEAT=$(gh_try gh issue list --repo "$REPO" --label type:feature --state all --limit 5 --json number -q '.[0].number')
 [ -n "$FEAT" ] && ok "kickoff created a type:feature issue (#$FEAT)" || bad "no type:feature issue in $REPO"
 # Fail-fast: with no Feature there is nothing to decompose — abort before the ~40-min
 # refine/plan/start/dispatch budget is spent on a doomed run.
-[ -n "$FEAT" ] || { echo "!! no Feature from kickoff — aborting before the expensive ceremonies/dispatch"; finish; exit 1; }
+[ -n "$FEAT" ] || { echo "!! no Feature from kickoff — aborting before the expensive ceremonies/dispatch (issue-list stderr: $(why))"; finish; exit 1; }
 ta=0
 if [ -n "$FEAT" ]; then gh issue view "$FEAT" --repo "$REPO" --comments 2>/dev/null | grep -q '\[Technical Analysis\]' && ta=1; fi
 [ "$ta" = 1 ] && ok "a [Technical Analysis] sentinel comment landed on the Feature (§7)" || bad "no [Technical Analysis] comment on the Feature"
