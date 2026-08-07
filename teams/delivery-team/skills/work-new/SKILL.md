@@ -1,7 +1,6 @@
 ---
 name: work-new
 description: /work-new "<title>" — open one work item by hand, in the right place in the hierarchy. Infers the type, finds or proposes a parent, elicits only what the item genuinely lacks, writes the fixed-heading spec field, and stamps a manual-provenance key so a re-run converges instead of duplicating. The light way to get a card onto the board; `/request` stays the heavy PO-gated intake for a request that needs a feasibility verdict. Mutating and interactive; run it explicitly.
-disable-model-invocation: true
 ---
 
 # /work-new — one card, in the right place

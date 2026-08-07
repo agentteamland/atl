@@ -1,7 +1,6 @@
 ---
 name: work-start
 description: /work-start <id> — claim one work item and build it, in a session the human is steering. Resolves the item over the active backend, refuses if the autonomous engine already owns it, resolves the sprint carrier, cuts the engine's own `delivery/<slug>/<id>` branch off a freshly fetched integration branch, moves the item to In Progress, briefs from the item's own spec field, its Canonical Brief and the nearest ancestor's Technical Analysis, loads the area's stack pack, then proceeds with implementation by default — `--prep-only` stops after the briefing. Mutating and interactive — run it explicitly; it is not something to invoke in passing. Hand-driven half of the drive loop; `/work-finish` closes the unit.
-disable-model-invocation: true
 ---
 
 # /work-start — claim a unit and build it
