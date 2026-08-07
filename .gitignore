@@ -8,6 +8,26 @@ coverage.out
 # OS
 .DS_Store
 
+# Team install output. This repo is where delivery-team's SOURCE lives
+# (teams/delivery-team/), and `atl install` writes a byte-identical copy of it
+# into .claude/ — ~1.1 MB that would go stale on every team PR and then be
+# re-synced at the next release. Same split as .delivery/.gitignore: the source
+# files are committed, the derived copy is not. `.delivery/config.json` +
+# methodology.json ARE tracked, so a fresh clone still declares its board; the
+# ceremonies themselves come back with one `atl install agentteamland/delivery-team`,
+# which is also exactly what a user runs — so dogfooding the published team is
+# preserved rather than replaced by a repo-local fork. Anything the agents
+# accumulate belongs upstream in teams/, never in an installed copy.
+/.claude/
+/.atl/installed/
+
+# `atl install` scaffolds these unconditionally, but this project is board-backed
+# (.delivery/config.json names a backend), and the brainstorm rule is explicit that
+# the board is then the single authoritative deferral surface — "one surface only,
+# so the two can't drift". Ignored rather than maintained. Tracked as #477.
+/.atl/backlog.md
+/.atl/tasks.md
+
 # e2e run mirror (stable path for test/e2e/watch.sh)
 test/e2e/.last-run.log
 # per-lane logs, written beside the aggregate by the lane runner (watch.sh reads them)
