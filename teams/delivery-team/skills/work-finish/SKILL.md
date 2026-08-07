@@ -1,7 +1,6 @@
 ---
 name: work-finish
 description: /work-finish — close out the unit on the current delivery branch: derive its id from the branch name, gate on a scoped build and test run, push, open (or update) the PR to the integration branch with the work item linked, and verify the link actually landed by reading it back. Deliberately does NOT merge and does NOT move the item's state — merge is a human decision and Done comes after it. Mutating and interactive; run it explicitly. Hand-driven half of the drive loop; `/work-start` opens the unit.
-disable-model-invocation: true
 ---
 
 # /work-finish — gate, push, PR, verify the link
