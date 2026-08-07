@@ -1,0 +1,86 @@
+name: sync-dev
+
+# Keep the delivery flow's integration branch current with main.
+#
+# This repo develops main-line — main + PRs + tags — while `dev` and `release`
+# exist because the delivery-team's two-branch flow requires a branchPair. So
+# `dev` is a MIRROR of main, not a line anyone works on, and nothing was keeping
+# it current: main moves several times a day, `dev` moved when a human
+# remembered. Measured 2026-08-07, it fell 22 commits behind and then re-opened
+# the gap TWICE more the same day, once within an hour of being hand-synced.
+#
+# It matters the moment the ceremony chain runs: `atl work dispatch` cuts each
+# worker's worktree off the integration branch, and `/work-start` cuts
+# delivery/<slug>/<id> off a freshly fetched `dev`. Against a stale `dev` every
+# worker builds on an old base, and the first merge back carries conflicts that
+# read as worker defects rather than as a stale base.
+#
+# `release` is deliberately NOT synced here. Advancing it is a PROMOTION, and
+# that gate is human-bound with the approval bound to a specific commit SHA
+# (`atl work promote`). The two branches look symmetric and answer to completely
+# different authority.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+# A push landing while an earlier run is mid-flight would race it to the same
+# ref. Queue instead of cancelling: every push must end with `dev` at main, and
+# a cancelled run could leave it one merge behind with nothing to retry it.
+concurrency:
+  group: sync-dev
+  cancel-in-progress: false
+
+jobs:
+  fast-forward:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fast-forward dev to main
+        run: |
+          set -euo pipefail
+          git fetch --quiet origin main dev
+
+          main_sha="$(git rev-parse origin/main)"
+          dev_sha="$(git rev-parse origin/dev)"
+
+          if [ "$main_sha" = "$dev_sha" ]; then
+            echo "dev is already at main ($main_sha) — nothing to do"
+            exit 0
+          fi
+
+          # The safety property is containment, not the commit count: if dev is
+          # an ancestor of main, nothing on dev can be lost. If it is NOT, dev
+          # has work main does not, and this job must refuse rather than decide
+          # what happens to it — deleting or overwriting unmerged work is the
+          # one thing the branch discipline never does on its own.
+          if ! git merge-base --is-ancestor "$dev_sha" "$main_sha"; then
+            echo "::error::dev ($dev_sha) is not an ancestor of main ($main_sha) — it carries commits main does not, so this is not a fast-forward. Refusing; resolve it by hand."
+            git --no-pager log --oneline "$main_sha..$dev_sha" | head -20
+            exit 1
+          fi
+
+          echo "fast-forwarding dev: $dev_sha -> $main_sha"
+          git push origin "$main_sha:refs/heads/dev"
+
+      - name: Verify dev landed on main
+        run: |
+          set -euo pipefail
+          git fetch --quiet origin main dev
+          main_sha="$(git rev-parse origin/main)"
+          dev_sha="$(git rev-parse origin/dev)"
+          if [ "$main_sha" != "$dev_sha" ]; then
+            echo "::error::dev is $dev_sha, expected $main_sha — the push did not take effect"
+            exit 1
+          fi
+          echo "verified: dev == main == $main_sha"
