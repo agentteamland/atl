@@ -16,7 +16,14 @@ stays lean: identity, anchors, standing, and links to the people inside it.
 ensure `~/.atl/profiles/_interfaces/org.md` exists; if it is absent I materialize it
 verbatim from the block below. If a newer canonical version ships (higher `schema-version`
 than the materialized file), I bring the on-disk interface forward and the changelog drives
-the lazy fill of every org profile (see `interface-model.md`). Thresholds live here —
+the lazy fill of every org profile (see `interface-model.md`).
+
+That bring-forward is **conditional**: first run the changelog comparison in
+`interface-model.md` ("Bringing a newer canonical interface forward over one I evolved in
+place"). If the on-disk copy carries entries I authored in place, the type **stalls** —
+the interface and its profiles are left exactly as they are, never narrowed.
+
+Thresholds live here —
 **not** in a config system (v2 has none by design); they are type-specific, so the
 interface is their natural home.
 

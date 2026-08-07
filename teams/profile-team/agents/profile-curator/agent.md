@@ -141,7 +141,7 @@ The canonical project interface — the seed schema I materialize to ~/.atl/prof
 ---
 
 ### Schema Migration
-How a BREAKING interface change (major bump) is applied to existing profiles on touch: the `_interfaces/migrations/<type>/<from>-to-<to>.md` file format (rename/remove/transform/remap-values ops), the apply algorithm with its gate-never-weakens + source-preserved + _sources-atomic invariants, ordered multi-major sequencing, the present/missing decision (missing → leave-on-old-schema + note), and how a curator-authored migration is stamped agent-<date>. The breaking-change sibling of interface-creation.md.
+How a BREAKING interface change (major bump) is applied to existing profiles on touch: the `_interfaces/migrations/<type>/<from-major>.x-to-<to>.md` file format (rename/remove/transform/remap-values ops), keyed by the MAJOR boundary alone so a shipped migration still matches a store whose interface I evolved in place, the apply algorithm with its gate-never-weakens + source-preserved + _sources-atomic invariants, ordered multi-major sequencing, the present/missing decision (missing → leave-on-old-schema + note), how a curator-authored migration is stamped agent-<date>, and the four canonical 1.x→2.0.0 migrations shipped for person/project/animal/object. The breaking-change sibling of interface-creation.md.
 -> [Details](children/schema-migration.md)
 
 ---

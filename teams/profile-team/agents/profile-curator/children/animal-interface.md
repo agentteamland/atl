@@ -14,7 +14,14 @@ lazy fill, and privacy gating all read from one place.
 ensure `~/.atl/profiles/_interfaces/animal.md` exists; if it is absent I materialize it
 verbatim from the block below. If a newer canonical version ships (higher `schema-version`
 than the materialized file), I bring the on-disk interface forward and the changelog drives
-the lazy fill of every animal profile (see `interface-model.md`). Thresholds live here —
+the lazy fill of every animal profile (see `interface-model.md`).
+
+That bring-forward is **conditional**: first run the changelog comparison in
+`interface-model.md` ("Bringing a newer canonical interface forward over one I evolved in
+place"). If the on-disk copy carries entries I authored in place, the type **stalls** —
+the interface and its profiles are left exactly as they are, never narrowed.
+
+Thresholds live here —
 **not** in a config system (v2 has none by design); they are type-specific, so the interface
 is their natural home.
 
@@ -30,7 +37,7 @@ animal is often a departed companion, so `anchors.passed` and the history-tracke
 ```markdown
 ---
 type-id: animal
-schema-version: 1.0.0
+schema-version: 2.0.0
 matches: |
   A real animal the user personally cares about — an own, family, or childhood pet, a
   working animal, or an animal they formed an emotional bond with. Living, passed, lost,
@@ -48,6 +55,13 @@ examples-negative:
 changelog:
   - version: 1.0.0
     added: [everything]   # initial animal interface
+  - version: 2.0.0
+    breaking: [state.status]
+    # state.status declared history-tracked against a BARE SCALAR, so the push-old-onto-history
+    # write had no target. Cardinality was never the problem here — allowed-status is an enum,
+    # so the values really are mutually exclusive and history-tracked is right; only the SHAPE
+    # was wrong. It now declares the paired {current, history[]}, matching state.health above.
+    # Migration: migrations/animal/1.x-to-2.0.0.md.
 thresholds:
   # Fit score at or above which this interface is reused instead of a new one being
   # created. Kept here so it travels with the type (governs v2 auto-creation).
@@ -93,11 +107,13 @@ fields:
     temperament: <str|null>          # gentle, skittish, fiercely loyal, ...
     quirks: [<list>]                 # the little behaviors the user remembers them by
     favorites: [<list>]             # favorite spots, foods, toys, people
-  state:                             # current + optional history (change-policy below)
+  state:                             # both one-at-a-time -> paired {current, history[]}
     health:
-      current: <str|null>            # a current wellbeing note
+      current: <str|null>            # a current wellbeing note (one composite reading, not a list of conditions)
       history: [ { value: <str>, date: <ISO date> } ]
-    status: <one of allowed-status>  # alive | passed | lost | rehomed
+    status:                          # alive | passed | lost | rehomed
+      current: <one of allowed-status>
+      history: [ { value: <str>, date: <ISO date> } ]
 change-policy:
   # default overwrite (decision D); history opt-in only where temporal evolution matters
   identity-extension.*: overwrite
