@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -44,7 +45,19 @@ type Orphan struct {
 	Abs   string // absolute path on disk
 	Unit  string // the owning asset unit (e.g. "agents/foo"), for the origin hint
 	Owned bool   // Unit is owned by some manifest at this layer (a sibling gain vs a wholly-unowned dir)
-	Size  int64
+	// Tracked reports that the project's git has this file committed. It is the
+	// one signal that separates content a person decided to keep from content an
+	// install left behind, and it is decidable rather than a heuristic: nothing
+	// reaches a commit by accident.
+	//
+	// Measured on this machine before it existed: `atl gc` listed two skills the
+	// user had HAND-WRITTEN — 15 KB and 10 KB, each with its own commit history,
+	// one with a PR of its own — as "unowned unit (a removed team or a hand-made
+	// dir)", i.e. as reclaimable. The message names the case its behaviour does
+	// not distinguish, which is the general tell: when a tool's vocabulary is
+	// ahead of its logic, that gap is the bug.
+	Tracked bool
+	Size    int64
 }
 
 // Origin is a human hint for why this item is reclaimable — never a certainty.
@@ -52,6 +65,8 @@ func (o Orphan) Origin() string {
 	switch {
 	case o.Scope == "history":
 		return "expired conflict archive"
+	case o.Tracked:
+		return "committed to this project's git — hand-authored or deliberately kept"
 	case o.Owned:
 		return "gain or edit beside an installed unit"
 	default:
@@ -118,11 +133,39 @@ func Scan(projectRoot string, now time.Time) ([]Orphan, error) {
 	return out, nil
 }
 
+// trackedUnder returns the set of ABSOLUTE paths git has committed beneath dir.
+//
+// One `git ls-files` per layer, not one per file: the walk can hold thousands of
+// entries and a subprocess each would dominate the scan. Any failure — no git, not
+// a repo, git absent from PATH — yields an empty set, so the classification simply
+// falls back to what it did before. This decides whether to WARN, so being wrong
+// must cost nothing.
+func trackedUnder(dir string) map[string]bool {
+	out := map[string]bool{}
+	// Paths RELATIVE to dir, deliberately. The first version joined
+	// `rev-parse --show-toplevel` with `ls-files --full-name` to build absolute
+	// paths, and never matched a single file: git resolves symlinks in the
+	// toplevel while the walk does not, so on macOS one side reads /var and the
+	// other /private/var. That would have failed silently on any symlinked path,
+	// not only in a test — the classification would simply never fire.
+	b, err := exec.Command("git", "-C", dir, "ls-files", "-z").Output()
+	if err != nil {
+		return out
+	}
+	for _, rel := range strings.Split(string(b), "\x00") {
+		if rel != "" {
+			out[filepath.ToSlash(rel)] = true
+		}
+	}
+	return out
+}
+
 // scanLayer walks a layer's asset dirs and returns files no manifest at that
 // layer claims. extraOwned holds paths owned outside any manifest (core assets at
 // the global layer). pinned, when non-nil, reports project-pinned paths to treat
 // as owned. A missing asset dir (the layer has no installs) yields nothing.
 func scanLayer(scopeName, layerDir, claudeDir string, extraOwned map[string]bool, pinned func(string) bool) ([]Orphan, error) {
+	tracked := trackedUnder(claudeDir)
 	manifests, err := manifest.List(layerDir)
 	if err != nil {
 		return nil, err
@@ -189,7 +232,7 @@ func scanLayer(scopeName, layerDir, claudeDir string, extraOwned map[string]bool
 			u := unitOf(rel)
 			out = append(out, Orphan{
 				Scope: scopeName, Rel: rel, Abs: path,
-				Unit: u, Owned: ownedUnits[u], Size: info.Size(),
+				Unit: u, Owned: ownedUnits[u], Tracked: tracked[rel], Size: info.Size(),
 			})
 			return nil
 		})

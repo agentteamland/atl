@@ -2,6 +2,7 @@ package gc
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
@@ -38,7 +39,7 @@ func TestScanOwnedVsUnowned(t *testing.T) {
 	writeFile(t, filepath.Join(claudeDir, "agents/api/agent.md"), "owned")        // owned → not orphan
 	writeFile(t, filepath.Join(claudeDir, "agents/api/children/gain.md"), "gain") // sibling of an owned unit → orphan, Owned
 	writeFile(t, filepath.Join(claudeDir, "skills/rogue/SKILL.md"), "rogue")      // wholly unowned unit → orphan
-	writeFile(t, filepath.Join(claudeDir, "knowledge/stale.md"), "stale")        // unowned knowledge asset → orphan (gc must walk knowledge/)
+	writeFile(t, filepath.Join(claudeDir, "knowledge/stale.md"), "stale")         // unowned knowledge asset → orphan (gc must walk knowledge/)
 
 	orphans, err := Scan(proj, time.Now())
 	if err != nil {
@@ -235,5 +236,84 @@ func TestScanHistoryExpiry(t *testing.T) {
 	}
 	if len(hist) != 1 || hist[0] != "acme__team/abc123" {
 		t.Errorf("only the expired snapshot should be reclaimable, got %v", hist)
+	}
+}
+
+// gitRepo turns dir into a repo and commits the given paths (relative to dir).
+func gitRepo(t *testing.T, dir string, commit ...string) {
+	t.Helper()
+	run := func(args ...string) {
+		t.Helper()
+		c := exec.Command("git", append([]string{"-C", dir}, args...)...)
+		c.Env = append(os.Environ(), "GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@t",
+			"GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@t")
+		if out, err := c.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	run("init", "-q")
+	for _, p := range commit {
+		run("add", "-f", p)
+	}
+	run("commit", "-q", "-m", "seed")
+}
+
+// The live case this was built for: `atl gc` listed two HAND-WRITTEN skills — each
+// with its own commit history — as reclaimable, under a message naming the very
+// case it could not distinguish. Nothing reaches a commit by accident.
+func TestACommittedFileIsNotReportedAsDisposable(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("HOME", t.TempDir())
+	claude := filepath.Join(root, ".claude")
+	writeFile(t, filepath.Join(claude, "skills/mine/SKILL.md"), "hand-written")
+	writeFile(t, filepath.Join(claude, "skills/scratch/SKILL.md"), "not committed")
+	gitRepo(t, claude, "skills/mine/SKILL.md")
+
+	got, err := Scan(root, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var mine, scratch *Orphan
+	for i := range got {
+		switch got[i].Rel {
+		case "skills/mine/SKILL.md":
+			mine = &got[i]
+		case "skills/scratch/SKILL.md":
+			scratch = &got[i]
+		}
+	}
+	if mine == nil || scratch == nil {
+		t.Fatalf("both files should be scanned; got %+v", got)
+	}
+	if !mine.Tracked {
+		t.Error("a committed file must be marked Tracked — it is the whole signal")
+	}
+	if scratch.Tracked {
+		t.Error("an untracked file must not be marked Tracked")
+	}
+	if mine.Origin() == scratch.Origin() {
+		t.Errorf("committed and uncommitted must not read identically: both say %q", mine.Origin())
+	}
+}
+
+// No git, not a repo, git missing from PATH — all must degrade to the previous
+// behaviour rather than failing the scan. This decides whether to WARN, so being
+// wrong must cost nothing.
+func TestScanWorksWhereThereIsNoGit(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("HOME", t.TempDir())
+	writeFile(t, filepath.Join(root, ".claude", "skills/loose/SKILL.md"), "x")
+
+	got, err := Scan(root, time.Now())
+	if err != nil {
+		t.Fatalf("a non-repo must still scan: %v", err)
+	}
+	for _, o := range got {
+		if o.Tracked {
+			t.Error("nothing can be Tracked outside a repo")
+		}
+	}
+	if len(got) == 0 {
+		t.Error("the orphan should still be found")
 	}
 }
