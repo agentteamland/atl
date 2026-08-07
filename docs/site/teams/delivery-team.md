@@ -184,7 +184,7 @@ what to set:
 | The record could not be read | Holds. Unverified is not approved (`read-failed`). |
 | The record matched, but GitHub refused the pinned merge | Holds (`merge-refused`) — `dev` moved between the check and the merge, so the provider rejected it. Nothing was promoted; approve the new head. |
 | No open `dev` → `release` PR to act on | Holds — open it first (`no-open-pr`). This is also how an already-promoted sprint converges: a re-run merges nothing. |
-| The backend does not bind the head-commit read | Holds (`backend-unbound`) — see **GitHub-only in v1** below. |
+| The command cannot reach the backend | Holds (`backend-unbound`) — see **GitHub-only in v1** below. |
 
 A hold is not a rejection: nothing is closed, nothing is tagged carryover, and the record is left where it
 is. An explicit **reject** stays conversational and runs the existing carryover path — the gate protects
@@ -204,17 +204,22 @@ promotion is commit-scoped (it can never silently ship a state later than the on
 attributable (a durable record naming a commit, an author, and a timestamp) — a correctness gate, not an
 authentication one.
 
-**GitHub-only in v1.** On Azure the approval record itself is bound (PR threads, read and write), but the
-head-commit read is not: the response field carrying the commit id on the branch read (`repo_branch`,
-`action: "get"`) has not been resolved against a live server, and the team never writes a field name it
-cannot evidence. **The commit-bound gate therefore does not operate on the Azure backend yet.**
+**GitHub-only in v1 — and the reason is the transport, not the data.** On Azure both of the gate's reads
+are bound in the adapter: the approval record via PR threads, and the head commit via the branch read
+(`repo_branch`, `action: "get"`), whose response carries it in `objectId` — resolved against a live server,
+so it is written down. But those are MCP tools, callable only from an LLM turn, and `atl work promote` is a
+Go binary with no MCP client. It can issue neither read, so **the commit-bound gate does not operate on the
+Azure backend yet.**
 
-That is a **HOLD, not a fallback** — an unresolvable head is a read failure, so on Azure `/sprint-review`
-compiles the report, opens (or finds) the promotion PR, and then holds: `atl work promote` reports
-`backend-unbound`, calls no Azure surface at all, and merges nothing. It does **not** revert to promoting
-on a conversational approval. Until the read is bound, an Azure project on this version promotes by
-completing that promotion PR itself, in Azure DevOps. Resolving the field against a live server and binding
-it is the named next step.
+That is a **HOLD, not a fallback** — a read the command cannot issue is a read failure, so on Azure
+`/sprint-review` compiles the report, opens (or finds) the promotion PR, and then holds: `atl work promote`
+reports `backend-unbound`, calls no Azure surface at all, and merges nothing. It does **not** revert to
+promoting on a conversational approval, and the ceremony does not read the head itself and promote on it
+either — a head the caller supplies is a head the caller can get wrong, which is the prose gate this
+replaced. Until a transport exists, an Azure project on this version promotes by completing that promotion
+PR itself, in Azure DevOps. Choosing how a deterministic Go gate should reach Azure — a team-owned REST
+helper like the attachment carve-out, or an Azure client inside `atl` — is the named next step, and it is
+an open design decision rather than a lookup.
 
 ## What ships
 

@@ -53,8 +53,8 @@ rules below or is escalated, not guessed.
 | Create / update / vote / thread a PR | `repo_create_pull_request` / `repo_update_pull_request` / `repo_vote_pull_request` / `repo_create_pull_request_thread` / `repo_list_pull_request_threads` / `repo_reply_to_comment` |
 | **Promotion approval record (#16)** | write: `repo_pull_request_thread_write` (action `create`, `content` = the record) · read: `repo_pull_request_thread` (action `list`), sentinel-matched (§7) |
 | List a project's repos (discovery, e.g. `/delivery-init`) | `repo_list_repos_by_project` |
-| **Read a branch (its head commit id, #16)** | `repo_branch` (action `get`, `branchName`) — ⚠ the response field carrying the commit id is **UNRESOLVED**; see §10 |
-| **Verify the promotion approval + merge `dev`→`release` (#16)** | **not bound** — `atl work promote` holds with `backend-unbound` here (§10); no Azure surface is called |
+| **Read a branch (its head commit id, #16)** | `repo_branch` (action `get`, `branchName`) → the head commit id is the response's top-level **`objectId`** (resolved against a live server, §10) |
+| **Verify the promotion approval + merge `dev`→`release` (#16)** | **bound for an LLM caller, not for `atl work promote`** — both legs are MCP rows above, and the gate is a Go binary with no MCP client; it holds with `backend-unbound` and calls no Azure surface (§10) |
 | Read repo/file | `repo_get_repo_by_name_or_id` / `repo_get_file_content` |
 | Read / upsert / list wiki pages | `wiki_get_page_content` / `wiki_create_or_update_page` / `wiki_list_pages` / `wiki_get_wiki` / `wiki_list_wikis` |
 | Discovery search | `search_workitem` / `search_wiki` / `search_code` |
@@ -72,7 +72,9 @@ disagree with the live server; the PR-thread tools are named both ways in this f
 reason. When it does,
 the rule at the top of this section wins: **resolve the real name before calling, never guess one**,
 then record it here. The same standard applies to a response **field**: a field you cannot evidence
-is not a field you may write down (see §10 for the one that currently blocks #16 on Azure).
+is not a field you may write down. The branch row's `objectId` is written down because it was read
+off a live server (§10); the rest of that response's shape was not, and still has to be resolved
+before any of it is relied on.
 
 ## 3. Resilience — rate-limit / backoff
 
@@ -373,40 +375,52 @@ landed (`MergedToBase` = `rev-list origin/dev..branch == 0`) — it never merges
   reviews only at sprint review (`dev`→`release` promotion). The carve-out is scoped to the
   machine, never the interactive session.
 
-**The `dev`→`release` promotion — the commit-bound gate does NOT operate on this backend in v1.**
+**The `dev`→`release` promotion — both READS are bound; `atl work promote` still does not run here.**
 Concept #16 has two legs: a durable approval record naming one commit, and a read of the promotion
-PR's **current head commit id** so the two can be compared. On Azure the **record leg is bound**
-(§2 + §7 — the PR-thread tools are resolved, and a PO can post the record today), but the
-**head-commit read is not**: `repo_branch` (action `get`) is the shipped branch read, and *which
-field of its response carries the branch's head commit id* has not been resolved against a live
-Azure DevOps server. §2's never-invent rule covers a response **field** exactly as it covers a tool
-name, so that field is not written down here — and without it there is nothing to compare the
-record against. Do **not** close the gap with a local `git` read: the head must come through the
-active adapter, or the gate is verifying something other than what the backend will merge. So **a
-reader must not take this section as "the gate is live on Azure"**.
+PR's **current head commit id** so the two can be compared. Both are now bound *for an LLM caller*:
+the **record leg** via the PR-thread tools (§2 + §7 — a PO can post the record today), and the
+**head-commit read** via `repo_branch` (action `get`), whose response carries the branch's head
+commit id in its top-level **`objectId`** — read off a live Azure DevOps server, so §2's
+never-invent rule is satisfied for that field and it is written down. Do **not** close the read with
+a local `git` read even now: the head must come through the active adapter, or the gate is verifying
+something other than what the backend will merge.
 
-**What that means operationally is a HOLD, not a fallback.** An unresolvable head is a **read
-failure**, and #16 fails closed on a read failure exactly as it does on a missing or mismatched
-record: until the read is bound, the `dev`→`release` promotion **holds** on this backend and reports
-why. It does **not** revert to promoting on a conversational PO decision — that is precisely the
-weakness #16 exists to remove, and reintroducing it as a fallback would give this backend the worst
-of both. Unverified is never approved.
+**What is still unbound is the gate's TRANSPORT, not its data.** `atl work promote` is a Go binary
+and both legs above are MCP tools; `atl` ships no MCP client, so the command cannot issue either
+call. This is a *different* blocker from the one this section carried until the field was resolved,
+and it is a design question rather than a lookup: §1 fixes MCP-first for every **LLM** caller and
+`atl work dispatch` is stated to never call Azure, but neither settles how a **deterministic Go
+gate** — which did not exist when those were decided — should reach Azure. The options are a
+team-owned REST helper in the `az-attach.sh` pattern (§9) versus an Azure client inside `atl`, and
+§1's "a raw-REST worker would fork the adapter into two implementations" is an argument against the
+second that has never been put to the question. **No recorded decision resolves it**, and one is
+needed before the compare-and-merge leg can be built. So **a reader must not take this section as
+"the gate is live on Azure"**.
+
+**What that means operationally is a HOLD, not a fallback.** A read the gate cannot issue is a
+**read failure**, and #16 fails closed on a read failure exactly as it does on a missing or
+mismatched record: until the transport is decided and built, the `dev`→`release` promotion **holds**
+on this backend and reports why. It does **not** revert to promoting on a conversational PO
+decision — that is precisely the weakness #16 exists to remove, and reintroducing it as a fallback
+would give this backend the worst of both. Nor may the head be passed *into* the gate by the
+ceremony that ran the MCP read: a value an LLM supplies is a value an LLM can get wrong, and a gate
+that trusts its caller for the thing it exists to verify is the prose gate #16 replaced. Unverified
+is never approved.
 
 **The promotion operation is `atl work promote`** — the deterministic gate that verifies the record
 against the PR's head and merges in the same call (the GitHub adapter §10 binds it; `/sprint-review`
-step 6b runs it). On this backend it resolves the configured `backend` and, finding the head-commit
-read unbound, returns the hold **`"reason": "backend-unbound"`** — it makes **no** call to any Azure
-surface, merges nothing, and leaves the promotion PR and any approval record untouched. That is the
-whole Azure binding of #16's compare-and-merge leg today: a refusal that names itself. Binding the
-read below is what makes this backend's promotion live; nothing in this file authorizes promoting
-around it.
+step 6b runs it). On this backend it resolves the configured `backend` and, having no way to issue
+the adapter's reads, returns the hold **`"reason": "backend-unbound"`** — it makes **no** call to any
+Azure surface, merges nothing, and leaves the promotion PR and any approval record untouched. That
+is the whole Azure binding of #16's compare-and-merge leg today: a refusal that names itself.
+Nothing in this file authorizes promoting around it.
 
-**The named next step:** resolve the response of `repo_branch` (action `get`) against a live Azure
-DevOps server, record the commit-id field here verbatim, then bind the branch row in §2 and lift
-this notice. (The team's e2e mock models that field as `objectId` — a shape assumption to confirm,
-not evidence about a live server.)
+**The named next step:** decide the gate's Azure transport (above), then build the compare-and-merge
+leg against it and lift this notice. The completion write it will need is `repo_update_pull_request`
+for an LLM caller (below); its shape under any other transport is **unresolved** and must be
+evidenced before it is written down, exactly as the branch read's field was.
 
-Two rules hold from now, so that binding the read is the *only* remaining step:
+Two rules hold from now, so that nothing else has to be undone once the transport lands:
 
 - **Never set `autoComplete` when the promotion PR is opened.** `autoComplete` lets the server
   complete the PR the moment its policies pass — which would promote `dev` before any gate ran, and
@@ -416,7 +430,7 @@ Two rules hold from now, so that binding the read is the *only* remaining step:
   asymmetric here and the asymmetry is real, not cosmetic. GitHub pins the SHA *in the merge call*
   and the provider itself refuses a moved head (verify-**and**-merge, atomic). Azure can only
   verify-**then**-complete, leaving a narrow window between the comparison and the completion in
-  which `dev` could advance. Mitigation once the read binds: re-read the head **immediately** before
+  which `dev` could advance. Mitigation once the gate binds: re-read the head **immediately** before
   the `autoComplete` write and re-compare — never reuse the value read earlier in the ceremony.
   Closing the window outright needs an Azure PR-completion SHA guard confirmed against the live API;
   that is deferred, and the window is stated rather than papered over.

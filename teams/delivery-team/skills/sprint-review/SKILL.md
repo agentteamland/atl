@@ -332,12 +332,16 @@ approved state is not the state that would be promoted. It **holds, never auto-c
 approval is not carried forward to the newer commit, and the stale record is left untouched as audit
 history for the next one to supersede.
 
-**Backend scope in v1 — the gate operates on the GitHub backend only.** It needs both legs of
-concept #16, and on **Azure** only the *record* leg is bound: the head-commit read is **unresolved**
-(`backends/azure/adapter.md` §10), so there is nothing to compare an approved commit against.
-**Unverified is never approved** — the command reports this itself as `"reason":
-"backend-unbound"`; relay it like any other hold. Azure does **not** fall back to a conversational
-approval, and this ceremony never substitutes a local `git` read for the adapter.
+**Backend scope in v1 — the gate operates on the GitHub backend only.** On **Azure** both legs of
+concept #16 are bound *for you* — you can read the approval record and the head commit through the
+MCP — but `atl work promote` is a Go binary with no MCP client, so **the command** cannot issue
+either read (`backends/azure/adapter.md` §10). **Unverified is never approved** — it reports this
+itself as `"reason": "backend-unbound"`; relay it like any other hold. Azure does **not** fall back
+to a conversational approval, this ceremony never substitutes a local `git` read for the adapter,
+and — the trap worth naming, because you *can* do it — **you must not read the head yourself and
+promote on it**, nor hand it to the command. A head the ceremony supplies is a head the ceremony
+could get wrong, and a gate that trusts its caller for the one value it exists to verify is the
+prose gate concept #16 replaced.
 
 #### 6c. Record the outcome
 
