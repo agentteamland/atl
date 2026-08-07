@@ -38,7 +38,7 @@ That's enough to install. The CLI parses the manifest, copies `agents/web-agent.
 | `scope` | string | — | Publisher-default install layer: `"project"`, `"global"`, or `"both"`. Defaults to `"project"`. The user can always override at install time with `--global` / `--project`. |
 | `dependencies` | object | — | Map of `team-name → version-constraint` for other teams the CLI installs alongside this one. |
 | `requires.atl` | string | — | Declared minimum `atl` version, e.g. `">=2.0.0"`. Conventional metadata — the install parser does not currently enforce it. |
-| `capabilities` | object | — | Optional contracts, mostly read by the platform's skills rather than the install parser. `capabilities.review: "<agent>"` names the agent [`/create-pr`](/skills/create-pr) spawns as this team's specialist reviewer; `capabilities.profile` declares the profile-layer provider/consumer role (see [profile-team](/teams/profile-team)). Two keys are read by the **CLI** itself: `store` and `channel` — see below. |
+| `capabilities` | object | — | Optional contracts, mostly read by the platform's skills rather than the install parser. `capabilities.review: "<agent>"` names the agent [`/create-pr`](/skills/create-pr) spawns as this team's specialist reviewer; `capabilities.profile` declares the profile-layer provider/consumer role (see [profile-team](/teams/profile-team)). Three keys are read by the **CLI** itself: `store`, `channel` and `sessionScript` — see below. |
 | `backends` | string[] | — | For teams shipping per-backend adapter packs under `backends/<name>/` (e.g. the delivery-team's `["azure", "github"]`): declares which backends the team supports. Informational today — the install parser does not read it. |
 
 ::: tip Keep the description short
@@ -133,6 +133,50 @@ Same story as `store`: the declaration is read at install time, so an install th
 :::
 
 **It grants nobody access.** ATL reads the declared *words* for this one mechanical purpose — wording a signal, and deciding which channels exist at all. Who may read or write what a capability names is a separate contract the platform does not yet enforce.
+
+## Declaring a session script
+
+The two declarations above hand ATL a *path* and a *set of words*. The third hands it something to run: a script ATL executes at session start, forwarding whatever it prints into the session's context.
+
+```json
+{
+  "capabilities": {
+    "delivery": { "sessionScript": "scripts/session-brief.sh" }
+  }
+}
+```
+
+Like `store` and `channel`, `sessionScript` may sit under any capability name. Its value is a path **relative to your team's assets** — `scripts/session-brief.sh` is the file at that path in your team repo, and after install it is the copy under the scope's `.claude/scripts/`. An absolute path, or one climbing out with `..`, is refused: the declaration names a file you ship, never a file on the user's machine.
+
+What it is for is the thing an always-loaded rule cannot do: report a *fact about right now*. The delivery-team's briefing is the first one — on a `delivery/<sprint>/<id>` branch it names the card that branch belongs to, its state and its sprint, and warns when the branch's PR has already merged while the card is still open. None of that is knowable from a file an agent could have read; it changes every time you switch branches.
+
+The output contract is short, and the whole of it is this: **a script speaks only by succeeding.**
+
+- ATL forwards **stdout**, and only on a **zero exit**. A non-zero exit throws the output away, so a half-finished read never reaches the session looking like a finished one.
+- **stderr is discarded.** Your diagnostics are for you; a hook's output is read as fact by an agent.
+- The whole pass is **time-bounded** and its output **size-capped**. A script that hangs, or floods, resolves to silence.
+- Every failure — missing file, lost `+x`, non-zero exit, timeout — is **silent**, because this runs in a hook and a hook must never block or fail a session.
+
+So write the script to **exit 0 with no output whenever it has nothing to say**, and to reach the network only once it knows it does. It runs with the project root as its working directory, so deciding that is usually two local reads.
+
+::: warning Silence is also how it breaks
+Every one of those failures looks exactly like a script that ran and had nothing to report. Two surfaces exist to make the difference visible, because nothing else can: [`atl skills check`](/cli/skills) resolves the declaration against the team's own tree and **fails CI** for a first-party team, and [`atl doctor`](/cli/doctor) **warns** on an installed team whose declared script is missing, escaping, or not executable. If your briefing never appears, run the doctor before debugging the script.
+:::
+
+Two things worth knowing when you write one:
+
+- **Ship it executable.** Install preserves the source file's mode, so a script committed without `+x` reflects without `+x` and then fails at exec — silently, on every machine. `atl skills check` catches this for teams in the ATL monorepo; `chmod +x` before you commit if yours lives elsewhere.
+- **It does not run inside a git worktree.** ATL's own delivery engine cuts one worktree per autonomous worker, and `.delivery/` is committed, so every worker would otherwise run your script — several times over, against one board, printing into a context with no human in it. A session briefing is for the session a person is sitting in.
+
+ATL learns nothing about your team from this. It does not know which team declared the script, what the output means, or what the script read to produce it — including which backend or service it talked to. That is the point: the delivery-team's briefing reads `.delivery/config.json` and branches on the backend *itself*, so adding a backend needs no change in the CLI.
+
+::: tip Already installed before this shipped?
+Same story as `store` and `channel`: the declaration is read at install time, so an install predating the `sessionScripts` field carries no record of it and behaves like a team that declares none. `atl update` backfills it once by re-fetching the pinned source, and it runs on its own.
+:::
+
+::: danger This runs installed code automatically
+A declared script is executed on your machine at every session start, with your permissions, without a prompt. That is a deliberate decision — a per-session confirmation would make the mechanism useless for the thing it exists for — and it is why it matters *where a team came from*. Install teams you trust. `ATL_NO_SESSION_SCRIPT=1` switches the whole pass off.
+:::
 
 ## Version constraints
 

@@ -182,5 +182,5 @@ func init() {
 	workDispatchCmd.Flags().IntVar(&workDispatchCap, "cap", dispatch.DefaultCap, "max concurrent workers")
 	workPromoteCmd.Flags().IntVar(&workPromotePR, "pr", 0, "promotion PR number (default: the open dev→release PR)")
 	workPromoteCmd.Flags().BoolVar(&workPromoteJSON, "json", false, "emit the machine-readable verdict instead of the message")
-	workCmd.AddCommand(workDispatchCmd, workPromoteCmd)
+	workCmd.AddCommand(workDispatchCmd, workPromoteCmd, workSprintScanCmd)
 }

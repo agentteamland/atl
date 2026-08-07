@@ -31,7 +31,12 @@ import (
 //	3 — adds `channels`, the capture channels the team declared. Like `stores`,
 //	    the value lives only in the team's team.json, so an install written at
 //	    v2 must re-fetch its pinned source once to learn it.
-const SchemaVersion = 4
+//	4 — adds `reviewer`, the agent the team offers /create-pr for domain review.
+//	5 — adds `sessionScripts`, the scripts the team declared for session start.
+//	    Same story as its three siblings: the declaration lives only in team.json,
+//	    which install does not reflect onto disk, so an install written at v4 has
+//	    to re-fetch its pinned source once to learn it.
+const SchemaVersion = 5
 
 // Source mirrors the index source an install resolved from, pinned to the ref
 // actually fetched, so doctor/update can re-fetch the exact same bytes.
@@ -103,6 +108,17 @@ type Manifest struct {
 	// consumer that only sees the installed tree cannot read it from disk.
 	// Empty for teams that declare none, which is the common case.
 	Reviewer string `json:"reviewer,omitempty"`
+	// SessionScripts are the scripts this team declared under
+	// `capabilities.<name>.sessionScript` — each a path relative to the team's
+	// asset root (so `scripts/x.sh` resolves to <scope>/.claude/scripts/x.sh once
+	// reflected). Session start runs each declared script and forwards its stdout
+	// into the session's context.
+	//
+	// Recorded here for the same reason as Stores, Channels and Reviewer: the
+	// declaration lives in team.json, which is NOT an installable asset, so a
+	// consumer that only sees the installed tree cannot read it from disk.
+	// Omitted for teams that declare none.
+	SessionScripts []string `json:"sessionScripts,omitempty"`
 }
 
 // dirName is the installed-manifests directory under a layer root.

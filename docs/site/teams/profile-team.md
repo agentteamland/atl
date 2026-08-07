@@ -157,7 +157,7 @@ validate. When the interface grows (a minor version adds fields), older profiles
 batch-migrated; each catches up **lazily** the next time drain touches it — the changelog's
 `added` lists drive a deterministic fill. A **breaking** change (a major version that renames,
 removes, or reshapes a field) is applied instead by a **migration file**
-(`_interfaces/migrations/<type>/<from>-to-<to>.md`) the curator runs on touch — validated so
+(`_interfaces/migrations/<type>/<from-major>.x-to-<to>.md`) the curator runs on touch — validated so
 it never weakens a privacy gate and carries each value's source across the move; if the file
 is missing the profile is simply left on its old schema and flagged, never guessed. Inference
 is tolerated but flagged (`agent-inferred-<date>`), so a wrong guess self-corrects in a later

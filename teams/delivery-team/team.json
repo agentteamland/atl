@@ -125,7 +125,10 @@
   ],
   "rules": [],
   "capabilities": {
-    "review": "tech-lead"
+    "review": "tech-lead",
+    "delivery": {
+      "sessionScript": "scripts/session-brief.sh"
+    }
   },
   "extends": null,
   "excludes": [],

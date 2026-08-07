@@ -69,6 +69,13 @@ For every `field-path: value` in `fields`:
      next confirmation corrects it; a wrong replace deletes something true and leaves no
      trace it was ever there. Defaulting to join also keeps a re-drain idempotent, which a
      per-write judgement call would not be.
+     **On a list of objects** (`traits.skills`, `state.goals`, `project.state.motivation`)
+     the element's **first key is its identity** — `name`, `goal`, `motive`. An arriving
+     element whose identity matches a standing one **updates that element in place**; only
+     an unmatched identity appends. Without this a re-drain of an unchanged fact appends a
+     second copy of the same entry, and "join is idempotent" above stops being true. Match
+     on meaning, not bytes: the same goal reworded is the same goal, and the fuller wording
+     wins.
    - `history-tracked` (`state.emotional`/`financial`, and the enum `state.status` /
      `state.standing` fields) → push the old `current` + its date onto `history`, then set
      the new `current`. **Only sound where the values are mutually exclusive** — see the
@@ -87,10 +94,11 @@ branch on whether the bump crosses a major boundary:
   (inference tolerated + flagged; Tier-3+ inference still rejected), set `meta.schema-version`
   to I.
 - **Major boundary** (`I.major > P.major`) → a **breaking migration**, per
-  `schema-migration.md`: apply the `_interfaces/migrations/<type>/<from>-to-<to>.md` file
-  (validated so no op weakens a tier gate; `_sources` carried atomically), then the add-only
-  fill on the remaining span, advancing one major hop at a time. If the migration file is
-  missing or malformed, leave the profile on P and note it — never guess a breaking change.
+  `schema-migration.md`: apply the `_interfaces/migrations/<type>/<from-major>.x-to-<to>.md`
+  file — selected by P's **major** alone, never by its minor/patch — (validated so no op
+  weakens a tier gate; `_sources` carried atomically), then the add-only fill on the
+  remaining span, advancing one major hop at a time. If the migration file is missing or
+  malformed, leave the profile on P and note it — never guess a breaking change.
 
 Then go to §6.
 
