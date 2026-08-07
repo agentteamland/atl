@@ -108,6 +108,7 @@ learning blueprints stay non-flaky).
 |---|---|---|
 | `init` | none | `atl init` scaffolds a per-tier CLAUDE.md, only-if-absent (never clobbers), flags mutually exclusive |
 | `install` | none | install at both scopes; assets + manifests + embedded core reflect; project CLAUDE.md scaffolded |
+| `install-deps-hooks` | none | what install does BESIDES copying the team you named: it follows the `dependencies` edge (personal-advisory-team pulls profile-team in, reported as a `(dependency)`), binds all five automation hooks by event + exact command incl. the guard's `Bash\|Edit\|Write` matcher (D-3), and a RE-install converges — a locally modified reflected file survives, hooks and manifests do not duplicate, and the user's own hook + non-hook settings keys are preserved through both passes. Every assertion is a delta against a baseline taken first, because each property's null outcome otherwise reads as a pass |
 | `promote` | none | a project gain lifts to global; second pass is a no-op |
 | `pin` | none | a pinned file is held back from promote; unpin re-enables it |
 | `doctor` | none | a deleted installed file is self-healed from the pinned source |

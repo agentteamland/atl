@@ -137,6 +137,40 @@ write_test_index_profile() {
   jq -n --arg ref "${ATL_E2E_TEAM_REF:-main}" '{schemaVersion:1,generatedAt:"2099-01-01T00:00:00Z",teams:[{handle:"agentteamland",name:"profile-team",version:"1.0.0",description:"profile-team e2e (monorepo subpath).",keywords:["profile"],scope:"global",verified:true,source:{repo:"agentteamland/atl",subpath:"teams/profile-team",ref:$ref}}]}' > "$HOME/.atl/index.json"
 }
 
+# write_test_index_advisory seeds ~/.atl/index.json with BOTH first-party teams
+# the transitive-install path needs: personal-advisory-team (the one installed)
+# and profile-team (the dependency it declares in team.json `dependencies`).
+#
+# Both are monorepo subpaths on ATL_E2E_TEAM_REF, for the reason spelled out on
+# write_test_index_delivery: the container fetches team content from that ref and
+# mounts nothing from the working tree.
+#
+# The dependency is listed here as a BARE name in personal-advisory-team's
+# manifest ("profile-team"), which `resolveDep` resolves via `LookupByName`,
+# preferring a verified publisher — hence `verified: true` on both.
+#
+# Why profile-team is in this index is NOT "otherwise the dependency cannot be
+# resolved" — that was the first explanation and it is measurably wrong. Removing
+# it from here changes nothing observable: `index.Resolve` UNION-merges this cache
+# with the binary's EMBEDDED SEED, which carries every first-party team, so the
+# recursion resolves it either way (verified — the blueprint stayed 29/29 with
+# this entry deleted).
+#
+# It is here for the reason write_test_index_delivery gives: the entry the merge
+# keeps is the one with the newer `generatedAt`, so the far-future stamp makes
+# THIS entry authoritative and the dependency is fetched from ATL_E2E_TEAM_REF.
+# Drop it and the dependency silently installs from the seed's released TAG — a
+# branch editing teams/profile-team would then be exercised for the consumer and
+# not for the dependency, and every assertion would still pass. Same pinned-ref
+# trap, one level down the dependency edge.
+write_test_index_advisory() {
+  mkdir -p "$HOME/.atl"
+  jq -n --arg ref "${ATL_E2E_TEAM_REF:-main}" '{schemaVersion:1,generatedAt:"2099-01-01T00:00:00Z",teams:[
+    {handle:"agentteamland",name:"personal-advisory-team",version:"0.1.0",description:"personal-advisory-team e2e (monorepo subpath).",keywords:["advisory"],scope:"global",verified:true,source:{repo:"agentteamland/atl",subpath:"teams/personal-advisory-team",ref:$ref}},
+    {handle:"agentteamland",name:"profile-team",version:"1.0.0",description:"profile-team e2e (monorepo subpath).",keywords:["profile"],scope:"global",verified:true,source:{repo:"agentteamland/atl",subpath:"teams/profile-team",ref:$ref}}
+  ]}' > "$HOME/.atl/index.json"
+}
+
 # write_test_index_delivery seeds ~/.atl/index.json with the first-party
 # delivery-team entry, pointing at the monorepo subpath (delivery-team is not yet
 # in the published catalog, so the e2e injects it the same way

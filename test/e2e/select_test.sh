@@ -57,6 +57,12 @@ check "team content runs the ceremony blueprints" \
   'teams/delivery-team/skills/sprint-plan/SKILL.md' \
   'delivery-loop github-delivery-autonomous-refine github-delivery-full-chain github-delivery-loop'
 
+# The hook-binding half of install-deps-hooks: `internal/settings` is what binds
+# them, and guard declares the same package because its matcher is written there.
+check "a settings change runs the hook-binding blueprints" \
+  'cli/internal/settings/settings.go' \
+  'guard install-deps-hooks'
+
 # Rule 2 — a blueprint is its own consumer.
 check "editing a blueprint runs that blueprint" \
   'test/e2e/blueprints/gc.sh' \
