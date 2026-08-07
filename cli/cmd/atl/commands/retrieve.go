@@ -418,6 +418,27 @@ func corpusDirs(projectRoot string) ([]string, error) {
 		filepath.Join(projectRoot, ".claude", "backends"),
 		filepath.Join(projectRoot, ".claude", "packs"),
 	}
+	// The team SOURCE tree, which exists only in the repo that owns it. The
+	// installed copies above are what a CONSUMING project executes; this is what a
+	// session EDITING a team is working on, and most sessions in that repo are
+	// exactly that. The two are not the same question — an installed copy can lag
+	// its source by a version, and in the owning repo the source is authoritative.
+	//
+	// Concretely: the two knowledge files that motivated the whole corpus-reach
+	// investigation — a pack format and a decomposition blueprint — both live here,
+	// each refuted a proposal that reached the user anyway, and neither was
+	// retrievable from a session in this repo.
+	//
+	// Measured before adding it, because the card required both checks. SIZE: the
+	// owning repo's corpus is 1 file today, so this is not a widening of a large
+	// index but the difference between retrieval existing there and not; it costs
+	// a consuming project nothing, since teams/ does not exist there.
+	// DOUBLE-INDEXING: the concern was source and installed copies ranking twice
+	// under two paths — but the owning repo has no installed teams at all (zero
+	// manifests), so the two never coexist.
+	if _, err := os.Stat(filepath.Join(projectRoot, "teams")); err == nil {
+		dirs = append(dirs, filepath.Join(projectRoot, "teams"))
+	}
 	if _, err := os.Stat(filepath.Join(projectRoot, ".delivery", "config.json")); err == nil {
 		dirs = append(dirs, filepath.Join(projectRoot, "docs"))
 	}
