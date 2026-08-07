@@ -4,6 +4,8 @@ The **deterministic collect** half of rules-distill: gather the normative / impe
 
 This is a **maintainer-side** surface that runs against the monorepo's `core/` + `teams/`. Outside the monorepo it does nothing and exits 0.
 
+**When the repo is not an ancestor of your working directory**, set `ATL_REPO_ROOT` to name it. That is the maintainer-hub case — a checkout that clones the monorepo as a *child* — where an upward walk can never reach the marker, so the command skips and exits 0 while looking like it passed. The root is named rather than searched for on purpose: in that layout the same marker also matches **archived** clones, and a search would resolve one of them by readdir order and report drift that is real about content nobody ships.
+
 ## Usage
 
 ```bash

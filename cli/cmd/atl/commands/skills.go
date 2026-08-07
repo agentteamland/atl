@@ -2,7 +2,6 @@ package commands
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"time"
 
@@ -36,7 +35,7 @@ var skillsCheckCmd = &cobra.Command{
 
 		root, err := findCoreRoot()
 		if err != nil {
-			fmt.Println("atl skills: no core/ here — nothing to check")
+			fmt.Println("atl skills: no core/ here — nothing to check (set ATL_REPO_ROOT if the monorepo is not an ancestor of this directory)")
 			return nil
 		}
 		in := skillcheck.Input{
@@ -78,23 +77,11 @@ var skillsCheckCmd = &cobra.Command{
 	},
 }
 
-// findCoreRoot walks up from the cwd to the monorepo root — the dir holding
-// core/skills. Returns an error outside the monorepo (the pre-flight skip).
+// findCoreRoot locates the monorepo root — the dir holding core/skills — from
+// the cwd, upward and then a bounded search downward (see findRepoRoot).
+// Returns an error outside the monorepo, which is the pre-flight skip.
 func findCoreRoot() (string, error) {
-	dir, err := os.Getwd()
-	if err != nil {
-		return "", err
-	}
-	for {
-		if st, e := os.Stat(filepath.Join(dir, "core", "skills")); e == nil && st.IsDir() {
-			return dir, nil
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			return "", fmt.Errorf("no core/skills found from %s upward", dir)
-		}
-		dir = parent
-	}
+	return findRepoRoot(filepath.Join("core", "skills"))
 }
 
 // skillsSessionSignal surfaces asset content-quality signals at session start, but

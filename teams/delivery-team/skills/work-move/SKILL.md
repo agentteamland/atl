@@ -1,6 +1,7 @@
 ---
 name: work-move
 description: /work-move <id> <state|flag> — the drive loop's only state writer. Moves a work item between the backend's real states, writing every surface a state spans in one pass (on GitHub, Done means both the Status field and a closed issue) and reading the result back to confirm it landed. Also sets the annotation flags that are conditions on a state rather than states of their own — blocked, and the verification pair test:pending / test:failed — leaving Status untouched so a unit in verification is still counted in flight. Refuses an illegal transition with the legal ones named, requires a reason for blocking, for reopening and for a failed verification, and refuses Done when the unit's PR has not actually merged or its verification is red. Mutating; run it explicitly.
+disable-model-invocation: true
 ---
 
 # /work-move — the one place state changes
