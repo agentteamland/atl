@@ -249,19 +249,29 @@ approved, reset `+"`%s`"+` to %s first.`,
 	return res
 }
 
-// HoldBackendUnbound is the verdict for a backend that binds only the record leg
-// of concept #16. On Azure the head-commit read is unresolved — which response
-// field of the branch read carries the commit id is not evidenced — so there is
-// nothing to compare an approved commit against. Unverified is never approved, so
-// the gate holds there; it does not fall back to a conversational approval and it
-// does not substitute a local git read for the adapter.
+// HoldBackendUnbound is the verdict for a backend this command cannot reach. On
+// Azure BOTH legs of concept #16 are bound in the adapter — the approval record via
+// the PR-thread tools, the head commit via `repo_branch` (action "get"), whose
+// response carries it in objectId — but every one of those is an MCP tool, and this
+// binary has no MCP client, so it can issue neither read. The data is available; the
+// transport is not, and which transport a deterministic Go gate should use on Azure
+// is an open design question (backends/azure/adapter.md §10), not a lookup.
+//
+// The tempting shortcut is to let the ceremony — which CAN call the MCP — read the
+// head and pass it in. That is refused deliberately: a head supplied by the caller is
+// a head the caller can get wrong, and a gate that trusts its caller for the one
+// value it exists to verify is the prose gate this package replaced.
+//
+// So the gate holds: unverified is never approved, no conversational fallback, and no
+// local git read substituted for the adapter.
 func HoldBackendUnbound(backend string) Result {
 	return holdf(ReasonBackendUnbound, `HOLD — on the %s backend I cannot read the promotion PR's current head commit, so I
 cannot verify that your approval names the commit that would be promoted. I have NOT
 promoted anything; unverified is not approved. The promotion PR and its approval
-record (if any) are preserved. Unblocking this needs the head-commit read bound in
-the Azure adapter — resolve the branch read's response field against a live server,
-then bind it.`, backend)
+record (if any) are preserved. The adapter does bind both reads for an LLM caller;
+what is missing is a way for THIS command to issue them, which is an open design
+decision (backends/azure/adapter.md §10). Until it is made and built, promotion on
+this backend holds — do not read the head by hand and promote on it.`, backend)
 }
 
 func holdf(reason, format string, a ...any) Result {

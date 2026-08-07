@@ -266,17 +266,23 @@ const tools = {
     inputSchema: { type: 'object', properties: { project: {}, repositoryNameOrId: {} } },
     handler: (st) => st.state.repos[0],
   },
-  repo_get_branch_by_name: {
-    description: 'Read a branch.',
-    inputSchema: { type: 'object', properties: { repositoryId: {}, name: {}, project: {} } },
-    // A realistic 40-char lowercase hex commit id, never a short placeholder: the
-    // promotion-approval gate (#16) matches a head commit with a strict 40-hex parse, so
-    // the fixture must carry a value that parse can accept. NOT exercised by the gate
-    // today — the commit-bound gate is GitHub-only in v1 and the Azure head-commit read
-    // is unbound (backends/azure/adapter.md §10). This keeps the fixture correct for the
-    // run where that read binds; the field name here is the mock's own shape assumption,
-    // not evidence about a live server.
-    handler: (st, a) => ({ name: S(a.name || 'dev'), objectId: '9c1f5f0e6d4b3a2c8e7d6b5a4938271605f4e3d2', repo: st.state.repos[0].name }),
+  repo_branch: {
+    description: 'Read branch data for a repository (action: get | list | list_mine).',
+    inputSchema: { type: 'object', properties: { action: {}, repositoryId: {}, branchName: {}, project: {} } },
+    // Named `repo_branch` with an `action` because that is the tool the shipped
+    // @azure-devops/mcp exposes; the granular `repo_get_branch_by_name` this mock used
+    // to model DOES NOT EXIST on the live server, so a blueprint could pass here against
+    // a call that can only fail in production.
+    //
+    // `objectId` is where a live server returns the branch head (resolved against a real
+    // Azure DevOps project, backends/azure/adapter.md §2 + §10) — no longer the mock's own
+    // shape assumption. A realistic 40-char lowercase hex commit id, never a short
+    // placeholder: the promotion-approval gate (#16) matches a head with a strict 40-hex
+    // parse, so the fixture must carry a value that parse can accept. NOT exercised by the
+    // gate today — `atl work promote` is a Go binary with no MCP client, so it cannot issue
+    // this read on Azure at all (§10); this keeps the fixture correct for the run where a
+    // transport for it exists.
+    handler: (st, a) => ({ name: S(a.branchName || a.name || 'dev'), objectId: '9c1f5f0e6d4b3a2c8e7d6b5a4938271605f4e3d2', repo: st.state.repos[0].name }),
   },
   repo_get_file_content: {
     description: 'Read a file from a branch.',

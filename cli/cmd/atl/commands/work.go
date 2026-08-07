@@ -147,8 +147,9 @@ var workPromoteCmd = &cobra.Command{
 				Run:     workPromoteRunner,
 			}.Verify()
 		default:
-			// Only the record leg of concept #16 is bound outside GitHub; the
-			// head-commit read is not, so the comparison cannot run at all.
+			// Outside GitHub, concept #16's reads are bound only for an LLM caller
+			// (Azure's are MCP tools), and this binary has no way to issue them —
+			// so the comparison cannot run at all. See HoldBackendUnbound.
 			res = promotiongate.HoldBackendUnbound(backend)
 		}
 

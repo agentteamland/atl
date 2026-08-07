@@ -185,7 +185,7 @@ tam olarak neyi set etmen gerektiğini yazar:
 | Kayıt okunamadı | Bekletir. Doğrulanmamış, onaylanmış değildir (`read-failed`). |
 | Kayıt eşleşti ama GitHub SHA'ya sabitlenmiş merge'ü reddetti | Bekletir (`merge-refused`) — kontrol ile merge arasında `dev` ilerlediği için sağlayıcı reddetti. Hiçbir şey promote edilmedi; yeni head'i onayla. |
 | Üzerinde çalışılacak açık bir `dev` → `release` PR'ı yok | Bekletir — önce onu aç (`no-open-pr`). Zaten promote edilmiş bir sprint de böyle yakınsar: yeniden koşu hiçbir şeyi merge etmez. |
-| Backend head-commit okumasını bağlamıyor | Bekletir (`backend-unbound`) — aşağıdaki **v1'de yalnızca GitHub** bloğuna bak. |
+| Komut backend'e erişemiyor | Bekletir (`backend-unbound`) — aşağıdaki **v1'de yalnızca GitHub** bloğuna bak. |
 
 HOLD bir ret değildir: hiçbir şey kapatılmaz, hiçbir şeye carryover etiketi konmaz ve kayıt olduğu yerde
 bırakılır. Açık bir **ret** sohbette kalır ve mevcut carryover yolunu işletir — kapı yalnız geri alınamaz
@@ -206,17 +206,22 @@ edemez. Kapının kazandırdığı şey şudur: bir promote artık commit-kapsam
 yenisini sessizce teslim edemez) ve atfedilebilirdir (bir commit, bir yazar ve bir zaman damgası veren
 kalıcı bir kayıt) — bu bir doğruluk kapısıdır, bir kimlik doğrulama kapısı değil.
 
-**v1'de yalnızca GitHub.** Azure'da onay kaydının kendisi bağlıdır (PR thread'leri, hem okuma hem yazma),
-ama head-commit okuması bağlı değildir: branch okumasında (`repo_branch`, `action: "get"`) commit id'sini
-taşıyan yanıt alanı canlı bir sunucuya karşı çözümlenmedi ve takım, kanıtlayamadığı bir alan adını asla
-yazmaz. **Dolayısıyla commit'e bağlı kapı Azure backend'inde henüz çalışmıyor.**
+**v1'de yalnızca GitHub — ve sebebi veri değil, taşıma katmanı.** Azure'da kapının her iki okuması da
+adapter'da bağlıdır: onay kaydı PR thread'leri üzerinden, head commit ise branch okuması (`repo_branch`,
+`action: "get"`) üzerinden — yanıt onu `objectId` alanında taşır ve bu, canlı bir sunucuya karşı
+çözümlendiği için yazılıdır. Ne var ki bunlar yalnızca bir LLM turundan çağrılabilen MCP araçlarıdır ve
+`atl work promote`, MCP istemcisi olmayan bir Go ikilisidir. İki okumadan hiçbirini yapamaz; **dolayısıyla
+commit'e bağlı kapı Azure backend'inde henüz çalışmıyor.**
 
-Bu bir **HOLD'dur, bir geri-dönüş (fallback) değil** — çözülemeyen bir head okuma hatasıdır: Azure'da
-`/sprint-review` raporu derler, promote PR'ını açar (ya da bulur) ve sonra bekletir; `atl work promote`
-`backend-unbound` bildirir, hiçbir Azure yüzeyini çağırmaz ve hiçbir şeyi merge etmez. Sohbette verilen
-bir onayla promote etmeye **geri dönmez**. Okuma bağlanana kadar bu
-sürümdeki bir Azure projesi, promote'u o PR'ı Azure DevOps üzerinde kendisi tamamlayarak yapar. O alanı
-canlı sunucuya karşı çözümleyip bağlamak, adı konmuş bir sonraki adımdır.
+Bu bir **HOLD'dur, bir geri-dönüş (fallback) değil** — komutun yapamadığı bir okuma, okuma hatasıdır:
+Azure'da `/sprint-review` raporu derler, promote PR'ını açar (ya da bulur) ve sonra bekletir; `atl work
+promote` `backend-unbound` bildirir, hiçbir Azure yüzeyini çağırmaz ve hiçbir şeyi merge etmez. Sohbette
+verilen bir onayla promote etmeye **geri dönmez**; seremoni head'i kendisi okuyup ona göre promote de etmez
+— çağıranın verdiği bir head, çağıranın yanlış verebileceği bir head'dir ve bu, tam olarak yerine geçilen
+düzyazı kapısıdır. Bir taşıma katmanı çıkana kadar bu sürümdeki bir Azure projesi, promote'u o PR'ı Azure
+DevOps üzerinde kendisi tamamlayarak yapar. Deterministik bir Go kapısının Azure'a nasıl erişeceğine karar
+vermek — attachment carve-out'u gibi takıma ait bir REST yardımcısı mı, yoksa `atl` içinde bir Azure
+istemcisi mi — adı konmuş bir sonraki adımdır ve bir arama değil, açık bir tasarım kararıdır.
 
 ## Neler geliyor
 
