@@ -23,13 +23,41 @@ import (
 const indexFormatVersion = 2
 
 // Index is the persisted retrieval index for one corpus: the documents plus one
-// embedding vector per document. BM25 is rebuilt in memory from the documents at
-// query time (tokenizing tens of pages is sub-millisecond), so only the
-// documents and their vectors are serialized.
+// embedding vector per document. BM25 is rebuilt in memory from the documents on
+// first use and cached for the process's lifetime, so only the documents and
+// their vectors are serialized.
+//
+// The previous note here said the rebuild costs nothing — "tokenizing tens of
+// pages is sub-millisecond". That was measured against a corpus an order of
+// magnitude smaller: this project alone now indexes 350 documents into a 4.1 MB
+// index, and a comment that under-describes a cost by 10x is exactly what stops
+// the next reader from looking.
 type Index struct {
 	Version int
 	Docs    []Doc
 	Vecs    [][]float32 // parallel to Docs; empty when the corpus is empty
+
+	// lex caches the BM25 index built from Docs. Building it tokenizes EVERY
+	// document, which is corpus-scale and entirely prompt-independent; ranking a
+	// prompt against it is the cheap part. Both Query and LexicalHits need one,
+	// and the hook path calls both on every prompt — so building per call meant
+	// tokenizing the whole corpus twice per prompt of every session.
+	//
+	// Safe to cache because Docs is assigned once at construction and never
+	// mutated: BuildIncremental returns a NEW Index, and Load decodes into a
+	// fresh one (an unexported field is not gob-encoded, so a loaded index starts
+	// with an empty cache and builds on first use). It is deliberately NOT
+	// exported and NOT persisted — it is derived state, and the only thing worse
+	// than rebuilding it would be loading a stale one.
+	lex *bm25Index
+}
+
+// bm25 returns the cached BM25 index, building it on first use.
+func (ix *Index) bm25() *bm25Index {
+	if ix.lex == nil {
+		ix.lex = newBM25(ix.Docs)
+	}
+	return ix.lex
 }
 
 // Result is one retrieved document, best-first from Query.
@@ -190,7 +218,7 @@ func (ix *Index) Query(ctx context.Context, prompt string, e *Embedder, k int, m
 	if len(ix.Docs) == 0 || k <= 0 {
 		return nil, nil
 	}
-	lexical := newBM25(ix.Docs).rank(prompt)
+	lexical := ix.bm25().rank(prompt)
 
 	var semantic []int
 	if e != nil && len(ix.Vecs) == len(ix.Docs) {
@@ -267,7 +295,7 @@ func (ix *Index) LexicalHits(prompt string) int {
 	if len(ix.Docs) == 0 {
 		return 0
 	}
-	return len(newBM25(ix.Docs).rank(prompt))
+	return len(ix.bm25().rank(prompt))
 }
 
 // Save writes the index to path via a same-dir temp file + atomic rename, so a

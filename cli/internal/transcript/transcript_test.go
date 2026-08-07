@@ -486,3 +486,47 @@ func TestExtractFlowSkipsMachineUserTurns(t *testing.T) {
 		t.Errorf("wrong turns survived: %+v", turns)
 	}
 }
+
+// The watchdog measures every declared channel over ONE transcript, so the
+// expensive half (read + parse + collapse) must be reusable across predicates.
+// This pins that: one LogicalTurns call feeding two different channels gives
+// each its own correct stretch — which is what lets the caller stop re-reading
+// the file per channel.
+func TestStretchOfIsReusableAcrossChannels(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "s.jsonl")
+	lines := []string{
+		dryLine("user", "please do the thing"),
+		dryLine("assistant", "done <!-- learning: a -->"),
+		dryLine("user", "and another"),
+		dryLine("assistant", "no marker here"),
+		dryLine("assistant", "still none"),
+	}
+	if err := os.WriteFile(p, []byte(strings.Join(lines, "\n")+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	logical, err := LogicalTurns(p)
+	if err != nil {
+		t.Fatalf("LogicalTurns: %v", err)
+	}
+
+	hasLearning := func(s string) bool { return strings.Contains(s, "<!-- learning:") }
+	hasProfile := func(s string) bool { return strings.Contains(s, "<!-- profile-fact:") }
+
+	// The learning channel saw a marker, so its stretch restarted after it.
+	// The profile-fact channel never did, so it counts every assistant turn.
+	learn := StretchOf("s.jsonl", logical, hasLearning)
+	prof := StretchOf("s.jsonl", logical, hasProfile)
+
+	if learn.Turns >= prof.Turns {
+		t.Fatalf("learning stretch (%d turns) should be shorter than the never-marked channel's (%d)", learn.Turns, prof.Turns)
+	}
+	if learn.Key == prof.Key {
+		t.Fatalf("both channels got key %q — the latch key must differ once one channel has seen a marker", learn.Key)
+	}
+
+	// And the split must not change what DryStretch reports.
+	if direct, derr := DryStretch(p, hasLearning); derr != nil || direct != learn {
+		t.Fatalf("DryStretch=%+v (err %v), StretchOf=%+v — the split changed behaviour", direct, derr, learn)
+	}
+}
