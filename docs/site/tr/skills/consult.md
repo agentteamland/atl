@@ -58,7 +58,7 @@ Modelin çağırdığı bir mekanizma, modelin çağırmayı hatırlamasına ba�
 - Her danışma, döndürdüğü sayfalarla birlikte fire log'una bir `consulted` sonucu yazar.
 - Bir `Stop` hook'u (`atl retrieve turn-end`) tamamlanan her tur için tek satır kaydeder ve modelin bağlamına hiçbir şey yazmaz. Amacı danışmaya dürüst bir **payda** vermektir — "ajan kaç turda kayda baktı?" — sunulan-sayfa-başına-okuma yerine; ki o oran, sayfalar her promptta sunulduğunda anlamsızdır.
 
-İkisi de `atl retrieve stats` çıktısında görünür:
+İkisi de [`atl retrieve stats`](/tr/cli/retrieve#stats-kanalin-kendi-sayilari) çıktısında görünür:
 
 ```
 turns           40

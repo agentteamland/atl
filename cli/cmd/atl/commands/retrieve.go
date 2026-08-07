@@ -63,9 +63,12 @@ type retrieveInput struct {
 }
 
 var retrieveCmd = &cobra.Command{
-	Use:    "retrieve",
-	Short:  "Per-prompt knowledge retrieval (hybrid lexical + semantic)",
-	Hidden: true, // internal — wired as a UserPromptSubmit hook, not typed by hand
+	Use:   "retrieve",
+	Short: "Per-prompt knowledge retrieval (hybrid lexical + semantic)",
+	// No longer Hidden. It was, correctly, while this was purely a hook body that
+	// nobody typed — but `--query` (the agent-initiated consult) and `stats` are
+	// deliberately invoked now, and the repo's own convention is that a hidden
+	// command is unhidden in the same change that makes it user-facing.
 	Long: "The read side of ATL's knowledge loop (the write side is learning-capture +\n" +
 		"/drain). Run with no subcommand as a UserPromptSubmit hook: it reads the prompt\n" +
 		"on stdin, ranks the project's knowledge pages (BM25 + a local semantic embedder,\n" +
