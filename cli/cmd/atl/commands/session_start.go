@@ -150,6 +150,15 @@ var sessionStartCmd = &cobra.Command{
 		// agent the board-tracked-work rule is active here. Silent otherwise.
 		boardTrackedSignal(project)
 
+		// The board's own state, one level past "the rule is active here": a
+		// board-backed project with open work and no active sprint has drifted out
+		// of the ceremony chain, and nothing about that says so on its own. Prints
+		// from a cached verdict a detached scan left behind, and schedules the next
+		// scan — so the network is never on this path. A REPORT: opening a sprint is
+		// the product owner's call, so it is raised, never dispatched. Silent on any
+		// backend/mode the deterministic read doesn't cover (see sprintSignalCovers).
+		sprintSessionSignal(project)
+
 		// Proactive-observer signal — fires in ANY project with an ATL decision
 		// surface (a .atl/ directory), throttled to ~once/day and only when that
 		// surface moved since the last sweep: prompts a /observe pass to surface ripe
