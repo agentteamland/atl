@@ -132,6 +132,30 @@ If you *are* running in a live turn (the user invoked `/observe` directly), pres
 ranked list as well — but still write it to the digest, so a finding they do not act on
 this turn is not gone by the next one.
 
+⚠ **To read the digest back — yours or anyone's — use `atl digest --all`. Never the bare
+`atl digest`.**
+
+```bash
+atl digest --all    # prints every finding, read ones included, and marks nothing
+```
+
+The bare form **prints the unread findings and marks them read**. The session-start signal
+reports an *unread count*, so checking your own work with it sets that count to zero: the
+sweep completes "successfully" and the user is told nothing is waiting. **The damage
+presents as silence, not as an error** — nothing anywhere reports that a sweep ran and its
+output was suppressed.
+
+This is not a hypothetical. The 2026-08-07 sweep recorded 12 findings, ran `atl digest` to
+confirm they had landed, and marked all 12 read. Recovery is manual and non-obvious:
+capture each finding's id, title and body, `atl digest drop <id>`, then re-`add` — because
+`add` on an existing `(sweep, title)` deliberately leaves the read state alone, so
+re-adding by itself does **not** restore unread.
+
+Verifying your own writes is the right instinct; it is the *bare invocation* that is
+wrong. Same family as `atl learnings transcript`, which spends its mine cursor as a side
+effect of producing output — a **read that mutates durable state**. This one is sharper,
+because the consuming action is self-verification.
+
 ### 6. Record the sweep
 ```bash
 atl observe --record

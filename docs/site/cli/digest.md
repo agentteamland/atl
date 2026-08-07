@@ -30,6 +30,8 @@ printf '<evidence, why it matters, suggested next step>' \
   | atl digest add --sweep observe --title '<the one-line claim>'
 ```
 
+> ⚠ **Reading your own sweep's output? Use `--all`.** The session-start signal reports an **unread count**, so running the bare form to check that findings landed marks them read and sets that count to zero — the sweep completes "successfully" and the next session is told nothing is waiting. The damage presents as **silence**, not as an error. Recovery is manual: capture each finding's id, title and body, `drop` it, then re-`add` — `add` deliberately preserves the read state, so re-adding alone does not restore unread.
+
 The body is read from stdin so it can carry evidence — file paths, quoted lines — without shell quoting.
 
 ## Idempotence

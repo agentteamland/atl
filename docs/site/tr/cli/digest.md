@@ -30,6 +30,8 @@ printf '<kanıt, neden önemli, önerilen sonraki adım>' \
   | atl digest add --sweep observe --title '<tek satırlık iddia>'
 ```
 
+> ⚠ **Kendi sweep'inizin çıktısını mı okuyorsunuz? `--all` kullanın.** Oturum-başlangıcı sinyali **okunmamış sayısını** raporlar; bulguların düştüğünü doğrulamak için çıplak formu çalıştırmak onları okundu işaretler ve o sayıyı sıfırlar — sweep "başarıyla" biter ve bir sonraki oturuma hiçbir şeyin beklemediği söylenir. Hasar hata olarak değil, **sessizlik** olarak görünür. Kurtarma elle yapılır: her bulgunun id'sini, başlığını ve gövdesini alın, `drop` edin, sonra yeniden `add` edin — `add` okundu durumunu bilerek korur, yani tek başına yeniden eklemek okunmamışa döndürmez.
+
 Gövde stdin'den okunur; böylece kanıt — dosya yolları, alıntılanan satırlar — kabuk tırnaklamasına takılmadan taşınabilir.
 
 ## Etkisizlik (idempotence)
