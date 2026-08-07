@@ -7,7 +7,8 @@ description: /work-finish — close out the unit on the current delivery branch:
 
 The drive loop's exit. It takes the branch you have been working and turns it into a reviewable
 PR that is genuinely, verifiably attached to its work item — then stops, because the two things
-that come next are decisions: a human merges, and only after the merge does the item become Done.
+that come next are decisions: a human merges, and the item becomes Done only once someone has
+verified what landed — it sits at `test:pending` in between.
 
 The one property this skill exists to guarantee is that **the PR is really linked**. A PR that
 looks linked and is not produces a card nobody can trace to code, and it is silent by
@@ -202,7 +203,8 @@ PR #<n> opened → <url>
   tests:    <result | none run — no test-bearing paths touched>
   evidence: <path | none>
 
-State stays <current>. Merge is yours; after it lands, /work-move <id> done.
+State stays <current>. Merge is yours; after it lands, /work-move <id> test:pending,
+then /work-move <id> done once you have verified it.
 ```
 
 ### 8. Do not merge, and do not move the state
