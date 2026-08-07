@@ -8,7 +8,8 @@ counterpart to the [backend interface](backend-interface.md) (the operation cont
 and the tester's Level-2 verification
 ([`../agents/tester/children/mobile-and-web-surfaces.md`](../agents/tester/children/mobile-and-web-surfaces.md));
 this doc is the **runtime wiring** they defer to: which surface runs at what concurrency, how the
-scarce mobile emulator is shared, and the helper scripts that stand the mechanism up.
+scarce mobile emulator is shared, the helper scripts that stand the mechanism up, and how a
+verification outcome is represented on the board once it has run.
 
 Two knobs stay elsewhere by design: the **stack-specific test commands** live in the loaded pack's
 `## Test commands` + `testing.md` (`pack-format.md` — a React app and a Flutter app test differently);
@@ -250,3 +251,40 @@ Run it **after committing** — `base...HEAD` sees committed work only, so a mid
 - The **tech-lead's evidence gate** (`green = (all test-gates passed) ∧ (review passed)`, ordered)
   reads the attached measurement rather than a claim; a passing suite is *not* evidence on its own.
 - The **pack** supplies the stack's how — see each pack's `production-unit.md`.
+
+## §8 — Representing the outcome on the board
+
+§1–§7 cover running a test, proving it ran, and requiring one to exist. None of them says where the
+**result** lands, and that silence has the same shape as §7's: a gate whose failure has no
+representation cannot be seen. A board on which verification passed, failed, or never ran reads
+identically in all three cases, and "the definition of done" is then something the board cannot
+report on.
+
+The representation is a **flag, never a state** (backend interface concept #17):
+
+| Condition | Carrier | Status |
+|---|---|---|
+| merged to the integration branch, not yet verified | `test:pending` label/tag | **unchanged** — still In Progress |
+| verified, came back red | `test:failed` label/tag + a diagnostic comment | **unchanged** — still In Progress |
+| verified, passed | neither — the unit moves to Done and the flag is cleared | Done |
+
+Two properties are load-bearing and both follow from it being a flag. A unit awaiting verification
+**stays inside the in-progress count**, so WIP and capacity keep meaning what they meant; and a unit
+can be `blocked` *while* carrying a `test:` flag, because the two are different namespaces on a set
+rather than two values of one field. `test:pending` and `test:failed` are mutually exclusive with
+each other, so a write swaps rather than accumulates.
+
+**`test:failed` without a diagnostic comment is half a signal.** The flag says a verification is
+red; what a human cannot reconstruct from it is *which* criterion failed and on which of the three
+surfaces (§1). The comment is what turns the flag from the start of an investigation into the end
+of one.
+
+### Where in the loop each one arises
+
+The interval these flags describe is the gap between a merge and a human's verdict, so it belongs to
+the **hand-driven** drive loop: `/work-finish` opens the PR, a human merges, and `/work-move` flags
+`test:pending` until someone verifies. In the **autonomous** loop that gap does not normally exist —
+Level-2 verification is micro-loop step 4b, *before* the PR (§5), so a unit that reaches the merge
+has already been verified and goes straight to Done. The flags remain available on both paths: a
+verification can be found wanting after a merge in either mode, and `test:failed` is how that fact
+reaches the board instead of living in someone's memory.

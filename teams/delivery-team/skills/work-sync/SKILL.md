@@ -25,15 +25,25 @@ Reads its contracts from [`config-and-methodology.md`](../../knowledge/config-an
 
 | # | Shape | Evidence | Fix |
 |---|---|---|---|
-| 1 | **Merged, still in flight** — a PR merged into the integration branch, its item still In Progress | the merge commit is an ancestor of `<dev>` | `/work-move <id> done` |
+| 1 | **Merged, unverified, unflagged** — a PR merged into the integration branch, its item still In Progress and carrying no `test:` flag | the merge commit is an ancestor of `<dev>` | `/work-move <id> test:pending` — **not** straight to Done: a merge is not a verdict, and this sweep has no way to know whether anyone verified it |
 | 2 | **Done without a merge** — an item is Done but its PR never merged | `git rev-list --count origin/<dev>..<branch>` is non-zero | reopen, or confirm it was closed deliberately |
 | 3 | **Orphan branch** — a `delivery/<slug>/<id>` branch whose item is closed, or which has no PR at all | branch exists; item state / PR absence | see the asymmetry below |
 | 4 | **Claimed, never started** — In Progress with no branch and no commits | no matching branch anywhere | un-claim, or leave it and say so |
 | 5 | **Two carriers** — a unit wearing more than one `sprint:` label | the labels | stop; a human decides which sprint it is in |
+| 6 | **Stale verification flag** — a Done/closed unit still carrying `test:pending` or `test:failed` | the item is closed and the label is present | clear the flag; Done means the condition is over |
+| 7 | **Two verification flags** — a unit wearing both `test:pending` and `test:failed` | the labels | stop; they are mutually exclusive and a human decides which is true |
 
-Two shapes that look like drift and are **not**, so do not offer to fix them: an open PR that has
-not merged yet (that is a PR under review), and an item marked `blocked` (that is a deliberate
-annotation, and pulling it back into flight overrides someone's judgement).
+Shape 6 matters more than its size suggests: a stale `test:pending` on a closed unit makes
+`/work-list verifying` report work that nobody actually owes, and a queue that lists phantom items
+is one the driver stops trusting.
+
+Shapes that look like drift and are **not**, so do not offer to fix them: an open PR that has not
+merged yet (that is a PR under review); an item marked `blocked` (a deliberate annotation, and
+pulling it back into flight overrides someone's judgement); and an item carrying `test:pending` or
+`test:failed` — those are **correctly** annotated units waiting on a human's verdict or fix, which
+is the flag doing its job. In particular a merged unit sitting at `test:pending` is not shape 1 all
+over again: shape 1 is the *unflagged* case, and once the flag is on, the board is telling the truth
+and the sweep has nothing to add.
 
 ## Procedure
 
@@ -51,7 +61,9 @@ git and the board:
 - has the branch merged into `config.branchPair.dev`? (`git rev-list --count origin/<dev>..<branch>`
   — zero means merged)
 - does a PR exist for it, and in what state?
-- what does the item itself say?
+- what does the item itself say — **its Status and its labels**? The `test:` flags decide between
+  shape 1 and no finding at all, so reading Status alone re-reports every correctly-annotated unit
+  as drift.
 
 **Read git for the merge, not the PR's own status.** A PR reporting merged and a branch that is
 actually an ancestor of the integration branch are two different claims, and only the second one
@@ -63,9 +75,10 @@ One line per finding, and always the evidence that produced it:
 
 ```
 #<id>  <title>
-  drift:     merged, still In Progress
-  evidence:  PR #<n> merged into <dev> 2 days ago; branch is an ancestor of origin/<dev>
-  fix:       Status → Done, close the issue
+  drift:     merged, unverified, carrying no test: flag
+  evidence:  PR #<n> merged into <dev> 2 days ago; branch is an ancestor of origin/<dev>;
+             labels: area:api sprint:3 (no test: flag)
+  fix:       add test:pending — Status stays In Progress
 ```
 
 A finding without its evidence is an assertion, and a sweep that asserts is one the driver learns
@@ -99,7 +112,7 @@ swept <n> units (<scope>)
   drift found:  <n>   [by shape]
   fixed:        <n>
   left alone:   <n>   [with why]
-  needs a human: <n>  [unmerged orphan branches, double carriers]
+  needs a human: <n>  [unmerged orphan branches, double carriers, double test: flags]
 ```
 
 Close by naming the last shape explicitly. Those are the ones that cannot be fixed mechanically,

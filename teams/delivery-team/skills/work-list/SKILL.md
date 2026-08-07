@@ -1,6 +1,6 @@
 ---
 name: work-list
-description: /work-list [mine|active|sprint|blocked|backlog|<type>] — read-only view of the board for a human working through a queue. Filters server-side where the backend supports it, excludes candidates from the ready frontier, and renders a compact grouped table rather than raw JSON. Writes nothing, so it is safe to run at any time.
+description: /work-list [mine|active|sprint|blocked|verifying|failed|backlog|<type>] — read-only view of the board for a human working through a queue. Filters server-side where the backend supports it, excludes candidates from the ready frontier, and renders a compact grouped table rather than raw JSON. Writes nothing, so it is safe to run at any time.
 ---
 
 # /work-list — what is on the board, readably
@@ -30,6 +30,8 @@ Tokens combine, space-separated, case-insensitive. No argument ⇒ **mine**, ope
 | `active` | Status is In Progress |
 | `sprint` | in the current sprint — the `sprint:<n>` label under `flow`, the Iteration field under `scrum` |
 | `blocked` | carries the `blocked` label |
+| `verifying` | carries `test:pending` — merged, awaiting verification |
+| `failed` | carries `test:failed` — verified and it came back red |
 | `backlog` | open, in no sprint |
 | a type name | that type only |
 
@@ -70,8 +72,19 @@ ordinary backlog invites someone to start work the PO has not agreed to.
 Group by type, newest-relevant first, one line per item:
 
 ```
-#<id>  [<status>]  <title>   <area>  <sprint>  <assignee if not you>
+#<id>  [<status>]  <flags>  <title>   <area>  <sprint>  <assignee if not you>
 ```
+
+**Render the flags, not just the status.** `blocked`, `test:pending` and `test:failed` leave Status
+untouched by design, so a unit awaiting verification and a unit still being written are both
+`In Progress` — and if the row shows only the status they are indistinguishable, which is the whole
+reason the flags exist. A unit carrying two flags shows both (`blocked test:pending` is a real and
+meaningful state of affairs, not a rendering bug to collapse).
+
+A `test:pending` unit **is** in flight and **does** appear under `active` — that is deliberate, not
+a leak. Verification is a condition on In Progress rather than a stage after it, so those units stay
+inside the WIP count that capacity is read from. Filtering them out of `active` would make the two
+numbers disjoint and hide real work in progress.
 
 Never dump raw JSON. Keep each group under roughly twenty rows; past that, truncate with an
 explicit `(+N more)` and a hint at the tighter filter, so a truncated view can never be mistaken

@@ -23,7 +23,8 @@ Reads its contracts from [`config-and-methodology.md`](../../knowledge/config-an
 - **When the unit's work is built and you believe it is done** — after `/work-start` cut the branch
   and you did the work.
 - **Not** to merge. It opens the PR; a human merges.
-- **Not** to mark the item Done. That is `/work-move`, *after* the merge lands.
+- **Not** to mark the item Done. That is `/work-move`, and not straight after the merge either: a
+  merged unit is flagged `test:pending` until someone verifies it, and only then does it go Done.
 
 ## Backend support
 
@@ -213,9 +214,14 @@ autonomous tech-lead worker merges a green PR to the integration branch. A hand-
 such worker; the human at the keyboard is the reviewer, and reviewing your own PR by merging it
 from a skill removes the only review the unit gets. Surface the URL and stop.
 
-**State.** Merge happens first, Done after — so a Done never fronts an unlanded merge. Moving the
-item here would assert a merge that has not happened. `/work-move` does it afterwards, and
-`/work-sync` sweeps the ones that get forgotten.
+**State.** Merge happens first, verification next, Done after — so a Done never fronts an unlanded
+merge or an unverified one. Moving the item here would assert a merge that has not happened.
+`/work-move` does it afterwards: `test:pending` on the merge, Done once it verifies (or
+`test:failed` if it does not). `/work-sync` sweeps the ones that get forgotten.
+
+The gap between merge and verdict is a real interval with a human in it, and leaving it unmarked is
+what made a merged-but-unverified unit read identically to one still being written. It is a flag
+rather than a state so the unit stays in the WIP count while it waits.
 
 **Promotion.** `dev`→`release` is not this skill's business at all: it is `atl work promote`, which
 verifies a durable approval record against the PR's current head commit and merges in one call.
