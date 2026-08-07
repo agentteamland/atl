@@ -4,9 +4,10 @@
 // docscheck validates the docs *site* against the code (docs-drift); skillcheck
 // validates the *assets themselves*: does every skill/agent carry a valid
 // frontmatter, does each team.json match what's on disk, does every declared
-// capture channel name assets the team actually ships, does every agent-KB
-// child declare its summary, and does any skill's executable shell body carry
-// one of two known shell-fragile constructs. Every check is LLM-free. The four
+// capture channel name assets the team actually ships, is every declared session
+// script a runnable file inside those assets, does every agent-KB child declare
+// its summary, and does any skill's executable shell body carry one of two known
+// shell-fragile constructs. Every check is LLM-free. The five
 // structural checks are zero-false-positive by construction — the finding is a
 // fact about the file; the shell check is a deliberately narrow pattern match
 // over named constructs, so see ShellBodies for what it does and does NOT cover.
@@ -22,6 +23,7 @@ import (
 	"strings"
 
 	"github.com/agentteamland/atl/cli/internal/manifest"
+	"github.com/agentteamland/atl/cli/internal/teampkg"
 )
 
 // Severity ranks a finding. Fail breaks the CI gate; Warn is surfaced only.
@@ -34,7 +36,7 @@ const (
 
 // Finding is a single content-quality problem.
 type Finding struct {
-	Check    string // "frontmatter" | "manifest" | "channel" | "children" | "shell"
+	Check    string // "frontmatter" | "manifest" | "channel" | "session-script" | "children" | "shell"
 	Severity Severity
 	Path     string // asset path relative to the repo root
 	Detail   string
@@ -52,6 +54,7 @@ func RunAll(in Input) []Finding {
 	f = append(f, Frontmatter(in.CoreDir, in.TeamsDir)...)
 	f = append(f, TeamManifest(in.TeamsDir)...)
 	f = append(f, Channels(in.TeamsDir)...)
+	f = append(f, SessionScripts(in.TeamsDir)...)
 	f = append(f, Children(in.TeamsDir)...)
 	f = append(f, ShellBodies(in.CoreDir, in.TeamsDir)...)
 	return f
@@ -267,6 +270,84 @@ func checkChannel(base, team, rel, capName string, ch manifest.Channel) []Findin
 			where + " names drain `" + ch.Drain + "` but there is no skills/" + drain + "/SKILL.md — the signal would tell an agent to spawn a skill the team never ships"})
 	}
 	return f
+}
+
+// SessionScripts checks every session script a team declares under
+// `capabilities.<name>.sessionScript` — that the declared path is inside the
+// team's assets, exists, and is executable. Fail-level.
+//
+// This is the same gate as Channels, aimed at the same blind spot: the runtime
+// contract for a session script is that every failure is SILENT, so a
+// declaration naming a file the team does not ship produces no error anywhere —
+// the session simply never gets the briefing, exactly as if the script had
+// decided it had nothing to say. `atl doctor`'s check catches it once installed,
+// but only for the user who installed it. Here, in the monorepo, the assets are
+// on disk, so a first-party team's broken declaration fails CI instead.
+//
+// The executable bit is checked because it is the realistic failure: install
+// preserves the source mode, so a script committed without +x reflects without
+// +x and then fails at exec, silently, on every machine.
+func SessionScripts(teamsDir string) []Finding {
+	var f []Finding
+	for _, team := range teamNames(teamsDir) {
+		base := filepath.Join(teamsDir, team)
+		rel := "teams/" + team + "/team.json"
+		b, err := os.ReadFile(filepath.Join(base, "team.json"))
+		if err != nil {
+			continue // TeamManifest already reports a missing/unparseable team.json
+		}
+		var meta struct {
+			Capabilities map[string]json.RawMessage `json:"capabilities"`
+		}
+		if err := json.Unmarshal(b, &meta); err != nil {
+			continue
+		}
+		for _, capName := range sortedCapabilities(meta.Capabilities) {
+			var wrapper struct {
+				SessionScript *string `json:"sessionScript"`
+			}
+			// A capability whose value carries no `sessionScript` — a bare string, an
+			// object without the field — is not a declaration; skip it, the same
+			// tolerance teampkg.DeclaredSessionScripts applies. A pointer, so an
+			// explicit "" is still a declaration and gets reported below rather than
+			// silently passing as "none declared".
+			if err := json.Unmarshal(meta.Capabilities[capName], &wrapper); err != nil || wrapper.SessionScript == nil {
+				continue
+			}
+			f = append(f, checkSessionScript(base, rel, capName, *wrapper.SessionScript)...)
+		}
+	}
+	return f
+}
+
+// checkSessionScript validates one declaration against the team's own tree.
+func checkSessionScript(base, rel, capName, decl string) []Finding {
+	where := "capabilities." + capName + ".sessionScript"
+
+	scriptRel, ok := teampkg.SessionScriptRel(decl)
+	if !ok {
+		return []Finding{{"session-script", Fail, rel,
+			where + " is `" + decl + "`, which is not a path inside the team's assets — " +
+				"the declared path is resolved against the installed .claude tree, so an empty, " +
+				"absolute, or escaping value can never name a file that gets installed"}}
+	}
+	path := filepath.Join(base, filepath.FromSlash(scriptRel))
+	info, err := os.Stat(path)
+	if err != nil {
+		return []Finding{{"session-script", Fail, rel,
+			where + " names `" + scriptRel + "` but the team ships no such file — " +
+				"session start would run nothing, and it fails silently, so nobody would ever find out"}}
+	}
+	if info.IsDir() {
+		return []Finding{{"session-script", Fail, rel,
+			where + " names `" + scriptRel + "`, which is a directory, not a script"}}
+	}
+	if info.Mode().Perm()&0o111 == 0 {
+		return []Finding{{"session-script", Fail, rel + "/" + scriptRel,
+			where + " names `" + scriptRel + "` but it is not executable — install preserves the " +
+				"source mode, so it would reflect without +x and fail at exec, silently, on every machine"}}
+	}
+	return nil
 }
 
 // sortedCapabilities orders capability names so findings are deterministic

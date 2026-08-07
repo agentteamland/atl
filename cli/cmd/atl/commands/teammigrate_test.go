@@ -255,3 +255,43 @@ func TestAManifestAlreadyAtTheCurrentSchemaIsNotMigratedAgain(t *testing.T) {
 		t.Errorf("SchemaVersion = %d — the reviewer field needs its own bump to reach existing installs", manifest.SchemaVersion)
 	}
 }
+
+// The sessionScripts field (schema v5) reaches an existing install by exactly one
+// path — this backfill. Same contract as its three siblings above: fill the
+// field, stamp the schema so it never repeats, and touch nothing else.
+func TestMigrateTeamManifestBackfillsSessionScripts(t *testing.T) {
+	layer := t.TempDir()
+	fetch, calls := teamSource(t, `{"name":"demo","version":"1.0.0","capabilities":{"delivery":{"sessionScript":"scripts/brief.sh"}}}`)
+
+	m := preV2Manifest()
+	if err := migrateTeamManifest(m, layer, fetch); err != nil {
+		t.Fatalf("migrateTeamManifest: %v", err)
+	}
+	if *calls != 1 {
+		t.Errorf("fetched %d times, want exactly 1", *calls)
+	}
+
+	got, err := manifest.Read(layer, "acme", "demo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.SessionScripts) != 1 || got.SessionScripts[0] != "scripts/brief.sh" {
+		t.Errorf("SessionScripts = %v, want [scripts/brief.sh]", got.SessionScripts)
+	}
+	if got.SchemaVersion != manifest.SchemaVersion {
+		t.Errorf("SchemaVersion = %d, want %d", got.SchemaVersion, manifest.SchemaVersion)
+	}
+	// The migration must not disturb what it did not come for.
+	if len(got.Files) != 1 || got.Files["agents/api/agent.md"] != "hash" {
+		t.Errorf("Files = %v, want the install baseline untouched", got.Files)
+	}
+}
+
+// The bump guard, aimed at the field this change adds. Without it the population
+// code above is correct, unreachable, and silent: every install on disk is
+// already at the current schema, so none is ever offered the backfill.
+func TestSessionScriptsFieldGotItsOwnSchemaBump(t *testing.T) {
+	if manifest.SchemaVersion < 5 {
+		t.Errorf("SchemaVersion = %d — the sessionScripts field needs its own bump to reach existing installs", manifest.SchemaVersion)
+	}
+}
