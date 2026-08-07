@@ -71,10 +71,11 @@ func updateTeams(projectRoot string) (int, error) {
 // manifest schema, without touching a single reflected file.
 //
 // Schema v2 added `stores` — the durable-store paths the team declared — v3
-// `channels`, the capture channels it owns, and v4 `reviewer`, the agent it
-// offers /create-pr for domain review. All three live in the team's own
-// team.json, which install does not reflect onto disk, so the only way to learn
-// them is to re-fetch the pinned source.
+// `channels`, the capture channels it owns, v4 `reviewer`, the agent it offers
+// /create-pr for domain review, and v5 `sessionScripts`, the scripts it wants run
+// at session start. All four live in the team's own team.json, which install does
+// not reflect onto disk, so the only way to learn them is to re-fetch the pinned
+// source.
 //
 // Bumping SchemaVersion is what makes a new field reach installs that already
 // exist — this runs only while `m.SchemaVersion < manifest.SchemaVersion`. Add a
@@ -104,6 +105,7 @@ func migrateTeamManifest(m *manifest.Manifest, layer string, fetch fetchFunc) er
 	m.Stores = tm.DeclaredStores()
 	m.Channels = tm.DeclaredChannels()
 	m.Reviewer = tm.DeclaredReviewer()
+	m.SessionScripts = tm.DeclaredSessionScripts()
 	m.SchemaVersion = manifest.SchemaVersion
 	return m.Write(layer)
 }
@@ -134,6 +136,7 @@ func upgradeTeam(m *manifest.Manifest, entry *index.Entry, layer, claude string)
 		m.Stores = tm.DeclaredStores()
 		m.Channels = tm.DeclaredChannels()
 		m.Reviewer = tm.DeclaredReviewer()
+		m.SessionScripts = tm.DeclaredSessionScripts()
 		m.SchemaVersion = manifest.SchemaVersion
 	}
 	return m.Write(layer)

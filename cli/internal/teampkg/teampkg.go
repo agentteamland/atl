@@ -119,6 +119,73 @@ func (t *TeamManifest) DeclaredChannels() []manifest.Channel {
 	return out
 }
 
+// DeclaredSessionScripts returns the scripts this team declares under
+// `capabilities.<name>.sessionScript`, in sorted capability order — the third
+// member of the same family as DeclaredStores and DeclaredChannels.
+//
+// A team that wants a briefing in front of the human at session start — the
+// delivery drive loop's "which card is this branch, and has it drifted?" is the
+// first — declares the script here so the platform can run it without knowing
+// which team owns it or what it reports on. The script itself reads whatever
+// project state it needs; core forwards its output and learns nothing.
+//
+// The value is a path relative to the team's asset root (`scripts/brief.sh`),
+// because that is what survives reflection: install copies the asset dirs into
+// the scope's .claude tree, so the same relative path resolves there. An
+// absolute path, or one escaping the asset root, is dropped — see
+// SessionScriptRel.
+//
+// Capability values whose shape carries no `sessionScript` are skipped, the same
+// tolerance the two siblings apply.
+func (t *TeamManifest) DeclaredSessionScripts() []string {
+	var out []string
+	for _, name := range sortedKeys(t.Capabilities) {
+		var cap struct {
+			SessionScript string `json:"sessionScript"`
+		}
+		if err := json.Unmarshal(t.Capabilities[name], &cap); err != nil {
+			continue // not an object, or otherwise unreadable — tolerate it
+		}
+		if rel, ok := SessionScriptRel(cap.SessionScript); ok {
+			out = append(out, rel)
+		}
+	}
+	return out
+}
+
+// SessionScriptRel normalises a declared session-script path and reports whether
+// it is one the platform will run.
+//
+// The declaration names a file inside the team's own assets, and after install
+// that file lives under a shared .claude tree beside every other team's. So the
+// path is vetted HERE, at the point it enters the manifest, rather than at the
+// point it is executed: a value that escapes the asset root would otherwise be
+// recorded as a legitimate declaration and only refused later, which reads as a
+// broken script rather than a refused one.
+//
+// Refused, in every case by returning ok=false rather than an error — a bad
+// declaration behaves exactly like a team that declares none:
+//   - empty
+//   - absolute ("/etc/x.sh"), which ignores the install layer entirely
+//   - any path escaping the asset root via "..", checked after cleaning so
+//     "scripts/../../x.sh" cannot slip through
+//   - a bare filename with no directory, which no AssetDir would ever reflect
+//
+// It deliberately does NOT check that the first segment is one of AssetDirs: a
+// team may add an asset kind before this binary knows about it, and the run path
+// checks the file exists anyway. Escaping the tree is the property that matters.
+func SessionScriptRel(decl string) (string, bool) {
+	p := strings.TrimSpace(decl)
+	if p == "" || filepath.IsAbs(p) || strings.HasPrefix(p, "/") {
+		return "", false
+	}
+	clean := filepath.ToSlash(filepath.Clean(filepath.FromSlash(p)))
+	if clean == "." || strings.HasPrefix(clean, "../") || !strings.Contains(clean, "/") {
+		return "", false
+	}
+	return clean, true
+}
+
 // DeclaredReviewer returns the agent this team declares under
 // `capabilities.review`, or "" when it declares none.
 //

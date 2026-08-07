@@ -159,6 +159,15 @@ var sessionStartCmd = &cobra.Command{
 		// backend/mode the deterministic read doesn't cover (see sprintSignalCovers).
 		sprintSessionSignal(project)
 
+		// Team-declared session scripts — the third "any team that declares X"
+		// contract, after capabilities.<name>.store and .channel. Core runs whatever
+		// an installed team declared and forwards its output; it learns neither the
+		// team nor what the output is about. Placed beside the board signals because
+		// the first consumer is one — the delivery drive loop's briefing for the card
+		// this branch belongs to. Bounded, worktree-skipping, silent on every failure;
+		// ATL_NO_SESSION_SCRIPT opts out.
+		runDeclaredSessionScripts(project)
+
 		// Proactive-observer signal — fires in ANY project with an ATL decision
 		// surface (a .atl/ directory), throttled to ~once/day and only when that
 		// surface moved since the last sweep: prompts a /observe pass to surface ripe

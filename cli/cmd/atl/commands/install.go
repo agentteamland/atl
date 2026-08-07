@@ -248,6 +248,7 @@ func installAt(target scope.Scope, projectRoot, handle, name string, entry *inde
 		existing.Stores = tm.DeclaredStores()
 		existing.Channels = tm.DeclaredChannels()
 		existing.Reviewer = tm.DeclaredReviewer()
+		existing.SessionScripts = tm.DeclaredSessionScripts()
 		// This path rebuilds the whole record, so it may claim the current schema.
 		existing.SchemaVersion = manifest.SchemaVersion
 		return existing.Write(layerDir)
@@ -265,8 +266,17 @@ func installAt(target scope.Scope, projectRoot, handle, name string, entry *inde
 		Scope:         target.String(),
 		Source:        src,
 		Files:         files,
-		Stores:        tm.DeclaredStores(),
-		Channels:      tm.DeclaredChannels(),
+		// Every declaration-derived field, together. They are recorded here and
+		// nowhere else for a FIRST install: this path claims the current schema, so
+		// migrateTeamManifest — which only runs while the recorded schema is behind —
+		// will never revisit it. A field wired into the update paths and forgotten
+		// here is therefore not late, it is permanently absent for everyone who
+		// installs the team fresh. (`Reviewer` was exactly that between schema v4 and
+		// this change: recorded on re-install and on update, never on a first install.)
+		Stores:         tm.DeclaredStores(),
+		Channels:       tm.DeclaredChannels(),
+		Reviewer:       tm.DeclaredReviewer(),
+		SessionScripts: tm.DeclaredSessionScripts(),
 	}
 	return m.Write(layerDir)
 }
