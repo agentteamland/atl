@@ -16,7 +16,14 @@ atl gc --undo                   # restore the most recent soft-delete batch
 atl gc --purge                  # hard-delete expired trash batches — the only real delete
 ```
 
-**Gains are retained by default.** A file that sits beside an installed unit but no manifest lists — a `children/` learning a `/drain` grew, or a hand edit — is *never* swept by a plain `atl gc --apply`; it is reported and kept, so the automatic gc awareness pass can never delete accumulated learning. Pass `--include-gains` only when you deliberately want those reclaimed too. Files you [`atl pin`](/cli/pin) are treated as owned and never flagged at all.
+**Two classes are retained by default**, and a plain `atl gc --apply` never touches either:
+
+- **Gains** — a file beside an installed unit that no manifest lists: a `children/` page a `/drain` grew, or a hand edit. Reported and kept, so the automatic awareness pass can never delete accumulated learning.
+- **Anything committed to the project's git.** Nothing reaches a commit by accident, so a tracked file is content someone decided to keep — whatever put it there.
+
+That second class exists because of a case the first one cannot catch. When a team is **removed**, its manifest goes with it, so *everything* in its directory becomes wholly unowned — including the knowledge the learning loop accumulated inside it. Measured on ATL's own workspace before the check existed: `atl gc` listed two hand-written skills, 15 KB and 10 KB with their own commit histories, as reclaimable — under a message that named the very case it could not distinguish (*"a removed team **or** a hand-made dir"*).
+
+Pass `--include-gains` only when you deliberately want both classes reclaimed. Files you [`atl pin`](/cli/pin) are treated as owned and never flagged at all.
 
 ## What counts as an orphan
 
