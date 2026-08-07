@@ -2,7 +2,6 @@ package commands
 
 import (
 	"fmt"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -36,7 +35,7 @@ var docsCheckCmd = &cobra.Command{
 
 		siteDir, repoRoot, err := findSiteDir()
 		if err != nil {
-			fmt.Println("atl docs: no docs site here — nothing to check")
+			fmt.Println("atl docs: no docs site here — nothing to check (set ATL_REPO_ROOT if the repo is not an ancestor of this directory)")
 			return nil
 		}
 
@@ -82,21 +81,11 @@ func init() {
 // returning the site dir and the repo root. The .vitepress probe is the
 // "does this repo have a docs site" pre-flight.
 func findSiteDir() (siteDir, repoRoot string, err error) {
-	dir, err := os.Getwd()
+	root, err := findRepoRoot(filepath.Join("docs", "site", ".vitepress"))
 	if err != nil {
 		return "", "", err
 	}
-	for {
-		site := filepath.Join(dir, "docs", "site")
-		if st, e := os.Stat(filepath.Join(site, ".vitepress")); e == nil && st.IsDir() {
-			return site, dir, nil
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			return "", "", fmt.Errorf("no docs site found from %s upward", dir)
-		}
-		dir = parent
-	}
+	return filepath.Join(root, "docs", "site"), root, nil
 }
 
 // commandDocs flattens the live cobra tree into the documented surface the checks

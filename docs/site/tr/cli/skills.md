@@ -4,6 +4,8 @@ Platformun kendi skill'leri, agent'ları ve takım manifestleri için belirlenim
 
 Bu, monorepo'nun `core/` ve `teams/` ağaçlarına karşı çalışan bir **maintainer-tarafı** kapıdır. Monorepo dışında hiçbir şey yapmaz ve 0 ile çıkar (ön-uçuş atlaması), böylece son-kullanıcı oturumları onu hiç görmez.
 
+**Repo, çalışma dizininizin bir üst dizini değilse**, onu adlandırmak için `ATL_REPO_ROOT` ayarlayın. Bu, monorepo'yu bir *alt* dizin olarak klonlayan bakım-merkezi düzenidir: yukarı doğru yürüme işaretçiye hiçbir zaman ulaşamaz, komut atlar ve 0 ile çıkar — geçmiş gibi görünerek. Kök aranmak yerine bilerek adlandırılır: o düzende aynı işaretçi **arşivlenmiş** klonlarla da eşleşir ve bir arama, bunlardan birini readdir sırasına göre seçip kimsenin yayınlamadığı içerik hakkında gerçek olan bir sapma raporlardı.
+
 ## Kullanım
 
 ```bash

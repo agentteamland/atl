@@ -10,6 +10,8 @@ atl docs check [--external] [--record-audit]
 
 `atl docs check` finds the docs site by walking up from the working directory to the repo that holds `docs/site/.vitepress`. Outside such a repo it does nothing and exits 0 — safe to run anywhere (the pre-flight skip). Inside one, it runs every deterministic check and exits non-zero if any **failure-level** finding is present (warnings never fail the command).
 
+**When the repo is not an ancestor of your working directory**, set `ATL_REPO_ROOT` to name it. That is the maintainer-hub case — a checkout that clones the monorepo as a *child* — where an upward walk can never reach the marker, so the command skips and exits 0 while looking like it passed. The root is named rather than searched for on purpose: in that layout the same marker also matches **archived** clones, and a search would resolve one of them by readdir order and report drift that is real about content nobody ships.
+
 | Flag | Effect |
 |---|---|
 | `--external` | Also check that external links resolve over HTTP. Slow, networked, and sensitive to transient outages, so it is opt-in and warning-only. |

@@ -10,6 +10,8 @@ atl docs check [--external] [--record-audit]
 
 `atl docs check`, çalışma dizininden yukarı doğru yürüyerek `docs/site/.vitepress` barındıran repo'yu bulur. Böyle bir repo dışında hiçbir şey yapmaz ve 0 ile çıkar — her yerde güvenle çalıştırılabilir (pre-flight atlaması). İçeride ise tüm deterministik kontrolleri çalıştırır ve **hata seviyesinde** herhangi bir bulgu varsa sıfırdan farklı kodla çıkar (uyarılar komutu asla başarısız kılmaz).
 
+**Repo, çalışma dizininizin bir üst dizini değilse**, onu adlandırmak için `ATL_REPO_ROOT` ayarlayın. Bu, monorepo'yu bir *alt* dizin olarak klonlayan bakım-merkezi düzenidir: yukarı doğru yürüme işaretçiye hiçbir zaman ulaşamaz, komut atlar ve 0 ile çıkar — geçmiş gibi görünerek. Kök aranmak yerine bilerek adlandırılır: o düzende aynı işaretçi **arşivlenmiş** klonlarla da eşleşir ve bir arama, bunlardan birini readdir sırasına göre seçip kimsenin yayınlamadığı içerik hakkında gerçek olan bir sapma raporlardı.
+
 | Bayrak | Etki |
 |---|---|
 | `--external` | Dış bağlantıların HTTP üzerinden çözülüp çözülmediğini de kontrol eder. Yavaş, ağ bağımlı ve geçici kesintilere duyarlı olduğundan opsiyoneldir ve yalnızca uyarı üretir. |
