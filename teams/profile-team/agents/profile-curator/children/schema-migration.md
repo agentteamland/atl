@@ -61,7 +61,7 @@ operations:
       map: { romantic: partner }
       drop: []
 ---
-# person 1.4.0 → 2.0.0
+# person 1.x → 2.0.0
 Prose intent for each op — enough that a later reviewer (or I, re-touching) understands
 *why*, and enough to disambiguate anything the structured op leaves open.
 ```
@@ -163,9 +163,9 @@ entry gate).
 ### The missing / malformed fallback
 If the required migration file is absent, or fails Step-0 validation, **do not guess.**
 Leave the profile on its current `meta.schema-version`, and note it in the drain report:
-`"<slug> at <P>, <type> interface at <I>, migration <from>-to-<to> missing/invalid — left
-as-is."` A stalled profile is a visible, fixable state; a guessed breaking migration is
-silent data corruption.
+`"<slug> at <P>, <type> interface at <I>, migration <from-major>.x-to-<to>
+missing/invalid — left as-is."` A stalled profile is a visible, fixable state; a guessed
+breaking migration is silent data corruption.
 
 ## Where migration files come from
 
