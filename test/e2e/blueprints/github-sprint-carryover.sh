@@ -224,7 +224,16 @@ gh project item-add "$PROJNUM" --owner "$OWNER" --url "https://github.com/$REPO/
 # closed iteration (adapter §5). Without it the contract says this run RE-PLANS
 # into sprint:1 rather than opening sprint:2, and the whole carryover question
 # never arises. Written through the Contents API upsert the adapter itself binds
-# concept #9 to, on the default branch the ceremony reads.
+# concept #9 to, ON THE INTEGRATION BRANCH — the branch that adapter now reads and
+# writes (`config.branchPair.dev`), resolved from the same config rather than
+# hardcoded, exactly as the adapter instructs.
+#
+# This used to seed the DEFAULT branch, and said so, because that is where the
+# ceremony read before atl#486 moved the binding. When the read moved, this seed
+# did not, so the page became invisible: /sprint-plan saw sprint:1 as unreviewed,
+# admitted no carryover, and the label swap never happened. The harness is a THIRD
+# writer to the same store — the adapter is the single binding for the TEAM, not
+# for the system — so a change to that binding has to move the harness with it.
 cat > "$HOME/sprint-1-review.md" <<EOF
 # Sprint 1 Review
 
@@ -239,10 +248,12 @@ cat > "$HOME/sprint-1-review.md" <<EOF
 Seeded by the e2e harness to close sprint 1 with two incomplete units.
 EOF
 REVIEW_B64=$(base64 < "$HOME/sprint-1-review.md" | tr -d '\n')
+DEV_BRANCH="$(jq -r '.branchPair.dev' "$PROJ/.delivery/config.json")"
 gh api --method PUT "repos/$REPO/contents/docs/sprints/sprint-1-review.md" \
-  -f message="e2e: seed the sprint-1 review page" -f content="$REVIEW_B64" >/dev/null 2>&1 || true
-gh_try gh api "repos/$REPO/contents/docs/sprints/sprint-1-review.md" -q .name >/dev/null \
-  && ok "sprint-1 review page readable at docs/sprints/sprint-1-review.md (sprint:1 is reviewed)" \
+  -f message="e2e: seed the sprint-1 review page" -f content="$REVIEW_B64" \
+  -f branch="$DEV_BRANCH" >/dev/null 2>&1 || true
+gh_try gh api "repos/$REPO/contents/docs/sprints/sprint-1-review.md?ref=$DEV_BRANCH" -q .name >/dev/null \
+  && ok "sprint-1 review page readable at docs/sprints/sprint-1-review.md on $DEV_BRANCH (sprint:1 is reviewed)" \
   || { bad "could not seed/read the sprint-1 review page: $(why)"; finish; exit 1; }
 
 # ---- BASELINE ---------------------------------------------------------------
