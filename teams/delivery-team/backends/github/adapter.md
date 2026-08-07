@@ -46,7 +46,7 @@ described here.
 | Read a branch's head commit (#16) | `gh api repos/{o}/{r}/commits/<branch> --jq .sha` — the plain branch read. **The gate does not use this one:** it compares against the promotion PR's own `headRefOid` (row below), which is the commit `--match-head-commit` pins at merge (§10) |
 | Promotion approval record (#16) | write (the PO): `gh pr comment <n> --body-file <file>` · read: `gh pr view <n> --json headRefOid,comments` (one call returns the record **and** the head to compare it against) |
 | Verify the approval + merge `dev`→`release` (#16) | **`atl work promote`** — the deterministic gate. It issues the read above and, on an exact match, `gh pr merge … --match-head-commit <SHA>` (§10). A ceremony runs the command; it does **not** issue these `gh` calls itself |
-| Durable-knowledge read/upsert (#9) | in-repo `/docs` via the Contents API: `gh api --method PUT repos/{o}/{r}/contents/{path}` / read via `gh api …/contents/{path}` (§9) |
+| Durable-knowledge read/upsert (#9) | in-repo `/docs` via the Contents API, **always against the integration branch**: write `gh api --method PUT repos/{o}/{r}/contents/{path} -f branch="$DEV"` / read `gh api "…/contents/{path}?ref=$DEV"`, where `DEV` is `config.branchPair.dev` (§9) |
 | Discovery search | `gh search issues` / `gh search code` |
 | Resolve repo / default branch / identity | `gh repo view --json …` / `gh api user` |
 | Test-evidence attachment (#12) | comment image upload or a repo-committed artifact (§11) |
@@ -282,12 +282,37 @@ Contents API — it behaves as an API-first project wiki that rides the same PR 
 - **Workers do NOT write `/docs`** — their role-craft learnings route to their agent
   `children/` via `/drain`; project-specific facts are promoted to `/docs` by the tech-lead.
   Single-owner-per-namespace, no N-worker write races.
+- **Branch — resolve it, never let the API default.** Every read and write here targets the
+  **integration branch**, `config.branchPair.dev`. Resolve it from the config; never hardcode `dev`
+  (the field configures what the branches are *called*) and never omit it.
+
+  ```bash
+  DEV="$(jq -r .branchPair.dev .delivery/config.json)"
+  ```
+
+  The Contents API falls back to the repository's **default branch** when the request carries no
+  branch, and that default is wrong twice over. It is usually **protected** — on a repo requiring a
+  PR, with `enforce_admins` on, the write is simply *refused*, which is how this surfaced. And it is
+  not part of `branchPair` at all, so even on an unprotected repo the knowledge that describes a unit
+  would land on a branch outside the flow, before and independently of the PR carrying the code.
+
+  **No prior decision put it there.** Grepping the design record for which branch the store lives on
+  returns nothing — `github-delivery-backend`'s D2 names *"in-repo `/docs` knowledge"* and stops.
+  The default-branch behaviour was **inherited from the API**, never chosen, so this section is the
+  decision rather than a restatement of one. A repo whose default branch *is* its integration branch
+  was correct all along by accident, which is why every green run stayed green.
+
+  Read and write must name the **same** branch. They agree today only by both omitting it; correct
+  one in isolation and a page written to one branch becomes invisible to a reader on the other.
+
 - **Read:** the canonical brief embeds the relevant `/docs` paths; the worker reads them via
-  `gh api …/contents/{path}` (or plain file read in its worktree — the repo is checked out).
-- **Write mechanics:** `PUT …/contents/{path}` is an idempotent upsert and — unlike the Azure
-  wiki — **creates ancestors implicitly** (a nested file path just works; no
-  `WikiAncestorPageNotFoundException`, no parent-first dance). A `/docs` write can also ride a
-  normal PR (diffable + reviewable), which the Azure wiki cannot.
+  `gh api "…/contents/{path}?ref=$DEV"` (or a plain file read in its worktree — the repo is checked
+  out there, already on the unit's branch off `$DEV`).
+- **Write mechanics:** `gh api --method PUT …/contents/{path} -f branch="$DEV"` is an idempotent
+  upsert and — unlike the Azure wiki — **creates ancestors implicitly** (a nested file path just
+  works; no `WikiAncestorPageNotFoundException`, no parent-first dance). A `/docs` write can also
+  ride a normal PR (diffable + reviewable), which the Azure wiki cannot — and on a repo whose
+  integration branch is itself protected, riding the PR is the only path that works.
 
 ## 10. PR + review + merge — the completion gate
 
