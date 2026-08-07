@@ -110,14 +110,18 @@ chmod +x "$NOPUSH/pre-push"
 # defect, in both directions.
 gh auth setup-git >/dev/null 2>&1 || true
 LOGIN=$(gh_login)
-[ -n "$LOGIN" ] || { bad "gh not authenticated"; finish; exit 1; }
+[ -n "$LOGIN" ] || { bad "could not resolve the gh login: $(why)"; finish; exit 1; }
 
-PUB_VIS=$(gh repo view "$PUB_REPO"  --json isPrivate -q .isPrivate 2>/dev/null)
-PRV_VIS=$(gh repo view "$PRIV_REPO" --json isPrivate -q .isPrivate 2>/dev/null)
+# Each read is asserted immediately after its own call, not batched: `why` holds
+# the LAST captured stderr, so probing both repos and then checking both would
+# report the second call's diagnostic against the first call's failure — a wrong
+# cause, which is worse than none.
+PUB_VIS=$(gh_try gh repo view "$PUB_REPO" --json isPrivate -q .isPrivate)
 if [ "$PUB_VIS" = "false" ]; then ok "fixture precondition: $PUB_REPO is PUBLIC"
-else bad "fixture precondition FAILED: $PUB_REPO isPrivate=[$PUB_VIS], expected false"; finish; exit 1; fi
+else bad "fixture precondition FAILED: $PUB_REPO isPrivate=[$PUB_VIS], expected false: $(why)"; finish; exit 1; fi
+PRV_VIS=$(gh_try gh repo view "$PRIV_REPO" --json isPrivate -q .isPrivate)
 if [ "$PRV_VIS" = "true" ]; then ok "fixture precondition: $PRIV_REPO is PRIVATE"
-else bad "fixture precondition FAILED: $PRIV_REPO isPrivate=[$PRV_VIS], expected true (token read rights?)"; finish; exit 1; fi
+else bad "fixture precondition FAILED: $PRIV_REPO isPrivate=[$PRV_VIS], expected true (token read rights?): $(why)"; finish; exit 1; fi
 
 # ---- 1. install profile-team + extract the two skill bodies ---------------------------
 fresh

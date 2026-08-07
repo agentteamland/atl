@@ -59,7 +59,7 @@ command -v node >/dev/null 2>&1 && ok "node present (workers run node --test)" |
 
 gh auth setup-git >/dev/null 2>&1 || true
 LOGIN=$(gh_login)
-[ -n "$LOGIN" ] || { bad "gh not authenticated"; finish; exit 1; }
+[ -n "$LOGIN" ] || { bad "could not resolve the gh login: $(why)"; finish; exit 1; }
 OWNER="${ATL_E2E_DELIVERY_OWNER:-agentteamland}"
 REPO="$OWNER/$(delivery_fixture)"
 
@@ -134,11 +134,11 @@ ic()    { gh issue list --repo "$REPO" "$@" --json number -q 'length' 2>/dev/nul
 gturn "/kickoff. You are ALSO acting as the human product owner for this headless run — answer intake from these facts, do not wait for interactive input. Project 'Calc': a tiny arithmetic helper library (Node.js; the repo already has add(a,b) in app.js). Create ONE Epic and ONE Feature as GitHub issues (gh issue create); label them 'type:epic' / 'type:feature'; stamp each with an 'atl-key:<shorthash>' label. The Feature is a CAPABILITY stated at VISION level — do NOT pre-split it into named tasks, files, or a PBI count; that decomposition is /refine's job. Put the business framing in the FEATURE issue BODY under the fixed H2s: ## Problem (the library can add two numbers but cannot compute differences between them), ## Business Value (a complete difference toolkit for callers), ## Scope (the app should support computing the difference between two numbers AND difference-derived checks — e.g. the absolute difference and a zero-difference test — all built on ONE shared subtract primitive rather than duplicating subtraction), ## Acceptance Criteria (one independently-verifiable criterion per capability: a raw subtract, an absolute-difference helper, and a zero-difference-check helper — each with a node --test case), ## Out of Scope (mobile, UI, CLI). Add ONE comment ON THE FEATURE issue whose FIRST LINE is the exact sentinel '**[Technical Analysis]**', with ## Approach (subtract(a,b) is the shared foundation — establish it FIRST in app.js and export it; the difference-derived helpers each build on subtract's contract; favor a MODULAR layout — one helper per its own module/file — so the helpers are independent and can be built and merged in parallel), ## Feasibility & Risks (trivial; the only sequencing constraint is that the derived helpers require subtract first), ## NFRs (each helper covered by a node --test case), ## Dependencies (the difference-derived helpers each require the subtract foundation), ## Suggested Areas (web). Do NOT enumerate specific PBIs, file names, or a PBI count anywhere — leave the entire decomposition to /refine. Skip sprint-0." || bad "kickoff turn errored"
 
 ge "$(ic --label type:epic --state all)" && ok "kickoff created a type:epic issue" || bad "no type:epic issue in $REPO"
-FEAT=$(gh issue list --repo "$REPO" --label type:feature --state all --limit 5 --json number -q '.[0].number' 2>/dev/null)
+FEAT=$(gh_try gh issue list --repo "$REPO" --label type:feature --state all --limit 5 --json number -q '.[0].number')
 [ -n "$FEAT" ] && ok "kickoff created a type:feature issue (#$FEAT)" || bad "no type:feature issue in $REPO"
 # Fail-fast: with no Feature there is nothing to decompose — abort before the ~40-min
 # refine/plan/start/dispatch budget is spent on a doomed run.
-[ -n "$FEAT" ] || { echo "!! no Feature from kickoff — aborting before the expensive ceremonies/dispatch"; finish; exit 1; }
+[ -n "$FEAT" ] || { echo "!! no Feature from kickoff — aborting before the expensive ceremonies/dispatch (issue-list stderr: $(why))"; finish; exit 1; }
 ta=0
 if [ -n "$FEAT" ]; then gh issue view "$FEAT" --repo "$REPO" --comments 2>/dev/null | grep -q '\[Technical Analysis\]' && ta=1; fi
 [ "$ta" = 1 ] && ok "a [Technical Analysis] sentinel comment landed on the Feature (§7)" || bad "no [Technical Analysis] comment on the Feature"

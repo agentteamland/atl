@@ -156,10 +156,107 @@ write_test_index_delivery() {
   jq -n --arg ref "${ATL_E2E_TEAM_REF:-main}" '{schemaVersion:1,generatedAt:"2099-01-01T00:00:00Z",teams:[{handle:"agentteamland",name:"delivery-team",version:"0.1.0",description:"delivery-team e2e (monorepo subpath).",keywords:["delivery"],scope:"project",verified:true,source:{repo:"agentteamland/atl",subpath:"teams/delivery-team",ref:$ref}}]}' > "$HOME/.atl/index.json"
 }
 
+# ---- attributable failures --------------------------------------------------
+#
+# A blueprint-ending assertion must be able to name its own cause. The pattern
+# these helpers replace is `X=$(gh ... 2>/dev/null)` followed by
+# `[ -n "$X" ] || { bad "could not do the thing"; finish; exit 1; }` — where the
+# only sentence that could explain the red was written to stderr and thrown away.
+#
+# That cost a real release gate: `github-delivery-engine` died 40s in with
+# `FAIL - could not seed the PBI` as its entire output, and the cause (most
+# likely GitHub's secondary rate limit, which is invisible in /rate_limit) had to
+# be reconstructed by hand afterwards from a two-hour run that already had the
+# answer. Suppressing stderr converts a loud failure into a silent skip.
+#
+# Scope note: this is deliberately NOT applied to every suppressed call in the
+# suite. A non-fatal `|| true` best-effort call is noise when it fails; only the
+# assertions that END a blueprint are worth the extra sentence, because those are
+# the ones whose missing cause costs a re-run to recover.
+LAST_ERR="$HOME/.last-stderr"
+
+# gh_try runs a command with its stderr CAPTURED to $LAST_ERR rather than
+# discarded, and passes its stdout through unchanged, so a caller can keep the
+# `X=$(gh_try gh ...)` shape and still recover the diagnostic via `why`.
+gh_try() {
+  : > "$LAST_ERR"
+  "$@" 2>"$LAST_ERR"
+}
+
+# why echoes the last captured stderr as ONE bounded line, for interpolation into
+# a `bad` message. Flattened because a `bad` line is grepped and tallied by the
+# watcher, and bounded because a stack-trace-length assertion message is as
+# unreadable as no message at all. Says so explicitly when there was no stderr —
+# "the command failed and said nothing" is itself a finding, and is otherwise
+# indistinguishable from having forgotten to capture it.
+why() {
+  local msg
+  msg=$(tr '\n\t' '  ' < "$LAST_ERR" 2>/dev/null | tr -s ' ' | sed 's/^ *//; s/ *$//')
+  if [ -n "$msg" ]; then printf '%.400s' "$msg"; else printf 'no stderr captured'; fi
+}
+
 # gh_login echoes the authenticated GitHub login (GH_TOKEN is passed through by
-# the runner); empty if gh isn't authenticated.
+# the runner); empty if the call fails. Routed through gh_try because an empty
+# login has more than one cause — an unauthenticated token, an expired one, and
+# a 5xx from the API all return the same empty string, and every caller reports
+# the first of those. `why` is what tells them apart.
 gh_login() {
-  gh api user -q .login 2>/dev/null || true
+  gh_try gh api user -q .login || true
+}
+
+# gh_seed_issue creates ONE seeded issue and echoes its number.
+#
+#   gh_seed_issue <repo> <title> <body-file> [label ...]
+#
+# The retry follows the precedent claude_turn sets above, including its boundary:
+# retrying is safe because of a convergence property, never because a second
+# attempt is cheap. `gh issue create` has no such property of its own — a create
+# that succeeded but whose response was lost would be DUPLICATED by a naive
+# retry — so the convergence is supplied here, by checking first for an issue
+# with this exact title before the second attempt. Found -> adopt it; not found
+# -> create. That is the check-first-by-stable-key contract, with the title as
+# the key.
+#
+# One retry, not a loop: a real failure must stay a failure, and a retry loop
+# would hide a systematic error behind a longer wait. The backoff is sized for
+# the failure actually observed — GitHub's secondary (content-creation) rate
+# limit, which clears in about a minute — so a lost two-hour gate becomes a
+# one-minute pause.
+GH_SEED_BACKOFF="${GH_SEED_BACKOFF:-60}"
+gh_seed_issue() {
+  local repo="$1" title="$2" bodyfile="$3"; shift 3
+  local labels=() l
+  for l in "$@"; do labels+=(--label "$l"); done
+
+  local attempt url num
+  for attempt in 1 2; do
+    if [ "$attempt" -eq 2 ]; then
+      # Converge, don't duplicate: attempt 1 may have landed the issue and lost
+      # the response. Diagnostics to stderr so they reach the run log without
+      # polluting this function's stdout (its number is read by $(...)).
+      num=$(gh_find_issue_by_title "$repo" "$title")
+      if [ -n "$num" ]; then
+        echo "  seed response was lost but the issue exists (#$num) — adopting it" >&2
+        echo "$num"; return 0
+      fi
+      echo "  seed failed, retrying once in ${GH_SEED_BACKOFF}s: $(why)" >&2
+      sleep "$GH_SEED_BACKOFF"
+    fi
+    url=$(gh_try gh issue create --repo "$repo" --title "$title" \
+            ${labels[@]+"${labels[@]}"} --body-file "$bodyfile")
+    num=$(echo "$url" | grep -oE '[0-9]+$')
+    [ -n "$num" ] && { echo "$num"; return 0; }
+  done
+  return 1
+}
+
+# gh_find_issue_by_title echoes the number of an existing issue with this EXACT
+# title, or nothing. Exact rather than a `--search` match: search is fuzzy and
+# eventually-consistent, and an idempotency check that matches the wrong issue is
+# worse than one that finds none.
+gh_find_issue_by_title() {
+  gh issue list --repo "$1" --state all --limit 100 --json number,title 2>/dev/null \
+    | jq -r --arg t "$2" '[.[] | select(.title == $t) | .number] | first // empty'
 }
 
 # reset_owned_repo force-restores <login>/atl-e2e-owned to the fixture baseline
