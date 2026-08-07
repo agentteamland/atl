@@ -167,3 +167,60 @@ func firstLine(s string) string {
 	}
 	return s
 }
+
+// A board-backed project must get NEITHER decision-state file: the board is the
+// authoritative deferral surface there, and scaffolding these produces exactly
+// the second surface the brainstorm rule exists to prevent (#477).
+func TestWriteStateFilesSkipsBoardBackedProject(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, ".delivery"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	cfg := []byte(`{"owner":"o","repo":"r","projectNumber":1,"backend":"github"}`)
+	if err := os.WriteFile(filepath.Join(root, ".delivery", "config.json"), cfg, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	created, err := WriteStateFilesIfAbsent(root)
+	if err != nil {
+		t.Fatalf("WriteStateFilesIfAbsent: %v", err)
+	}
+	if len(created) != 0 {
+		t.Fatalf("created %v in a board-backed project — the board is the only deferral surface there", created)
+	}
+	for _, name := range stateFiles {
+		if _, err := os.Stat(filepath.Join(root, ".atl", name)); !os.IsNotExist(err) {
+			t.Fatalf(".atl/%s exists in a board-backed project", name)
+		}
+	}
+}
+
+// A .delivery/ with no backend field is not a board-backed project, and the check
+// fails toward writing: silently scaffolding nothing would leave a project with
+// nowhere to record a deferral and nothing reporting the absence.
+func TestWriteStateFilesWritesWhenBackendIsAbsentOrUnreadable(t *testing.T) {
+	for _, tc := range []struct {
+		name, body string
+	}{
+		{"no backend field", `{"owner":"o","repo":"r"}`},
+		{"empty backend", `{"backend":""}`},
+		{"malformed json", `{oops`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			if err := os.MkdirAll(filepath.Join(root, ".delivery"), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(root, ".delivery", "config.json"), []byte(tc.body), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			created, err := WriteStateFilesIfAbsent(root)
+			if err != nil {
+				t.Fatalf("WriteStateFilesIfAbsent: %v", err)
+			}
+			if len(created) != len(stateFiles) {
+				t.Fatalf("created %d file(s), want %d — the check must fail toward writing", len(created), len(stateFiles))
+			}
+		})
+	}
+}
