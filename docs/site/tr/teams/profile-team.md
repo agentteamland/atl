@@ -158,7 +158,7 @@ büyüdüğünde (minor bir sürüm alan eklediğinde) eski profiller toplu olar
 drain bir sonraki kez dokunduğunda **tembel (lazy)** yakalar — changelog'un `added` listeleri
 deterministik bir doldurmayı yönetir. **Kırıcı** bir değişiklik (bir alanı yeniden adlandıran,
 kaldıran ya da yeniden şekillendiren major sürüm) bunun yerine, curator'ın dokununca çalıştırdığı
-bir **göç dosyasıyla** (`_interfaces/migrations/<type>/<from>-to-<to>.md`) uygulanır — bir gizlilik
+bir **göç dosyasıyla** (`_interfaces/migrations/<type>/<from-major>.x-to-<to>.md`) uygulanır — bir gizlilik
 kapısını asla zayıflatmayacak şekilde doğrulanır ve her değerin kaynağını taşıma boyunca korur;
 dosya eksikse profil, tahmin edilmeden, eski şemasında bırakılır ve işaretlenir. Çıkarım
 (inference) tolere edilir ama etiketlenir (`agent-inferred-<date>`), böylece yanlış bir tahmin

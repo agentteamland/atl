@@ -1,5 +1,5 @@
 ---
-knowledge-base-summary: "How a BREAKING interface change (major bump) is applied to existing profiles on touch: the `_interfaces/migrations/<type>/<from>-to-<to>.md` file format (rename/remove/transform/remap-values ops), the apply algorithm with its gate-never-weakens + source-preserved + _sources-atomic invariants, ordered multi-major sequencing, the present/missing decision (missing → leave-on-old-schema + note), and how a curator-authored migration is stamped agent-<date>. The breaking-change sibling of interface-creation.md."
+knowledge-base-summary: "How a BREAKING interface change (major bump) is applied to existing profiles on touch: the `_interfaces/migrations/<type>/<from-major>.x-to-<to>.md` file format (rename/remove/transform/remap-values ops), keyed by the MAJOR boundary alone so a shipped migration still matches a store whose interface I evolved in place, the apply algorithm with its gate-never-weakens + source-preserved + _sources-atomic invariants, ordered multi-major sequencing, the present/missing decision (missing → leave-on-old-schema + note), how a curator-authored migration is stamped agent-<date>, and the four canonical 1.x→2.0.0 migrations shipped for person/project/animal/object. The breaking-change sibling of interface-creation.md."
 ---
 
 # Schema Migration (breaking-change apply-on-touch)
@@ -17,16 +17,35 @@ This is the breaking-change sibling of `interface-creation.md`. Where that autho
 
 ## The migration file
 
-`~/.atl/profiles/_interfaces/migrations/<type>/<from>-to-<to>.md` — one file per type,
-per major-version jump (e.g. `migrations/person/1.4.0-to-2.0.0.md`). It is **per-type**
+`~/.atl/profiles/_interfaces/migrations/<type>/<from-major>.x-to-<to>.md` — one file per
+type, per major-version jump (e.g. `migrations/person/1.x-to-2.0.0.md`). It is **per-type**
 because version numbers are type-local: `person` 2.0.0 and `object` 2.0.0 are unrelated
 histories. Frontmatter declares the field-level operations; the body is prose the curator
 reads for judgment on anything the ops can't fully encode.
 
+### A migration is keyed by the MAJOR boundary, never by an exact from-version
+
+The `from` side is written `<major>.x` and matched on the **major alone**: a profile at
+`1.0.0` and one at `1.7.3` are both migrated by `1.x-to-2.0.0.md`. Its minor and patch never
+participate in selecting the file.
+
+This is not cosmetic. **An upstream-shipped migration cannot know which minor of the previous
+major a given store sits at**, because I author add-only bumps in place: on a live store the
+`project` interface had been evolved to `1.2.0` and `place` to `1.1.0` while the shipped
+canonical copies were still `1.0.0`. A file keyed `1.0.0-to-2.0.0` would match neither, every
+lookup would fall through to the missing-file branch, and every profile of that type would
+stall permanently on its old schema — a silent, store-wide freeze that looks exactly like the
+mechanism working. Keying on the major boundary is what makes a shipped migration reach the
+stores it was written for.
+
+The consequence for the author: a `1.x-to-2.0.0` migration must be written to be correct for
+**any** 1.x profile, not just the shipped 1.0.0 — so its ops must name only paths the whole
+major shares, and must tolerate a field being absent.
+
 ```markdown
 ---
 type-id: person
-from: 1.4.0
+from: 1.x
 to: 2.0.0
 # authored: agent-2026-08-01   # present ONLY on a curator-authored migration (see "Where
 #                              # migration files come from"); upstream-shipped files omit it
@@ -134,7 +153,7 @@ would double-write, or clobber a migrated value with an inference).
 ### Step 3 — advance the version
 Set `meta.schema-version` to this hop's ceiling. **Multi-major jumps (e.g. 1.x → 3.x) are
 an ordered sequence, not one collapsed apply:** for each major boundary in order —
-(1) apply migration file `(b-1)-to-b`, (2) run the add-only fill up to b's ceiling,
+(1) apply migration file `<b-1>.x-to-<b>.0.0`, (2) run the add-only fill up to b's ceiling,
 (3) set `meta.schema-version` to b's ceiling — then advance to the next boundary. The
 profile passes through each real intermediate version so the next hop's `from` paths match
 what the previous hop produced. If **any** migration file in the chain is missing, halt at
@@ -156,11 +175,10 @@ reaches disk"):
 1. **Upstream-shipped (canonical).** A future profile-team version that breaking-bumps an
    interface ships the canonical migration file *in my knowledge* (a block in this child,
    alongside the bumped interface). On drain I ensure
-   `_interfaces/migrations/<type>/<from>-to-<to>.md` exists, materializing it verbatim from
-   that block if absent — exactly as I materialize a `<type>.md` interface. These carry
-   **no** `authored:` stamp (they are canonical, like a shipped interface). **v1 ships no
-   breaking bump, so there is no canonical migration file yet — the mechanism is defined and
-   ready, waiting for the first one.**
+   `_interfaces/migrations/<type>/<from-major>.x-to-<to>.md` exists, materializing it verbatim
+   from that block if absent — exactly as I materialize a `<type>.md` interface. These carry
+   **no** `authored:` stamp (they are canonical, like a shipped interface). The four blocks
+   under "Canonical migrations shipped with this version" below are the first of these.
 2. **Curator-authored (provisional).** When I myself perform a breaking bump (e.g. while
    evolving an agent-authored interface), I author the migration file on the fly and stamp
    it **`authored: agent-<today>`** in the frontmatter — the same provisional/reviewable
@@ -168,6 +186,130 @@ reaches disk"):
    curator-authored breaking migration mutates existing user data irreversibly and must be
    at least as guardrailed as a new-interface authoring. The stamp makes it discoverable,
    reviewable, and promotable to canonical.
+
+## Canonical migrations shipped with this version
+
+The first breaking bump the team has ever shipped: four interfaces go to `2.0.0` because
+their `state` fields were declared with the wrong *shape*. Two kinds of defect, and they are
+not the same fault — read each block's body before applying it.
+
+Nothing below invents a value. Every op is a **reshape of a value already stored**, which
+matters at Step 0: the "never fabricate a Tier-3+ value" check rejects a `transform` that
+*synthesizes*, and splitting one stored string into the strands it already contains is not
+synthesis. Where a path is unchanged, its `_sources` entry is unchanged too — there is
+nothing to move.
+
+### `migrations/person/1.x-to-2.0.0.md`
+
+```markdown
+---
+type-id: person
+from: 1.x
+to: 2.0.0
+operations:
+  - transform:
+      from: [state.goals]
+      to:   [state.goals]
+      via: "Single {current, history[]} slot -> a list of { goal, noted }. Absent or null current and empty history -> leave the field absent; do not write an empty list. Otherwise: (a) split `current` into one element per goal the stored text ALREADY separates — an explicit domain label, an enumerated strand, a sentence naming a distinct aim — carrying each strand's wording VERBATIM; if the text does not plainly separate, emit exactly ONE element holding it whole. Never paraphrase, summarize, or complete a strand. (b) `noted` takes a date the strand itself states, else null — never today's date, which would claim the goal was stated now. (c) Append each `history` entry as a further element { goal: <value>, noted: <date> }: those values were filed as past by the very policy this bump removes, so under the concurrent reading they were never shown to have ended. Name every carried history entry and every split in the drain report so a wrong split is visible and correctable."
+---
+# person 1.x -> 2.0.0
+
+`state.goals` was named plural and typed as one scalar slot under `history-tracked`, so an
+arriving goal in one life domain filed a still-live goal in another as *past*. Goals are
+concurrent; the field is now list-valued and merged.
+
+**Why history is carried in rather than dropped.** A `history` entry here is not evidence a
+goal ended — it is evidence the broken policy displaced it. Join is the safe error: a wrong
+join is additive and visible on the page and the next confirmation corrects it, while a wrong
+drop deletes something true and leaves no trace it was ever there.
+
+**Splitting is judgment, so it is bounded.** Split only where the stored text separates
+itself; when in doubt keep it whole. One over-large element is a cosmetic flaw the next write
+can refine; a split that invents a boundary puts words in the user's mouth on a Tier-3 field.
+
+**Tier.** `state.goals` stays Tier 3 and the path does not move, so no gate is weakened and
+`_sources.state.goals` carries over untouched. If that entry reads `agent-inferred`, Step 0's
+Tier-3 rule applies exactly as it would to a fresh write.
+```
+
+### `migrations/project/1.x-to-2.0.0.md`
+
+```markdown
+---
+type-id: project
+from: 1.x
+to: 2.0.0
+operations:
+  - transform:
+      from: [state.motivation]
+      to:   [state.motivation]
+      via: "Single {current, history[]} slot -> a list of { motive, noted }. Same rules as person/state.goals: absent or null and empty history -> leave absent; split `current` only where the stored text already separates distinct motives, carrying wording verbatim, else ONE element holding it whole; `noted` from a date the text states, else null; each `history` entry appended as a further element { motive: <value>, noted: <date> }. Report every split and every carried history entry."
+---
+# project 1.x -> 2.0.0
+
+`state.motivation` held one slot under `history-tracked`, so a newly stated motive filed a
+still-operating one as past. Motives stack — money, craft and obligation coexist on the same
+endeavour — so the field is now list-valued and merged.
+
+`state.status` is deliberately **untouched**: its `allowed-statuses` enum makes two values
+structurally impossible at once, so supersession is sound there, and it already declared the
+paired `{current, history[]}`. This bump changes one field only.
+
+**Tier.** `state.motivation` is Tier 2 and the path does not move — no gate moves, and
+`_sources.state.motivation` carries over untouched.
+```
+
+### `migrations/animal/1.x-to-2.0.0.md`
+
+```markdown
+---
+type-id: animal
+from: 1.x
+to: 2.0.0
+operations:
+  - transform:
+      from: [state.status]
+      to:   [state.status]
+      via: "Bare enum scalar -> the paired { current, history[] }. If a value is stored, set current to that exact value and start history as an empty list. If the field is absent or null, leave it absent — do not write a { current: null, history: [] } husk. No value is read, invented, or dropped; this only gives the existing value the container the write contract already assumed."
+---
+# animal 1.x -> 2.0.0
+
+`state.status` declared `history-tracked` against a bare scalar, so the push-old-onto-history
+write had no array to push onto. Cardinality was never the problem — `allowed-status` is an
+enum, so the values are genuinely mutually exclusive and `history-tracked` is the right
+policy. Only the shape was wrong, and it now matches `state.health` directly above it.
+
+`history` starts **empty**, not seeded: the pre-2.0.0 store has no record of what the status
+used to be, and inventing one would fabricate a dated fact about a departed animal. The arc a
+lens reads begins at the first post-migration transition.
+
+**Tier.** `state.status` stays Tier 1 and the path does not move.
+```
+
+### `migrations/object/1.x-to-2.0.0.md`
+
+```markdown
+---
+type-id: object
+from: 1.x
+to: 2.0.0
+operations:
+  - transform:
+      from: [state.status]
+      to:   [state.status]
+      via: "Bare enum scalar -> the paired { current, history[] }. If a value is stored, set current to that exact value and start history as an empty list. If the field is absent or null, leave it absent — do not write a { current: null, history: [] } husk. No value is read, invented, or dropped."
+---
+# object 1.x -> 2.0.0
+
+Identical in kind to the animal bump: `state.status` declared `history-tracked` against a
+bare scalar and had no target for the history push. `allowed-status` is an enum, so the
+policy was right and only the shape was wrong.
+
+`history` starts **empty** for the same reason — the pre-2.0.0 store never recorded a prior
+standing, so there is nothing truthful to seed it with.
+
+**Tier.** `state.status` stays Tier 1 and the path does not move.
+```
 
 ## Completion discipline
 

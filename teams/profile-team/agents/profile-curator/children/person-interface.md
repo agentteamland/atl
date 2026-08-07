@@ -22,7 +22,7 @@ type-specific, so the interface is their natural home.
 ```markdown
 ---
 type-id: person
-schema-version: 1.0.0
+schema-version: 2.0.0
 matches: |
   A human — a living individual the user has a personal or emotional bond with
   (family, friend, colleague, partner, mentor, rival, neighbour, acquaintance).
@@ -39,6 +39,13 @@ examples-negative:
 changelog:
   - version: 1.0.0
     added: [everything]   # initial person interface
+  - version: 2.0.0
+    breaking: [state.goals]
+    # state.goals was named plural but typed as one {current, history[]} slot under
+    # history-tracked, so a goal arriving in one life domain filed a still-live goal in
+    # another as *past*. CARDINALITY, asked first (interface-creation.md): several goals
+    # are true at once, so the field is LIST-VALUED and merged on write — never
+    # history-tracked. Migration: migrations/person/1.x-to-2.0.0.md.
 thresholds:
   # Fit score at or above which an existing interface is reused instead of a new one
   # being created. Person-only in v1, so this governs v2 auto-creation; kept here so it
@@ -113,10 +120,12 @@ fields:
     # skills (with self-awareness, decision 4c)
     skills:
       - { name: <str>, aware-of-it: <bool|null>, level: <novice|intermediate|expert|null> }
-  state:                              # current + optional history (change-policy below)
+  state:                              # shape follows cardinality (change-policy below)
+    # One-at-a-time, read as a composite snapshot -> paired {current, history[]}.
     emotional: { current: <str|null>, history: [ { value: <str>, date: <ISO date> } ] }
-    goals:     { current: <str|null>, history: [ { value: <str>, date: <ISO date> } ] }
     financial: { current: <str|null>, history: [ { value: <str>, date: <ISO date> } ] }  # Tier 4
+    # Concurrent across life domains (a career aim and a family aim are both live) -> list, merged.
+    goals: [ { goal: <str>, noted: <ISO date|null> } ]
   relationships:                      # person-to-person graph (this person's ties)
     - { to: <slug>, kind: <str>, user-perceives: <str|null> }
 change-policy:
@@ -126,8 +135,8 @@ change-policy:
   relation-to-user.*: overwrite
   traits.*: overwrite
   state.emotional: history-tracked
-  state.goals: history-tracked
   state.financial: history-tracked
+  state.goals: overwrite            # list-valued -> MERGE, never displace (cardinality rule)
 ---
 
 # Person

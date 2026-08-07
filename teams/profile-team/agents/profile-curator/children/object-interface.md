@@ -24,7 +24,7 @@ type-specific, so the interface is their natural home.
 ```markdown
 ---
 type-id: object
-schema-version: 1.0.0
+schema-version: 2.0.0
 matches: |
   A specific physical object loaded with personal meaning for the user — a beloved toy,
   a meaningful mug, an heirloom, a missed car; something cherished, feared, missed, or
@@ -41,6 +41,13 @@ examples-negative:
 changelog:
   - version: 1.0.0
     added: [everything]   # initial object interface
+  - version: 2.0.0
+    breaking: [state.status]
+    # state.status declared history-tracked against a BARE SCALAR, so the push-old-onto-history
+    # write had no target. Cardinality was never the problem here — allowed-status is an enum,
+    # so the values really are mutually exclusive and history-tracked is right; only the SHAPE
+    # was wrong. It now declares the paired {current, history[]}.
+    # Migration: migrations/object/1.x-to-2.0.0.md.
 thresholds:
   # Fit score at or above which an existing interface is reused instead of a new one
   # being created. Kept here so it travels with the type. Mesut's scenario: "couldn't
@@ -82,7 +89,9 @@ fields:
     acquired-when: <ISO date|null>      # when it entered the user's life
     occasion: <str|null>                # the occasion it marks (a birthday, a farewell, ...)
   state:                                # current standing of the object (change-policy below)
-    status: <one of allowed-status>     # have | lost | broke | gave-away | seeking
+    status:                             # have | lost | broke | gave-away | seeking
+      current: <one of allowed-status>  # one-at-a-time (enum) -> paired {current, history[]}
+      history: [ { value: <str>, date: <ISO date> } ]
     condition: <str|null>               # worn, pristine, restored, faded, ...
   story: <pointer>                      # the narrative of why it matters lives in the
                                         # profile.md body, not here; this is a pointer to it
@@ -114,9 +123,11 @@ grown against.
   object with only `identity.name` + `identity-extension.description` is a valid profile.
   This is what lets the interface grow (add a field → old profiles stay valid →
   lazy-filled on next touch).
-- **`state.status` is history-tracked.** An object's standing moves over time (a lost
-  thing is found, a kept thing breaks, a given thing is sought again), so `status` keeps a
-  dated history like the person type's `state.*`; everything else overwrites.
+- **`state.status` is history-tracked, and carries the paired `{current, history[]}`.** An
+  object's standing moves over time (a lost thing is found, a kept thing breaks, a given
+  thing is sought again) and only one of those is true at once — `allowed-status` is an enum,
+  which is what makes supersession sound here. The `history` array is the target the
+  push-old-onto-history write needs; everything else overwrites.
 - **`story` is a pointer, not a field to stuff.** The reason an object matters is prose —
   it lives in the profile.md body and reads at Tier 2; the frontmatter only points at it.
 - **`tier-defaults`** feeds the privacy gating in `curation-charter.md`; **`change-policy`**

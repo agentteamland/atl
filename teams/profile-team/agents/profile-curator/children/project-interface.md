@@ -24,7 +24,7 @@ is their natural home.
 ```markdown
 ---
 type-id: project
-schema-version: 1.0.0
+schema-version: 2.0.0
 matches: |
   A real endeavour the user is personally invested in and driving — a dream, a side
   project, a work initiative, a creative work — that they are considering, planning,
@@ -41,6 +41,14 @@ examples-negative:
 changelog:
   - version: 1.0.0
     added: [everything]   # initial project interface
+  - version: 2.0.0
+    breaking: [state.motivation]
+    # state.motivation held one {current, history[]} slot under history-tracked, so a newly
+    # stated motive filed a still-operating one as *past*. CARDINALITY, asked first
+    # (interface-creation.md): motives stack — money, craft and obligation coexist — so the
+    # field is LIST-VALUED and merged on write. state.status keeps history-tracked: its
+    # allowed-statuses enum makes two values structurally impossible at once.
+    # Migration: migrations/project/1.x-to-2.0.0.md.
 thresholds:
   # Fit score at or above which this existing interface is reused instead of a new type
   # being created. Kept here so it travels with the type. Mesut's scenario: "couldn't
@@ -76,10 +84,12 @@ fields:
   identity-extension:
     kind: <one of allowed-kinds>        # personal | work | creative | side
     domain: <str|null>                  # subject area, e.g. "software", "writing", "home"
-  state:                                # current + optional history (change-policy below)
+  state:                                # shape follows cardinality (change-policy below)
+    # One-at-a-time (enum) -> paired {current, history[]}.
     status:     { current: <one of allowed-statuses>, history: [ { value: <str>, date: <ISO date> } ] }
     progress: <str|null>                # free-text sense of how far along
-    motivation: { current: <str|null>, history: [ { value: <str>, date: <ISO date> } ] }  # why the user is (or isn't) pushing on it now
+    # Concurrent — several motives drive one project at once -> list, merged.
+    motivation: [ { motive: <str>, noted: <ISO date|null> } ]   # why the user is (or isn't) pushing on it now
     stakes: <str|null>                  # what riding on it — consequences of success/failure
   anchors:
     started: <ISO date|null>
@@ -99,7 +109,7 @@ change-policy:
   state.progress: overwrite
   state.stakes: overwrite
   state.status: history-tracked
-  state.motivation: history-tracked
+  state.motivation: overwrite         # list-valued -> MERGE, never displace (cardinality rule)
 ---
 
 # Project
