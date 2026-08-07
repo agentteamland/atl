@@ -7,6 +7,7 @@ package scaffold
 
 import (
 	"embed"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -76,7 +77,20 @@ var stateFiles = []string{"backlog.md", "tasks.md"}
 // root, each only if absent (a user's own file is never overwritten). It returns the
 // paths it actually created. These are project-scoped decision state — callers must
 // NOT invoke this for the global tier (which has no project .atl/).
+//
+// It writes nothing at all in a project with a delivery BOARD backend. There the
+// board is the authoritative deferral surface, and the brainstorm rule is explicit
+// about why — "one surface only, so the two can't drift". /brainstorm done already
+// honours this and stops writing these files; scaffolding them anyway produced
+// exactly the second surface the rule exists to prevent, in a project whose own
+// configuration says it must not exist. The failure was quiet: nothing errors, and
+// the files are entirely plausible — correctly formatted, self-describing — so a
+// later reader has no way to tell this project's deferrals live elsewhere, and the
+// natural thing to do with an empty backlog file is start filling it (#477).
 func WriteStateFilesIfAbsent(root string) (created []string, err error) {
+	if boardBacked(root) {
+		return nil, nil
+	}
 	atlDir := filepath.Join(root, ".atl")
 	for _, name := range stateFiles {
 		b, rerr := templates.ReadFile("templates/" + name)
@@ -93,6 +107,30 @@ func WriteStateFilesIfAbsent(root string) (created []string, err error) {
 		}
 	}
 	return created, nil
+}
+
+// boardBacked reports whether root runs a delivery board backend — the same
+// predicate /brainstorm done applies: a .delivery/config.json carrying a non-empty
+// `backend`. Only that field is decoded, so the check stays independent of the rest
+// of the delivery schema and of the dispatch package.
+//
+// It fails toward WRITING: an unreadable or malformed config leaves the files
+// scaffolded, which is the recoverable direction. A stray backlog.md in a
+// board-backed project is visible and deletable; a project that needed the two
+// files and silently got neither has nowhere to record a deferral, and nothing
+// reports the absence.
+func boardBacked(root string) bool {
+	b, err := os.ReadFile(filepath.Join(root, ".delivery", "config.json"))
+	if err != nil {
+		return false
+	}
+	var cfg struct {
+		Backend string `json:"backend"`
+	}
+	if json.Unmarshal(b, &cfg) != nil {
+		return false
+	}
+	return strings.TrimSpace(cfg.Backend) != ""
 }
 
 // writeIfAbsent writes body to path only if nothing exists there yet, creating
