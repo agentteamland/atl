@@ -58,7 +58,7 @@ A model-invoked mechanism depends on the model remembering to invoke it — and 
 - Every consult writes a `consulted` outcome to the fire log, with the pages it returned.
 - A `Stop` hook (`atl retrieve turn-end`) records one line per completed turn, writing nothing to the model's context. It exists to give consultation an honest **denominator** — "in how many turns did the agent check the record?" — instead of reads-per-offered-page, which is meaningless when pages are offered on every prompt.
 
-Both surface in `atl retrieve stats`:
+Both surface in [`atl retrieve stats`](/cli/retrieve#stats-the-channel-s-own-numbers):
 
 ```
 turns           40
