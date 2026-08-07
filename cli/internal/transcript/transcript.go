@@ -388,14 +388,31 @@ type Stretch struct {
 // Key changes whenever a new marker-bearing turn appears or the session file
 // changes, which is exactly when a fired watchdog should re-arm.
 func DryStretch(path string, isMarker func(string) bool) (Stretch, error) {
-	// A skipped over-long record simply isn't measured: the stretch is a
-	// heuristic, and reporting the skip belongs to the two read surfaces that
-	// print (tick's drain pass and `atl learnings transcript`), not to a nudge.
-	turns, _, err := ExtractFlow(path)
+	logical, err := LogicalTurns(path)
 	if err != nil {
 		return Stretch{}, err
 	}
-	// Collapse consecutive same-role turns into logical turns.
+	return StretchOf(filepath.Base(path), logical, isMarker), nil
+}
+
+// LogicalTurns reads a transcript and collapses consecutive same-role records
+// into logical turns. It is split out from DryStretch because it is the whole
+// cost — the file read, the JSON parse, the collapse — and it is entirely
+// CHANNEL-INDEPENDENT: the per-channel part is one predicate over the result.
+//
+// The watchdog measures every declared channel, so calling DryStretch per
+// channel re-read and re-parsed the same transcript N times, before even the
+// threshold and latch checks that would have skipped the work. Both axes grow:
+// transcript size within a session, and channel count as teams are installed.
+//
+// A skipped over-long record simply isn't measured: the stretch is a heuristic,
+// and reporting the skip belongs to the two read surfaces that print (tick's
+// drain pass and `atl learnings transcript`), not to a nudge.
+func LogicalTurns(path string) ([]Turn, error) {
+	turns, _, err := ExtractFlow(path)
+	if err != nil {
+		return nil, err
+	}
 	var logical []Turn
 	for _, t := range turns {
 		if n := len(logical); n > 0 && logical[n-1].Role == t.Role {
@@ -404,6 +421,13 @@ func DryStretch(path string, isMarker func(string) bool) (Stretch, error) {
 		}
 		logical = append(logical, t)
 	}
+	return logical, nil
+}
+
+// StretchOf measures the dry stretch for ONE channel over already-collapsed
+// turns. Pure and cheap — no I/O — so a caller measuring N channels extracts
+// once and calls this N times.
+func StretchOf(sessionKey string, logical []Turn, isMarker func(string) bool) Stretch {
 	markerTurns := 0 // ordinal count of marker-bearing assistant turns seen
 	st := Stretch{}
 	for _, t := range logical {
@@ -428,6 +452,6 @@ func DryStretch(path string, isMarker func(string) bool) (Stretch, error) {
 		}
 		st.Chars += utf8.RuneCountInString(t.Text)
 	}
-	st.Key = filepath.Base(path) + ":" + strconv.Itoa(markerTurns)
-	return st, nil
+	st.Key = sessionKey + ":" + strconv.Itoa(markerTurns)
+	return st
 }

@@ -315,12 +315,15 @@ func captureWatchdogNotice(st *queue.Store, project, path string, chans []manife
 		return
 	}
 	session := filepath.Base(path)
+	// Read and collapse the transcript ONCE. That work is the whole cost and it is
+	// channel-independent; only the marker predicate below differs per channel.
+	logical, err := transcript.LogicalTurns(path)
+	if err != nil {
+		return // unreadable transcript: no channel can be measured
+	}
 	for _, c := range chans {
 		ch := c.Name
-		stx, err := transcript.DryStretch(path, func(s string) bool { return marker.Has(s, ch) })
-		if err != nil {
-			return // unreadable transcript: no channel can be measured
-		}
+		stx := transcript.StretchOf(session, logical, func(s string) bool { return marker.Has(s, ch) })
 		if stx.Turns < watchdogMinTurns || stx.Chars < watchdogMinChars {
 			continue
 		}
