@@ -16,7 +16,14 @@ atl gc --undo                   # en son yumuşak-silme grubunu geri yükle
 atl gc --purge                  # süresi dolmuş çöp gruplarını kalıcı sil — tek gerçek silme
 ```
 
-**Kazançlar varsayılan olarak korunur.** Kurulu bir birimin yanında duran ama hiçbir manifestin listelemediği bir dosya — bir `/drain`'in büyüttüğü bir `children/` öğrenmesi ya da elle bir düzenleme — düz bir `atl gc --apply` ile *asla* süpürülmez; raporlanır ve tutulur, böylece otomatik gc farkındalık geçişi birikmiş öğrenmeyi asla silemez. Bunların da geri kazanılmasını bilinçli olarak istediğinde `--include-gains` geç. [`atl pin`](/tr/cli/pin) ettiğin dosyalar sahipli sayılır ve hiç işaretlenmez.
+**İki sınıf varsayılan olarak korunur** ve düz bir `atl gc --apply` ikisine de dokunmaz:
+
+- **Kazançlar** — kurulu bir birimin yanında duran ama hiçbir manifestin listelemediği dosya: bir `/drain`'in büyüttüğü `children/` sayfası ya da elle bir düzenleme. Raporlanır ve tutulur; böylece otomatik farkındalık geçişi birikmiş öğrenmeyi asla silemez.
+- **Projenin git'ine commit edilmiş her şey.** Hiçbir şey kazara commit'e ulaşmaz; dolayısıyla izlenen bir dosya, oraya ne koymuş olursa olsun, birinin tutmaya karar verdiği içeriktir.
+
+İkinci sınıf, birincinin yakalayamadığı bir durum yüzünden var. Bir takım **kaldırıldığında** manifesti de gider, yani dizinindeki *her şey* tamamen sahipsiz hale gelir — öğrenme döngüsünün orada biriktirdiği bilgi dahil. Bu kontrol var olmadan önce ATL'nin kendi workspace'inde ölçüldü: `atl gc`, kendi commit geçmişleri olan 15 KB ve 10 KB'lık iki elle yazılmış beceriyi geri kazanılabilir diye listeledi — üstelik ayırt edemediği durumu bizzat adlandıran bir mesajla (*"kaldırılmış bir takım **ya da** elle yapılmış bir dizin"*).
+
+İki sınıfın da geri kazanılmasını bilinçli olarak istediğinde `--include-gains` geç. [`atl pin`](/tr/cli/pin) ettiğin dosyalar sahipli sayılır ve hiç işaretlenmez.
 
 ## Neyler sahipsiz sayılır
 

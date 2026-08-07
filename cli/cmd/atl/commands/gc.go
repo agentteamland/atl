@@ -75,14 +75,29 @@ var gcCmd = &cobra.Command{
 			return nil
 		}
 
-		// Partition: a gain (a file beside an installed unit, owned by no manifest)
-		// is retained by default so the automatic pass never sweeps learning; only
-		// wholly-unowned units + expired history are swept unless --include-gains.
-		var sweepable, gains []gc.Orphan
+		// Partition. Two classes are retained by default:
+		//
+		//   - a GAIN — a file beside an installed unit that no manifest owns, i.e.
+		//     learning-loop growth or a hand edit.
+		//   - a file COMMITTED TO THIS PROJECT'S GIT. Nothing reaches a commit by
+		//     accident, so a tracked file is content someone decided to keep, whatever
+		//     put it there. Before this existed, `atl gc` on this very repo listed two
+		//     hand-written skills — 15 KB and 10 KB, each with its own commit history
+		//     — as reclaimable, under a message that named the case it could not
+		//     distinguish ("a removed team OR a hand-made dir").
+		//
+		// The second is what the retired-team case needs and the `Owned` test cannot
+		// give: when a team is removed its manifest goes with it, so EVERYTHING in its
+		// directory becomes wholly-unowned — including the knowledge the learning loop
+		// accumulated inside it.
+		var sweepable, gains, kept []gc.Orphan
 		for _, o := range orphans {
-			if o.Owned && !includeGains {
+			switch {
+			case o.Tracked && !includeGains:
+				kept = append(kept, o)
+			case o.Owned && !includeGains:
 				gains = append(gains, o)
-			} else {
+			default:
 				sweepable = append(sweepable, o)
 			}
 		}
@@ -103,12 +118,14 @@ var gcCmd = &cobra.Command{
 				fmt.Println("gc: nothing to reclaim — no unowned orphans")
 			}
 			reportRetainedGains(gains)
+			reportTracked(kept)
 			return nil
 		}
 
 		if len(sweepable) == 0 {
 			fmt.Println("gc: nothing to reclaim — no unowned orphans")
 			reportRetainedGains(gains)
+			reportTracked(kept)
 			return nil
 		}
 
@@ -152,6 +169,21 @@ func reportRetainedGains(gains []gc.Orphan) {
 		fmt.Printf("  [%-7s] %s  (%s)\n", o.Scope, o.Rel, o.Origin())
 	}
 	fmt.Println("Pass `atl gc --apply --include-gains` to reclaim these too.")
+}
+
+// reportTracked notes the files gc kept because the project's git has them
+// committed. Printed rather than silent: a user who deliberately committed
+// something into .claude/ should see that gc saw it and chose not to touch it.
+func reportTracked(kept []gc.Orphan) {
+	if len(kept) == 0 {
+		return
+	}
+	fmt.Printf("gc: retained %d file(s) committed to this project's git — not reclaimable by default:\n", len(kept))
+	for _, o := range kept {
+		fmt.Printf("  [%-7s] %s\n", o.Scope, o.Rel)
+	}
+	fmt.Println("Nothing reaches a commit by accident, so these are treated as content you meant to keep.")
+	fmt.Println("Pass `atl gc --apply --include-gains` if you really do want them swept.")
 }
 
 // humanBytes formats a byte count for the gc report.
