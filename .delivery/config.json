@@ -4,6 +4,6 @@
   "projectNumber": 1,
   "branchPair": { "dev": "dev", "release": "release" },
   "backend": "github",
-  "methodology": "flow",
+  "methodology": "scrum",
   "credential": { "ref": "GH_TOKEN" }
 }
