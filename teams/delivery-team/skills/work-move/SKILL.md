@@ -129,15 +129,20 @@ Reading Status alone is how a second `test:` label gets added instead of swapped
   is the category error the two-axis split exists to prevent.
 - **A state** (`Todo`, `In Progress`, `Done`, `reopen`) — check it against the table.
 
-**The one precondition on a flag write: the unit must be open.** A flag is a condition on live work,
-so setting one on a Done/closed unit is refused rather than written — `/work-sync` reports exactly
-that combination as drift (its shape 6), and a skill that creates the drift its own sweep then flags
-is a loop with no fixed point:
+**The one precondition, and it is asymmetric: SETTING a flag needs an open unit; CLEARING one is
+always allowed.** A flag is a condition on live work, so *setting* one on a Done/closed unit is
+refused rather than written — `/work-sync` reports exactly that combination as drift (its shape 6),
+and a skill that creates the drift its own sweep then flags is a loop with no fixed point:
 
 ```
 /work-move: #<id> is Done; a test: flag is a condition on open work.
 Reopen it first if the verification result is genuinely new.
 ```
+
+*Clearing* carries no such check, in either direction. Removing a stale `test:` label from a closed
+unit is the documented remedy for shape 6, so refusing it would leave that drift with no fix that
+goes through this skill — and clearing can never assert something untrue, where setting can. The
+asymmetry is deliberate: the guard belongs on the write that makes a claim.
 
 | From | Legal to |
 |---|---|
