@@ -106,7 +106,7 @@
     },
     {
       "name": "work-list",
-      "description": "/work-list [mine|active|sprint|blocked|backlog|<type>] — read-only view of the board for a human working a queue: server-side filters where the backend allows, candidates excluded from the ready frontier, rendered as a grouped table. Writes nothing."
+      "description": "/work-list [mine|active|sprint|blocked|verifying|failed|backlog|<type>] — read-only view of the board for a human working a queue: server-side filters where the backend allows, candidates excluded from the ready frontier, flags rendered beside the status, rendered as a grouped table. Writes nothing."
     }
   ],
   "areas": [
