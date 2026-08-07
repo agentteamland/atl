@@ -51,11 +51,11 @@ check "a core-rule change runs the reflection + loop blueprints" \
 
 check "the engine runs the dispatch-dependent blueprints" \
   'cli/internal/dispatch/dag.go' \
-  'delivery-loop github-delivery-engine github-delivery-full-chain github-delivery-loop work-dispatch'
+  'delivery-loop github-delivery-engine github-delivery-full-chain github-delivery-loop github-sprint-carryover work-dispatch'
 
 check "team content runs the ceremony blueprints" \
   'teams/delivery-team/skills/sprint-plan/SKILL.md' \
-  'delivery-loop github-delivery-autonomous-refine github-delivery-full-chain github-delivery-loop'
+  'delivery-loop github-delivery-autonomous-refine github-delivery-full-chain github-delivery-loop github-sprint-carryover'
 
 # The hook-binding half of install-deps-hooks: `internal/settings` is what binds
 # them, and guard declares the same package because its matcher is written there.
