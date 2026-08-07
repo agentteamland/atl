@@ -98,7 +98,7 @@
     },
     {
       "name": "work-move",
-      "description": "/work-move <id> <state> — the drive loop's only state writer. Writes every surface a state spans in one pass, reads the result back, refuses an illegal transition with the legal ones named, and guards Done against a PR that never merged."
+      "description": "/work-move <id> <state|flag> — the drive loop's only state writer. Writes every surface a state spans in one pass, reads the result back, refuses an illegal transition with the legal ones named, sets the annotation flags that are conditions rather than states (blocked, test:pending, test:failed) without touching Status, and guards Done against a PR that never merged or a verification that came back red."
     },
     {
       "name": "work-sync",
@@ -106,7 +106,7 @@
     },
     {
       "name": "work-list",
-      "description": "/work-list [mine|active|sprint|blocked|backlog|<type>] — read-only view of the board for a human working a queue: server-side filters where the backend allows, candidates excluded from the ready frontier, rendered as a grouped table. Writes nothing."
+      "description": "/work-list [mine|active|sprint|blocked|verifying|failed|backlog|<type>] — read-only view of the board for a human working a queue: server-side filters where the backend allows, candidates excluded from the ready frontier, flags rendered beside the status, rendered as a grouped table. Writes nothing."
     }
   ],
   "areas": [

@@ -175,6 +175,25 @@ has **one model**, so "resolution" collapses to it:
 - **"Blocked" is a FLAG, never a state:** add a `blocked` **label** + a diagnostic comment,
   leaving the issue open. Same discipline as the Azure `blocked` tag — never invent a blocked
   status to transition to.
+- **Verification is a FLAG too, never a state** (concept #17). Between a merge into `dev` and the
+  human's verdict a unit is *merged but unverified*, and that is a condition on In Progress, not a
+  stage after it: `test:pending` **label** (merged, awaiting verification) or `test:failed`
+  **label** + a diagnostic comment naming what came back red. **Status is unchanged and the issue
+  stays open** for both — so a unit in verification is still counted in the WIP number, and it can
+  carry `blocked` at the same time. **At most one `test:` label per issue** (they are mutually
+  exclusive): swap with `gh issue edit <n> --remove-label test:<prior> --add-label test:<next>` in
+  **one** call, the `sprint:` discipline (§5) — a label accumulates where a field replaces, and an
+  issue wearing both leaves "was this verified?" without an answer. Both labels are cleared when the
+  unit reaches Done (§6). **Never add a `Test` Status option for this** — a hand-added Status column
+  is not an illegal state but an *unknown* one: `/work-move` checks every move against a fixed table
+  and would refuse to enter or leave it, `/work-sync` could not see it, and the refusal message
+  cannot even name it. Labels need **no Projects-settings-UI setup at all**, unlike the `candidate`
+  Status option below — but they are not literally zero-setup: **`--add-label` fails on a label the
+  repo has never defined** (`could not add label: not found`), so ensure it exists first with
+  `gh label create test:pending --force` / `gh label create test:failed --force` (`--force` is
+  create-or-update, so it is safe to re-run). The distinction that matters is that a label is
+  **API-creatable** while a Status option is not — one is a scripted line, the other is a human in
+  a settings page.
 - **"Candidate" is a Projects v2 Status option (board-setup, NOT auto-created)** (concept #13). A
   `/request` candidate sets **Status = `candidate`** on the issue's project item + a `candidate` label
   + a `triage:<tier>` label. Projects v2 Status **options are not cleanly API-settable** (see

@@ -223,6 +223,27 @@ Priority** under `flow`. **Create only what is missing** (idempotent):
 | **Story Points** | number | **Scrum mode only — under `flow`, skip this row entirely** (no capacity ceiling, so nothing reads an estimate). Under `scrum`: `gh project field-create <n> --owner <owner> --name "Story Points" --data-type NUMBER` |
 | **Priority** | single-select | `gh project field-create <n> --owner <owner> --name "Priority" --data-type SINGLE_SELECT --single-select-options "P0,P1,P2,P3"` |
 
+**Label check (labels, not fields).** The verification flags are **labels**, so they need no
+Projects field and no settings-UI work — but `--add-label` fails on a label the repo has never
+defined, so create them once here (idempotent, `--force` is create-or-update):
+
+```
+gh label create test:pending --force --repo <owner>/<repo> --description "merged, awaiting verification"
+gh label create test:failed  --force --repo <owner>/<repo> --description "verified and it came back red"
+gh label create blocked      --force --repo <owner>/<repo> --description "stalled; see the diagnostic comment"
+```
+
+> **Do NOT add a `Test` Status option for verification.** It is the natural instinct and it breaks
+> the drive loop: `/work-move` checks every move against a fixed transition table, so a hand-added
+> column is not an *illegal* state but an **unknown** one — no move enters it, no move leaves it,
+> `/work-sync` cannot see it, and the refusal message cannot even name it, because it can only name
+> moves the table knows. Verification is a **condition on** a unit's state, not a stage of it
+> (concept #17): a unit can be blocked *while* awaiting verification, and two labels express that
+> where two statuses cannot. Modelling it as a status would also pull every unit in verification
+> out of the In Progress count that WIP is read from. If a board already has such a column, the fix
+> is to retire the column and use the labels — not to teach the skills a state they were designed
+> not to have.
+
 > **Flow mode removes the one board step that cannot be automated.** Under `flow` the
 > reconciliation is **Status + Priority**, and this skill creates or verifies both through `gh` —
 > so the board needs **no manual Projects-settings-UI work at all**, with the `candidate` Status

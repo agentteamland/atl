@@ -213,6 +213,17 @@ write a literal `"Done"`/`"Active"` into a ceremony or worker prompt.
   `/sprint-plan`) **exclude the `candidate` tag** until the PO accepts; accept removes the tag. No
   custom state or category is created — Azure needs no board-setup for this (unlike GitHub's
   `candidate` Status option).
+- **"Verification" is a FLAG too, not a state** (concept #17). A unit merged to `dev` but not
+  yet verified, and a unit whose verification came back red, are **conditions on** the state the
+  unit is already in — never states after it. Signal them with a `test:pending` / `test:failed`
+  tag in `System.Tags` (zero-setup, template-agnostic, exactly like `blocked`), `test:failed`
+  plus a diagnostic comment naming what failed; `System.State` stays **unchanged**. **At most one
+  `test:` tag per item** — they are mutually exclusive, so re-flagging removes the prior tag and
+  adds the new one in the **same** `System.Tags` write (a tag set accumulates where a field
+  replaces, the `sprint:` discipline). Both are cleared when the unit completes. Do not resolve or
+  invent a `Test`/`Verifying` state to transition to — the same rule as `blocked` above, and for
+  the same reason: a unit can be blocked *while* awaiting verification, which two tags express and
+  one state field cannot.
 - "Done" for velocity / completion = resolve the **Completed** state-category, not a
   literal string — different templates spell it differently.
 
