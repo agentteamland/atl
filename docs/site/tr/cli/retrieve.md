@@ -59,7 +59,9 @@ turns           62
 
 ## Neyi dizinler
 
-`.atl/{wiki,journal,docs}` ve `.claude/{agents,knowledge,skills,backends,packs}`, artı delivery destekli bir projede `docs/`.
+`.atl/{wiki,journal,docs}` ve `.claude/{agents,knowledge,skills,backends,packs}`, artı delivery destekli bir projede `docs/` ve bir takımın **kaynağını** barındıran repo'da `teams/`.
+
+Sonuncusu kurulu kopyalarla aynı şey değildir: kurulu bir kopya kaynağının bir sürüm gerisinde kalabilir ve kaynağı barındıran repo'da otorite kaynaktır. O repo'daki oturumların çoğu bir takımı düzenliyor ve bu eklenene kadar düzenledikleri şeyi getiremiyorlardı.
 
 `.atl/brain-storms` **bilerek ve kalıcı olarak dışarıda**: brainstorm'ların çoğu reddedilen seçenekleri gereği kaydeder, ve kararından koparılmış bir parça birebir bir karar gibi okunur. Müzakereyi değil, hükmü dizinle.
 
