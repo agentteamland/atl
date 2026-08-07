@@ -37,7 +37,7 @@ var rulesScanCmd = &cobra.Command{
 
 		root, err := findCoreRoot()
 		if err != nil {
-			fmt.Println("atl rules: no core/ here — nothing to scan")
+			fmt.Println("atl rules: no core/ here — nothing to scan (set ATL_REPO_ROOT if the monorepo is not an ancestor of this directory)")
 			return nil
 		}
 		stmts, err := rulesscan.Collect(filepath.Join(root, "core"), filepath.Join(root, "teams"))
