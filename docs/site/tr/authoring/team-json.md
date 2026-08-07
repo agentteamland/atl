@@ -38,7 +38,7 @@ Bu kadarı kuruluma yeter. CLI manifest dosyasını çözümler, `agents/web-age
 | `scope` | dize | — | Yayıncı varsayılan kurulum katmanı: `"project"`, `"global"` ya da `"both"`. Varsayılan `"project"`. Kullanıcı kurulum sırasında `--global` / `--project` ile her zaman geçersiz kılabilir. |
 | `dependencies` | nesne | — | CLI'nin bu takımın yanına kurması gereken diğer takımlar için `team-name → version-constraint` eşlemesi. |
 | `requires.atl` | dize | — | Bildirilen en düşük `atl` sürümü. Örneğin `">=2.0.0"`. Geleneksel üst veri — kurulum ayrıştırıcısı şu an bunu dayatmaz. |
-| `capabilities` | nesne | — | Çoğunlukla kurulum ayrıştırıcısının değil, platformun becerilerinin okuduğu isteğe bağlı sözleşmeler. `capabilities.review: "<agent>"`, [`/create-pr`](/tr/skills/create-pr)'in bu takımın uzman gözden geçireni olarak başlattığı ajanı adlandırır; `capabilities.profile`, profil katmanı sağlayıcı/tüketici rolünü bildirir ([profile-team](/tr/teams/profile-team)'e bakın). **CLI**'ın kendisinin okuduğu iki anahtar var: `store` ve `channel` — aşağıya bakın. |
+| `capabilities` | nesne | — | Çoğunlukla kurulum ayrıştırıcısının değil, platformun becerilerinin okuduğu isteğe bağlı sözleşmeler. `capabilities.review: "<agent>"`, [`/create-pr`](/tr/skills/create-pr)'in bu takımın uzman gözden geçireni olarak başlattığı ajanı adlandırır; `capabilities.profile`, profil katmanı sağlayıcı/tüketici rolünü bildirir ([profile-team](/tr/teams/profile-team)'e bakın). **CLI**'ın kendisinin okuduğu üç anahtar var: `store`, `channel` ve `sessionScript` — aşağıya bakın. |
 | `backends` | dize[] | — | `backends/<name>/` altında arka uca özel bağdaştırıcı paketleri gönderen takımlar için (ör. delivery-team'in `["azure", "github"]` değeri): takımın hangi arka uçları desteklediğini bildirir. Bugün yalnızca bilgilendirme amaçlıdır — kurulum ayrıştırıcısı bunu okumaz. |
 
 ::: tip Açıklamayı kısa tut
@@ -133,6 +133,50 @@ Bu yön, **bildirilmemiş** bir kanaldaki işaretçinin başına ne geleceğini 
 :::
 
 **Kimseye erişim vermez.** ATL bildirilen *sözcükleri* yalnızca bu tek mekanik amaç için okur — bir sinyali sözcüklendirmek ve hangi kanalların var olduğuna karar vermek. Bir yeteneğin adlandırdığı şeyi kimin okuyup yazabileceği, platformun henüz uygulamadığı ayrı bir sözleşmedir.
+
+## Oturum betiği bildirmek {#declaring-a-session-script}
+
+Yukarıdaki iki bildirim ATL'ye bir *yol* ve bir *sözcük kümesi* verir. Üçüncüsü ise çalıştırılacak bir şey verir: ATL'nin oturum başlangıcında çalıştırdığı ve yazdırdığı her şeyi oturumun bağlamına ilettiği bir betik.
+
+```json
+{
+  "capabilities": {
+    "delivery": { "sessionScript": "scripts/session-brief.sh" }
+  }
+}
+```
+
+`store` ve `channel` gibi `sessionScript` de herhangi bir yetenek adının altında durabilir. Değeri, **takımınızın varlıklarına göreli** bir yoldur — `scripts/session-brief.sh`, takım deponuzda o yoldaki dosyadır; kurulumdan sonra ise kapsamın `.claude/scripts/` dizinindeki kopyasıdır. Mutlak bir yol ya da `..` ile dışarı tırmanan bir yol reddedilir: bildirim, sizin dağıttığınız bir dosyayı adlandırır, kullanıcının makinesindeki bir dosyayı değil.
+
+Ne işe yaradığı, her oturumda yüklenen bir kuralın yapamadığı şeydir: *şu ana dair bir olguyu* bildirmek. İlk örneği delivery-team'in oturum brifingidir — bir `delivery/<sprint>/<id>` dalındayken o dalın ait olduğu kartı, durumunu ve sprint'ini adlandırır; dalın PR'ı çoktan birleştirilmişken kart hâlâ açıksa uyarır. Bunların hiçbiri bir ajanın okuyabileceği bir dosyadan bilinemez; her dal değiştirdiğinizde değişir.
+
+Çıktı sözleşmesi kısadır ve tamamı şudur: **bir betik yalnızca başarılı olarak konuşur.**
+
+- ATL **stdout**'u iletir, yalnızca **sıfır çıkış kodunda**. Sıfır olmayan bir çıkış, çıktıyı atar; böylece yarım kalmış bir okuma oturuma asla tamamlanmış gibi ulaşmaz.
+- **stderr atılır.** Tanılamalarınız sizin içindir; bir kancanın çıktısı ise bir ajan tarafından olgu olarak okunur.
+- Geçişin tamamı **süre sınırlıdır** ve çıktısı **boyut sınırlıdır**. Asılı kalan ya da taşıran bir betik sessizliğe dönüşür.
+- Her başarısızlık — eksik dosya, kaybolan `+x`, sıfır olmayan çıkış, zaman aşımı — **sessizdir**, çünkü bu bir kanca içinde çalışır ve bir kanca bir oturumu asla engellememeli ya da başarısız etmemelidir.
+
+Bu yüzden betiği, **söyleyecek bir şeyi yokken çıktısız biçimde 0 ile çıkacak** ve ağa ancak söyleyecek bir şeyi olduğunu bildikten sonra ulaşacak şekilde yazın. Çalışma dizini proje kökü olduğundan, buna karar vermek genellikle iki yerel okumadır.
+
+::: warning Sessizlik aynı zamanda bozulma biçimidir
+Bu başarısızlıkların her biri, çalışıp da söyleyecek bir şeyi olmayan bir betiğe birebir benzer. Farkı görünür kılmak için iki yüzey vardır, çünkü başka hiçbir şey kılamaz: [`atl skills check`](/tr/cli/skills) bildirimi takımın kendi ağacına karşı çözer ve birinci taraf bir takım için **CI'ı kırar**; [`atl doctor`](/tr/cli/doctor) ise bildirilen betiği eksik, dışarı taşan ya da çalıştırılabilir olmayan kurulu bir takım için **uyarır**. Brifinginiz hiç görünmüyorsa, betiği ayıklamadan önce doctor'ı çalıştırın.
+:::
+
+Bir tane yazarken bilmeye değer iki şey:
+
+- **Çalıştırılabilir olarak dağıtın.** Kurulum, kaynak dosyanın kipini korur; dolayısıyla `+x` olmadan işlenen bir betik `+x` olmadan yansıtılır ve sonra exec'te başarısız olur — sessizce, her makinede. `atl skills check` bunu ATL tek deposundaki takımlar için yakalar; sizinki başka yerde yaşıyorsa işlemeden önce `chmod +x` yapın.
+- **Bir git worktree içinde çalışmaz.** ATL'nin kendi teslimat motoru her otonom işçi için bir worktree açar ve `.delivery/` işlenmiş durumdadır; aksi hâlde her işçi betiğinizi çalıştırırdı — tek bir panoya karşı defalarca ve içinde hiç insan olmayan bir bağlama yazdırarak. Oturum brifingi, bir insanın içinde oturduğu oturum içindir.
+
+ATL bundan takımınız hakkında hiçbir şey öğrenmez. Betiği hangi takımın bildirdiğini, çıktının ne anlama geldiğini ya da betiğin bunu üretmek için ne okuduğunu — hangi arka uçla ya da hizmetle konuştuğu dâhil — bilmez. Nokta da budur: delivery-team'in brifingi `.delivery/config.json`'ı *kendisi* okur ve arka uca göre dallanır, dolayısıyla yeni bir arka uç eklemek CLI'da hiçbir değişiklik gerektirmez.
+
+::: tip Bu özellik gelmeden önce mi kurmuştunuz?
+`store` ve `channel` ile aynı hikâye: bildirim kurulum anında okunur, dolayısıyla `sessionScripts` alanından önceki bir kurulumda bu kayıt yoktur ve hiç bildirmeyen bir takım gibi davranır. `atl update` sabitlenmiş kaynağı yeniden çekerek bunu bir kez geri doldurur ve kendiliğinden çalışır.
+:::
+
+::: danger Bu, kurulu kodu otomatik çalıştırır
+Bildirilen bir betik, makinenizde her oturum başlangıcında, sizin izinlerinizle ve sorulmadan çalıştırılır. Bu bilinçli bir karardır — oturum başına bir onay, mekanizmayı var oluş amacı için kullanılamaz kılardı — ve tam da bu yüzden *bir takımın nereden geldiği* önemlidir. Güvendiğiniz takımları kurun. `ATL_NO_SESSION_SCRIPT=1` geçişin tamamını kapatır.
+:::
 
 ## Sürüm kısıtları {#version-constraints}
 

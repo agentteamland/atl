@@ -15,6 +15,19 @@ atl skills: a stocktake is due — run /skill-stocktake now in a background suba
 atl rules: a distill is due — run /rules-distill now in a background subagent …
 ```
 
+**A signal without those words is not a dispatch signal.** Setting `ATL_NO_SWEEP_DISPATCH`
+makes every one of them print its passive form instead — `… is due — run /observe to …`,
+naming no subagent and citing no rule. That is a report addressed to a person, and this rule
+does not apply to it: do not spawn anything, do not offer to, and do not treat the shorter
+wording as an abbreviation of the longer one. Mention the sweep if it is relevant to what the
+user is doing, and otherwise carry on.
+
+The brake exists because the addressee *is* the behaviour. These signals ship to every user, and
+spawning background subagents unasked in someone else's project is a different decision from
+making it in the project that authored this rule. The opt-out drops the dispatch and keeps the
+report, on purpose — someone who does not want automatic work has not asked to stop being told
+the work is due.
+
 ## What to do
 
 **Spawn ONE background subagent per signal**, using the Agent tool with `run_in_background`.
