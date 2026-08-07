@@ -242,3 +242,41 @@ func TestCorpusDirsGatesDocsOnDelivery(t *testing.T) {
 		t.Error("docs/ must be included for a delivery project")
 	}
 }
+
+// The team SOURCE tree, in the repo that owns it. Not the same question as the
+// installed copies: an installed copy can lag its source by a version, and in the
+// owning repo the source is the authoritative one. Most sessions in that repo are
+// editing a team, and until this they could not retrieve what they were editing.
+func TestCorpusIncludesTheTeamSourceTreeWhenPresent(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "teams", "demo-team"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	dirs, err := corpusDirs(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := filepath.Join(root, "teams")
+	for _, d := range dirs {
+		if d == want {
+			return
+		}
+	}
+	t.Errorf("teams/ present on disk but not in the corpus: %v", dirs)
+}
+
+// A consuming project has no teams/ — only installed copies under .claude. The
+// corpus must not carry a path that does not exist there, so the cost of this
+// lands only in the repo that owns the source.
+func TestCorpusOmitsTheTeamSourceTreeWhenAbsent(t *testing.T) {
+	root := t.TempDir()
+	dirs, err := corpusDirs(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, d := range dirs {
+		if filepath.Base(d) == "teams" {
+			t.Errorf("teams/ is absent on disk but present in the corpus: %v", dirs)
+		}
+	}
+}
