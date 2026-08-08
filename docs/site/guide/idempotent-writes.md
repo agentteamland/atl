@@ -1,12 +1,12 @@
 # Idempotent writes
 
-ATL agents and ceremonies **re-run** constantly — on a restart, a retry, a resumed sprint. This core rule makes those re-runs safe: a write to any durable store must **converge** on the same end-state rather than duplicate work or clobber a newer edit. This page is the user side of that discipline.
+ATL agents and ceremonies **re-run** constantly — on a restart, a retry, a resume. This core rule makes those re-runs safe: a write to any durable store must **converge** on the same end-state rather than duplicate work or clobber a newer edit. This page is the user side of that discipline.
 
 ## What's happening under the hood
 
-The [`idempotent-writes` rule](https://github.com/agentteamland/atl/blob/main/core/rules/idempotent-writes.md) auto-loads in every session (and into the autonomous `claude -p` workers the delivery-team spawns, via the same global rule reflection). It codifies one habit: **check-before-create by a stable key, overwrite current-truth in place, never blind-write.**
+The [`idempotent-writes` rule](https://github.com/agentteamland/atl/blob/main/core/rules/idempotent-writes.md) auto-loads in every session (and into every autonomous `claude -p` session, via the same global rule reflection). It codifies one habit: **check-before-create by a stable key, overwrite current-truth in place, never blind-write.**
 
-It was distilled from the corpus itself — the same principle was independently re-derived in the delivery loop (its cross-backend "concept #10"), in `/brainstorm`, in `/create-code-diagram`, and in `/profile-restore`. When a discipline recurs in that many unrelated places, it belongs in one rule.
+It was distilled from the corpus itself — the same principle was independently re-derived in a work-tracking loop (as a named `check-first-by-key` contract), in `/brainstorm`, in `/create-code-diagram`, and in `/profile-restore`. When a discipline recurs in that many unrelated places, it belongs in one rule.
 
 ## What it means in practice
 
@@ -18,4 +18,4 @@ It was distilled from the corpus itself — the same principle was independently
 
 ## Why it's a core rule
 
-ATL's **autonomous delivery** depends on it: a resumed sprint must converge on the durable state, not re-create it — otherwise a restart means a duplicate work-item, a doubled PR, or a lost edit. Making convergence the default (not a special recovery mode) is what lets an unattended `claude -p` worker retry and resume safely. The one intentional exception is **append-only** stores — a journal or audit log, where adding a new dated entry each run is the point, not a duplicate.
+Any **unattended re-run** depends on it: a resumed run must converge on the durable state, not re-create it — otherwise a restart means a duplicate work-item, a doubled PR, or a lost edit. Making convergence the default (not a special recovery mode) is what lets an unattended `claude -p` session retry and resume safely. The one intentional exception is **append-only** stores — a journal or audit log, where adding a new dated entry each run is the point, not a duplicate.

@@ -28,7 +28,7 @@ Bir **inceleme ajanı** beyan eden takım (`team.json` içinde `capabilities.rev
 
 ```
 project:
-  acme/delivery-team@0.15.0  (review: tech-lead)
+  acme/proto-team@0.3.0  (review: code-reviewer)
 ```
 
 ## `--json`
@@ -39,10 +39,10 @@ Aynı kümeyi bir dizi olarak yazdırır; [`/create-pr`](/tr/skills/create-pr) i
 [
   {
     "handle": "acme",
-    "name": "delivery-team",
-    "version": "0.15.0",
+    "name": "proto-team",
+    "version": "0.3.0",
     "scope": "project",
-    "reviewer": "tech-lead"
+    "reviewer": "code-reviewer"
   }
 ]
 ```

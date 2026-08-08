@@ -39,7 +39,7 @@ That's enough to install. The CLI parses the manifest, copies `agents/web-agent.
 | `dependencies` | object | — | Map of `team-name → version-constraint` for other teams the CLI installs alongside this one. |
 | `requires.atl` | string | — | Declared minimum `atl` version, e.g. `">=2.0.0"`. Conventional metadata — the install parser does not currently enforce it. |
 | `capabilities` | object | — | Optional contracts, mostly read by the platform's skills rather than the install parser. `capabilities.review: "<agent>"` names the agent [`/create-pr`](/skills/create-pr) spawns as this team's specialist reviewer; `capabilities.profile` declares the profile-layer provider/consumer role (see [profile-team](/teams/profile-team)). Three keys are read by the **CLI** itself: `store`, `channel` and `sessionScript` — see below. |
-| `backends` | string[] | — | For teams shipping per-backend adapter packs under `backends/<name>/` (e.g. the delivery-team's `["azure", "github"]`): declares which backends the team supports. Informational today — the install parser does not read it. |
+| `backends` | string[] | — | For teams shipping per-backend adapter packs under `backends/<name>/` — a team carrying `backends/stripe/` and `backends/paddle/` declares `["stripe", "paddle"]`. Informational today — the install parser does not read it. |
 
 ::: tip Keep the description short
 `description` is rendered as a single line in `atl search` output, so a long one wraps awkwardly. Aim for one tight sentence — it's a pitch, not a paragraph.
@@ -141,14 +141,14 @@ The two declarations above hand ATL a *path* and a *set of words*. The third han
 ```json
 {
   "capabilities": {
-    "delivery": { "sessionScript": "scripts/session-brief.sh" }
+    "migrations": { "sessionScript": "scripts/session-brief.sh" }
   }
 }
 ```
 
 Like `store` and `channel`, `sessionScript` may sit under any capability name. Its value is a path **relative to your team's assets** — `scripts/session-brief.sh` is the file at that path in your team repo, and after install it is the copy under the scope's `.claude/scripts/`. An absolute path, or one climbing out with `..`, is refused: the declaration names a file you ship, never a file on the user's machine.
 
-What it is for is the thing an always-loaded rule cannot do: report a *fact about right now*. The delivery-team's briefing is the first one — on a `delivery/<sprint>/<id>` branch it names the card that branch belongs to, its state and its sprint, and warns when the branch's PR has already merged while the card is still open. None of that is knowable from a file an agent could have read; it changes every time you switch branches.
+What it is for is the thing an always-loaded rule cannot do: report a *fact about right now*. Picture an `acme/example-team` that owns a project's database migrations: its briefing names the migration the local database is actually on, and warns when the branch you just checked out expects a later one. None of that is knowable from a file an agent could have read — it changes with the branch you are on and with the state of a database only this machine has.
 
 The output contract is short, and the whole of it is this: **a script speaks only by succeeding.**
 
@@ -166,9 +166,9 @@ Every one of those failures looks exactly like a script that ran and had nothing
 Two things worth knowing when you write one:
 
 - **Ship it executable.** Install preserves the source file's mode, so a script committed without `+x` reflects without `+x` and then fails at exec — silently, on every machine. `atl skills check` catches this for teams in the ATL monorepo; `chmod +x` before you commit if yours lives elsewhere.
-- **It does not run inside a git worktree.** ATL's own delivery engine cuts one worktree per autonomous worker, and `.delivery/` is committed, so every worker would otherwise run your script — several times over, against one board, printing into a context with no human in it. A session briefing is for the session a person is sitting in.
+- **It does not run inside a git worktree.** A declaration is a *committed* file, so every session opened in any worktree of one repo would otherwise run your script — several times over, each repeating whatever the script reads, and printing into contexts with nobody sitting in them. A session briefing is for the session a person is sitting in.
 
-ATL learns nothing about your team from this. It does not know which team declared the script, what the output means, or what the script read to produce it — including which backend or service it talked to. That is the point: the delivery-team's briefing reads `.delivery/config.json` and branches on the backend *itself*, so adding a backend needs no change in the CLI.
+ATL learns nothing about your team from this. It does not know which team declared the script, what the output means, or what the script read to produce it — including which service it talked to. That is the point: the script reads whatever project state it cares about *itself*, so a new consumer — or a new thing to report — needs no change in the CLI.
 
 ::: tip Already installed before this shipped?
 Same story as `store` and `channel`: the declaration is read at install time, so an install predating the `sessionScripts` field carries no record of it and behaves like a team that declares none. `atl update` backfills it once by re-fetching the pinned source, and it runs on its own.
@@ -212,7 +212,7 @@ my-team/
     └── commit-style.md
 ```
 
-The installable asset directories are `agents/`, `skills/`, `rules/`, `knowledge/`, `backends/`, `scripts/`, and `packs/` (the `teampkg.AssetDirs` set). `agents/`/`skills/`/`rules/` are what Claude Code reads directly; `knowledge/`/`scripts/`/`packs/` carry a team's runtime reference docs, helper scripts, and area packs; `backends/` carries a team's per-backend adapter contracts (e.g. the delivery-team's `backends/{azure,github}/`). Everything else (`team.json`, `README`, `LICENSE`) stays behind.
+The installable asset directories are `agents/`, `skills/`, `rules/`, `knowledge/`, `backends/`, `scripts/`, and `packs/` (the `teampkg.AssetDirs` set). `agents/`/`skills/`/`rules/` are what Claude Code reads directly; `knowledge/`/`scripts/`/`packs/` carry a team's runtime reference docs, helper scripts, and area packs; `backends/` carries a team's per-backend adapter contracts, one subdirectory per backend it names in `backends[]`. Everything else (`team.json`, `README`, `LICENSE`) stays behind.
 
 A team must ship at least one file under an asset directory or `atl install` fails (`team ships no installable assets`). Individual declared `agents[]`/`skills[]`/`rules[]` entries are catalog metadata and are not validated against disk at install time — the `atl skills check` dev command cross-checks the declared `agents[]` and `skills[]` for first-party teams.
 

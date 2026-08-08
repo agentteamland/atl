@@ -1,10 +1,10 @@
 # İcra hijyeni
 
-ATL ajanları küçük bir **icra varsayılanları** kümesini paylaşır — çok adımlı mühendislik işini *nasıl* temiz yapacaklarına dair alışkanlıklar. Bunlar eskiden yalnızca tek bir bakımcının kişisel kurulumunda yaşıyordu; artık bir çekirdek kural, dolayısıyla her takım ve her otonom teslim worker'ı aynı disiplinli biçimde çalışıyor. Bu sayfa, o duruşun kullanıcı tarafıdır.
+ATL ajanları küçük bir **icra varsayılanları** kümesini paylaşır — çok adımlı mühendislik işini *nasıl* temiz yapacaklarına dair alışkanlıklar. Bunlar eskiden yalnızca tek bir bakımcının kişisel kurulumunda yaşıyordu; artık bir çekirdek kural, dolayısıyla her takım ve her otonom `claude -p` oturumu aynı disiplinli biçimde çalışıyor. Bu sayfa, o duruşun kullanıcı tarafıdır.
 
 ## Kaputun altında ne oluyor
 
-[`execution-hygiene` kuralı](https://github.com/agentteamland/atl/blob/main/core/rules/execution-hygiene.md) her oturumda otomatik yüklenir (ve delivery-team'in başlattığı otonom `claude -p` worker'larına da, aynı global-kural yansıması yoluyla). Bir ajanın işini incelenebilir ve güvenilir kılan üç alışkanlığı kurallaştırır — "bir diff üretti" ile "kıdemli bir mühendisin onaylayacağı bir diff üretti" arasındaki fark.
+[`execution-hygiene` kuralı](https://github.com/agentteamland/atl/blob/main/core/rules/execution-hygiene.md) her oturumda otomatik yüklenir (ve her otonom `claude -p` oturumuna da, aynı global-kural yansıması yoluyla). Bir ajanın işini incelenebilir ve güvenilir kılan üç alışkanlığı kurallaştırır — "bir diff üretti" ile "kıdemli bir mühendisin onaylayacağı bir diff üretti" arasındaki fark.
 
 Yanındaki iki kuralı tekrarlamak yerine **tamamlar**: [Karpathy ilkeleri](/tr/guide/karpathy-guidelines) kodlamadan önce *düşünmeyi* yönetir; branch hijyeni ise *branch yaşam döngüsünü*. İcra hijyeni ise aradaki anlık-mekaniği ele alır.
 
@@ -18,4 +18,4 @@ Yanındaki iki kuralı tekrarlamak yerine **tamamlar**: [Karpathy ilkeleri](/tr/
 
 ## Neden çekirdek kural
 
-Bunlar ATL'nin **otonom teslimini** güvenilir kılan disiplinlerdir: bir `claude -p` worker'ı bir backlog item'ını gözetimsiz inşa ederken atomik commit'ler, kendi test hatalarını düzeltir ve temiz delege eder — çünkü kural yalnızca interaktif bir oturuma değil, ona da ulaşır. Bunları tek bir kişinin persona'sından platforma terfi ettirmek, "backlog kendini teslim ediyor"un *temiz* anlamına gelmesini sağlayan şeydir.
+Bunlar **gözetimsiz işi** güvenilir kılan disiplinlerdir: bir `claude -p` oturumu kimse başında değilken bir şey inşa ederken atomik commit'ler atar, kendi test hatalarını düzeltir ve temiz delege eder — çünkü kural yalnızca interaktif bir oturuma değil, ona da ulaşır. Bunları tek bir kişinin persona'sından platforma terfi ettirmek, o otonomiyi yalnızca hızlı değil *temiz* kılan şeydir.

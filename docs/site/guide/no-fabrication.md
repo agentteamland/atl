@@ -4,9 +4,9 @@ An ATL agent that invents a plausible-looking value — a tool name, a work-item
 
 ## What's happening under the hood
 
-The [`no-fabrication` rule](https://github.com/agentteamland/atl/blob/main/core/rules/no-fabrication.md) auto-loads in every session (and into the autonomous `claude -p` workers the delivery-team spawns, via the same global rule reflection). It codifies an **output-integrity** habit: never manufacture a fact, identifier, or result you don't have.
+The [`no-fabrication` rule](https://github.com/agentteamland/atl/blob/main/core/rules/no-fabrication.md) auto-loads in every session (and into every autonomous `claude -p` session, via the same global rule reflection). It codifies an **output-integrity** habit: never manufacture a fact, identifier, or result you don't have.
 
-It was distilled from the corpus itself — the same edge was independently re-derived across three teams and the core skills: the delivery `developer` ("never invent a tool name, a state literal, or a path"; "unverified is never a pass"), the backend contract ("a surface that can't be run → block, never fake-green"), the profile `curator` ("never fabricate a value"), the `advisor` ("never asserted without proof"), and `/rule` ("never assume — if information is missing, ask").
+It was distilled from the corpus itself — the same edge was independently re-derived across three teams and the core skills: an implementer agent ("never invent a tool name, a state literal, or a path"; "unverified is never a pass"), the backend contract ("a surface that can't be run → block, never fake-green"), the profile `curator` ("never fabricate a value"), the `advisor` ("never asserted without proof"), and `/rule` ("never assume — if information is missing, ask").
 
 ## What it means in practice
 
@@ -18,4 +18,4 @@ It was distilled from the corpus itself — the same edge was independently re-d
 
 ## Why it's a core rule
 
-It is the honesty layer under ATL's **autonomous delivery**: an unattended `claude -p` worker that fabricates a merge state or fakes a green test would land broken work silently — the exact failure the deterministic gates exist to prevent. It **complements** the [Karpathy guidelines](/guide/karpathy-guidelines): those govern the *input* side (don't guess the requirement — ask); this governs the *output* side (don't fabricate the artifact you emit). The rule targets facts and results you claim to be real — it does **not** restrain genuinely generative work (drafting prose, brainstorming, clearly-labeled estimates), where invention is the task.
+It is the honesty layer under any **unattended run**: a `claude -p` session that fabricates a merge state or fakes a green test would land broken work silently — the exact failure the deterministic gates exist to prevent. It **complements** the [Karpathy guidelines](/guide/karpathy-guidelines): those govern the *input* side (don't guess the requirement — ask); this governs the *output* side (don't fabricate the artifact you emit). The rule targets facts and results you claim to be real — it does **not** restrain genuinely generative work (drafting prose, brainstorming, clearly-labeled estimates), where invention is the task.

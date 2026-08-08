@@ -128,7 +128,7 @@ Tetikleyici bir dil denetimi değil, sözcüksel yarının boş dönmesidir. Yan
 
 ### Otomatik, artımlı, arka planda
 
-Bir drain bilgi tabanını değiştirdiğinde dizin kendini yeniden kurar. [`atl session-start`](/cli/setup-hooks) korpusun değiştiğini fark eder ve derlemeyi **arka planda** (ayrık/detached) başlatır, böylece oturumu asla bloklamaz; ve derleme **artımlıdır** — yalnızca metni gerçekten değişen sayfalar yeniden gömülür, dolayısıyla rutin bir drain saniyeler içinde tazelenir. Bu oturumda drain ettiğiniz, bir sonraki oturumda erişilebilir. (`atl work dispatch` altında, worktree başına worker'lar yeniden-derleme fırtınasını önlemek için otomatik derlemeyi atlar.)
+Bir drain bilgi tabanını değiştirdiğinde dizin kendini yeniden kurar. [`atl session-start`](/cli/setup-hooks) korpusun değiştiğini fark eder ve derlemeyi **arka planda** (ayrık/detached) başlatır, böylece oturumu asla bloklamaz; ve derleme **artımlıdır** — yalnızca metni gerçekten değişen sayfalar yeniden gömülür, dolayısıyla rutin bir drain saniyeler içinde tazelenir. Bu oturumda drain ettiğiniz, bir sonraki oturumda erişilebilir. (Bağlı bir git worktree'sinde açılan bir oturum otomatik derlemeyi atlar; böylece aynı deponun birden çok worktree'si tam bir yeniden-derleme fırtınası koparmaz.)
 
 ### Araç — soruyu istem değil, durumun kendisi doğurduğunda
 

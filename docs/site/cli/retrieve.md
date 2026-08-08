@@ -61,9 +61,11 @@ A **cold** build is expensive — tens of minutes on a large corpus — and an i
 
 ## What it indexes
 
-`.atl/{wiki,journal,docs}` and `.claude/{agents,knowledge,skills,backends,packs}`, plus `docs/` in a delivery-backed project and `teams/` in the repo that owns a team's **source**.
+`.atl/{wiki,journal,docs}` and `.claude/{agents,knowledge,skills,backends,packs}`, plus `teams/` in the repo that owns a team's **source**.
 
 That last one is not the same as the installed copies: an installed copy can lag its source by a version, and in the owning repo the source is authoritative. Most sessions there are editing a team, and until it was added they could not retrieve what they were editing.
+
+Read the first entry precisely: it is `.atl/docs`, not a repo's own top-level `docs/`. That tree is **never** indexed — it is usually a generated or vendored site rather than this project's knowledge, and indexing it buries the pages that are.
 
 `.atl/brain-storms` is **deliberately excluded, permanently**: most brainstorms record rejected options by mandate, and a chunk split from its verdict reads exactly like a decision. Index the verdict, not the deliberation.
 

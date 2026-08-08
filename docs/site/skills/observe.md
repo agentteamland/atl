@@ -18,7 +18,7 @@ Scope it with `--triggers-only` or `--gaps-only` to run just one dimension; the 
 
 ## What it does
 
-1. **Orient** — read the project's `CLAUDE.md`, recent `.atl/journal/`, and the deferral surface (`.atl/backlog.md`, or a delivery board when one is configured).
+1. **Orient** — read the project's `CLAUDE.md`, recent `.atl/journal/`, and the deferral surface (`.atl/backlog.md`).
 2. **Ripe triggers** — judge each deferred item's `_Trigger:_` against real evidence; an item is ripe only with a verbatim quote of the signal that fired it.
 3. **Latent-gap sweep** — fan out finders across lenses (shipped-vs-designed, growth/scale, decided-but-unshipped, user setup), each grounding its findings with a source quote.
 4. **Verify adversarially** — try to *refute* every candidate; keep only what survives, re-weigh severity.
@@ -27,7 +27,7 @@ Scope it with `--triggers-only` or `--gaps-only` to run just one dimension; the 
 
 ## Boundaries
 
-- **It proposes, it doesn't auto-act.** A latent-gap finding often needs a decision (a brainstorm) — `/observe` surfaces it and lets you choose; it doesn't silently open PRs or create work items.
+- **It proposes, it doesn't auto-act.** A latent-gap finding often needs a decision (a brainstorm) — `/observe` surfaces it and lets you choose; it doesn't silently open PRs.
 - **Honest bound.** It catches a *class* of gaps reliably — shipped-vs-designed mismatches, growth/scale risks, unshipped decisions, ripe triggers — enough to stop the recurring "you caught it first." It is **not** a guarantee to catch everything; it's a multiplier on your vigilance, not a replacement.
 - **Advisor boundary.** It audits the advisor's *setup and output* from the outside; it never runs inside, or as, the advisor — that conversation stays pure.
 

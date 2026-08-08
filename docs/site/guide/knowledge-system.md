@@ -128,7 +128,7 @@ The trigger is the lexical half coming back empty, not a language check. So an E
 
 ### Automatic, incremental, background
 
-The index rebuilds itself whenever a drain changes the knowledge base. [`atl session-start`](/cli/setup-hooks) notices the corpus changed and spawns the build **in the background** (detached), so it never blocks the session, and the build is **incremental** — only pages whose text actually changed are re-embedded, so a routine drain refreshes in seconds. What you drain this session is retrievable the next. (Under `atl work dispatch`, per-worktree workers skip the auto-build to avoid a rebuild storm.)
+The index rebuilds itself whenever a drain changes the knowledge base. [`atl session-start`](/cli/setup-hooks) notices the corpus changed and spawns the build **in the background** (detached), so it never blocks the session, and the build is **incremental** — only pages whose text actually changed are re-embedded, so a routine drain refreshes in seconds. What you drain this session is retrievable the next. (A session opened in a linked git worktree skips the auto-build, so several worktrees of one repo don't each storm a full rebuild.)
 
 ### The tool — when the situation raises the question, not the prompt
 

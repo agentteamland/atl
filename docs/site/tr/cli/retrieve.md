@@ -61,9 +61,11 @@ turns           62
 
 ## Neyi dizinler
 
-`.atl/{wiki,journal,docs}` ve `.claude/{agents,knowledge,skills,backends,packs}`, artı delivery destekli bir projede `docs/` ve bir takımın **kaynağını** barındıran repo'da `teams/`.
+`.atl/{wiki,journal,docs}` ve `.claude/{agents,knowledge,skills,backends,packs}`, artı bir takımın **kaynağını** barındıran repo'da `teams/`.
 
 Sonuncusu kurulu kopyalarla aynı şey değildir: kurulu bir kopya kaynağının bir sürüm gerisinde kalabilir ve kaynağı barındıran repo'da otorite kaynaktır. O repo'daki oturumların çoğu bir takımı düzenliyor ve bu eklenene kadar düzenledikleri şeyi getiremiyorlardı.
+
+İlk girdiyi tam olarak oku: orada yazan `.atl/docs`, bir repo'nun kendi üst düzey `docs/` ağacı değil. O ağaç **hiçbir zaman** dizinlenmez — genellikle bu projenin bilgisi değil, üretilmiş ya da dışarıdan alınmış büyük bir sitedir ve onu dizinlemek asıl bilgi sayfalarını altında bırakır.
 
 `.atl/brain-storms` **bilerek ve kalıcı olarak dışarıda**: brainstorm'ların çoğu reddedilen seçenekleri gereği kaydeder, ve kararından koparılmış bir parça birebir bir karar gibi okunur. Müzakereyi değil, hükmü dizinle.
 

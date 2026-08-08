@@ -120,7 +120,7 @@ Human-readable output is one line per turn:
 
 Moves pending items out of buckets whose project directory **no longer exists** and into the current project's, where a drain can reach them.
 
-The queue partitions by project, and every read surface is project-scoped — so a bucket keyed to a deleted directory is invisible from everywhere, indistinguishable from no bucket at all. `atl work dispatch` cuts one git worktree per unit and deletes it on completion, so before the key became the repository root, an autonomous worker's markers were queued under a path that then ceased to exist. Measured 2026-08-08: **13 items across 6 vanished buckets**, seven of them real learnings captured by delivery workers three weeks earlier. The payloads were intact the whole time; only their address was gone.
+The queue partitions by project, and every read surface is project-scoped — so a bucket keyed to a deleted directory is invisible from everywhere, indistinguishable from no bucket at all. Any workflow that runs a session inside a throwaway git worktree hits this: before the key became the repository root, markers captured there were queued under a path that then ceased to exist. Measured 2026-08-08: **13 items across 6 vanished buckets**, seven of them real learnings captured three weeks earlier. The payloads were intact the whole time; only their address was gone.
 
 Keying by the repository root stops new losses. It cannot surface what is already stranded — after a re-key, nothing looks for the old addresses — which is why this exists beside it.
 

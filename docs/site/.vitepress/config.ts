@@ -60,8 +60,7 @@ export default defineConfig({
                 { text: 'Untrusted input', link: '/guide/untrusted-input' },
                 { text: 'Execution hygiene', link: '/guide/execution-hygiene' },
                 { text: 'Idempotent writes', link: '/guide/idempotent-writes' },
-                { text: 'No fabrication', link: '/guide/no-fabrication' },
-                { text: 'Board-tracked work', link: '/guide/board-tracked-work' }
+                { text: 'No fabrication', link: '/guide/no-fabrication' }
               ]
             },
             {
@@ -137,7 +136,6 @@ export default defineConfig({
               items: [
                 { text: 'Browse', link: '/teams/' },
                 { text: 'profile-team', link: '/teams/profile-team' },
-                { text: 'delivery-team', link: '/teams/delivery-team' },
                 { text: 'personal-advisory-team', link: '/teams/personal-advisory-team' }
               ]
             }
@@ -210,8 +208,7 @@ export default defineConfig({
                 { text: 'Güvenilmez girdi', link: '/tr/guide/untrusted-input' },
                 { text: 'İcra hijyeni', link: '/tr/guide/execution-hygiene' },
                 { text: 'Idempotent yazımlar', link: '/tr/guide/idempotent-writes' },
-                { text: 'Uydurma yok', link: '/tr/guide/no-fabrication' },
-                { text: "Board'a-işlenen iş", link: '/tr/guide/board-tracked-work' }
+                { text: 'Uydurma yok', link: '/tr/guide/no-fabrication' }
               ]
             },
             {
@@ -287,7 +284,6 @@ export default defineConfig({
               items: [
                 { text: 'Göz at', link: '/tr/teams/' },
                 { text: 'profile-team', link: '/tr/teams/profile-team' },
-                { text: 'delivery-team', link: '/tr/teams/delivery-team' },
                 { text: 'personal-advisory-team', link: '/tr/teams/personal-advisory-team' }
               ]
             }

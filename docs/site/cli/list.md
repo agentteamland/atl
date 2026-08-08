@@ -28,7 +28,7 @@ A team that declares a **review agent** (`capabilities.review` in its `team.json
 
 ```
 project:
-  acme/delivery-team@0.15.0  (review: tech-lead)
+  acme/proto-team@0.3.0  (review: code-reviewer)
 ```
 
 ## `--json`
@@ -39,10 +39,10 @@ Emits the same set as an array, which is how [`/create-pr`](/skills/create-pr) d
 [
   {
     "handle": "acme",
-    "name": "delivery-team",
-    "version": "0.15.0",
+    "name": "proto-team",
+    "version": "0.3.0",
     "scope": "project",
-    "reviewer": "tech-lead"
+    "reviewer": "code-reviewer"
   }
 ]
 ```

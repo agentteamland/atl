@@ -120,7 +120,7 @@ Her iki kip de aşırı uzun olduğu için atlanan transkript kayıtlarını bil
 
 Proje dizini **artık var olmayan** kovalardaki bekleyen öğeleri, bir drain'in ulaşabileceği şekilde mevcut projenin kovasına taşır.
 
-Kuyruk projeye göre bölümlenir ve her okuma yüzeyi proje-kapsamlıdır — yani silinmiş bir dizine anahtarlanmış kova her yerden görünmezdir, hiç kova olmamasından ayırt edilemez. `atl work dispatch` her birim için bir git worktree açıp tamamlanınca siler; anahtar depo köküne dönmeden önce otonom bir worker'ın işaretleri, sonradan yok olan bir yola kuyruklanıyordu. 2026-08-08 ölçümü: **6 kaybolmuş kovada 13 öğe**, yedisi üç hafta önce delivery worker'larının yakaladığı gerçek öğrenmeler. İçerikler baştan sona sağlamdı; kaybolan yalnızca adresleriydi.
+Kuyruk projeye göre bölümlenir ve her okuma yüzeyi proje-kapsamlıdır — yani silinmiş bir dizine anahtarlanmış kova her yerden görünmezdir, hiç kova olmamasından ayırt edilemez. Bir oturumu geçici bir git worktree içinde çalıştıran her iş akışı bununla karşılaşır: anahtar depo köküne dönmeden önce orada yakalanan işaretler, sonradan yok olan bir yola kuyruklanıyordu. 2026-08-08 ölçümü: **6 kaybolmuş kovada 13 öğe**, yedisi üç hafta önce yakalanmış gerçek öğrenmeler. İçerikler baştan sona sağlamdı; kaybolan yalnızca adresleriydi.
 
 Depo köküne anahtarlamak yeni kayıpları durdurur. Zaten sıkışmış olanı yüzeye çıkaramaz — yeniden anahtarlamadan sonra eski adresleri kimse aramaz — bu komut da bu yüzden onun yanında durur.
 

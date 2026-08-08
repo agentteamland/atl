@@ -18,7 +18,7 @@ Yalnızca bir boyutu çalıştırmak için `--triggers-only` ya da `--gaps-only`
 
 ## Ne yapar
 
-1. **Yönel** — projenin `CLAUDE.md`'sini, son `.atl/journal/` kayıtlarını ve erteleme yüzeyini (`.atl/backlog.md` ya da yapılandırılmış bir teslimat panosu) oku.
+1. **Yönel** — projenin `CLAUDE.md`'sini, son `.atl/journal/` kayıtlarını ve erteleme yüzeyini (`.atl/backlog.md`) oku.
 2. **Olgun tetikleyiciler** — her ertelenmiş öğenin `_Trigger:_`'ini gerçek kanıta karşı değerlendir; bir öğe yalnızca onu ateşleyen sinyalin birebir alıntısı varsa olgundur.
 3. **Gizli-boşluk taraması** — merceklere göre bulucuları dağıt (sevk-edilen-vs-tasarlanan, büyüme/ölçek, alınmış-ama-sevk-edilmemiş, kullanıcı kurulumu), her biri bulgusunu bir kaynak alıntısıyla temellendirir.
 4. **Çelişkili doğrula** — her adayı *çürütmeye* çalış; yalnızca ayakta kalanı tut, ciddiyeti yeniden tart.
@@ -27,7 +27,7 @@ Yalnızca bir boyutu çalıştırmak için `--triggers-only` ya da `--gaps-only`
 
 ## Sınırlar
 
-- **Önerir, kendiliğinden eylemez.** Bir gizli-boşluk bulgusu çoğu zaman bir karar gerektirir (bir brainstorm) — `/observe` onu yüzeye çıkarır ve seçmenize bırakır; sessizce PR açmaz ya da iş öğesi oluşturmaz.
+- **Önerir, kendiliğinden eylemez.** Bir gizli-boşluk bulgusu çoğu zaman bir karar gerektirir (bir brainstorm) — `/observe` onu yüzeye çıkarır ve seçmenize bırakır; sessizce PR açmaz.
 - **Dürüst sınır.** Bir *sınıf* boşluğu güvenilir biçimde yakalar — sevk-edilen-vs-tasarlanan uyumsuzlukları, büyüme/ölçek riskleri, sevk edilmemiş kararlar, olgun tetikleyiciler — "önce siz yakaladınız" döngüsünü durduracak kadar. Her şeyi yakalama garantisi **değildir**; teyakkuzunuzun yerine geçen değil, onu çoğaltan bir araçtır.
 - **Advisor sınırı.** Advisor'ın *kurulumunu ve çıktısını* dışarıdan denetler; asla onun içinde ya da onun *olarak* çalışmaz — o sohbet saf kalır.
 

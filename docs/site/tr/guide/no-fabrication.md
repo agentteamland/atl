@@ -4,9 +4,9 @@ Makul görünen bir değer uyduran bir ATL ajanı — bir tool adı, bir work-it
 
 ## Kaputun altında ne oluyor
 
-[`no-fabrication` kuralı](https://github.com/agentteamland/atl/blob/main/core/rules/no-fabrication.md) her oturumda otomatik yüklenir (ve delivery-team'in başlattığı otonom `claude -p` worker'larına da, aynı global-kural yansıması yoluyla). Bir **çıktı-bütünlüğü (output-integrity)** alışkanlığını kurallaştırır: sahip olmadığın bir fact'i, identifier'ı ya da sonucu asla imal etme.
+[`no-fabrication` kuralı](https://github.com/agentteamland/atl/blob/main/core/rules/no-fabrication.md) her oturumda otomatik yüklenir (ve her otonom `claude -p` oturumuna da, aynı global-kural yansıması yoluyla). Bir **çıktı-bütünlüğü (output-integrity)** alışkanlığını kurallaştırır: sahip olmadığın bir fact'i, identifier'ı ya da sonucu asla imal etme.
 
-Corpus'un kendisinden damıtıldı — aynı kenar üç takımda ve çekirdek skill'lerde bağımsız yeniden türetilmişti: delivery `developer` ("bir tool adını, state literal'ini ya da path'i asla uydurmam"; "unverified asla pass değildir"), backend kontratı ("çalıştırılamayan bir yüzey → block, asla fake-green"), profile `curator` ("bir değeri asla fabricate etme"), `advisor` ("kanıtsız asla iddia edilmez") ve `/rule` ("asla varsayma — bilgi eksikse, sor").
+Corpus'un kendisinden damıtıldı — aynı kenar üç takımda ve çekirdek skill'lerde bağımsız yeniden türetilmişti: bir implementer (uygulayıcı) ajan ("bir tool adını, state literal'ini ya da path'i asla uydurmam"; "unverified asla pass değildir"), backend kontratı ("çalıştırılamayan bir yüzey → block, asla fake-green"), profile `curator` ("bir değeri asla fabricate etme"), `advisor` ("kanıtsız asla iddia edilmez") ve `/rule` ("asla varsayma — bilgi eksikse, sor").
 
 ## Pratikte ne demek
 
@@ -18,4 +18,4 @@ Corpus'un kendisinden damıtıldı — aynı kenar üç takımda ve çekirdek sk
 
 ## Neden çekirdek kural
 
-ATL'nin **otonom teslimi**nin altındaki dürüstlük katmanıdır: bir merge state'ini uyduran ya da bir yeşil testi taklit eden gözetimsiz bir `claude -p` worker'ı, bozuk işi sessizce indirir — deterministik gate'lerin önlemek için var olduğu tam da o hata. [Karpathy ilkelerini](/tr/guide/karpathy-guidelines) **tamamlar**: onlar *girdi* tarafını yönetir (requirement'ı tahmin etme — sor); bu, *çıktı* tarafını (emit ettiğin artifact'i uydurma). Kural, gerçek olduğunu iddia ettiğin fact ve sonuçları hedefler — gerçekten üretken işi (prose taslağı, brainstorm, açıkça-etiketli tahminler) **kısıtlamaz**, ki orada uydurmak zaten işin kendisidir.
+Her **gözetimsiz çalışmanın** altındaki dürüstlük katmanıdır: bir merge state'ini uyduran ya da bir yeşil testi taklit eden gözetimsiz bir `claude -p` oturumu, bozuk işi sessizce indirir — deterministik gate'lerin önlemek için var olduğu tam da o hata. [Karpathy ilkelerini](/tr/guide/karpathy-guidelines) **tamamlar**: onlar *girdi* tarafını yönetir (requirement'ı tahmin etme — sor); bu, *çıktı* tarafını (emit ettiğin artifact'i uydurma). Kural, gerçek olduğunu iddia ettiğin fact ve sonuçları hedefler — gerçekten üretken işi (prose taslağı, brainstorm, açıkça-etiketli tahminler) **kısıtlamaz**, ki orada uydurmak zaten işin kendisidir.

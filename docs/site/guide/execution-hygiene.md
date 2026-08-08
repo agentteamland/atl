@@ -1,10 +1,10 @@
 # Execution hygiene
 
-ATL agents share a small set of **execution defaults** — habits for *how* to do multi-step engineering work cleanly. They used to live only in one maintainer's personal setup; now they're a core rule, so every team and every autonomous delivery worker works the same disciplined way. This page is the user side of that posture.
+ATL agents share a small set of **execution defaults** — habits for *how* to do multi-step engineering work cleanly. They used to live only in one maintainer's personal setup; now they're a core rule, so every team and every autonomous `claude -p` session works the same disciplined way. This page is the user side of that posture.
 
 ## What's happening under the hood
 
-The [`execution-hygiene` rule](https://github.com/agentteamland/atl/blob/main/core/rules/execution-hygiene.md) auto-loads in every session (and into the autonomous `claude -p` workers the delivery-team spawns, via the same global rule reflection). It codifies three habits that make an agent's work reviewable and trustworthy — the difference between "it produced a diff" and "it produced a diff a senior engineer would sign off on."
+The [`execution-hygiene` rule](https://github.com/agentteamland/atl/blob/main/core/rules/execution-hygiene.md) auto-loads in every session (and into every autonomous `claude -p` session, via the same global rule reflection). It codifies three habits that make an agent's work reviewable and trustworthy — the difference between "it produced a diff" and "it produced a diff a senior engineer would sign off on."
 
 It **complements** the two rules next to it rather than repeating them: the [Karpathy guidelines](/guide/karpathy-guidelines) govern *thinking* before coding, and [branch hygiene](https://github.com/agentteamland/atl/blob/main/core/rules/branch-hygiene.md) governs the *branch lifecycle*. Execution hygiene is about the moment-to-moment mechanics in between.
 
@@ -18,4 +18,4 @@ It **complements** the two rules next to it rather than repeating them: the [Kar
 
 ## Why it's a core rule
 
-These are the disciplines that make ATL's **autonomous delivery** trustworthy: when a `claude -p` worker builds a backlog item unattended, it commits atomically, fixes its own test failures, and delegates cleanly — because the rule reaches it, not just an interactive session. Promoting them from one person's persona into the platform is what lets "the backlog delivers itself" mean *cleanly*.
+These are the disciplines that make **unattended work** trustworthy: when a `claude -p` session builds something with nobody watching, it commits atomically, fixes its own test failures, and delegates cleanly — because the rule reaches it, not just an interactive session. Promoting them from one person's persona into the platform is what makes that autonomy *clean* rather than merely fast.
