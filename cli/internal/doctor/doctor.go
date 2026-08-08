@@ -12,6 +12,7 @@ package doctor
 
 import (
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/agentteamland/atl/cli/internal/queue"
@@ -80,7 +81,46 @@ func QueueChecks(store *queue.Store, project string, now time.Time) []Check {
 	return []Check{
 		func() Result { return backlogCheck(store, project) },
 		func() Result { return cursorCheck(store, project, now) },
+		func() Result { return strandedCheck(store) },
 	}
+}
+
+// strandedCheck reports pending items in buckets whose project directory no
+// longer exists. It is the only check in this file that looks OUTSIDE the
+// current project, and that is the entire point: every other queue surface is
+// project-scoped, so a bucket keyed to a deleted directory is invisible from
+// everywhere — it reads exactly like no bucket at all, which is why three weeks
+// of stranded items produced no signal of any kind.
+//
+// Keying by the repository root (the CLI's projectKey) stops NEW items being
+// stranded. It cannot surface the ones already there, because after a re-key
+// nothing looks for the old addresses — so the fix needs this check beside it or
+// the existing loss stays silent forever.
+//
+// Warn, never Fail: the items are intact and recoverable, and a doctor that
+// fails on history nobody can act on this minute is a doctor people stop
+// reading.
+func strandedCheck(store *queue.Store) Result {
+	projects, err := store.Projects()
+	if err != nil {
+		return Result{Name: "queue-stranded", Status: Fail, Detail: "cannot enumerate queue buckets: " + err.Error()}
+	}
+	items, buckets := 0, 0
+	for key, counts := range projects {
+		if st, serr := os.Stat(key); serr == nil && st.IsDir() {
+			continue
+		}
+		buckets++
+		for _, n := range counts {
+			items += n
+		}
+	}
+	if buckets == 0 {
+		return Result{Name: "queue-stranded", Status: OK, Detail: "every pending item is in a live project"}
+	}
+	return Result{Name: "queue-stranded", Status: Warn, Detail: fmt.Sprintf(
+		"%d pending item(s) in %d bucket(s) whose directory is gone — no project-scoped drain can reach them; recover them before they are written off",
+		items, buckets)}
 }
 
 func pendingTotal(store *queue.Store, project string) (int, error) {

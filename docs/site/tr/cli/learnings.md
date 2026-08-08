@@ -23,6 +23,8 @@ atl learnings status --json          # bekleyen sayılar JSON olarak (kanal→sa
 atl learnings peek                   # bekleyen öğeleri listele (insan-okunur)
 atl learnings peek --json            # tam makine-okunur liste
 atl learnings peek --channel learning  # tek bir kanala filtrele
+atl learnings recover                # silinmiş projelerde sıkışmış öğeleri listele (kuru çalışma)
+atl learnings recover --apply        # onları bu projeye taşı, böylece bir drain ulaşabilsin
 atl learnings ack <id>               # bir öğeyi işlenmiş işaretle (sil)
 atl learnings transcript             # son konuşma akışı (düz bir okuma)
 atl learnings transcript --json      # aynı akış, rol/metin kayıtları olarak
@@ -113,6 +115,18 @@ Her iki kip de aşırı uzun olduğu için atlanan transkript kayıtlarını bil
 [user] hayır, oturum değil yenileme jetonu kullan
 [assistant] Haklısın — yenileme jetonlarına geçiyorum.
 ```
+
+### `atl learnings recover`
+
+Proje dizini **artık var olmayan** kovalardaki bekleyen öğeleri, bir drain'in ulaşabileceği şekilde mevcut projenin kovasına taşır.
+
+Kuyruk projeye göre bölümlenir ve her okuma yüzeyi proje-kapsamlıdır — yani silinmiş bir dizine anahtarlanmış kova her yerden görünmezdir, hiç kova olmamasından ayırt edilemez. `atl work dispatch` her birim için bir git worktree açıp tamamlanınca siler; anahtar depo köküne dönmeden önce otonom bir worker'ın işaretleri, sonradan yok olan bir yola kuyruklanıyordu. 2026-08-08 ölçümü: **6 kaybolmuş kovada 13 öğe**, yedisi üç hafta önce delivery worker'larının yakaladığı gerçek öğrenmeler. İçerikler baştan sona sağlamdı; kaybolan yalnızca adresleriydi.
+
+Depo köküne anahtarlamak yeni kayıpları durdurur. Zaten sıkışmış olanı yüzeye çıkaramaz — yeniden anahtarlamadan sonra eski adresleri kimse aramaz — bu komut da bu yüzden onun yanında durur.
+
+**Varsayılan kuru çalışmadır.** Taşımayı `--apply` yapar. İçerik, id ve özgün yakalama zamanı korunur; böylece drain bugün yakalanmış bir şey değil, üç haftalık bir kurtarma görür. Hedefte zaten bulunan bir id'ye dokunulmaz, yani iki kez kurtarmak asla kopyalamaz. Kaynak için tombstone yazılmaz: tombstone *işlendi* demektir, sıkışmış bir öğe ise hiç işlenmemiştir.
+
+`atl doctor` aynı durumu `queue-stranded` olarak raporlar.
 
 ## Örnekler
 
