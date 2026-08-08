@@ -317,3 +317,57 @@ func TestScanWorksWhereThereIsNoGit(t *testing.T) {
 		t.Error("the orphan should still be found")
 	}
 }
+
+// The guard's per-session state grows forever otherwise: measured 2026-08-07 at
+// 69 session dirs and 2,372 EMPTY marker files, invisible to any size-based check.
+// A session's state is worthless once the session ends, so gc reclaims the dirs
+// past GuardStateMaxAge — and must leave a recent one, which is how the current
+// session's own state survives its own gc run.
+func TestScanGuardStatePrunesOnlyOldSessions(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	root := filepath.Join(home, ".atl", "cache", "guard")
+
+	now := time.Now()
+	mk := func(name string, age time.Duration) string {
+		dir := filepath.Join(root, name)
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		// An empty marker, exactly as the guard writes them.
+		if err := os.WriteFile(filepath.Join(dir, "marker"), nil, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		when := now.Add(-age)
+		if err := os.Chtimes(dir, when, when); err != nil {
+			t.Fatal(err)
+		}
+		return dir
+	}
+	old := mk("old-session", GuardStateMaxAge+24*time.Hour)
+	mk("fresh-session", time.Hour)
+
+	got, err := scanGuardState(now)
+	if err != nil {
+		t.Fatalf("scanGuardState: %v", err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("got %d orphan(s), want exactly the one past GuardStateMaxAge: %+v", len(got), got)
+	}
+	if got[0].Abs != old {
+		t.Fatalf("reclaimed %q, want %q — a fresh session's state must survive", got[0].Abs, old)
+	}
+	if got[0].Scope != "guard-state" {
+		t.Fatalf("scope %q, want guard-state so the report says what it is", got[0].Scope)
+	}
+}
+
+// No guard dir at all is the common case (a machine that has never run the hook)
+// and must be silent, not an error — gc runs on every session.
+func TestScanGuardStateAbsentIsNotAnError(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	got, err := scanGuardState(time.Now())
+	if err != nil || len(got) != 0 {
+		t.Fatalf("got %v / %d orphan(s), want no error and nothing to reclaim", err, len(got))
+	}
+}

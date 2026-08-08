@@ -34,6 +34,7 @@ atl gc --purge                  # süresi dolmuş çöp gruplarını kalıcı si
 | *kurulu bir birimin yanında kazanç ya da düzenleme* | Kurulu bir agent/skill altında, manifestte olmayan bir dosya (ör. bir `children/` öğrenmesi) — çoğunlukla bir öğrenme kazancı, bazen elle düzenleme. **`--include-gains` geçmedikçe `--apply` tarafından korunur.** |
 | *sahipsiz birim (kaldırılmış bir takım ya da elle yapılmış bir dizin)* | Hiçbir manifestin sahiplenmediği bütün bir `agents/x` veya `skills/x` dizini — geride dosya bırakarak kaldırılmış bir takım ya da senin kendi ATL-dışı Claude Code varlıkların. |
 | *süresi dolmuş çakışma arşivi* | `~/.atl/history/` altında 30 günden eski bir promote çakışma arşivi (bunlar içerik-adresli ve başka türlü hiç budanmaz). |
+| *bitmiş oturumun guard durumu* | `~/.atl/cache/guard/` altında 14 günden eski, oturum başına bir dizin. `atl guard` uyardığı her dosya için boş bir işaretçi yazar, yani buradaki hiçbir şey kendi oturumundan uzun yaşamaz — ama hiçbir şey de onları silmiyordu; ve her işaretçi **boş** olduğu için ağaç, boyuta bakan hiçbir kontrole görünmez (ölçüm: 69 dizin, 2.372 işaretçi). Maliyet bayt değil, inode. |
 
 "Hiçbir manifest sahiplenmiyor" senin kendi ATL-dışı varlıklarına da uyduğu için, gc **varsayılan olarak kuru-çalışmadır** ve asla geri-alınamaz biçimde silmez — herhangi bir şey taşınmadan önce listeyi daima görürsün.
 
