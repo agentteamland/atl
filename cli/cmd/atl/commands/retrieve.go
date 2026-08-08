@@ -100,7 +100,7 @@ var retrieveCmd = &cobra.Command{
 // answer or a reason. Fail-open is a property of something that fires
 // uninvited; a tool the agent chose to call should say when it found nothing.
 func runConsult(cmd *cobra.Command, query string) error {
-	root, err := os.Getwd()
+	root, err := projectKey()
 	if err != nil {
 		return err
 	}
@@ -171,10 +171,14 @@ func runRetrieveHook(cmd *cobra.Command) {
 	if prompt == "" {
 		return
 	}
+	// The payload's directory, resolved to the repository that owns it. The turn
+	// hook resolves the same way, which is what keeps one session's fires and its
+	// turns in one bucket instead of splitting them wherever the agent cd'd to.
 	root := in.CWD
 	if root == "" {
 		root, _ = os.Getwd()
 	}
+	root = projectKeyFrom(root)
 
 	// Two suppressions before any work. Measured over one real session: of 277
 	// fires, 112 ranked machine-injected notification text and 43 ranked a prompt
@@ -275,7 +279,7 @@ var retrieveIndexCmd = &cobra.Command{
 		ctx, cancel := context.WithTimeout(cmd.Context(), timeout)
 		defer cancel()
 
-		root, err := os.Getwd()
+		root, err := projectKey()
 		if err != nil {
 			return err
 		}
@@ -841,7 +845,7 @@ var retrieveTurnEndCmd = &cobra.Command{
 		if isATLInternalSession() {
 			return nil
 		}
-		if root, err := os.Getwd(); err == nil {
+		if root, err := projectKey(); err == nil {
 			logRetrieveFire(root, "turn", nil)
 		}
 		return nil // never fail a turn over bookkeeping
@@ -859,7 +863,7 @@ var retrieveStatsCmd = &cobra.Command{
 	Args:         cobra.NoArgs,
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		root, err := os.Getwd()
+		root, err := projectKey()
 		if err != nil {
 			return err
 		}
