@@ -100,15 +100,31 @@ Model bilinçli olarak **çok dillidir**. Önceki yalnızca-İngilizce model, İ
 Bir dizinin vektörleri yalnızca aynı modelden gelen vektörlerle karşılaştırılabilir; bu yüzden gömme modelini değiştirmek saklı bütün dizinleri geçersiz kılar. Böyle bir yükseltmeden sonra her projedeki ilk oturum, o projenin dizinini **arka planda sıfırdan** yeniden derler — küçük bir korpusta dakikalar, büyükte daha uzun. Başlarken kendini duyurur, çekirdeklerinizin yarısıyla sınırlıdır ve `ATL_NO_RETRIEVE_INDEX=1` ile atlanır. Bitene kadar getirme yalnızca sessiz kalır.
 :::
 
-### İngilizce olmayan istemler, arama öncesi çevrilir
+### İngilizce olmayan istemler, arama öncesi çevrilir {#non-english-prompts-are-translated-before-searching}
 
 Getirmenin iki yarısı var ve İngilizce dışında farklı biçimde başarısız oluyorlar. Anlamsal yarı çok dillidir ve çalışır. **Sözcüksel yarı ise tam kelime eşler**, yani bilgi tabanınızın dilinde olmayan bir sorgu hiçbir sayfayla ortak simge taşımaz ve matematiksel olarak sıfır alır — getirme iki yarı yerine tek yarıyla koşar. Sabit bir cevap anahtarına karşı ölçüldü: İngilizce sorularda **%75**, aynı soruların Türkçesinde **%25**; anlamsal yarı ise iki dilde *birebir aynı* puanı alıyor.
 
 Bu yüzden sözcüksel yarı hiçbir şey döndürmediğinde ATL sorguyu İngilizce olarak yeniden yazar ve aramayı tekrarlar. Teknik tanımlayıcılar — dosya adları, komutlar, bayraklar, semboller — olduğu gibi korunur; çünkü sözcüksel yarının en iyi eşlediği şey tam olarak onlardır.
 
-Bunun kendi kimlik bilgisine ihtiyacı var: bir oturumun girişi ana uygulamada tutulur ve başlattığı araçlara görünmez. `claude setup-token` çalıştırıp değeri `CLAUDE_CODE_OAUTH_TOKEN` olarak dışa aktarın. Bu olmadan hiçbir şey bozulmaz — oturum başındaki bilgilendirme neyin eksik olduğunu söyler, getirme tek yarıyla çalışmaya devam eder. Uçtan uca **hataya-açıktır**: eksik kimlik bilgisi, zaman aşımı ya da sorguya benzemeyen bir cevap, hepsi sizin özgün kelimelerinizle aramaya geri döner.
+Bunun kendi kimlik bilgisine ihtiyacı var: bir oturumun girişi Claude Code'un kendi sürecinde tutulur ve başlattığı araçlara görünmez; yani token'ın, bir kancanın okuyabileceği bir yerde yeniden oluşturulması gerekir. Akla ilk gelen yerlerin ikisi bunu yapamaz — üstüne zaman harcamadan önce hangileri olduğunu bilmekte fayda var.
 
-İngilizce bir istem bunun bedelini hiç ödemez — çeviri yalnızca sözcüksel yarı boş döndüğünde çalışır.
+::: warning Çalışmayan iki yer
+- **`~/.claude/settings.json` içindeki `env` bloğu.** Claude Code bu değişkenleri kendi sürecinde tutar ve küçük bir kümesini başlattığı her araçtan esirger — macOS'ta, ana süreç ile bir araç alt süreci arasındaki değişken *adları* karşılaştırılarak ölçüldü: tam olarak beşi esirgeniyor ve `CLAUDE_CODE_OAUTH_TOKEN` bunlardan biri. Ortam değişkeni tanımlamak için belgelenmiş yer, *bu* değişkeni bir kancaya ulaştırmaktan yapısal olarak aciz.
+- **`~/.zshrc`.** zsh bu dosyayı yalnızca etkileşimli kabuklar için okur; bir kanca ise etkileşimli değildir.
+
+İkisi de işe yaramış gibi görünür ve sessizce hiçbir şey yapmaz.
+:::
+
+Çalışan iki yer var. `claude setup-token` çalıştırın, sonra yazdırdığı token'ı şu **ikisinden birine** koyun:
+
+- **`~/.atl/claude-token`** — yalnızca token'ı tutan, başka hiçbir şey içermeyen düz bir dosya. Yalnızca sahibine açık tutun (`chmod 600`); daha genişse [`atl doctor`](/tr/cli/doctor) sizin için daraltır ve aynı kontrol her oturum başında da koşar.
+- **`~/.zshenv` içinden dışa aktarılan `CLAUDE_CODE_OAUTH_TOKEN`** — zsh bu dosyayı etkileşimli olsun olmasın her çağrıda okur, böylece değer, esirgemeden sonra alt sürecin içinde yeniden oluşur. (`ANTHROPIC_API_KEY` de aynı şekilde okunur.)
+
+Önce ortam, sonra dosya okunur; yani açıkça dışa aktardığınız bir değer, dosyada duran değere her zaman baskın gelir.
+
+Kimlik bilgisi olmadan hiçbir şey bozulmaz — oturum başındaki bilgilendirme neyin eksik olduğunu söyler, getirme tek yarıyla çalışmaya devam eder. Yapılandırılmış bir kimlik bilgisi sonradan çalışmaz hale gelirse, oturum başında bu kez farklı bir bilgilendirme çıkar ve gerçekte kullandığınız kaynağı adıyla söyler; yani tahmin etmek yerine ya dosyayı ya da `~/.zshenv`'i işaret eder. Çeviri ayrıca uçtan uca **hataya-açıktır**: eksik kimlik bilgisi, zaman aşımı ya da sorguya benzemeyen bir cevap, hepsi sizin özgün kelimelerinizle aramaya geri döner.
+
+Tetikleyici bir dil denetimi değil, sözcüksel yarının boş dönmesidir. Yani korpusun kapsadığı bir konudaki İngilizce istem çeviriciye hiç uğramaz; kapsamadığı bir konudaki istem uğrar, kendi sözcüklerini geri alır ve bu cevap atılır — boşa giden bir alt süreç, ama asla daha kötü bir arama değil.
 
 ### Otomatik, artımlı, arka planda
 

@@ -71,10 +71,110 @@ func TestCleanTranslationKeepsOnlyTheFirstLine(t *testing.T) {
 // No credential means no translator. Checked without spending an API call —
 // the hook fires on every prompt and must not pay for a liveness probe.
 func TestClaudeAvailableRequiresACredential(t *testing.T) {
+	// HOME is isolated because there is now a FILE source too. Without this the
+	// test reads the developer's real credential file and passes on CI while
+	// failing on the machine of anyone who actually configured the feature — the
+	// inverse of the CI-is-poorer asymmetry this function's own comment records,
+	// and the direction a green suite cannot see.
+	t.Setenv("HOME", t.TempDir())
 	t.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "")
 	t.Setenv("ANTHROPIC_API_KEY", "")
 	if claudeAvailable() {
-		t.Fatal("reported available with no credential in the environment")
+		t.Fatal("reported available with no credential in any source")
+	}
+}
+
+// The file is a real source, not a decoration. It exists because the environment
+// cannot always be reached: the host withholds its own credential from the
+// processes it starts, so the documented place to set a variable cannot deliver
+// this one to a hook.
+func TestCredentialResolvesFromTheFileWhenTheEnvironmentIsEmpty(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "")
+	t.Setenv("ANTHROPIC_API_KEY", "")
+	writeCredFile(t, home, "  sk-ant-oat01-from-file\n")
+
+	cred, ok := translatorCredential()
+	if !ok {
+		t.Fatal("a populated credential file was not recognised as a credential")
+	}
+	// Trimming matters: the file is hand-written, so a trailing newline is the
+	// normal case rather than the exception, and an untrimmed token is rejected by
+	// the API in a way that surfaces as an expired credential.
+	if cred.Value != "sk-ant-oat01-from-file" {
+		t.Errorf("Value = %q — surrounding whitespace must be trimmed", cred.Value)
+	}
+	if cred.EnvName != "CLAUDE_CODE_OAUTH_TOKEN" {
+		t.Errorf("EnvName = %q, want the variable the child actually reads", cred.EnvName)
+	}
+	if cred.Source != translatorCredSourceFile || cred.FromEnv {
+		t.Errorf("Source = %q FromEnv = %v — the expired notice sends the user to Source, so it must name the file", cred.Source, cred.FromEnv)
+	}
+}
+
+// Environment wins: it is the per-invocation, more specific channel, and
+// silently preferring a file over a value the user explicitly exported is the
+// more surprising of the two orders.
+func TestEnvironmentWinsOverTheFile(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "sk-ant-oat01-from-env")
+	writeCredFile(t, home, "sk-ant-oat01-from-file")
+
+	cred, ok := translatorCredential()
+	if !ok {
+		t.Fatal("no credential resolved with both sources present")
+	}
+	if cred.Value != "sk-ant-oat01-from-env" {
+		t.Errorf("Value = %q, want the exported one", cred.Value)
+	}
+	// Source is what the expired notice points the user at. Naming the file when
+	// the environment is in use sends them to edit something that is not being
+	// read — the exact drift this change exists to end.
+	if cred.Source != "CLAUDE_CODE_OAUTH_TOKEN" {
+		t.Errorf("Source = %q, want the env var actually in use", cred.Source)
+	}
+}
+
+// A created-but-unfilled file is not a credential. An existence check would
+// report configured, suppress the actionable missing-credential notice, and
+// then — three prompts later — announce that a credential the user never had
+// has expired.
+func TestAnEmptyCredentialFileIsNotACredential(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "")
+	t.Setenv("ANTHROPIC_API_KEY", "")
+	writeCredFile(t, home, "\n   \n")
+
+	if _, ok := translatorCredential(); ok {
+		t.Fatal("an empty credential file was reported as a credential")
+	}
+}
+
+// The remedy has to name the place the user actually has to edit.
+func TestExpiredNoticeNamesTheSourceInUse(t *testing.T) {
+	if msg := expiredTranslationNotice(translatorCredSourceFile); !strings.Contains(msg, translatorCredSourceFile) {
+		t.Errorf("file-configured user is not sent to the file:\n%s", msg)
+	}
+	msg := expiredTranslationNotice("CLAUDE_CODE_OAUTH_TOKEN")
+	if !strings.Contains(msg, ".zshenv") {
+		t.Errorf("env-configured user is not sent to a shell file that a hook actually reads:\n%s", msg)
+	}
+	if strings.Contains(msg, translatorCredSourceFile) {
+		t.Errorf("env-configured user sent to edit a file that is not being read:\n%s", msg)
+	}
+}
+
+// writeCredFile lays down the translator credential file under an isolated HOME.
+func writeCredFile(t *testing.T, home, body string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Join(home, ".atl"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(home, ".atl", translatorCredFile), []byte(body), 0o600); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -113,9 +213,34 @@ func TestTranslationNoticeOnlyWhereItWouldChangeSomething(t *testing.T) {
 	if !ok {
 		t.Fatal("not shown where retrieval is live and no credential is configured")
 	}
-	for _, want := range []string{"setup-token", "CLAUDE_CODE_OAUTH_TOKEN"} {
+	for _, want := range []string{"setup-token", translatorCredSourceFile, ".zshenv"} {
 		if !strings.Contains(msg, want) {
 			t.Errorf("notice does not tell the user how to act: missing %q", want)
+		}
+	}
+	// The two places that do NOT work must be named as warnings, BEFORE the two
+	// that do. Both halves are load-bearing and this is what pins them.
+	//
+	// Naming them at all is the point of the notice: measured on macOS, the host
+	// strips this variable from every process it spawns, so settings.json's env
+	// block cannot deliver it to a hook, and zsh reads .zshrc only for interactive
+	// shells, which a hook is not. A reader who already tried one of those and saw
+	// the notice again concludes the notice is wrong and stops reading.
+	//
+	// And the ORDER is what stops them being read as suggestions: a reader
+	// skimming for a path must not meet ~/.zshrc first.
+	offer := strings.Index(msg, "EITHER of these")
+	if offer < 0 {
+		t.Fatalf("notice no longer offers the working locations as a choice:\n%s", msg)
+	}
+	for _, doesNotWork := range []string{"~/.zshrc", "settings.json"} {
+		i := strings.Index(msg, doesNotWork)
+		if i < 0 {
+			t.Errorf("notice does not warn about %q, so a reader who used it learns nothing", doesNotWork)
+			continue
+		}
+		if i > offer {
+			t.Errorf("%q appears after the offer — it reads as a place to put the token, which is the failure this notice exists to prevent", doesNotWork)
 		}
 	}
 	// It must read as optional. A notice that sounds like a failure is a gate in
@@ -133,8 +258,8 @@ func TestTranslationNoticeOnlyWhereItWouldChangeSomething(t *testing.T) {
 // An oversized prompt is a paste, not a question: the lexical arm already has
 // plenty to match on, and sending it costs latency for nothing.
 func TestTranslateSkipsAnOversizedPrompt(t *testing.T) {
-	if _, ok := translatePrompt(t.Context(), strings.Repeat("z", maxTranslatableRunes+1)); ok {
-		t.Fatal("attempted to translate a prompt past the cap")
+	if _, out := translatePrompt(t.Context(), strings.Repeat("z", maxTranslatableRunes+1)); out != translateSkipped {
+		t.Fatalf("outcome = %v, want translateSkipped — the cap is a deliberate skip, and recording it as a failure would count toward 'your credential expired'", out)
 	}
 }
 
@@ -146,16 +271,28 @@ func TestTranslateSkipsAnOversizedPrompt(t *testing.T) {
 // marking left every other test in this package green — the guard that CONSUMES
 // the mark was covered, the wiring that SETS it was not.
 func TestTranslateCommandMarksTheChildAsInternal(t *testing.T) {
-	cmd := translateCommand(t.Context(), "ogrenme kuyrugu isaretcileri")
+	cred := translatorCred{EnvName: "CLAUDE_CODE_OAUTH_TOKEN", Value: "sk-ant-oat01-test", Source: translatorCredSourceFile}
+	cmd := translateCommand(t.Context(), "ogrenme kuyrugu isaretcileri", cred)
 
-	var found bool
+	var found, carried bool
 	for _, kv := range cmd.Env {
 		if kv == atlInternalSessionEnv+"=1" {
 			found = true
 		}
+		if kv == cred.EnvName+"="+cred.Value {
+			carried = true
+		}
 	}
 	if !found {
 		t.Fatalf("child not marked internal — its hook will fire; env had %d entries", len(cmd.Env))
+	}
+	// The credential has to REACH the child, not merely be resolvable by the
+	// parent. A file-borne token is absent from os.Environ() by definition, so
+	// without this the resolver would report the translator available while every
+	// attempt paid a process spawn and up to the timeout and then failed — on
+	// exactly the prompts the feature exists for.
+	if !carried {
+		t.Fatal("credential not passed to the child: it reads its token from the environment, and a file-borne one reaches it only through this Env")
 	}
 	// The mark is an addition, not a replacement: the child still needs the
 	// credential and PATH it inherits, so a bare one-entry Env would break it.
@@ -233,5 +370,65 @@ func TestUnrelatedFiresDoNotInterruptTheCount(t *testing.T) {
 func TestNoFireLogIsSilent(t *testing.T) {
 	if translationFailing(filepath.Join(t.TempDir(), "index.gob")) {
 		t.Error("a missing fire log must not produce a notice")
+	}
+}
+
+// The expired branch end to end, not just its predicate. It has to resolve a
+// credential in order to name the source in the remedy, and a resolution that
+// comes back empty returns silence — so this path can fail by saying NOTHING,
+// which is indistinguishable from a healthy machine. The unit tests above cover
+// translationFailing and the notice text separately; only this one covers the
+// wiring between them.
+func TestRetrievalNoticeReportsAnExpiredFileCredential(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "")
+	t.Setenv("ANTHROPIC_API_KEY", "")
+	writeCredFile(t, home, "sk-ant-oat01-stale")
+
+	// The real probe needs a `claude` binary, which CI does not have.
+	orig := claudeAvailable
+	claudeAvailable = func() bool { return true }
+	t.Cleanup(func() { claudeAvailable = orig })
+
+	project := t.TempDir()
+	idx, err := indexPathFor(project)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Dir(idx), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(idx, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeFires(t, idx, "translate-failed", "translate-failed", "translate-failed")
+
+	msg, ok := retrievalTranslationNotice(project)
+	if !ok {
+		t.Fatal("a dead credential produced no notice at all — the failure mode here is silence, which looks exactly like a healthy machine")
+	}
+	if !strings.Contains(msg, translatorCredSourceFile) {
+		t.Errorf("the remedy does not name the file the credential actually came from:\n%s", msg)
+	}
+}
+
+// A skipped translation must be transparent to the expiry evidence. Three
+// ordinary English prompts in a row are completely normal, and before the
+// outcome was split they were logged identically to three 401s — telling a user
+// with a perfectly good token that it had expired.
+func TestSkippedTranslationsAreNotEvidenceOfAnExpiry(t *testing.T) {
+	idx := filepath.Join(t.TempDir(), "index.gob")
+	writeFires(t, idx, "translate-skipped", "translate-skipped", "translate-skipped", "translate-skipped")
+	if translationFailing(idx) {
+		t.Error("skipped translations read as a dead credential — an English-speaking user would be told their token expired")
+	}
+
+	// …and they do not interrupt a genuine run of failures either: the skips are
+	// invisible to the count rather than resetting it.
+	idx2 := filepath.Join(t.TempDir(), "index.gob")
+	writeFires(t, idx2, "translate-failed", "translate-skipped", "translate-failed", "translate-skipped", "translate-failed")
+	if !translationFailing(idx2) {
+		t.Error("three real failures stopped counting because skips sat between them")
 	}
 }

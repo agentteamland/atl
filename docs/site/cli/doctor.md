@@ -50,6 +50,12 @@ A third case: if the block **opened but never closed** — a half-finished closu
 
 It **reports, never rewrites**. The doctor's self-heals only touch ATL-owned artifacts; `CLAUDE.md` is your own always-loaded instruction file, and the missing-pin direction needs a one-line summary of the topic — judgment, not a mechanical fix. A project with no `.atl/brain-storms` directory is silent.
 
+### `credential-file` — can anyone else read the translator's token?
+
+[Retrieval's prompt translator](/cli/retrieve) takes its credential from the environment or, when the environment can't carry it, from `~/.atl/claude-token` — a plain file holding just the token. `atl` never writes that file, so a hand-created one gets your umask, which on a default macOS shell is `0644`: a secret every account on the machine can read, and nothing else in the tree would ever notice. This check reads the file's mode and, when it is wider than owner-only, **tightens it to `0600`** — a `(self-healed)` repair. A file that is already owner-only is `OK`; a mode it cannot change is a `WARN` carrying the mode it found and the reason.
+
+It checks the mode and nothing else. It deliberately does **not** report a missing or empty credential — the session-start notice already owns that condition, and reporting one condition through two channels is how a signal stops being read. So no file at all is `OK` ("no translator credential file (optional)"), translation being an improvement rather than a requirement, and after healing once the check goes quiet for good. The `~/.atl` directory itself is left alone on purpose — it is shared with the learning queue, which creates it `0755`, so its mode is not this check's to argue with.
+
 ## The CLI / Skill split
 
 `atl doctor` only does deterministic repairs — re-fetch an absent file, retry a mechanical step. Anything that needs an LLM (processing a queued learning into the knowledge base) is out of scope by design; the doctor surfaces the count and points you at the skill. This is why a large backlog shows up as a warning here but is actually cleared by running [`/drain`](/cli/learnings).

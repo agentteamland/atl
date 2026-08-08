@@ -22,6 +22,8 @@ A **legitimate call to the credential's own API passes** — guard checks the re
 
 Guard watches only well-known platform credentials (Claude Code, Anthropic, GitHub, AWS) — each has a knowable set of home hosts. Your own app tokens going to your own backend are never touched, so normal work never triggers a false alarm.
 
+One entry matches a **file path** rather than a variable name or a token's shape: `~/.atl/claude-token`, where the [retrieval translator's credential](/guide/knowledge-system#non-english-prompts-are-translated-before-searching) may live. It needs its own rule because a command like `curl … -d @~/.atl/claude-token` contains no variable name and no token value, so the four patterns above cannot see it at all. The same home-host rule applies — sending that file to Anthropic is allowed, sending it anywhere else is not, and reading it locally (`cat ~/.atl/claude-token`) is not exfiltration and is never touched.
+
 ## What this means for you
 
 - **You don't have to do anything** — the posture is on by default (the rule auto-loads; the guard hook installs with ATL).

@@ -49,6 +49,8 @@ Two lines deserve reading carefully:
 - **`suppressed`** is healthy, not lost work. A quarter of prompts are machine-generated text or a few characters — questions nobody asked. A channel that cannot stay silent is not a signal.
 - **`consulted`** counts turns where the agent asked *deliberately*. Its denominator is turns, which is why the `Stop` hook (`atl retrieve turn-end`) exists at all: without a turn marker the log records what was **offered** and nothing about what happened next.
 
+The `translated` row itself is not counted as a prompt — it is a modifier on the fire that follows, and counting it would inflate the denominator every percentage above divides by. Its sibling `translate-skipped` is kept out on the same terms but has no row of its own: it marks a translation that ran and whose answer was deliberately not used — the text was already English, or the model returned prose where a query was asked for. If the `translated` row is missing entirely, nothing has been translated here — usually because no credential is configured. The translator needs one of its own, either `~/.atl/claude-token` or an exported environment variable, and **where** you export it decides whether a hook can see it at all — see [the knowledge system guide](/guide/knowledge-system).
+
 ## `index` and `warm`
 
 `index` rebuilds the corpus index. You rarely need it — session-start rebuilds in the background when the corpus has moved, and a deleted page is detected now (a delete-only change used to leave the index serving a file that no longer exists).
