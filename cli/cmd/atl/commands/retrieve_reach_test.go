@@ -38,16 +38,16 @@ func TestCorpusDirsCoversTheKnowledgeThatRefutesClaims(t *testing.T) {
 		{".atl/wiki/unenforceable-rule-not-written.md", "the rule broken hours after it was written", true},
 		{".atl/journal/2026-08-03.md", "history", true},
 		{".atl/docs/atl-v2.md", "states that promotion already runs automatically", true},
-		{".claude/knowledge/pack-format.md", "states the area vocabulary is project-shaped", true},
-		{".claude/agents/tech-lead/children/decomposition-blueprint.md", "'areas are project-shaped, NOT stack-shaped'", true},
-		{".claude/packs/api/production-unit.md", "the stack craft a worker is told to load", true},
-		{".claude/skills/work-start/SKILL.md", "the skill whose authored rationale was false", true},
-		{".claude/backends/github/adapter.md", "the backend contract every operation follows", true},
+		{".claude/knowledge/testing-surfaces.md", "a team's runtime reference doc", true},
+		{".claude/agents/react-web/children/screen-blueprint.md", "an installed agent's accumulated craft", true},
+		{".claude/packs/web/production-unit.md", "the stack craft a session is told to load", true},
+		{".claude/skills/profile-drain/SKILL.md", "an installed skill's own spec", true},
+		{".claude/backends/github/adapter.md", "a team's per-provider contract", true},
 
 		// Deliberately out. A brainstorm records rejected options by mandate, and a
 		// chunk of one, split from the verdict that rejected it, reads exactly like
 		// a decision — which is the failure shape this change exists to reduce.
-		{".atl/brain-storms/delivery-drive-loop.md", "process, not current truth", false},
+		{".atl/brain-storms/some-decision.md", "process, not current truth", false},
 	} {
 		if got := covers(tc.file); got != tc.want {
 			verb := "must be reachable"
@@ -59,9 +59,10 @@ func TestCorpusDirsCoversTheKnowledgeThatRefutesClaims(t *testing.T) {
 	}
 }
 
-// docs/ stays gated on the delivery marker: an ordinary repo's docs/ is often a
-// vendored site tree that would flood the corpus.
-func TestCorpusDirsAddsRepoDocsOnlyForADeliveryProject(t *testing.T) {
+// The repo's own docs/ is never indexed: it is often a vendored site tree that
+// would flood the corpus, and a project keeping real knowledge there can point
+// the wiki at it.
+func TestCorpusDirsNeverAddsTheRepoDocsTree(t *testing.T) {
 	root := t.TempDir()
 	has := func() bool {
 		dirs, err := corpusDirs(root)
