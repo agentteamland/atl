@@ -40,15 +40,12 @@ you only want one; the default is both.
 Run from a project with an ATL decision surface (a `.atl/` directory). If `atl observe`
 prints "no .atl/ surface here", stop. Orient first: read the project's `CLAUDE.md`
 (pending-implementation + the knowledge map), scan recent `.atl/journal/` entries, and note
-the deferral surface — a `.atl/backlog.md`, or a delivery **board** when `.delivery/config.json`
-names a backend (then the deferrals live on the board, queried through the delivery-team
-adapter, not in a file).
+the deferral surface — the scope's `.atl/backlog.md`.
 
 ### 2. Dimension (a) — ripe backlog triggers  *(skip if `--gaps-only`)*
 Collect every deferred item and its `_Trigger:_`, then judge each against reality:
-- **Source the deferrals** — `.atl/backlog.md` `_Trigger:_` lines, or the board's deferred
-  items (via the delivery-team adapter for the active backend). Read each item's trigger and
-  its linked brainstorm for the real condition.
+- **Source the deferrals** — `.atl/backlog.md` `_Trigger:_` lines. Read each item's trigger
+  and its linked brainstorm for the real condition.
 - **Judge ripeness against evidence** — has the trigger's condition actually been met? Ground
   it: the usage signal, the journal, the profile/knowledge growth, the count that had to
   cross a threshold. A trigger is "ripe" only with a **verbatim quote of the evidence** that

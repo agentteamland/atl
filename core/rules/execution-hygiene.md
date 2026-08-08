@@ -1,6 +1,6 @@
 # Execution hygiene
 
-Universal execution defaults for any agent doing multi-step engineering work — inherited by every ATL team and every autonomous `claude -p` delivery worker (they load these from `~/.claude/rules/` exactly as an interactive session does). Three disciplines that keep execution clean. They **complement** the thinking discipline in [karpathy-guidelines](karpathy-guidelines.md) and the branch discipline in [branch-hygiene](branch-hygiene.md) — they do not duplicate them.
+Universal execution defaults for any agent doing multi-step engineering work — inherited by every ATL team and every autonomous `claude -p` session (they load these from `~/.claude/rules/` exactly as an interactive session does). Three disciplines that keep execution clean. They **complement** the thinking discipline in [karpathy-guidelines](karpathy-guidelines.md) and the branch discipline in [branch-hygiene](branch-hygiene.md) — they do not duplicate them.
 
 ## 1. Subagent hygiene
 

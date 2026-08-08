@@ -6,12 +6,12 @@ Any operation that writes to a durable store must be **idempotent**: running it 
 
 The same discipline is re-derived independently across the platform — a sign it belongs in one place, not scattered:
 
-- The delivery loop makes it a named cross-backend contract (**concept #10**, `check-first-by-key before every create → found→reuse+update, not-found→create-then-stamp`), consumed by `/kickoff` ("must converge, never blind re-create"), `/refine` ("a re-run must never duplicate"), and `/delivery-init` ("if config already exists, do not blind-overwrite").
+- A work-tracking loop makes it a named contract: `check-first-by-key before every create → found→reuse+update, not-found→create-then-stamp`, so a ceremony re-run converges rather than blind re-creating.
 - `/brainstorm` implements it with its own provenance key ("`done` on the same brainstorm must converge, never duplicate").
 - `/create-code-diagram` states the overwrite-in-place flavor ("running again overwrites the previous diagram — always fresh").
 - The profile layer's `/profile-restore` is a guarded overlay that "never silently clobbers global data that is newer".
 
-Every autonomous worker and every ceremony re-runs — on restart, on retry, on a resumed sprint. A non-idempotent write turns a re-run into a duplicate work-item, a doubled PR, or a lost edit. The stakes are highest for the delivery engine (a resumed run must converge on the durable state, not re-create it) and for any long-lived knowledge store.
+Every autonomous worker and every ceremony re-runs — on restart, on retry, on a resume. A non-idempotent write turns a re-run into a duplicate work-item, a doubled PR, or a lost edit. The stakes are highest for any long-lived knowledge store.
 
 ## What the agent must do
 

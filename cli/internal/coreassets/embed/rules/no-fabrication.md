@@ -6,9 +6,9 @@ Never manufacture a fact, value, identifier, or result you do not actually have.
 
 This output-integrity discipline is re-derived independently across three teams and the core skills — different mechanics, same edge:
 
-- The delivery `developer` agent: "I **never invent** a tool name, a state literal, or a path", and "a run that timed out is **unverified**, and unverified is never a pass."
+- An implementer agent: "I **never invent** a tool name, a state literal, or a path", and "a run that timed out is **unverified**, and unverified is never a pass."
 - The backend interface: "a surface that can't be run is UNVERIFIED → block, **never fake-green**."
-- `/refine`: "do not invent the analysis; stop and surface it." `/delivery-init`: "do not fabricate an id."
+- A decomposition ceremony: "do not invent the analysis; stop and surface it." An init ceremony: "do not fabricate an id."
 - The profile `curator`: "never fabricate a Tier-3+ value", "never guess a malformed fact into a profile."
 - The `advisor`: "dense and evidence-backed — never asserted without proof."
 - The core `/rule` + `/rule-wizard` skills: "never assume — if information is missing, ask."

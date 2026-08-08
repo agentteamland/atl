@@ -86,12 +86,12 @@ Before deleting any branch, ask what points at it **by name**:
 
 | Pointer | Example |
 |---|---|
-| A config field | `.delivery/config.json` `branchPair` — `dev` / `release`, required by the two-branch flow |
+| A config field | a branch named in a project's own config — an integration or release branch a tool cuts from |
 | A Pages source | GitHub Pages serving from a branch — `gh api repos/<o>/<r>/pages --jq .source.branch` |
 | Branch protection, or the repo default | `gh api repos/<o>/<r> --jq .default_branch` |
 | A CI trigger, or a test harness | a workflow's `on.push.branches`; an e2e suite that pushes to a fixture branch |
 
-Both halves were measured on 2026-08-07 while cleaning `agentteamland/*`, and both would have been destroyed by a plain "delete every merged branch" sweep. `agentteamland/atl`'s `dev` had just been fast-forwarded to `main` — identical tree, zero commits either way, so *maximally* merged — and it is the integration branch every `atl work dispatch` worktree is cut from. And the archived `agentteamland/docs` carries `pages-redirect`, which is what GitHub Pages actually serves: two files that redirect the old v1 site to the live docs. Deleting it would have 404'd every old bookmark, silently, with nothing in the repo suggesting the branch mattered.
+Both halves were measured on 2026-08-07 while cleaning `agentteamland/*`, and both would have been destroyed by a plain "delete every merged branch" sweep. `agentteamland/atl`'s `dev` had just been fast-forwarded to `main` — identical tree, zero commits either way, so *maximally* merged — and it was the integration branch every automated worktree was cut from. And the archived `agentteamland/docs` carries `pages-redirect`, which is what GitHub Pages actually serves: two files that redirect the old v1 site to the live docs. Deleting it would have 404'd every old bookmark, silently, with nothing in the repo suggesting the branch mattered.
 
 The check is one API call per repo and it is cheap. Run it **before** the merge test, not after: a load-bearing branch that also happens to be merged will pass the merge test and be gone before anyone asks the question.
 
