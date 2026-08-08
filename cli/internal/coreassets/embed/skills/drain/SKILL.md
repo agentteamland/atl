@@ -209,8 +209,30 @@ Target: the `<!-- wiki:index:start --> … <!-- wiki:index:end -->` block in the
 **project root** `CLAUDE.md`. If the project has no `CLAUDE.md`, skip the rebuild
 (don't create the file from here — `atl init` / `atl install` own that).
 
-Rebuild the block contents from every `<proj>/.atl/wiki/*.md`, sorted
-alphabetically by filename:
+**First, look at the block that is there.** It is derived by default, but a
+long-lived one accumulates editorial content a rebuild cannot reproduce. Any of
+these means it has been curated by hand:
+
+- group headings inside the block, or an order that is not alphabetical;
+- an entry whose text is not simply the page's first line — an annotation, a
+  qualifier, a dated clause appended to it;
+- a link to something other than a `.atl/wiki/*.md` page.
+
+**A curated block is added to surgically, never regenerated.** A new page gets a
+new line in the group it belongs to; an existing line is edited in place. Do not
+sort it, do not reflow it, do not rebuild it from the directory.
+
+The reason is not tidiness. That editorial content exists **only in the block** —
+it cannot be reconstructed from the pages, because it was never in them — and the
+block is the vocabulary an agent draws on when it writes its own retrieval query,
+so flattening an entry to its first line strips exactly the terms that
+discriminate. A regeneration is a content deletion wearing a refresh's clothes:
+the result is well-formed and complete by its own definition, and it passes every
+check, because "every page has a line" is precisely what a rebuild guarantees.
+
+**A block with none of those marks is still derived** — rebuild it freely. So is
+one that does not exist yet: generate it from every `<proj>/.atl/wiki/*.md`,
+sorted alphabetically by filename.
 
 ```markdown
 <!-- wiki:index:start -->
@@ -224,12 +246,16 @@ Knowledge lives in `.atl/wiki/` (current truth, topic-organized) and `.atl/journ
 
 Each entry is one line: `- [<topic>](.atl/wiki/<topic>.md) — <summary>`, where
 `<topic>` is the filename without `.md` and `<summary>` is the page's first
-non-frontmatter, non-heading line. The block is **derived, not hand-edited** —
-replace its contents wholesale each run (same discipline as the agent KB).
+non-frontmatter, non-heading line. That is the shape of a **new** entry in either
+case; it is not a licence to re-derive the entries already there. The agent KB
+section above is unconditionally derived, and this block is not — the difference
+is that a child's summary lives in its own frontmatter, while an index entry's
+annotation lives nowhere but the index.
 
-**Placement:** if the block exists, replace its contents in place. If it's absent,
-insert it near the top of `CLAUDE.md` — after the H1 + intro, before the first
-plain `##` section, and **below** any `<!-- brainstorm:active -->` /
+**Placement:** if the block exists, edit within it in place — never replace it
+whole unless it carries none of the curation marks above. If it's absent, insert
+it near the top of `CLAUDE.md` — after the H1 + intro, before the first plain
+`##` section, and **below** any `<!-- brainstorm:active -->` /
 `<!-- pending-implementation -->` blocks (the knowledge map is the least urgent of
 the three managed blocks, so it sits last).
 

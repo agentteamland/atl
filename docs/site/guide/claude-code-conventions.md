@@ -30,7 +30,7 @@ Volatile working/sprint state does **not** belong in the always-loaded file — 
 
 | Block | Written by | Purpose |
 |---|---|---|
-| `<!-- wiki:index -->` | [`/drain`](/skills/drain) | Auto-rebuilt table of contents for `.atl/wiki/` pages. Loads with project context, gives Claude the knowledge map at zero cost. |
+| `<!-- wiki:index -->` | [`/drain`](/skills/drain) | Table of contents for `.atl/wiki/` pages, maintained by the drain. Loads with project context, gives Claude the knowledge map at zero cost. Regenerated while it is still purely derived; once you group or annotate it, the drain adds to it in place instead. |
 | `<!-- brainstorm:active -->` | [`/brainstorm start`](/skills/brainstorm) and [`/brainstorm done`](/skills/brainstorm) | Pins active brainstorm topics into project context so the next session cannot miss them. |
 | `<!-- pending-implementation -->` | Brainstorm `done` flow | Reminds the next session that a brainstorm decided X but the implementation hasn't shipped yet. |
 
@@ -167,6 +167,6 @@ HTML comments are:
 ## Related
 
 - [`/brainstorm`](/skills/brainstorm) — writes/removes the `<!-- brainstorm:active -->` block
-- [`/drain`](/skills/drain) — rebuilds the `<!-- wiki:index -->` block
+- [`/drain`](/skills/drain) — maintains the `<!-- wiki:index -->` block
 - [Knowledge system](/guide/knowledge-system) — what the wiki:index block indexes
 - [Concepts: Skill](/guide/concepts#skill) — where these conventions fit in the broader picture
