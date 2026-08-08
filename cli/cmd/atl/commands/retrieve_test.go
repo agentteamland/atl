@@ -160,7 +160,7 @@ func TestInGitWorktreeNonRepo(t *testing.T) {
 	}
 }
 
-// TestInGitWorktreeReal guards the worktree-skip that keeps `atl work dispatch`
+// TestInGitWorktreeReal guards the worktree-skip that keeps concurrent worktree
 // workers from each storming a full index build — and the symlink-immune
 // comparison (a main repo reached through a symlinked path must NOT be misread as
 // a worktree, which would silently disable auto-indexing).
@@ -206,7 +206,7 @@ func TestInGitWorktreeReal(t *testing.T) {
 	}
 }
 
-func TestCorpusDirsGatesDocsOnDelivery(t *testing.T) {
+func TestCorpusDirsNeverIndexesTheRepoDocsTree(t *testing.T) {
 	root := t.TempDir()
 
 	// The REPO's docs/, specifically — matching on the base name alone would also
@@ -225,21 +225,7 @@ func TestCorpusDirsGatesDocsOnDelivery(t *testing.T) {
 		t.Fatal(err)
 	}
 	if hasDocs(dirs) {
-		t.Error("docs/ must be excluded without a .delivery marker")
-	}
-
-	if err := os.MkdirAll(filepath.Join(root, ".delivery"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(root, ".delivery", "config.json"), []byte("{}"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	dirs, err = corpusDirs(root)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !hasDocs(dirs) {
-		t.Error("docs/ must be included for a delivery project")
+		t.Error("docs/ must never be indexed — it is often a large vendored site")
 	}
 }
 

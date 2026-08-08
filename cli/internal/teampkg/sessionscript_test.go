@@ -1,16 +1,14 @@
 package teampkg
 
 import (
-	"os"
-	"path/filepath"
 	"testing"
 )
 
-// The shape delivery-team ships: a field inside a named capability object, like
-// `store` and `channel` — not a bare-string capability the way `review` is.
+// The declared shape: a field inside a named capability object, like `store` and
+// `channel` — not a bare-string capability the way `review` is.
 func TestDeclaredSessionScripts(t *testing.T) {
 	tm := withCapabilities(t, `{"capabilities":{
-		"delivery": {"sessionScript": "scripts/session-brief.sh"}
+		"briefing": {"sessionScript": "scripts/session-brief.sh"}
 	}}`)
 	got := tm.DeclaredSessionScripts()
 	if len(got) != 1 || got[0] != "scripts/session-brief.sh" {
@@ -97,28 +95,3 @@ func TestSessionScriptRelNormalises(t *testing.T) {
 	}
 }
 
-// The end-to-end contract for the first consumer, asserted against the shipped
-// team rather than a fixture: the declaration must resolve to a file that is
-// actually in the team's assets AND executable. Install preserves the source
-// mode, so a script committed without +x reflects without +x and then fails at
-// exec — silently, by this mechanism's own contract, on every machine.
-func TestTheShippedDeliveryTeamDeclaresARunnableSessionScript(t *testing.T) {
-	const teamDir = "../../../teams/delivery-team"
-	tm, err := ReadManifest(teamDir)
-	if err != nil {
-		t.Fatalf("read delivery-team's team.json: %v", err)
-	}
-	scripts := tm.DeclaredSessionScripts()
-	if len(scripts) == 0 {
-		t.Fatal("delivery-team declares capabilities.delivery.sessionScript but DeclaredSessionScripts() read nothing")
-	}
-	for _, rel := range scripts {
-		info, err := os.Stat(filepath.Join(teamDir, filepath.FromSlash(rel)))
-		if err != nil {
-			t.Fatalf("declared session script %q is not in the team's assets: %v", rel, err)
-		}
-		if info.Mode().Perm()&0o111 == 0 {
-			t.Errorf("declared session script %q is not executable — it would reflect without +x and never run", rel)
-		}
-	}
-}

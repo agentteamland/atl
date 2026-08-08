@@ -14,7 +14,7 @@ func withCapabilities(t *testing.T, raw string) *TeamManifest {
 	return &tm
 }
 
-// The shape delivery-team actually ships: `review` IS a capability whose value
+// The declared shape: `review` IS a capability whose value
 // is the agent name, a bare string — not a field inside a capability object the
 // way `store` and `channel` are.
 func TestDeclaredReviewerReadsTheBareString(t *testing.T) {
@@ -64,16 +64,3 @@ func TestDeclaredReviewerTrims(t *testing.T) {
 	}
 }
 
-// The regression this whole change exists for: the reviewer must survive into
-// the INSTALLED manifest. team.json is not an installable asset, so a consumer
-// that only sees the installed tree has no other way to learn the declaration —
-// which is exactly why /create-pr step 5b silently did nothing.
-func TestTheShippedTeamManifestStillDeclaresItsReviewer(t *testing.T) {
-	tm, err := ReadManifest("../../../teams/delivery-team")
-	if err != nil {
-		t.Fatalf("read delivery-team's team.json: %v", err)
-	}
-	if got := tm.DeclaredReviewer(); got == "" {
-		t.Fatal("delivery-team declares capabilities.review but DeclaredReviewer() read nothing")
-	}
-}

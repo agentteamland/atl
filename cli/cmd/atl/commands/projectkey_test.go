@@ -57,7 +57,7 @@ func TestProjectKeyCollapsesASubdirectoryToTheRepositoryRoot(t *testing.T) {
 	}
 }
 
-// The case the queue fix was built for: `atl work dispatch` cuts a worktree per
+// The case the queue fix was built for: the autonomous drive loop cut a worktree per
 // unit and deletes it on completion, so anything keyed to the worktree's own
 // path becomes unreachable the moment the unit finishes. Resolving through the
 // COMMON dir is what makes a worker's items outlive its worktree.
@@ -174,7 +174,7 @@ func TestDigestFindingIsReachableFromASubdirectory(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	repo := t.TempDir()
 	gitRepo(t, repo)
-	sub := filepath.Join(repo, "teams", "delivery-team")
+	sub := filepath.Join(repo, "teams", "some-team")
 	if err := os.MkdirAll(sub, 0o755); err != nil {
 		t.Fatal(err)
 	}

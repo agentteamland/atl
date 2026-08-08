@@ -1,7 +1,6 @@
 package commands
 
 import (
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -77,15 +76,6 @@ func TestCorpusDirsAddsRepoDocsOnlyForADeliveryProject(t *testing.T) {
 		return false
 	}
 	if has() {
-		t.Error("docs/ must not be indexed without a .delivery marker")
-	}
-	if err := os.MkdirAll(filepath.Join(root, ".delivery"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(root, ".delivery", "config.json"), []byte("{}"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if !has() {
-		t.Error("a delivery project keeps its durable knowledge in docs/ — it must be indexed")
+		t.Error("docs/ must not be indexed — it is often a large vendored site")
 	}
 }

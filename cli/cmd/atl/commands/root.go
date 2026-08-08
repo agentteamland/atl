@@ -48,7 +48,6 @@ func init() {
 		skillsCmd,
 		rulesCmd,
 		observeCmd,
-		workCmd,
 		upgradeCmd,
 		retrieveCmd,
 	)

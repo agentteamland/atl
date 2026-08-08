@@ -2,10 +2,7 @@ package commands
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/agentteamland/atl/cli/internal/buildinfo"
@@ -139,33 +136,17 @@ var sessionStartCmd = &cobra.Command{
 
 		// The installed-layer half of the same contract: agent-KB children /drain
 		// wrote here, which the monorepo-gated check above structurally cannot see.
-		// Fires in ANY project, like boardTrackedSignal.
+		// Fires in ANY project.
 		installedChildrenSignal(project)
 
 		// Rules-distill "distill due" signal — monorepo-internal, same shape.
 		rulesSessionSignal()
 
-		// Board-tracked-work signal — fires in ANY project with a delivery board
-		// backend (a .delivery/config.json), not just the monorepo: reminds the
-		// agent the board-tracked-work rule is active here. Silent otherwise.
-		boardTrackedSignal(project)
-
-		// The board's own state, one level past "the rule is active here": a
-		// board-backed project with open work and no active sprint has drifted out
-		// of the ceremony chain, and nothing about that says so on its own. Prints
-		// from a cached verdict a detached scan left behind, and schedules the next
-		// scan — so the network is never on this path. A REPORT: opening a sprint is
-		// the product owner's call, so it is raised, never dispatched. Silent on any
-		// backend/mode the deterministic read doesn't cover (see sprintSignalCovers).
-		sprintSessionSignal(project)
-
 		// Team-declared session scripts — the third "any team that declares X"
 		// contract, after capabilities.<name>.store and .channel. Core runs whatever
 		// an installed team declared and forwards its output; it learns neither the
-		// team nor what the output is about. Placed beside the board signals because
-		// the first consumer is one — the delivery drive loop's briefing for the card
-		// this branch belongs to. Bounded, worktree-skipping, silent on every failure;
-		// ATL_NO_SESSION_SCRIPT opts out.
+		// team nor what the output is about. Bounded, worktree-skipping, silent on
+		// every failure; ATL_NO_SESSION_SCRIPT opts out.
 		runDeclaredSessionScripts(project)
 
 		// Proactive-observer signal — fires in ANY project with an ATL decision
@@ -213,30 +194,3 @@ var sessionStartCmd = &cobra.Command{
 	},
 }
 
-// boardTrackedSignal fires in any project that has a delivery board backend
-// configured (a .delivery/config.json at the project root). It reminds the agent
-// that the board-tracked-work rule is ACTIVE here: every shippable unit needs a
-// board item before it ships, and work discovered mid-task gets its own item — so
-// the board reflects reality. Unlike the docs/skills/rules "due" signals (which are
-// monorepo-internal), the trigger is the config file, present in any board-backed
-// project. Never fails: a hook must not block the session.
-func boardTrackedSignal(projectRoot string) {
-	if projectRoot == "" {
-		return
-	}
-	b, err := os.ReadFile(filepath.Join(projectRoot, ".delivery", "config.json"))
-	if err != nil {
-		return // no board backend here — the rule is dormant
-	}
-	var cfg struct {
-		Backend string `json:"backend"`
-	}
-	if err := json.Unmarshal(b, &cfg); err != nil {
-		return // malformed config — stay silent, never fail a hook
-	}
-	backend := cfg.Backend
-	if backend == "" {
-		backend = "azure" // the schema default
-	}
-	fmt.Printf("atl: this project is board-backed (%s) — record every shippable unit on the board before it ships, give new work discovered mid-task its own item, and on resume check the board for anything already In Progress (board-tracked-work rule)\n", backend)
-}

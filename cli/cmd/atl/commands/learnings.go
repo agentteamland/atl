@@ -482,8 +482,8 @@ func firstLine(s string) string {
 var learningsRecoverCmd = &cobra.Command{
 	Use:   "recover",
 	Short: "Move pending items from deleted projects into this one, so a drain can reach them",
-	Long: "Buckets keyed to a directory that no longer exists — an `atl work dispatch` worktree,\n" +
-		"a throwaway checkout — hold items no project-scoped surface can name. This moves them\n" +
+	Long: "Buckets keyed to a directory that no longer exists — a deleted worktree, a throwaway\n" +
+		"checkout — hold items no project-scoped surface can name. This moves them\n" +
 		"into the current project's bucket. Payload, id and original capture time are preserved,\n" +
 		"so the drain sees a rescue rather than a re-capture. Dry-run unless --apply.",
 	Args: cobra.NoArgs,

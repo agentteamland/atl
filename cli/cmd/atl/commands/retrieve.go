@@ -395,11 +395,10 @@ var retrieveWarmCmd = &cobra.Command{
 }
 
 // corpusDirs returns the knowledge-corpus roots to index for a project: its own
-// knowledge — the wiki (current truth) and journal (history). A delivery project
-// (GitHub backend) keeps durable knowledge in the in-repo docs/ tree, so docs/ is
-// added ONLY when the .delivery marker is present — an ordinary repo's docs/ site
-// is often a large vendored tree (node_modules and all) that must not pollute the
-// corpus. The agent knowledge base is a deferred corpus expansion (global agent
+// knowledge — the wiki (current truth) and journal (history). A repo's docs/ tree
+// is deliberately NOT indexed: it is often a large vendored site (node_modules and
+// all) that would swamp the corpus, and a project that keeps real knowledge there
+// can point the wiki at it. The agent knowledge base is a deferred corpus expansion (global agent
 // KBs need cross-project relevance gating); v1 surfaces project knowledge, the
 // core of what #140 exists for.
 //
@@ -453,9 +452,6 @@ func corpusDirs(projectRoot string) ([]string, error) {
 	// manifests), so the two never coexist.
 	if _, err := os.Stat(filepath.Join(projectRoot, "teams")); err == nil {
 		dirs = append(dirs, filepath.Join(projectRoot, "teams"))
-	}
-	if _, err := os.Stat(filepath.Join(projectRoot, ".delivery", "config.json")); err == nil {
-		dirs = append(dirs, filepath.Join(projectRoot, "docs"))
 	}
 	return dirs, nil
 }
@@ -686,9 +682,9 @@ func excerpt(path string) string {
 // when its knowledge corpus has changed since the last build. It runs from
 // session-start: deterministic (no reliance on the LLM drain skill), self-healing,
 // and reaching any project a session opens — the "index on drain" mechanism.
-// Fail-open: it never blocks or fails the hook. It skips git worktrees so
-// `atl work dispatch`'s N per-worktree workers don't each storm a full rebuild
-// (per-worker retrieval is a separate follow-up), and honors ATL_NO_RETRIEVE_INDEX.
+// Fail-open: it never blocks or fails the hook. It skips git worktrees so that N
+// sessions opened across worktrees of one repo don't each storm a full rebuild,
+// and honors ATL_NO_RETRIEVE_INDEX.
 func autoIndexRetrieval(project string) {
 	if project == "" || os.Getenv(envNoAutoIndex) != "" {
 		return

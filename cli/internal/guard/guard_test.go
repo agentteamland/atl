@@ -315,13 +315,13 @@ func TestCatastropheOutranksPipeNudge(t *testing.T) {
 // this hook already decodes.
 func TestIsSpecFileMatchesWhatAnAgentObeys(t *testing.T) {
 	for _, p := range []string{
-		"/r/teams/delivery-team/skills/work-start/SKILL.md", // the actual failure's file
+		"/r/teams/some-team/skills/work-start/SKILL.md", // the actual failure's file
 		"/r/core/skills/drain/SKILL.md",
-		"/r/teams/delivery-team/knowledge/pack-format.md",
-		"/r/teams/delivery-team/agents/tech-lead/children/decomposition-blueprint.md",
-		"/r/teams/delivery-team/backends/github/adapter.md",
-		"/r/teams/delivery-team/agents/developer/agent.md",
-		"/r/teams/delivery-team/team.json",
+		"/r/teams/some-team/knowledge/pack-format.md",
+		"/r/teams/some-team/agents/tech-lead/children/decomposition-blueprint.md",
+		"/r/teams/some-team/backends/github/adapter.md",
+		"/r/teams/some-team/agents/developer/agent.md",
+		"/r/teams/some-team/team.json",
 	} {
 		if !IsSpecFile(p) {
 			t.Errorf("%s is a shipped spec — an agent reads it as instruction", p)

@@ -130,8 +130,8 @@ func TestRunAllIncludesTheSessionScriptCheck(t *testing.T) {
 	}
 }
 
-// The shipped team, through the real gate. teams/delivery-team declares a session
-// script; if this goes red the declaration and the file have drifted apart.
+// Every shipped team, through the real gate: a declaration and its file must not
+// have drifted apart.
 func TestTheShippedTeamsPassTheSessionScriptGate(t *testing.T) {
 	if f := SessionScripts("../../../teams"); len(f) != 0 {
 		t.Errorf("SessionScripts(teams/) = %v, want clean", f)

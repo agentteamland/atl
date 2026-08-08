@@ -15,8 +15,8 @@ import (
 // Keying by the working directory failed differently in each store, and the
 // three failures are worth keeping side by side because they are one bug:
 //
-//   - The QUEUE lost data. `atl work dispatch` cuts one git worktree per unit
-//     and deletes it on completion, so an autonomous worker's markers were
+//   - The QUEUE lost data. The autonomous drive loop (since removed) cut one git
+//     worktree per unit and deleted it on completion, so a worker's markers were
 //     queued under a path that then ceased to exist — and since every read
 //     surface is project-scoped, no drain could name them again. Measured
 //     2026-08-08: 13 pending items in 6 vanished buckets, 7 of them real

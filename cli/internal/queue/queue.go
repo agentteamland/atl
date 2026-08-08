@@ -215,10 +215,10 @@ func (s *Store) Counts(project string) (map[Channel]int, error) {
 // a directory that no longer exists is invisible everywhere — indistinguishable
 // from no bucket at all.
 //
-// That is not hypothetical. `atl work dispatch` deletes each unit's worktree
-// when it completes, and until the key became the repository root (see the CLI's
-// projectKey) an autonomous worker's markers were queued under the worktree
-// path. Measured 2026-08-08: 13 items stranded across 6 vanished buckets. The
+// That is not hypothetical. The autonomous drive loop (since removed) deleted
+// each unit's worktree when it completed, and until the key became the repository
+// root (see the CLI's projectKey) a worker's markers were queued under the
+// worktree path. Measured 2026-08-08: 13 items stranded across 6 vanished buckets. The
 // payloads were intact; nothing could name them.
 //
 // Reserved buckets are skipped — they are keyed by their own scheme, not by a

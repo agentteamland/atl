@@ -38,7 +38,7 @@ func TestSearchDecidedFindsADecisionRecordedOnlyInCode(t *testing.T) {
 	if !strings.HasPrefix(hits[0].Path, "cli/") || hits[0].Line != 2 {
 		t.Errorf("wrong hit: %+v", hits[0])
 	}
-	if !contains(strings.Join(searched, " "), "cli") {
+	if !strings.Contains(strings.Join(searched, " "), "cli") {
 		t.Errorf("cli/ must be searched and reported, got %v", searched)
 	}
 }
@@ -60,12 +60,12 @@ func TestSearchDecidedReportsOnlyTheRootsThatExist(t *testing.T) {
 func TestRenderDecidedDoesNotClaimNoDecisionExists(t *testing.T) {
 	out := renderDecided("brief and stop", nil, []string{".atl/docs", "cli"})
 	for _, want := range []string{"0 matches", "searched: .atl/docs cli", "about this QUERY", "synonyms"} {
-		if !contains(out, want) {
+		if !strings.Contains(out, want) {
 			t.Errorf("missing %q in:\n%s", want, out)
 		}
 	}
 	for _, forbidden := range []string{"no decision exists", "was never decided", "nothing was decided"} {
-		if contains(strings.ToLower(out), forbidden) {
+		if strings.Contains(strings.ToLower(out), forbidden) {
 			t.Errorf("must not assert %q — a text search cannot know that:\n%s", forbidden, out)
 		}
 	}
@@ -74,7 +74,7 @@ func TestRenderDecidedDoesNotClaimNoDecisionExists(t *testing.T) {
 // A project with none of the surfaces gets told so, rather than a "0 matches"
 // that reads as a searched-and-found-nothing answer.
 func TestRenderDecidedSaysWhenThereIsNothingToSearch(t *testing.T) {
-	if out := renderDecided("x", nil, nil); !contains(out, "no decision surfaces here") {
+	if out := renderDecided("x", nil, nil); !strings.Contains(out, "no decision surfaces here") {
 		t.Errorf("got %q", out)
 	}
 }
@@ -100,7 +100,7 @@ func TestRenderDecidedTruncatesLongResults(t *testing.T) {
 	for i := 0; i < 45; i++ {
 		hits = append(hits, decidedHit{Path: "a.md", Line: i + 1, Text: "match"})
 	}
-	if out := renderDecided("q", hits, []string{"a"}); !contains(out, "… 5 more") {
+	if out := renderDecided("q", hits, []string{"a"}); !strings.Contains(out, "… 5 more") {
 		t.Errorf("want a truncation note, got:\n%s", out)
 	}
 }
@@ -120,7 +120,7 @@ func TestDecidedCommandSearchesTheCurrentProject(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := out.String()
-	if !contains(got, "1 matches") || !contains(got, "a-decision.md") {
+	if !strings.Contains(got, "1 matches") || !strings.Contains(got, "a-decision.md") {
 		t.Errorf("multi-word query must be joined and matched, got:\n%s", got)
 	}
 }
@@ -134,7 +134,7 @@ func TestDecidedCommandReportsZeroThroughTheCommand(t *testing.T) {
 	if err := decidedCmd.RunE(decidedCmd, []string{"nothing like this"}); err != nil {
 		t.Fatal(err)
 	}
-	if !contains(out.String(), "0 matches") || !contains(out.String(), "about this QUERY") {
+	if !strings.Contains(out.String(), "0 matches") || !strings.Contains(out.String(), "about this QUERY") {
 		t.Errorf("got:\n%s", out.String())
 	}
 }
@@ -148,7 +148,7 @@ func TestDecidedCommandOnAProjectWithNoSurfaces(t *testing.T) {
 	if err := decidedCmd.RunE(decidedCmd, []string{"anything"}); err != nil {
 		t.Fatal(err)
 	}
-	if !contains(out.String(), "no decision surfaces here") {
+	if !strings.Contains(out.String(), "no decision surfaces here") {
 		t.Errorf("got %q", out.String())
 	}
 }
@@ -200,10 +200,10 @@ func TestSearchDecidedOrdersStably(t *testing.T) {
 func TestRenderDecidedTruncatesALongLine(t *testing.T) {
 	long := strings.Repeat("x", 300)
 	out := renderDecided("x", []decidedHit{{Path: "a.md", Line: 1, Text: long}}, []string{"a"})
-	if !contains(out, "…") {
+	if !strings.Contains(out, "…") {
 		t.Errorf("a 300-char line must be truncated, got:\n%s", out)
 	}
-	if contains(out, strings.Repeat("x", 200)) {
+	if strings.Contains(out, strings.Repeat("x", 200)) {
 		t.Error("the full line leaked through the truncation")
 	}
 }

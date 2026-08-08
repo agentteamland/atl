@@ -229,9 +229,9 @@ func downloadVerified(ctx context.Context, f modelFile, dest string) error {
 		return fmt.Errorf("checksum mismatch for %s (got %s, want %s)", f.name, got, f.sha256)
 	}
 	// Write to a per-process temp file in the same dir, then atomically rename. A
-	// per-process name (not a shared dest+".tmp") is what keeps two workers racing
-	// to download the same file — the N-way `atl work dispatch --cap N` cold-start
-	// case — from clobbering each other's temp on rename.
+	// per-process name (not a shared dest+".tmp") is what keeps two processes racing
+	// to download the same file — several sessions starting cold at once — from
+	// clobbering each other's temp on rename.
 	tmp, err := os.CreateTemp(filepath.Dir(dest), f.name+"-*")
 	if err != nil {
 		return err

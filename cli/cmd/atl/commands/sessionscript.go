@@ -23,8 +23,8 @@ const (
 	// team content. An env brake is not that gate. It is the same opt-out every
 	// other automatic user-facing behaviour here already carries
 	// (ATL_NO_SELF_UPDATE, ATL_NO_TEAM_UPDATE, ATL_NO_RETRIEVE_INDEX,
-	// ATL_NO_CAPTURE_WATCHDOG, ATL_NO_STORE_GIT, ATL_NO_SWEEP_DISPATCH,
-	// ATL_NO_SPRINT_SIGNAL), and running a team's shell is a LARGER automatic
+	// ATL_NO_CAPTURE_WATCHDOG, ATL_NO_STORE_GIT, ATL_NO_SWEEP_DISPATCH),
+	// and running a team's shell is a LARGER automatic
 	// behaviour than any of them, so shipping it without one would be the
 	// inconsistency rather than the caution.
 	envNoSessionScript = "ATL_NO_SESSION_SCRIPT"
@@ -69,9 +69,8 @@ type sessionScript struct {
 // This is the third "any team that declares X" contract, after
 // capabilities.<name>.store and .channel. Core runs the script and prints what it
 // says; it learns neither which team declared it nor what the output is about.
-// The first consumer reads .delivery/config.json itself and branches on the
-// backend — which is the point: adding a backend, or a second consumer, needs no
-// change here.
+// A script reads whatever project state it cares about itself — which is the
+// point: a new consumer needs no change here.
 //
 // A script speaks only by SUCCEEDING. Missing, not executable, non-zero exit,
 // timed out, empty output — all resolve to silence, because this runs inside a
@@ -87,13 +86,12 @@ func runDeclaredSessionScripts(projectRoot string) {
 	if len(scripts) == 0 {
 		return
 	}
-	// Skip git worktrees, for the reason sprintSessionSignal and autoIndexRetrieval
-	// both skip them: `atl work dispatch` cuts one worktree per autonomous worker,
-	// and .delivery/ is COMMITTED, so every worker's session start would land here.
-	// That is wrong in both directions — N workers would each run the script (and
-	// each script's network reads) against one board, and the output would print
-	// into a context with no human in it, where a briefing about drift has nobody
-	// to reach. A session briefing belongs in the session a person is sitting in.
+	// Skip git worktrees, for the reason autoIndexRetrieval skips them: a
+	// declaration is a COMMITTED file, so every session opened in any worktree of
+	// one repo would land here. That is wrong in both directions — N sessions would
+	// each run the script (and each script's network reads), and the output would
+	// print into contexts with nobody sitting in them. A session briefing belongs
+	// in the session a person is sitting in.
 	// The git exec runs only after the cheap manifest reads above, matching the
 	// ordering those two callers use.
 	if projectRoot != "" && inGitWorktree(projectRoot) {
@@ -112,7 +110,7 @@ func runDeclaredSessionScripts(projectRoot string) {
 // runSessionScript runs one script and returns the text to forward, or "".
 func runSessionScript(ctx context.Context, s sessionScript, dir string) string {
 	cmd := exec.CommandContext(ctx, s.Path)
-	cmd.Dir = dir // the script reads project state (.delivery/config.json, the branch)
+	cmd.Dir = dir // the script reads project state (its own config, the branch)
 	cmd.WaitDelay = sessionScriptWaitDelay
 	out, err := cmd.Output()
 	if err != nil {

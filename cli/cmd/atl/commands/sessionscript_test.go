@@ -71,7 +71,7 @@ const briefScript = "#!/bin/sh\necho 'atl delivery: on delivery/s1/7'\n"
 func TestCollectSessionScriptsResolvesADeclarationIntoTheClaudeTree(t *testing.T) {
 	isolatedHome(t)
 	root := t.TempDir()
-	writeInstalledTeam(t, root, "delivery-team", []string{"scripts/brief.sh"}, "scripts/brief.sh", briefScript, 0o755)
+	writeInstalledTeam(t, root, "acme-team", []string{"scripts/brief.sh"}, "scripts/brief.sh", briefScript, 0o755)
 
 	got, problems := collectSessionScripts(root)
 	if len(got) != 1 {
@@ -80,8 +80,8 @@ func TestCollectSessionScriptsResolvesADeclarationIntoTheClaudeTree(t *testing.T
 	if want := filepath.Join(root, ".claude", "scripts", "brief.sh"); got[0].Path != want {
 		t.Errorf("resolved path = %q, want %q", got[0].Path, want)
 	}
-	if got[0].Team != "acme/delivery-team" {
-		t.Errorf("Team = %q, want acme/delivery-team", got[0].Team)
+	if got[0].Team != "acme/acme-team" {
+		t.Errorf("Team = %q, want acme/acme-team", got[0].Team)
 	}
 	if len(problems) != 0 {
 		t.Errorf("problems = %v, want none", problems)
@@ -118,7 +118,7 @@ func TestCollectSessionScriptsReportsEveryRefusalRatherThanSwallowingIt(t *testi
 			}
 			isolatedHome(t)
 			root := t.TempDir()
-			writeInstalledTeam(t, root, "delivery-team", tc.decls, tc.rel, briefScript, tc.mode)
+			writeInstalledTeam(t, root, "acme-team", tc.decls, tc.rel, briefScript, tc.mode)
 
 			got, problems := collectSessionScripts(root)
 			if len(got) != 0 {
@@ -128,7 +128,7 @@ func TestCollectSessionScriptsReportsEveryRefusalRatherThanSwallowingIt(t *testi
 				t.Fatalf("problems = %v, want one mentioning %q", problems, tc.wantSub)
 			}
 			// A refusal must name the team, or the report cannot be acted on.
-			if !strings.Contains(problems[0], "delivery-team") {
+			if !strings.Contains(problems[0], "acme-team") {
 				t.Errorf("problem %q does not name the declaring team", problems[0])
 			}
 		})
@@ -160,8 +160,8 @@ func TestCollectSessionScriptsClaimsADeclarationOnceAcrossLayers(t *testing.T) {
 		t.Setenv("USERPROFILE", home)
 	}
 	root := t.TempDir()
-	writeInstalledTeam(t, home, "delivery-team", []string{"scripts/brief.sh"}, "scripts/brief.sh", briefScript, 0o755)
-	writeInstalledTeam(t, root, "delivery-team", []string{"scripts/brief.sh"}, "scripts/brief.sh", briefScript, 0o755)
+	writeInstalledTeam(t, home, "acme-team", []string{"scripts/brief.sh"}, "scripts/brief.sh", briefScript, 0o755)
+	writeInstalledTeam(t, root, "acme-team", []string{"scripts/brief.sh"}, "scripts/brief.sh", briefScript, 0o755)
 
 	got, problems := collectSessionScripts(root)
 	if len(got) != 1 {
@@ -201,7 +201,7 @@ func TestNoDeclarationIsSilentEverywhere(t *testing.T) {
 func TestCollectSessionScriptsSkipsTheProjectLayerWithNoRoot(t *testing.T) {
 	isolatedHome(t)
 	root := t.TempDir()
-	writeInstalledTeam(t, root, "delivery-team", []string{"scripts/brief.sh"}, "scripts/brief.sh", briefScript, 0o755)
+	writeInstalledTeam(t, root, "acme-team", []string{"scripts/brief.sh"}, "scripts/brief.sh", briefScript, 0o755)
 
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -222,7 +222,7 @@ func TestCollectSessionScriptsSkipsTheProjectLayerWithNoRoot(t *testing.T) {
 func TestSessionScriptsCheckWarnsRatherThanFails(t *testing.T) {
 	isolatedHome(t)
 	root := t.TempDir()
-	writeInstalledTeam(t, root, "delivery-team", []string{"scripts/gone.sh"}, "", "", 0o755)
+	writeInstalledTeam(t, root, "acme-team", []string{"scripts/gone.sh"}, "", "", 0o755)
 
 	r := sessionScriptsCheck(root)()
 	if r.Status != doctor.Warn {
@@ -350,7 +350,7 @@ func TestTheBrakeStopsThePassEntirely(t *testing.T) {
 	isolatedHome(t)
 	root := t.TempDir()
 	sentinel := filepath.Join(root, "ran")
-	writeInstalledTeam(t, root, "delivery-team", []string{"scripts/brief.sh"}, "scripts/brief.sh",
+	writeInstalledTeam(t, root, "acme-team", []string{"scripts/brief.sh"}, "scripts/brief.sh",
 		"#!/bin/sh\ntouch '"+sentinel+"'\n", 0o755)
 	t.Setenv(envNoSessionScript, "1")
 
