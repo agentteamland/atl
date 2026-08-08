@@ -178,18 +178,17 @@ Add whatever static analysis the project actually has configured. **Check that i
 it**: invoking an analyzer through a package runner against a project with no configuration downloads a
 tool and points it at nothing, and a clean report from a tool with no rules is not a clean codebase.
 
-**Coverage — produced, never claimed.** The delivery-team's testing-surfaces policy is a conjunction:
-**diff coverage ≥ 90% of the lines this unit added or modified**, *and* **at least one test that goes RED
-when the change is reverted**. The first half is mechanical; the second is what makes it mean anything,
-because a test that calls the code and asserts nothing scores 100%. Confirming it costs a minute: revert
-the change, run the test, see red, restore.
+**Coverage — produced, never claimed.** The bar is a conjunction: **diff coverage ≥ 90% of the lines
+this change added or modified**, *and* **at least one test that goes RED when the change is reverted**.
+The first half is mechanical; the second is what makes it mean anything, because a test that calls the
+code and asserts nothing scores 100%. Confirming it costs a minute: revert the change, run the test,
+see red, restore.
 
 Generate the report with the project's configured runner — for most .NET projects
-`dotnet test --collect:"XPlat Code Coverage"` produces a Cobertura report the delivery worker's
-`atl work coverage` reads. Where the project has **no** coverage tooling at all, that is a project-level
-finding to record, not a reason to skip the test: *no test, no green*, regardless of whether the project
-can measure. Where 90% is genuinely unreachable, write the exception on the work-item — which lines and
-why — never a silent pass.
+`dotnet test --collect:"XPlat Code Coverage"` produces a Cobertura report. Where the project has **no**
+coverage tooling at all, that is a project-level finding to record, not a reason to skip the test:
+*no test, no green*, regardless of whether the project can measure. Where 90% is genuinely unreachable,
+write the exception down — which lines and why — never a silent pass.
 
 **Attach the run's output, not a pass count.** For this unit type the decisive evidence is the
 demonstrated contract: the success status and shape, plus the boundary rejections with their problem

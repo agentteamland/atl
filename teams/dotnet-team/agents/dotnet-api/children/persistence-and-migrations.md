@@ -20,8 +20,8 @@ question about the schema by reading the database, and a question about behaviou
 Reading the code you just wrote proves only that you can read.
 
 Project-specific truth — the actual entities, the pinned provider, the real command wrappers, the
-migration workflow — lives in the durable-knowledge store, named by the tech-lead's brief. This page
-is the generic craft under it.
+migration workflow — lives in the project's own documentation. This page is the generic craft under
+it.
 
 ## The `SaveChanges` seam — one owner, and a per-call cost
 

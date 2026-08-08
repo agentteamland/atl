@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "name": "dotnet-team",
-  "version": "0.1.0",
-  "description": "The .NET API stack specialist for the delivery loop: dotnet-api carries ASP.NET Core and EF Core craft plus the cache, broker, realtime and background surfaces a delivery worker loads it for.",
+  "version": "0.2.0",
+  "description": "The .NET API stack specialist: dotnet-api carries ASP.NET Core and EF Core craft plus the cache, broker, realtime and background surfaces built around them.",
   "author": {
     "name": "AgentTeamLand",
     "url": "https://github.com/agentteamland"
@@ -15,8 +15,7 @@
     "efcore",
     "api",
     "backend",
-    "stack-specialist",
-    "delivery"
+    "stack-specialist"
   ],
   "repository": "https://github.com/agentteamland/atl",
   "homepage": "https://github.com/agentteamland",
@@ -24,7 +23,7 @@
   "agents": [
     {
       "name": "dotnet-api",
-      "description": ".NET API craft — ASP.NET Core and EF Core plus the queue, cache, realtime and out-of-request surfaces around them: the stack knowledge a delivery worker loads when its unit lands on a .NET backend."
+      "description": ".NET API craft — ASP.NET Core and EF Core plus the queue, cache, realtime and out-of-request surfaces around them: the stack knowledge for work that lands on a .NET backend."
     }
   ],
   "skills": [],
@@ -33,8 +32,7 @@
   "extends": null,
   "excludes": [],
   "dependencies": {
-    "core": "^1.0.0",
-    "delivery-team": ">=0.15.0"
+    "core": "^1.0.0"
   },
   "requires": {
     "atl": ">=2.17.0"

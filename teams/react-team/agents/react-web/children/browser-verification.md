@@ -248,6 +248,6 @@ call sites, not by counting red tests.
 The discipline here — the minimum pass, claim-at-the-depth-reached, the positive control, the
 fault-injection techniques and their honesty constraints — is stack craft and travels. **Which**
 screens exist, which roles reach them, how this project's dev server is started, and what its
-evidence conventions are, are project facts: they reach me through the work-item and the
-tech-lead's canonical brief, and I never pre-author them here. Evidence attaches to the work-item
-through the delivery worker's own contract, not through anything I own.
+evidence conventions are, are project facts: they reach me through the task at hand, and I never
+pre-author them here. Where the evidence is attached is the project's convention, not anything I
+own.

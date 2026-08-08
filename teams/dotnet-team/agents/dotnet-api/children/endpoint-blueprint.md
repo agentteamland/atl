@@ -23,8 +23,8 @@ registration line" is itself a claim.
 Baseline: ASP.NET Core Minimal APIs with route groups, a mediator, and FluentValidation in a pipeline
 behaviour. A controller-based project maps the same six steps onto attribute routing plus
 `AddControllers()` / `MapControllers()` — the *decisions* and the *false greens* are identical, only
-the registration surface moves. Where the project's real layout, host topology and route prefixes
-live is the durable-knowledge store, named by the tech-lead's brief; see
+the registration surface moves. The project's real layout, host topology and route prefixes live in
+its own documentation; see
 [architecture-and-layering.md](architecture-and-layering.md).
 
 ## 1. Decide before you write
@@ -263,8 +263,8 @@ Three more durable effects to observe when they apply:
 **The unit is not done until it ships a test covering the behaviour it added**, and at least one that
 goes **red when the change is reverted**. That second half is not ceremony: coverage proves a line
 *ran*, never that anything *checked* the result — a test that exercises the endpoint and asserts
-nothing scores full marks. Confirming it costs a minute. The numeric gate is the delivery team's and
-the project's; the shape is this stack's, and the details are in
+nothing scores full marks. Confirming it costs a minute. The numeric gate is the project's; the shape
+is this stack's, and the details are in
 [testing-and-verification.md](testing-and-verification.md).
 
 ## 5. Common pitfalls

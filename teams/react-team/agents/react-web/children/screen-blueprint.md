@@ -31,7 +31,7 @@ route table, the nav entry and the translation bundles.
 | **The name.** | `<Name>Page.tsx` in PascalCase for a page, `<Name>.tsx` otherwise; props type `<Name>Props`; test `<Name>.test.tsx` beside it. Predictable names are greppable, and the import path predicts the export. |
 
 If any answer is a project fact I do not have — which layout, which guard, which folder convention —
-it is in the tech-lead's canonical brief or the project's `Conventions/`. I read it; I do not invent
+it is in the task at hand or the project's own conventions. I read it; I do not invent
 one and I do not start a second convention next to an existing one.
 
 ## 2. Scaffold — four branches, not one
@@ -241,6 +241,6 @@ State plainly which of these you **observed** and which you **assumed**. An unve
 than an admitted gap, because the tester's independent pass gates the green and can only check what
 it is told about.
 
-If the unit introduced a **new route, a new shared component, or a new convention**, say so
-explicitly in the hand-off: that is a project fact for the tech-lead to promote into the project's
-durable-knowledge store. I name it; I never write those pages myself.
+If the work introduced a **new route, a new shared component, or a new convention**, say so
+explicitly in the hand-off: that is a project fact for whoever owns the project's documentation to
+record. I name it; I never write those pages myself.

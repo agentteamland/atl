@@ -1,6 +1,6 @@
 ---
 name: dotnet-api
-description: ".NET API craft — ASP.NET Core and EF Core plus the queue, cache, realtime and out-of-request surfaces around them: the stack knowledge a delivery worker loads when its unit lands on a .NET backend."
+description: ".NET API craft — ASP.NET Core and EF Core plus the queue, cache, realtime and out-of-request surfaces around them: the stack knowledge for work that lands on a .NET backend."
 ---
 
 # .NET API
@@ -11,16 +11,15 @@ I am **.NET API craft** — the knowledge of building a server-side HTTP API in 
 the request path, EF Core behind it, and the four surfaces that hang off it (a cache, a message
 broker, a realtime hub, and work that runs outside a request).
 
-I am **knowledge, not a worker.** `atl work dispatch` spawns the delivery-team's `developer`; that
-worker becomes competent on this stack by loading me, exactly where it would otherwise load a stack
-pack. So I carry none of its role-craft — no worktree handling, no claim protocol, no PR contract,
-no escalation rules. Those live in the `developer`'s own `children/` and travel unchanged across
-every stack; duplicating them here would create a second copy that drifts.
+I am **knowledge, not a worker.** Whatever session is writing the code reads me and becomes
+competent on this stack. So I carry no process craft — no branch handling, no claim protocol, no PR
+contract, no escalation rules. Those belong to whatever drives the work, and duplicating them here
+would create a second copy that drifts.
 
-**I declare what I am; I never declare which area I belong to.** An `area:` tag is a functional
-slice of one particular system — this project may call my slice `api`, the next `backend`, the next
-`core-service` — and that vocabulary belongs to the project's tech-lead, who binds stack to area on
-the `Architecture/` page they already own. I am the .NET API stack. Where it lands is not my call.
+**I declare what I am; I never declare where I am used.** This project may call my slice `api`, the
+next `backend`, the next `core-service` — that vocabulary is a functional slice of one particular
+system and belongs to the project, not to me. I am the .NET API stack. Where it lands is not my
+call.
 
 What makes this stack worth a specialist is the *shape* of its failures. The characteristic .NET
 API defect is not one the compiler, the test suite or a clean-environment run can see: a batch
@@ -55,19 +54,17 @@ I do:
   loop, so what one project pays for, the next one inherits.
 
 I do NOT:
-- **Own an area, or name one.** Binding is the tech-lead's, on their `Architecture/` page. A shipped
-  agent that hardcoded `area:api` would be wrong on the first project that calls it something else.
-- **Do the delivery worker's job.** Claiming the work-item, running the worktree, the Level-1
-  self-test protocol, opening the PR, escalating a blocker — all the `developer`'s, all
+- **Own an area, or name one.** Where this stack applies is the project's call. A shipped agent that
+  hardcoded `area:api` would be wrong on the first project that calls it something else.
+- **Run the process.** Claiming work, handling branches, opening the PR, escalating a blocker — all
   stack-independent, all deliberately absent here.
-- **Review or merge.** Review is the tech-lead's and merge follows it; I am read by the hand that
-  writes the code, which is exactly the hand that must not sign it off.
+- **Review or merge.** I am read by the hand that writes the code, which is exactly the hand that
+  must not sign it off.
 - **Hold project truth.** The project's real module layout, its pinned libraries, its error-code
-  catalog, its area names and its deployment topology live in the durable-knowledge store
-  (`Architecture/`, `Conventions/`, `Domain/`), named page-by-page in the tech-lead's canonical
-  brief. I am generic .NET craft layered *under* that; where the two disagree, the project wins.
-- **Stack alongside a generic pack for the same unit.** Where I am bound I *replace* the area's
-  pack. A worker reading both reads two documents written by different hands about the same
+  catalog and its deployment topology live in the project's own documentation. I am generic .NET
+  craft layered *under* that; where the two disagree, the project wins.
+- **Stack alongside a second generic document for the same work.** Reading both means reading two
+  documents written by different hands about the same
   decision, and has no rule for which to obey.
 - **Cover the browser half.** A client's consumption of this API — its data-fetching, its cache
   invalidation, its reconnect behaviour — belongs to the web specialist. I own the server side of
