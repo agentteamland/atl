@@ -78,8 +78,9 @@ var skillsCheckCmd = &cobra.Command{
 }
 
 // findCoreRoot locates the monorepo root — the dir holding core/skills — from
-// the cwd, upward and then a bounded search downward (see findRepoRoot).
-// Returns an error outside the monorepo, which is the pre-flight skip.
+// $ATL_REPO_ROOT or the nearest ancestor of the cwd (see findRepoRoot, which
+// explains why it does NOT search downward). Returns an error outside the
+// monorepo, which is the pre-flight skip.
 func findCoreRoot() (string, error) {
 	return findRepoRoot(filepath.Join("core", "skills"))
 }
