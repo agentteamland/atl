@@ -34,6 +34,7 @@ Pass `--include-gains` only when you deliberately want both classes reclaimed. F
 | *gain or edit beside an installed unit* | A file under an installed agent/skill (e.g. a `children/` learning) that isn't in the manifest — often a learning-loop gain, sometimes a hand edit. **Retained by `--apply` unless you pass `--include-gains`.** |
 | *unowned unit (a removed team or a hand-made dir)* | A whole `agents/x` or `skills/x` dir no manifest owns — a team that was removed leaving files behind, or your own non-ATL Claude Code assets. |
 | *expired conflict archive* | A promote conflict archive under `~/.atl/history/` older than 30 days (these are content-addressed and never pruned otherwise). |
+| *ended session's guard state* | A per-session directory under `~/.atl/cache/guard/` older than 14 days. `atl guard` writes one empty marker per file it has nudged, so nothing here outlives its session — but nothing removed them either, and because every marker is **empty** the tree is invisible to any size-based check (measured: 69 dirs, 2,372 markers). The cost is inodes, not bytes. |
 
 Because "no manifest owns it" also matches your own non-ATL assets, gc is **dry-run by default** and never deletes irreversibly — you always see the list before anything moves.
 

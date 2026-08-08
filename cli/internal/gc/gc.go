@@ -37,6 +37,21 @@ import (
 // anything else, so they accumulate forever without this.
 const HistoryMaxAge = 30 * 24 * time.Hour
 
+// GuardStateMaxAge is how long `atl guard`'s per-session state survives before gc
+// treats it as reclaimable. The guard keeps one directory per Claude Code session
+// under ~/.atl/cache/guard/<session-uuid>/, holding empty marker files that record
+// "this file has already had its grep-before-edit nudge this session".
+//
+// Nothing ever removed them, so the tree only grows: measured 2026-08-07 at 69
+// session dirs and 2,372 markers, the oldest five weeks old. It is invisible to any
+// size-based check because every marker is EMPTY — the cost is inodes and a slower
+// walk, not bytes, which is exactly why nothing surfaced it.
+//
+// A session's state is worthless the moment that session ends, and a session does
+// not outlive a day. Two weeks is far past any plausible resume and leaves the
+// current session's own state well alone.
+const GuardStateMaxAge = 14 * 24 * time.Hour
+
 // Orphan is one reclaimable item: an on-disk asset file no manifest at its layer
 // owns, or an expired conflict archive.
 type Orphan struct {
@@ -65,6 +80,13 @@ func (o Orphan) Origin() string {
 	switch {
 	case o.Scope == "history":
 		return "expired conflict archive"
+	case o.Scope == "guard-state":
+		// Its own reason, not the default. These are aged-out per-session marker
+		// dirs, deliberately reclaimable — calling them an "unowned unit (a removed
+		// team or a hand-made dir)" would describe them as something a person might
+		// have authored, which is the exact vocabulary-ahead-of-logic gap the
+		// Tracked field above exists to close.
+		return "ended session's guard state, past " + GuardStateMaxAge.String()
 	case o.Tracked:
 		return "committed to this project's git — hand-authored or deliberately kept"
 	case o.Owned:
@@ -118,6 +140,12 @@ func Scan(projectRoot string, now time.Time) ([]Orphan, error) {
 		}
 		out = append(out, orphans...)
 	}
+	guard, err := scanGuardState(now)
+	if err != nil {
+		return nil, err
+	}
+	out = append(out, guard...)
+
 	hist, err := scanHistory(now)
 	if err != nil {
 		return nil, err
@@ -287,6 +315,45 @@ func scanHistory(now time.Time) ([]Orphan, error) {
 				Abs:   abs, Unit: t.Name(), Size: dirSize(abs),
 			})
 		}
+	}
+	return out, nil
+}
+
+// scanGuardState returns `atl guard` per-session state dirs older than
+// GuardStateMaxAge. Layout: ~/.atl/cache/guard/<session-uuid>/<marker files>. The
+// prune unit is the session dir — a session's state is meaningless once it ends,
+// and there is nothing inside worth keeping separately.
+func scanGuardState(now time.Time) ([]Orphan, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return nil, err
+	}
+	root := filepath.Join(home, ".atl", "cache", "guard")
+	sessions, err := os.ReadDir(root)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	var out []Orphan
+	for _, sess := range sessions {
+		if !sess.IsDir() {
+			continue
+		}
+		info, ierr := sess.Info()
+		if ierr != nil {
+			continue
+		}
+		if now.Sub(info.ModTime()) <= GuardStateMaxAge {
+			continue
+		}
+		abs := filepath.Join(root, sess.Name())
+		out = append(out, Orphan{
+			Scope: "guard-state",
+			Rel:   filepath.ToSlash(filepath.Join("guard", sess.Name())),
+			Abs:   abs, Unit: "guard", Size: dirSize(abs),
+		})
 	}
 	return out, nil
 }
