@@ -107,6 +107,64 @@ func TestProjectKeyFallsBackToTheWorkingDirectoryOutsideGit(t *testing.T) {
 	}
 }
 
+// The retrieval cache's regression, stated as the two hooks see it. The prompt
+// hook resolves from its JSON payload and the turn hook from the process, and
+// they must land on one bucket however far apart the agent's directory wandered
+// between them — otherwise one session's fires and its turns are counted as two
+// projects, and the adoption rate is divided by a number that tracks how often
+// somebody typed `cd`.
+func TestBothHookRootsResolveToOneBucket(t *testing.T) {
+	repo := t.TempDir()
+	gitRepo(t, repo)
+	payloadDir := filepath.Join(repo, "cli", "cmd")
+	processDir := filepath.Join(repo, "test", "e2e")
+	for _, d := range []string{payloadDir, processDir} {
+		if err := os.MkdirAll(d, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// The prompt hook's route: a directory handed over in the payload.
+	fromPayload := projectKeyFrom(payloadDir)
+	// The turn hook's route: whatever directory the process is standing in.
+	t.Chdir(processDir)
+	fromProcess, err := projectKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if fromPayload != fromProcess {
+		t.Fatalf("the two hook roots disagree: payload=%q process=%q", fromPayload, fromProcess)
+	}
+	if want := resolved(t, repo); fromPayload != want {
+		t.Errorf("both resolved to %q, want the repository root %q", fromPayload, want)
+	}
+
+	// And the property a person can observe: the fire log is written next to the
+	// index, so agreeing roots mean one cache directory — not merely one counter.
+	a, err := indexPathFor(fromPayload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := indexPathFor(fromProcess)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a != b {
+		t.Errorf("the two hooks would write to different cache dirs:\n  %s\n  %s", a, b)
+	}
+}
+
+// projectKeyFrom keeps the fallback its cwd-flavoured sibling has: a directory
+// git cannot answer for is still a usable key, so the caller never has to handle
+// an error it could do nothing about.
+func TestProjectKeyFromReturnsAnUngitDirectoryUnchanged(t *testing.T) {
+	dir := t.TempDir()
+	if got := projectKeyFrom(dir); got != dir {
+		t.Errorf("projectKeyFrom(%q) = %q, want it unchanged outside git", dir, got)
+	}
+}
+
 // The regression this key sharing exists to prevent, stated as the user sees it:
 // session-start counts the findings at the repository root and tells you to run
 // `atl digest`. If that command resolved its own root differently, it would
