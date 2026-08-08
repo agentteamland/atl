@@ -65,8 +65,16 @@ out="$(echo '{"prompt":"anything","cwd":"'"$HOME/empty"'"}' | atl retrieve 2>&1)
 # which is precisely the arm required.
 unset CLAUDE_CODE_OAUTH_TOKEN ANTHROPIC_API_KEY
 
+# The notice is identified by a phrase only IT carries, never by the path. The
+# doctor check in this same PR prints "~/.atl/claude-token ... tightened to 0600"
+# when it heals, so a grep for the path matches session-start output in which the
+# notice is correctly absent — the silencing assertion below failed for exactly
+# that reason, on a run where the product was behaving correctly.
+notice_phrase="not a requirement"
+
 out="$(atl session-start 2>&1)"
-echo "$out" | grep -q "claude-token" && ok "no credential: session-start names the file to create" || bad "notice missing or does not name the file -- [$out]"
+echo "$out" | grep -q "$notice_phrase" && ok "no credential: the notice appears" || bad "notice missing -- [$out]"
+echo "$out" | grep -q "claude-token" && ok "the notice names the file to create" || bad "notice does not name the file -- [$out]"
 
 # the two places that do NOT work must be named, or a user who used one of them
 # reads the same notice next session and concludes the notice is wrong
@@ -75,7 +83,7 @@ echo "$out" | grep -q "zshrc" && ok "notice warns about ~/.zshrc" || bad "notice
 mkdir -p "$HOME/.atl"
 printf 'sk-ant-oat01-e2e-not-a-real-token\n' > "$HOME/.atl/claude-token"
 out="$(atl session-start 2>&1)"
-echo "$out" | grep -q "claude-token" && bad "notice still shown after the file was created -- [$out]" || ok "credential file silences the notice"
+echo "$out" | grep -q "$notice_phrase" && bad "notice still shown after the file was created -- [$out]" || ok "credential file silences the notice"
 
 # the doctor tightens a hand-created file: atl never writes it, so it arrives
 # with the user's umask (0644 on a default macOS shell) and nothing else notices
