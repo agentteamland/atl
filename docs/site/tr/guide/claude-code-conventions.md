@@ -30,7 +30,7 @@ Oynak çalışma/sprint durumu her-zaman-yüklü dosyaya **ait değildir** — h
 
 | Blok | Yazan | Amaç |
 |---|---|---|
-| `<!-- wiki:index -->` | [`/drain`](/tr/skills/drain) | `.atl/wiki/` sayfaları için kendiliğinden yeniden inşa edilen içindekiler tablosu. Proje bağlamıyla yüklenir, Claude'a sıfır maliyetle bilgi haritasını sunar. |
+| `<!-- wiki:index -->` | [`/drain`](/tr/skills/drain) | `.atl/wiki/` sayfaları için, drain tarafından bakımı yapılan içindekiler tablosu. Proje bağlamıyla yüklenir, Claude'a sıfır maliyetle bilgi haritasını sunar. Blok saf türetilmiş halde kaldığı sürece yeniden üretilir; onu gruplandırdığınız ya da açıklama eklediğiniz andan itibaren drain yerinde ekleme yapar. |
 | `<!-- brainstorm:active -->` | [`/brainstorm start`](/tr/skills/brainstorm) ve [`/brainstorm done`](/tr/skills/brainstorm) | Etkin beyin fırtınası konularını proje bağlamına sabitler; bir sonraki oturum bunları kaçıramaz. |
 | `<!-- pending-implementation -->` | Beyin fırtınası `done` akışı | Bir beyin fırtınasının X kararını verdiğini ama uygulamasının henüz yayımlanmadığını bir sonraki oturuma anımsatır. |
 
@@ -167,6 +167,6 @@ HTML yorumları:
 ## İlgili
 
 - [`/brainstorm`](/tr/skills/brainstorm) — `<!-- brainstorm:active -->` bloğunu yazar ve kaldırır.
-- [`/drain`](/tr/skills/drain) — `<!-- wiki:index -->` bloğunu yeniden inşa eder.
+- [`/drain`](/tr/skills/drain) — `<!-- wiki:index -->` bloğunun bakımını yapar.
 - [Bilgi sistemi](/tr/guide/knowledge-system) — wiki:index bloğunun neyi indekslediği.
 - [Kavramlar: Beceri](/tr/guide/concepts#skill) — bu sözleşmelerin geniş resme nereye oturduğu.
