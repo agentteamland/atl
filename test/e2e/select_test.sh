@@ -44,18 +44,13 @@ check "a guard change runs only the guard blueprint" \
 
 # Core rules reflect into every project, but what PROVES the reflection is
 # install/update; learning-loop and profile-loop exercise the rules' behaviour.
-# The delivery blueprints deliberately do not declare core/ — see their headers.
 check "a core-rule change runs the reflection + loop blueprints" \
   'core/rules/communication-style.md' \
   'install learning-loop profile-loop update'
 
-check "the engine runs the dispatch-dependent blueprints" \
-  'cli/internal/dispatch/dag.go' \
-  'delivery-loop github-delivery-engine github-delivery-full-chain github-delivery-loop github-sprint-carryover work-dispatch'
-
-check "team content runs the ceremony blueprints" \
-  'teams/delivery-team/skills/sprint-plan/SKILL.md' \
-  'delivery-loop github-delivery-autonomous-refine github-delivery-full-chain github-delivery-loop github-sprint-carryover'
+check "team content runs the blueprints that install and exercise it" \
+  'teams/profile-team/skills/profile-drain/SKILL.md' \
+  'install-deps-hooks profile-backup-restore profile-install profile-loop'
 
 # The hook-binding half of install-deps-hooks: `internal/settings` is what binds
 # them, and guard declares the same package because its matcher is written there.

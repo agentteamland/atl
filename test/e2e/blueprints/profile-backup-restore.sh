@@ -41,7 +41,7 @@ source /e2e/lib.sh
 note() { echo "  note - $1"; }
 
 PUB_REPO="${ATL_E2E_PUBLIC_REPO:-agentteamland/atl-e2e-team}"
-PRIV_REPO="${ATL_E2E_PRIVATE_REPO:-agentteamland/$(delivery_fixture)}"
+PRIV_REPO="${ATL_E2E_PRIVATE_REPO:-agentteamland/atl-e2e-delivery}"
 
 PUB="$HOME/pub"                 # clone of the PUBLIC fixture — only for its URL
 PRIV="$HOME/priv"               # clone of the PRIVATE fixture — only for its URL

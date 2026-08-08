@@ -113,7 +113,7 @@ headless_claude_setup() {
 # first-party team wins and the blueprint silently tests the wrong content. A
 # fixed past date rots as each release bumps the seed's generatedAt; a far-future
 # date keeps the cache authoritative forever. (Invisible for teams with no drift
-# vs the seed; it bit delivery-team once backends/ diverged from the v2.6.0 seed.)
+# vs the seed; it bit a first-party team once its content diverged from the seed.)
 write_test_index() {
   local owned_login="${1:-}"
   mkdir -p "$HOME/.atl"
@@ -127,8 +127,9 @@ write_test_index() {
 
 # write_test_index_profile seeds ~/.atl/index.json with the first-party
 # profile-team entry, pointing at the monorepo subpath on ATL_E2E_TEAM_REF (the
-# current branch — see write_test_index_delivery below for why this must not be
-# pinned to `main`). profile-team is a real monorepo team (not a standalone
+# current branch — never `main`: a pin to main means an edited team is never
+# loaded, every assertion passes on main's copy, and the run reports green on
+# content it never saw). profile-team is a real monorepo team (not a standalone
 # fixture repo), so `atl install` fetches teams/profile-team from the atl repo
 # tarball over public HTTPS — the blueprint stays hermetic (no dedicated fixture
 # repo) and auth-free.
@@ -141,9 +142,9 @@ write_test_index_profile() {
 # the transitive-install path needs: personal-advisory-team (the one installed)
 # and profile-team (the dependency it declares in team.json `dependencies`).
 #
-# Both are monorepo subpaths on ATL_E2E_TEAM_REF, for the reason spelled out on
-# write_test_index_delivery: the container fetches team content from that ref and
-# mounts nothing from the working tree.
+# Both are monorepo subpaths on ATL_E2E_TEAM_REF, for the reason above: the
+# container fetches team content from that ref and mounts nothing from the
+# working tree.
 #
 # The dependency is listed here as a BARE name in personal-advisory-team's
 # manifest ("profile-team"), which `resolveDep` resolves via `LookupByName`,
@@ -156,7 +157,7 @@ write_test_index_profile() {
 # recursion resolves it either way (verified — the blueprint stayed 29/29 with
 # this entry deleted).
 #
-# It is here for the reason write_test_index_delivery gives: the entry the merge
+# It is here for the generatedAt reason above: the entry the merge
 # keeps is the one with the newer `generatedAt`, so the far-future stamp makes
 # THIS entry authoritative and the dependency is fetched from ATL_E2E_TEAM_REF.
 # Drop it and the dependency silently installs from the seed's released TAG — a
@@ -171,25 +172,6 @@ write_test_index_advisory() {
   ]}' > "$HOME/.atl/index.json"
 }
 
-# write_test_index_delivery seeds ~/.atl/index.json with the first-party
-# delivery-team entry, pointing at the monorepo subpath (delivery-team is not yet
-# in the published catalog, so the e2e injects it the same way
-# write_test_index_profile does). It is project-scope, so the blueprint installs
-# it into the project, not globally.
-#
-# The ceremony CONTENT comes from ATL_E2E_TEAM_REF, which run.sh resolves to the
-# CURRENT BRANCH and refuses to run if the branch's teams/ differs from what is
-# on that ref. This used to be pinned to `main` — and the pin was documented here
-# as a feature ("a change on the branch still tests against the merged
-# ceremonies"), which is why it read as intentional for so long. It is not a
-# feature: it means an edited ceremony is never loaded, every assertion passes on
-# main's copy, and the run reports green on content it never saw. Only the mock
-# MCP server + the blueprints come from the image (COPY test/e2e/).
-write_test_index_delivery() {
-  mkdir -p "$HOME/.atl"
-  jq -n --arg ref "${ATL_E2E_TEAM_REF:-main}" '{schemaVersion:1,generatedAt:"2099-01-01T00:00:00Z",teams:[{handle:"agentteamland",name:"delivery-team",version:"0.1.0",description:"delivery-team e2e (monorepo subpath).",keywords:["delivery"],scope:"project",verified:true,source:{repo:"agentteamland/atl",subpath:"teams/delivery-team",ref:$ref}}]}' > "$HOME/.atl/index.json"
-}
-
 # ---- attributable failures --------------------------------------------------
 #
 # A blueprint-ending assertion must be able to name its own cause. The pattern
@@ -197,7 +179,7 @@ write_test_index_delivery() {
 # `[ -n "$X" ] || { bad "could not do the thing"; finish; exit 1; }` — where the
 # only sentence that could explain the red was written to stderr and thrown away.
 #
-# That cost a real release gate: `github-delivery-engine` died 40s in with
+# That cost a real release gate: a GitHub blueprint died 40s in with
 # `FAIL - could not seed the PBI` as its entire output, and the cause (most
 # likely GitHub's secondary rate limit, which is invisible in /rate_limit) had to
 # be reconstructed by hand afterwards from a two-hour run that already had the
@@ -314,78 +296,3 @@ reset_owned_repo() {
   rm -rf "$tmp"
 }
 
-# delivery_fixture echoes the delivery fixture's repo/project NAME. One name is
-# used for both, and it is a variable rather than a constant because it is the
-# only thing standing between the six GitHub delivery blueprints and running
-# concurrently: they all force-reset this repo AND delete/recreate a Project of
-# this title, so two of them at once is not slow, it is destructive — the loser
-# sees a board that vanished mid-run and fails an assertion that says nothing
-# about concurrency. Point separate blueprints at separate names and the same
-# runner parallelises them safely.
-delivery_fixture() { echo "${ATL_E2E_DELIVERY_REPO:-atl-e2e-delivery}"; }
-
-# reset_delivery_repo force-restores <owner>/$(delivery_fixture) to the fixture baseline
-# and rebuilds the two-branch flow, so the github-delivery-loop blueprint starts from a
-# clean repo even after a prior run left issues, PRs, feature branches, or tags behind.
-# The owner is the org (agentteamland by default). The twin of reset_owned_repo.
-reset_delivery_repo() {
-  local owner="$1"
-  local repo="$owner/$(delivery_fixture)"
-  # Delete every prior issue — idempotency labels would otherwise converge onto them,
-  # and (unlike PRs) issues CAN be removed, so a truly empty baseline is achievable.
-  for n in $(gh issue list --repo "$repo" --state all --limit 200 --json number -q '.[].number' 2>/dev/null); do
-    gh issue delete "$n" --repo "$repo" --yes 2>/dev/null || gh issue close "$n" --repo "$repo" 2>/dev/null || true
-  done
-  # A clean baseline is a PRECONDITION, not best-effort: `gh issue delete` needs a
-  # triage/admin token, and if it silently fell back to `close`, stale CLOSED issues
-  # would false-pass the `--state all` count assertions. Fail loudly instead.
-  local remaining
-  remaining=$(gh issue list --repo "$repo" --state all --limit 200 --json number -q 'length' 2>/dev/null || echo 999)
-  [ "$remaining" = 0 ] || return 1
-  local tmp; tmp=$(mktemp -d)
-  git clone -q "https://github.com/$repo.git" "$tmp" || { rm -rf "$tmp"; return 1; }
-  local rc=0
-  (
-    cd "$tmp" || exit 1
-    find . -mindepth 1 -maxdepth 1 -not -name '.git' -exec rm -rf {} +
-    cp -R /e2e/fixtures/delivery-repo/. .
-    git add -A
-    git -c user.email=e2e@atl.local -c user.name=atl-e2e commit -q -m "reset: e2e baseline" --allow-empty
-    # rebuild the two-branch delivery flow off the fresh main (deleting a PR's head
-    # branch below auto-closes any open FEATURE-branch PR, so no separate pr-close pass
-    # is needed for those). A dev->release promotion PR is the exception: its head is
-    # `dev`, which is never deleted, so one left open by a failed run survives the reset
-    # — harmless, because /sprint-review's step 6a is open-or-find and reuses it, and the
-    # force-push gives it a fresh head that no prior approval record can match.
-    git push -q -f origin HEAD:main    || exit 1
-    git push -q -f origin HEAD:dev     || exit 1
-    git push -q -f origin HEAD:release || exit 1
-    for b in $(git ls-remote --heads origin | awk '{print $2}' | sed 's|refs/heads/||' | grep -vE '^(main|dev|release)$'); do
-      git push -q --delete origin "$b" 2>/dev/null || true
-    done
-    for t in $(git ls-remote --tags origin | awk '{print $2}' | sed 's|refs/tags/||' | grep -v '\^{}$'); do
-      git push -q --delete origin "$t" 2>/dev/null || true
-    done
-  ) || rc=1
-  rm -rf "$tmp"
-  return $rc
-}
-
-# reset_delivery_project deletes any prior Project titled $(delivery_fixture) for the
-# owner, creates a fresh one, sets up the autonomous-loop custom fields, and echoes
-# its NUMBER (its only stdout — all gh diagnostics go to /dev/null). Status exists by
-# default (Todo/In Progress/Done); Iteration is UI-only (gh cannot create it), so the
-# blueprint tolerates its absence. Requires the `project` token scope.
-reset_delivery_project() {
-  local owner="$1"
-  local existing
-  local title; title="$(delivery_fixture)"
-  existing=$(gh project list --owner "$owner" --format json --limit 100 -q ".projects[] | select(.title==\"$title\") | .number" 2>/dev/null | head -1)
-  [ -n "$existing" ] && gh project delete "$existing" --owner "$owner" >/dev/null 2>&1 || true
-  local num
-  num=$(gh project create --owner "$owner" --title "$title" --format json -q '.number' 2>/dev/null)
-  [ -z "$num" ] && return 1
-  gh project field-create "$num" --owner "$owner" --name "Story Points" --data-type NUMBER >/dev/null 2>&1 || true
-  gh project field-create "$num" --owner "$owner" --name "Priority" --data-type SINGLE_SELECT --single-select-options "P0,P1,P2,P3" >/dev/null 2>&1 || true
-  echo "$num"
-}

@@ -33,10 +33,12 @@ INTERVAL="${ATL_E2E_WATCH_INTERVAL:-300}"
 # Per LANE, which needs a different number from the aggregate. On the aggregate a
 # quiet stretch was bounded by the per-turn cap, because some other blueprint kept
 # writing; a lane holds ONE blueprint at a time, and a blueprint can be legitimately
-# silent for its whole run — github-delivery-autonomous-refine's dispatch phase
-# writes nothing until its real `claude -p` workers finish. Measured on a green
-# run: 2137s for that one, 2231s for the longest. So the floor is the longest
+# silent for its whole run while a long `claude -p` turn is in flight. Measured on
+# a green run: 2231s for the longest blueprint. So the floor is the longest
 # blueprint, not the longest turn. 1200s false-fired on exactly that case.
+#
+# NOTE the 2700s floor was calibrated against a suite that included blueprints far
+# longer than any that remain — it is now conservative by a wide margin, not wrong.
 STALL="${ATL_E2E_WATCH_STALL:-2700}"
 
 # Wait for the log to appear — the watcher is usually armed a beat before the suite writes.

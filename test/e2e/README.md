@@ -17,15 +17,15 @@ Auth is passed into the container only when present on the host:
 
 - **gh** — `GH_TOKEN` (from your `gh auth token`) — the publish blueprints
 - **Claude** — `CLAUDE_CODE_OAUTH_TOKEN` (from `claude setup-token`) or `ANTHROPIC_API_KEY` — the learning-loop blueprint
-- **both** (`gh+token`) — `github-delivery-loop` needs a `GH_TOKEN` **and** a Claude token; the token also needs the `project` scope (Projects v2) — `gh auth refresh -s project`
+- **both** (`gh+token`) — a blueprint that drives a real GitHub fixture *and* a real `claude -p` turn needs a `GH_TOKEN` **and** a Claude token
 
 A blueprint whose auth is absent is skipped, so the same script is CI-safe (only
 the auth-free core runs) and local-full (everything runs when you're authed).
 
 ### Run only what the change can reach
 
-A full run is ~2 hours, and three GitHub delivery blueprints are ~70% of it. A change to
-`internal/guard` or to a core rule cannot reach any of them.
+A full run costs far more than most changes need. A change to `internal/guard` or to a
+core rule reaches only a couple of blueprints.
 
 ```bash
 test/e2e/run.sh --changed            # vs origin/main
@@ -120,10 +120,6 @@ learning blueprints stay non-flaky).
 | `profile-backup-restore` | gh+token | the two irreversible profile skills: `/profile-backup`'s visibility guard refuses on public / no-remote / non-GitHub-remote / gh-unavailable and writes NOTHING, snapshots a private repo byte-identically (no gitlink, no `.git`, commit scoped to `profile-backup/`, mirror semantics), and `/profile-restore`'s newer-guard flags a global file modified after the snapshot commit (surviving a fresh clone, so it is commit-time based not mtime based), stays dry-run without `--apply`, and preserves global-only memory on apply. Mostly deterministic — it runs the skills' own fenced bash bodies extracted from the installed SKILL.md — plus two real `claude -p` turns on the paths where improvising is unrecoverable |
 | `publish-propose` | gh | a gain in a team you don't own → real fork + PR (then cleanup) |
 | `publish-own` | gh | a team you own → real commit + version bump + tag |
-| `github-delivery-loop` | gh+token | the GitHub-backend Layer-B / T-point: real `claude -p` ceremonies + a developer→tech-lead micro-loop on a real fixture repo + Project — Epic/Feature issues + `[Technical Analysis]`, `plan.json`, a PR merged to `dev` + its issue closed (§10), and the commit-bound promotion gate (#16): `/sprint-review` HOLDs with no approval record on the promotion PR **and** with one naming a superseded commit, and merges dev→release only for the exact commit the record names |
-| `github-delivery-engine` | gh+token | the follow-on to `github-delivery-loop`: the Go engine (`atl work dispatch`) driving REAL developer→tester→tech-lead `claude -p` workers on GitHub — seeds one buildable PBI + `plan.json`, then proves the (backend-neutral) worker prompts reach `gh` and land a real merge to `dev` (issue closed, worktree reclaimed). The github twin of the real-Azure engine run; the deterministic engine loop is covered by `work-dispatch` |
-| `github-delivery-full-chain` | gh+token | the SEAM joining `github-delivery-loop` (ceremonies) + `github-delivery-engine` (dispatch): the FULL chain `/kickoff → /refine → /sprint-plan → /sprint-start → atl work dispatch --cap 2` with real `claude -p`, over a Feature `/refine` decomposes into 3 dependency-linked PBIs — proves a MULTI-NODE `plan.json` driving the engine to ≥2 dependency-ordered merges to `dev` with genuine cap-2 concurrency (the first real-worker multi-node GitHub run) |
-| `github-sprint-carryover` | gh+token | MULTI-UNIT CARRYOVER, the path the flow-admission fix (#333) changed and nothing exercised: a sprint ends with two units incomplete, the second depending on the first, and the re-plan must admit BOTH to the next sprint and carry the edge into `plan.json`. Seeds the prior sprint (two open PBIs at `sprint:1` + `carryover`, the dependent's `## Depends On` naming the foundation, and the `docs/sprints/sprint-1-review.md` page that makes sprint:1 *reviewed*) and runs only `/sprint-plan` + `/sprint-start`. The regression it catches — admitting the foundation and leaving the dependent behind — is silent everywhere else: the ceremony reports a clean sprint and the dependent just sits at the old ordinal. **Flow only**: scrum's carrier is a Projects v2 Iteration field `gh` cannot create, so under scrum "was this unit admitted?" has no durable surface to read on this backend |
 
 ## Fixtures
 
@@ -133,28 +129,18 @@ publish blueprints exercise actual GitHub:
 - `agentteamland/atl-e2e-team` — propose-upstream upstream (not owned by the tester)
 - `<your-login>/atl-e2e-owned` — own-team re-publish target (the `publish-own`
   blueprint force-resets it to the fixture baseline each run, so it's repeatable)
-- `agentteamland/atl-e2e-delivery`, `-2`, `-3` — **three** GitHub-backend delivery
-  fixtures, in the org (ATL's own infra, alongside `atl-e2e-team`; override the owner
-  for a fork with `ATL_E2E_DELIVERY_OWNER`). Create each once, private, with merge
-  commits allowed and at least one commit so `git clone` succeeds — the content does
-  not matter, because every run wipes it and copies `fixtures/delivery-repo/` in.
+- `agentteamland/atl-e2e-delivery-2` — a private fixture repo used by
+  `profile-backup-restore` as the "private remote" arm. Create it once, private, with
+  at least one commit so `git clone` succeeds; the content does not matter.
 
-  Each GitHub delivery blueprint force-resets its fixture to that baseline
-  (main/dev/release, no stale issues/PRs) and deletes and recreates a Project of the
-  same title, so the loop is repeatable. **That is also why there are three.** Two
-  blueprints on one fixture cannot overlap: the second one's reset destroys the
-  first's board mid-run, and the loser fails an assertion that says nothing about
-  concurrency. Separate fixtures mean separate lanes, which is what takes the suite from ~132 min
-  to ~58. **Two** delivery lanes, not three, and the limit is not the fixtures: a full
-  suite costs roughly one hourly GitHub GraphQL quota (the ceremony turns, not the
-  fixture resets — those are 15 points each), so compressing it far below an hour
-  exhausts the budget and the failures land on unrelated blueprints. `atl-e2e-delivery-3`
-  exists and is unused; a third lane becomes viable if that consumption ever drops. The mapping is declared per blueprint on its `# fixture:` line;
+  A blueprint that force-resets an external fixture declares it on a `# fixture:`
+  line, and blueprints sharing one fixture run serially in a lane while lanes run
+  concurrently — two resets of one fixture at once is not slow, it is destructive,
+  and the loser fails an assertion that says nothing about concurrency.
   `test/e2e/run.sh --lanes` prints the partition without running anything.
 
-  Adding a fourth is a repo plus a `# fixture:` line — no harness change. The runner's
-  token needs `repo` + `project` rights on the owner; the container ships a modern `gh`
-  for Projects v2 (`field-create`/`item-edit`).
+  Adding another is a repo plus a `# fixture:` line — no harness change. The runner's
+  token needs `repo` rights on the owner.
 
 The blueprints inject a test-only `~/.atl/index.json` (via `write_test_index` in
 `lib.sh`) so `atl install` resolves the fixtures offline — the production index is

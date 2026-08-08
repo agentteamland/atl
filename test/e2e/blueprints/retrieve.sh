@@ -11,9 +11,7 @@
 source /e2e/lib.sh
 
 PROJ="$HOME/retrieve-proj"
-mkdir -p "$PROJ/.atl/wiki" "$PROJ/docs" "$PROJ/.delivery"
-# a .delivery marker makes this a delivery project, so docs/ joins the corpus
-echo '{"backend":"github"}' > "$PROJ/.delivery/config.json"
+mkdir -p "$PROJ/.atl/wiki" "$PROJ/docs"
 cat > "$PROJ/.atl/wiki/merge-verify.md" <<'MD'
 # Verify durable state not worker exit-code
 A deterministic supervisor confirms a git merge by reading the durable branch state, never trusting an LLM worker exit code.
@@ -22,24 +20,26 @@ cat > "$PROJ/.atl/wiki/pr-merge.md" <<'MD'
 # PR merge discipline
 Never merge pull requests from Claude; surface the URL and stop.
 MD
-# a delivery-style in-repo docs/ page is part of the corpus too
+# an in-repo docs/ page is NOT part of the corpus — docs/ is never indexed
 cat > "$PROJ/docs/architecture.md" <<'MD'
 # Architecture store
-The GitHub backend keeps its durable knowledge in the in-repo docs tree.
+A repo's docs tree is often a large vendored site, so it stays out of the corpus.
 MD
 cd "$PROJ"
 
-# build a lexical-only index (deterministic, offline) — covers wiki + docs/
+# build a lexical-only index (deterministic, offline) — wiki only; docs/ is out
 out="$(atl retrieve index --lexical 2>&1)"
-echo "$out" | grep -q "indexed 3 pages" && ok "index built 3 pages (wiki + docs)" || bad "index build -- [$out]"
+echo "$out" | grep -q "indexed 2 pages" && ok "index built 2 pages (wiki only)" || bad "index build -- [$out]"
 
 # a second build is idempotent (incremental reuse path stays correct)
 out="$(atl retrieve index --lexical 2>&1)"
-echo "$out" | grep -q "indexed 3 pages" && ok "re-index is idempotent" || bad "re-index -- [$out]"
+echo "$out" | grep -q "indexed 2 pages" && ok "re-index is idempotent" || bad "re-index -- [$out]"
 
-# the docs/ page is retrievable
-out="$(echo '{"prompt":"where does the github backend keep its durable knowledge","cwd":"'"$PROJ"'"}' | atl retrieve 2>&1)"
-echo "$out" | grep -q "docs/architecture.md" && ok "docs/ page surfaced" || bad "docs page missing -- [$out]"
+# the docs/ page is NOT retrievable — the corpus boundary, asserted rather than
+# assumed: docs/ sits right beside .atl/ and is the easiest tree to re-admit by
+# accident, and re-admitting it is silent (a bigger index looks like a better one).
+out="$(echo '{"prompt":"where does a repo keep its architecture store","cwd":"'"$PROJ"'"}' | atl retrieve 2>&1)"
+echo "$out" | grep -q "docs/architecture.md" && bad "docs/ page surfaced -- [$out]" || ok "docs/ stays out of the corpus"
 
 # the hook surfaces the relevant page with the context header
 out="$(echo '{"prompt":"how does the supervisor confirm a merge landed on the branch","cwd":"'"$PROJ"'"}' | atl retrieve 2>&1)"

@@ -20,8 +20,7 @@
 #   - Claude: CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY    — the learning-loop blueprint
 # Each blueprint declares its need on a `# needs: none|gh|token|gh+token` line; a
 # blueprint whose auth is absent is skipped (so this same script is CI-safe and
-# local-full). `gh+token` (github-delivery-loop) needs BOTH a GH_TOKEN and a Claude
-# token — the real GitHub-backend Layer-B loop.
+# local-full). `gh+token` needs BOTH a GH_TOKEN and a Claude token.
 
 set -euo pipefail
 cd "$(dirname "$0")/../.."   # atl repo root (build context)
@@ -146,11 +145,10 @@ timings=()
 
 # ---- lane partitioning ------------------------------------------------------
 #
-# Blueprints that force-reset the SAME external fixture cannot overlap: the six
-# GitHub delivery blueprints each restore a fixture repo to a baseline AND delete
-# and recreate a Project of a fixed title, so two at once is not slow, it is
-# destructive — the loser sees a board that vanished mid-run and fails an
-# assertion that says nothing about concurrency.
+# Blueprints that force-reset the SAME external fixture cannot overlap: restoring
+# a fixture repo to a baseline is destructive, so two at once is not slow — the
+# loser sees its fixture vanish mid-run and fails an assertion that says nothing
+# about concurrency.
 #
 # So parallelism is DERIVED from a declaration rather than chosen: a blueprint
 # names the fixture it mutates on a `# fixture:` line, blueprints sharing one run
@@ -202,77 +200,6 @@ fi
 # suite, which matters because a wrong declaration is not a slow run — it is two
 # lanes force-resetting one fixture, and the failure surfaces as an unrelated
 # assertion in whichever lane lost.
-# GraphQL budget preflight — only when a delivery lane is actually selected.
-#
-# The budget only matters to the GitHub delivery blueprints; a subset of auth-free
-# ones has nothing to do with it, and an unconditional check blocks work that could
-# not spend a point. (Caught by using it: a `needs: none` blueprint was refused.)
-#
-# The first full parallel run exhausted the 5000/hr budget at ~30 minutes and took
-# down two blueprints in the FREE lane that never touch Projects at all — with
-# assertion messages ("no tag in output") that say nothing about rate limits.
-#
-# Measured afterwards, because the obvious culprit was wrong: the fixture reset
-# (delete + create a Project, two field-creates) costs 15 points, i.e. 90 across a
-# whole suite — 1.8% of the budget. The consumption is in the CEREMONY TURNS, where
-# each `claude -p` agent queries and mutates the board. That is the work under test,
-# so it cannot be optimised away.
-#
-# Which gives the real bound: a full suite costs approximately ONE HOURLY QUOTA, so
-# its runtime cannot be compressed far below an hour however many lanes there are.
-# The requirement scales with what was SELECTED, not with what a full suite costs.
-# A flat full-suite threshold refuses a single delivery blueprint because the budget
-# is mid-recovery — the same over-reach as checking at all for a `needs: none`
-# subset, one level down.
-#
-# 400 per delivery blueprint, and where that number comes from matters. The first
-# estimate was 800, drawn from the run that EXHAUSTED the budget — a corrupted
-# three-lane run whose draw included its own re-runs. It then refused the FULL
-# SUITE at 4891/5000: the guard blocking the exact case it exists to protect.
-#
-# Grounded on the clean two-lane run instead: 4659 -> 2397 across its first twenty
-# minutes for seven delivery blueprints, so a peak draw near 2300, ~325 each. 400
-# rounds that up without inventing headroom.
-#
-# Note this is PEAK draw, not total. A run longer than an hour crosses a reset and
-# is refilled while it works, which is why what a suite CONSUMES is not what a
-# preflight should ask for — asking for the total is what produced the 800.
-delivery_n=0
-for k in ${LANE_KEYS[@]+"${LANE_KEYS[@]}"}; do
-  [ "$k" = free ] && continue
-  delivery_n=$((delivery_n + $(wc -l < "$WORK/lane.$k")))
-done
-# ...and 1.5x that, because the estimate is a MEASUREMENT and measurements vary.
-# 400 was grounded on a clean TWO-lane run; peak draw rises with concurrency, not
-# only with count, since more lanes means more ceremony turns querying the board at
-# once. A run admitted at bare parity has no protection the moment actual draw
-# exceeds the sample.
-#
-# Measured 2026-08-08: started at 4013 against a need of 3200 — admitted at 1.25x —
-# and exhausted mid-flight. The cost of that is not the skipped work: one blueprint
-# ran 2109 seconds and THEN reported RATELIMIT. A refusal at the start costs zero;
-# an exhaustion at minute 60 discards everything spent so far. 1.5x would have
-# refused that run.
-#
-# The margin does not double-count the hourly reset. A >1h suite is refilled while
-# it works, and that refill is already priced into "peak draw, not total" above —
-# counting it again as headroom is exactly the reasoning that admitted the run that
-# then died.
-if [ "$delivery_n" -gt 0 ] && command -v gh >/dev/null 2>&1; then
-  need=$((delivery_n * 400))
-  want=$((need * 3 / 2))
-  gql_left="$(gh api rate_limit --jq '.resources.graphql.remaining' 2>/dev/null || echo "")"
-  if [ -n "$gql_left" ] && [ "$gql_left" -lt "$want" ] 2>/dev/null; then
-    gql_reset="$(gh api rate_limit --jq '((.resources.graphql.reset - now)/60|floor)' 2>/dev/null || echo "?")"
-    echo "!! GraphQL budget is ${gql_left}/5000; $delivery_n delivery blueprint(s) draw about ${need}," >&2
-    echo "   and this refuses below ${want} (1.5x) because a run admitted at bare parity" >&2
-    echo "   exhausts mid-flight — and the failures then surface on UNRELATED blueprints." >&2
-    echo "   The window resets in ~${gql_reset} min. Wait for it, or run a subset that" >&2
-    echo "   excludes the github-delivery-* lanes." >&2
-    [ "${ATL_E2E_IGNORE_BUDGET:-0}" = 1 ] || exit 4
-  fi
-fi
-
 if [ "${SHOW_LANES:-0}" = 1 ]; then
   for k in ${LANE_KEYS[@]+"${LANE_KEYS[@]}"}; do
     echo "lane $k:"; sed 's/^/  /' "$WORK/lane.$k"
@@ -302,7 +229,7 @@ run_lane() {
     case "$needs" in token|gh+token) secret_env+=(-e "CLAUDE_CODE_OAUTH_TOKEN=$CLAUDE_TOK" -e "ANTHROPIC_API_KEY=$API_KEY") ;; esac
     # The lane key IS the fixture name, so a lane can only ever touch its own.
     local fixture_env=()
-    [ "$key" != "free" ] && fixture_env+=(-e "ATL_E2E_DELIVERY_REPO=$key")
+    [ "$key" != "free" ] && fixture_env+=(-e "ATL_E2E_FIXTURE_REPO=$key")
 
     {
       echo ""
@@ -349,7 +276,7 @@ run_lane() {
       #
       # The text match alone is not enough: an exhausted budget also shows up as a
       # read that simply comes back EMPTY, with no "rate limit" anywhere. Measured
-      # 2026-08-08 — github-delivery-engine was recorded FAILED on
+      # 2026-08-08 — a GitHub blueprint was recorded FAILED on
       # "issue #104 not closed (state=)", an empty state field, i.e. the read
       # failed rather than the issue being open. So ask the budget itself at the
       # moment of failure: state beats a phrase in the output. Scoped to blueprints

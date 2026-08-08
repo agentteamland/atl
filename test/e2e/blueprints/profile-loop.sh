@@ -16,7 +16,7 @@
 # FIDELITY (the exact fields the curator rewrote) is LLM-variable → NOTE-tiered.
 source /e2e/lib.sh
 # note() is NOT in lib.sh (only ok=PASS / bad=FAIL) — a local observe-only tier for
-# LLM-variable assertions (llm-e2e-assertion-tiering), mirroring delivery-loop.sh.
+# LLM-variable assertions (llm-e2e-assertion-tiering).
 note() { echo "  note - $1"; }
 
 fresh
