@@ -182,6 +182,38 @@ ta=0
 if [ -n "$FEAT" ]; then gh issue view "$FEAT" --repo "$REPO" --comments 2>/dev/null | grep -q '\[Technical Analysis\]' && ta=1; fi
 [ "$ta" = 1 ] && ok "a [Technical Analysis] sentinel comment landed on the Feature (§7)" || bad "no [Technical Analysis] comment on the Feature"
 
+# ---- 1b. THE SEAM: is the seeded Feature compatible with the decomposition below? -----
+#
+# /kickoff WRITES the acceptance criteria that /refine then reads back as BINDING. On
+# 2026-08-05 the two disagreed one turn apart — kickoff put all three helpers in app.js
+# and wrote an NFR pinning them there, /refine was told to create absdiff.js/iszero.js
+# and to forbid touching app.js, and /refine correctly refused to decompose an
+# irreconcilable pair. Six assertions went red in a cascade, none of them naming the
+# actual problem, and the diagnosis went hunting a product defect for a while.
+#
+# The prompts were fixed. This asserts the SEAM instead, which is the part that
+# generalises: a future contradiction becomes ONE legible failure here rather than six
+# illegible ones downstream. It is also the only check that can catch it at all — the
+# defect needs kickoff to be MORE specific than usual, so repeated sampling does not
+# explore that direction and a green history says nothing about it.
+#
+# What it checks: the two module filenames survived into the seeded Feature. If kickoff
+# collapsed the helpers into app.js they cannot be there. Deliberately a POSITIVE check
+# on what must be present rather than a search for forbidden phrasing — "no AC pins this
+# to app.js" has unbounded wordings, while "the design's own filenames are in the body"
+# has exactly one.
+#
+# What it does NOT catch: a Feature that names both files and still contradicts the
+# decomposition some other way. This is a precondition, not a proof of compatibility.
+FEAT_BODY="$(gh issue view "$FEAT" --repo "$REPO" --json body -q .body 2>/dev/null | tr 'A-Z' 'a-z')"
+if printf '%s' "$FEAT_BODY" | grep -q 'absdiff\.js' && printf '%s' "$FEAT_BODY" | grep -q 'iszero\.js'; then
+  ok "seam: the seeded Feature carries the module-per-helper layout /refine will require"
+else
+  bad "seam: the Feature does not name absdiff.js and iszero.js — kickoff seeded a layout /refine is about to contradict"
+  echo "!! aborting at the seam rather than spending the ~40-min refine/plan/dispatch budget on a decomposition that cannot hold" >&2
+  finish; exit 1
+fi
+
 # ---- 2. /refine — decompose the Feature into 3 dependency-linked PBIs ----------------
 gturn "/refine. Decompose the Feature #$FEAT into EXACTLY 3 PBI issues, each created with gh issue create, each nested under #$FEAT via the sub_issues REST endpoint (adapter §1), each labelled 'area:web' AND 'type:pbi' AND stamped an 'atl-key:<shorthash>' label. Converge — do NOT duplicate the kickoff Epic/Feature. The 3 PBIs:
   PBI-A  title 'Add subtract(a,b) to app.js' — add subtract(a,b) returning a-b to app.js and export it in module.exports alongside add; add a node --test case IN app.test.js asserting subtract(5,3)===2. Modify ONLY app.js and app.test.js. NO dependencies.
