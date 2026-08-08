@@ -49,6 +49,8 @@ turns           62
 - **`suppressed`** kayıp iş değil, sağlık işaretidir. İstemlerin dörtte biri makine üretimi metin ya da birkaç karakterdir — kimsenin sormadığı sorular. Susamayan bir kanal sinyal değildir.
 - **`consulted`**, ajanın **bilerek** sorduğu turları sayar. Paydası turlardır; `Stop` hook'unun (`atl retrieve turn-end`) varlık sebebi tam da budur: tur işareti olmadan günlük neyin **sunulduğunu** kaydeder, sonrasında ne olduğunu değil.
 
+`translated` satırının kendisi bir istem olarak sayılmaz — kendisinden sonra gelen fire üzerinde bir niteleyicidir ve sayılması yukarıdaki her yüzdenin bölündüğü paydayı şişirirdi. Kardeşi `translate-skipped` aynı gerekçeyle dışarıda tutulur ama kendine ait bir satırı yoktur: çalışmış, ancak cevabı bilerek kullanılmamış bir çeviriyi işaretler — metin zaten İngilizceydi ya da model, sorgu beklenen yerde düz metin döndürdü. `translated` satırı hiç görünmüyorsa burada hiçbir şey çevrilmemiş demektir — genellikle bir kimlik bilgisi tanımlı olmadığı için. Çevirmenin kendine ait bir kimlik bilgisine ihtiyacı vardır: ya `~/.atl/claude-token` ya da dışa aktarılmış bir ortam değişkeni — ve onu **nerede** dışa aktardığın, bir hook'un onu görüp göremeyeceğini belirler; bkz. [bilgi sistemi kılavuzu](/tr/guide/knowledge-system).
+
 ## `index` ve `warm`
 
 `index` korpus dizinini yeniden kurar. Nadiren gerekir — korpus değiştiğinde session-start arka planda yeniden kurar, ve silinen bir sayfa artık tespit edilir (yalnızca-silme içeren bir değişiklik eskiden dizini var olmayan bir dosyayı sunar halde bırakıyordu).

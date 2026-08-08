@@ -216,10 +216,12 @@ func runRetrieveHook(cmd *cobra.Command) {
 	// one part the decision explicitly agreed to pay time for.
 	query := prompt
 	if ix.LexicalHits(prompt) == 0 && claudeAvailable() {
-		if translated, ok := translatePrompt(cmd.Context(), prompt); ok {
+		translated, outcome := translatePrompt(cmd.Context(), prompt)
+		switch outcome {
+		case translateOK:
 			query = translated
 			logRetrieveFire(root, "translated", nil)
-		} else {
+		case translateFailed:
 			// Record the failure too. Translation is fail-open and silent by
 			// design, so without this line a credential that has EXPIRED is
 			// indistinguishable from one that is working: the env var is still
@@ -227,6 +229,12 @@ func runRetrieveHook(cmd *cobra.Command) {
 			// quietly searches on one arm. This is the only evidence of that
 			// state that costs nothing to collect.
 			logRetrieveFire(root, "translate-failed", nil)
+		default:
+			// The subprocess ran and its answer was not used — already English,
+			// or prose where a query was asked for. Logged under its own token so
+			// it stays out of the expired-credential evidence: three ordinary
+			// English prompts must never add up to "your credential is dead".
+			logRetrieveFire(root, "translate-skipped", nil)
 		}
 	}
 
@@ -496,6 +504,7 @@ func logRetrieveFire(projectRoot, outcome string, paths []string) {
 type retrieveFireStats struct {
 	Total, Fired, Silent, Machine, Short int
 	Translated                           int
+	TranslateFailed                      int
 	Turns, Consulted, ConsultedEmpty     int
 	Offered                              int
 	Pages                                map[string]int
@@ -528,6 +537,26 @@ func readFireStats(logPath string) (retrieveFireStats, error) {
 		// exactly as the thing it measures gets adopted.
 		if f[1] == "translated" {
 			st.Translated++
+			continue
+		}
+		// Same reasoning, other outcome: a skipped translation is a modifier on the
+		// fire that follows, not a fire of its own. Left to fall through it would
+		// land in st.Total and inflate the denominator every percentage divides by —
+		// and inflate it most for English-speaking users, whose prompts are the ones
+		// that get skipped.
+		//
+		// The same holds for BOTH other translate outcomes, and translate-failed was
+		// the one already getting this wrong. Control falls through to the search
+		// after every outcome, so a failed translation is followed by its own
+		// fired/silent line exactly like a successful one — it is a modifier, not a
+		// second prompt. Counting it inflated the denominator hardest on a machine
+		// whose credential has EXPIRED, which is precisely the state the notice
+		// exists to detect, so the instrument degraded exactly where it was needed.
+		if f[1] == "translate-skipped" {
+			continue
+		}
+		if f[1] == "translate-failed" {
+			st.TranslateFailed++
 			continue
 		}
 		// Turns and consults are not prompts either. A turn is the denominator
@@ -899,6 +928,15 @@ func renderFireStats(st retrieveFireStats) string {
 	if st.Translated > 0 {
 		fmt.Fprintf(&b, "  translated %5d  %s   (of the above — a query with no lexical hit)\n",
 			st.Translated, pct(st.Translated))
+	}
+	// Shown because it is the one state a user cannot otherwise see: translation is
+	// fail-open, so an expired credential produces no error, no missing output, and
+	// no change a reader would notice — only a silently worse search. The
+	// session-start notice needs three consecutive failures before it speaks; this
+	// line shows the state from the first one.
+	if st.TranslateFailed > 0 {
+		fmt.Fprintf(&b, "  translate-failed %5d       (the translator could not run — credential expired?)\n",
+			st.TranslateFailed)
 	}
 	// The agent-initiated half, reported against TURNS rather than against fires.
 	// "Reads per offered page" is the wrong rate — the hook offers pages on every

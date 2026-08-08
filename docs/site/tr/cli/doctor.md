@@ -50,6 +50,12 @@ Bu denetim, iğnelenmiş kümeyi her brainstorm'un frontmatter `status:` değeri
 
 **Raporlar, asla yeniden yazmaz.** Doctor'ın kendi kendini onaran adımları yalnızca ATL'ye ait dosyalara dokunur; `CLAUDE.md` senin her oturumda yüklenen kendi yönerge dosyandır ve eksik-iğne yönü konunun tek satırlık özetini gerektirir — mekanik bir düzeltme değil, muhakeme. `.atl/brain-storms` dizini olmayan bir projede sessizdir.
 
+### `credential-file` — çeviricinin token'ını başkaları okuyabiliyor mu?
+
+[Erişimin istem çeviricisi](/tr/cli/retrieve) kimlik bilgisini ortamdan, ortam onu taşıyamadığındaysa `~/.atl/claude-token` dosyasından alır — içinde yalnızca token bulunan düz bir dosya. Bu dosyayı `atl` asla yazmaz; dolayısıyla elle oluşturulmuş bir dosya senin umask değerini alır ve bu değer varsayılan bir macOS kabuğunda `0644`'tür: makinedeki her hesabın okuyabildiği bir sır ve ağaçta bunu fark edecek başka hiçbir şey yok. Bu denetim dosyanın modunu okur ve mod sahibinden başkasına da açıksa **`0600`'e daraltır** — bir `(self-healed)` onarımı. Zaten yalnızca sahibine açık olan bir dosya `OK`'tir; değiştiremediği bir mod ise bulduğu modu ve gerekçesini taşıyan bir `WARN`'dır.
+
+Yalnızca modu denetler, başka hiçbir şeyi değil. Eksik ya da boş bir kimlik bilgisini bilerek **raporlamaz** — bu koşul zaten oturum-başlangıcı bildirimine aittir ve tek bir koşulu iki ayrı kanaldan bildirmek, bir sinyalin okunmaz hâle gelme biçimidir. Bu yüzden dosyanın hiç olmaması da `OK`'tir ("no translator credential file (optional)"); çeviri bir gereklilik değil, bir iyileştirmedir ve denetim bir kez onardıktan sonra tümüyle susar. `~/.atl` dizininin kendisine bilerek dokunulmaz — o dizin, kendisini `0755` olarak oluşturan öğrenme kuyruğuyla paylaşılır; dolayısıyla dizinin modu bu denetimin tartışacağı bir şey değildir.
+
 ## CLI / Beceri ayrımı
 
 `atl doctor` yalnızca deterministik onarımlar yapar — eksik bir dosyayı yeniden çek, mekanik bir adımı yeniden dene. Bir LLM gerektiren her şey (kuyruğa alınmış bir öğrenimi bilgi tabanına işlemek) tasarım gereği kapsam dışıdır; doctor sayıyı su yüzüne çıkarır ve seni beceriye yönlendirir. İşte bu yüzden büyük bir biriken iş burada bir uyarı olarak görünür ama aslında [`/drain`](/tr/cli/learnings) çalıştırılarak temizlenir.

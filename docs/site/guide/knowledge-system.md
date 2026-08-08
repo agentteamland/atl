@@ -106,9 +106,25 @@ Retrieval has two halves and they fail differently outside English. The semantic
 
 So when the lexical half returns nothing, ATL rewrites the query in English and searches again. Technical identifiers — file names, commands, flags, symbols — are kept verbatim, because those are exactly what the lexical half matches best.
 
-This needs its own credential: a session's login is held by the host and is not visible to the tools it starts. Run `claude setup-token` and export the value as `CLAUDE_CODE_OAUTH_TOKEN`. Without it nothing breaks — the notice at session start tells you what you are missing, and retrieval keeps working on one half. It is also **fail-open** end to end: a missing credential, a timeout, or an answer that does not look like a query all fall back to searching with your original words.
+This needs its own credential: a session's login is held by Claude Code and is not visible to the tools it starts, so the token has to be re-created somewhere a hook can read it. Two of the obvious places cannot do that, and it is worth knowing which before you spend time on them.
 
-An English prompt never pays for any of this — the translation only runs when the lexical half came back empty.
+::: warning Two places that do NOT work
+- **`~/.claude/settings.json`'s `env` block.** Claude Code keeps those variables in its own process and withholds a small set of them from every tool it spawns — measured on macOS by diffing variable *names* between the host process and a tool subprocess, exactly five are withheld, and `CLAUDE_CODE_OAUTH_TOKEN` is one of them. The documented place to set an environment variable is structurally incapable of delivering *this* variable to a hook.
+- **`~/.zshrc`.** zsh reads it only for interactive shells, and a hook is not one.
+
+Either one looks like it worked and silently does nothing.
+:::
+
+Two places do work. Run `claude setup-token`, then put the token it prints in **either**:
+
+- **`~/.atl/claude-token`** — a plain file holding just the token and nothing else. Keep it owner-only (`chmod 600`); if it is wider, [`atl doctor`](/cli/doctor) tightens it for you, and the same check runs at every session start.
+- **`CLAUDE_CODE_OAUTH_TOKEN`, exported from `~/.zshenv`** — zsh reads that file on every invocation, interactive or not, so the value is re-created inside the child process after the strip. (`ANTHROPIC_API_KEY` is read the same way.)
+
+The environment is checked first and the file second, so a value you exported explicitly always wins over one left in the file.
+
+Without a credential nothing breaks — the notice at session start tells you what you are missing, and retrieval keeps working on one half. If a credential is configured and later stops working, a different session-start notice names the source you actually used, so it points at the file or at `~/.zshenv` rather than guessing. Translation is also **fail-open** end to end: a missing credential, a timeout, or an answer that does not look like a query all fall back to searching with your original words.
+
+The trigger is the lexical half coming back empty, not a language check. So an English prompt on a topic the corpus covers never reaches the translator at all; one on a topic it does not cover does reach it, gets its own words back, and that answer is discarded — a wasted subprocess, never a worse search.
 
 ### Automatic, incremental, background
 

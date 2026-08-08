@@ -282,6 +282,13 @@ var exfilCreds = []exfilCred{
 	{"Anthropic API key", regexp.MustCompile(`\bANTHROPIC_API_KEY\b|\bsk-ant-[A-Za-z0-9_-]{8,}`), []string{"anthropic.com"}},
 	{"GitHub token", regexp.MustCompile(`\bgh[posur]_[A-Za-z0-9]{20,}\b|\bgithub_pat_[A-Za-z0-9_]{20,}\b`), []string{"github.com", "githubusercontent.com", "ghcr.io"}},
 	{"AWS secret", regexp.MustCompile(`\bAKIA[0-9A-Z]{16}\b|\bAWS_SECRET_ACCESS_KEY\b`), []string{"amazonaws.com"}},
+	// The retrieval translator's credential can live in a file, which the four
+	// entries above cannot see: they match an env-var NAME or a token's value
+	// shape, and `curl -d @<path>` contains neither. Matching the path closes the
+	// direct form. It does NOT close the pipe-split form (`cat file | curl -d @-`),
+	// because a rule is evaluated per shell segment — the same declared,
+	// trigger-gated gap this whole table carries, not a new one.
+	{"atl translator credential file", regexp.MustCompile(`\.atl/claude-token\b`), []string{"anthropic.com", "claude.ai"}},
 }
 
 var catastrophes = []catastrophe{

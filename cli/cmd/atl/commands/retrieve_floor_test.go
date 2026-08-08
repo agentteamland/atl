@@ -24,6 +24,19 @@ import (
 func hookOut(t *testing.T, home, root, prompt string) string {
 	t.Helper()
 	t.Setenv("HOME", home)
+
+	// Stated, not inherited. runRetrieveHook reaches claudeAvailable, and on a
+	// machine that HAS configured the translator these tests would spawn a real
+	// `claude -p` — ten seconds each, a live API call per test, and a
+	// translate-failed line in the log they then assert on. That is the CI-is-
+	// poorer asymmetry running the other way: the developer's machine is the rich
+	// one, so the suite goes red only for whoever actually uses the feature, and
+	// is green everywhere it would be checked. These tests are about which
+	// suppression fires, never about the translator.
+	orig := claudeAvailable
+	claudeAvailable = func() bool { return false }
+	t.Cleanup(func() { claudeAvailable = orig })
+
 	in, err := json.Marshal(retrieveInput{Prompt: prompt, CWD: root})
 	if err != nil {
 		t.Fatal(err)
@@ -560,5 +573,40 @@ func TestTurnEndIsSilentInAnInternalSession(t *testing.T) {
 	}
 	if lines := fireLog(t, home, here); len(lines) != 0 {
 		t.Fatalf("recorded %d turn(s) for an internal session: %v", len(lines), lines)
+	}
+}
+
+// A SKIPPED translation is a modifier on the fire that follows, exactly like a
+// successful one: the subprocess ran, its answer was not used, and the search
+// then records its own outcome. Counting it would inflate the denominator every
+// percentage divides by — and inflate it most for English-speaking users, whose
+// prompts are the ones that get skipped, so the instrument would degrade in
+// proportion to how little the feature applies.
+func TestFireStatsDoesNotCountASkippedTranslationAsAPrompt(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "fires.log")
+	if err := os.WriteFile(p, []byte(
+		"t\ttranslate-skipped\n"+
+			"t\tfired\ta.md\n"+
+			"t\ttranslate-failed\n"+
+			"t\tsuppressed-machine\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	st, err := readFireStats(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// fired + suppressed-machine = 2. NONE of the three translate outcomes is a
+	// prompt: control falls through to the search after every one of them, so each
+	// is followed by its own fired/silent line for the same prompt. Excluding only
+	// "translated" — as this did before — inflated the denominator hardest on a
+	// machine whose credential had expired, which is exactly the state the
+	// session-start notice exists to detect.
+	if st.Total != 2 {
+		t.Fatalf("Total = %d, want 2 — no translate outcome is a prompt of its own", st.Total)
+	}
+	// …and the failure is still COUNTED, just not as a prompt. It is the only
+	// visible sign of a fail-open translator that has stopped working.
+	if st.TranslateFailed != 1 {
+		t.Fatalf("TranslateFailed = %d, want 1 — excluding it from the denominator must not make it invisible", st.TranslateFailed)
 	}
 }

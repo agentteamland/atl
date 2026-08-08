@@ -22,6 +22,8 @@ Kimlik bilgisinin **kendi API'sine meşru bir çağrı geçer** — guard, gerç
 
 Guard yalnızca bilinen platform kimlik bilgilerini izler (Claude Code, Anthropic, GitHub, AWS) — her birinin bilinebilir bir home-host kümesi var. Kendi uygulama token'larının kendi backend'ine gitmesine hiç dokunulmaz, dolayısıyla normal iş asla yanlış alarm tetiklemez.
 
+Bir kural, değişken adı ya da token biçimi yerine bir **dosya yolu** eşler: [getirme çevirmeninin kimlik bilgisinin](/tr/guide/knowledge-system#non-english-prompts-are-translated-before-searching) durabileceği `~/.atl/claude-token`. Kendi kuralına ihtiyaç duymasının sebebi şu: `curl … -d @~/.atl/claude-token` gibi bir komutta ne bir değişken adı ne de bir token değeri geçer, dolayısıyla yukarıdaki dört desen onu hiç göremez. Aynı home-host kuralı burada da geçerli — o dosyanın Anthropic'e gitmesine izin verilir, başka bir yere gitmesine verilmez; yerelde okumak (`cat ~/.atl/claude-token`) ise sızdırma değildir ve hiç dokunulmaz.
+
 ## Bu senin için ne anlama geliyor
 
 - **Bir şey yapmana gerek yok** — duruş varsayılan olarak açık (kural kendiliğinden yüklenir; guard hook'u ATL ile kurulur).
