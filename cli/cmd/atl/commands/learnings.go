@@ -558,49 +558,6 @@ func openQueue() (*queue.Store, string, error) {
 	return st, project, nil
 }
 
-// projectKey is the queue's partition key: the repository the current directory
-// belongs to, falling back to the directory itself outside git.
-//
-// It used to be the bare working directory, and that lost learnings. `atl work
-// dispatch` cuts one git WORKTREE per unit and deletes it when the unit
-// completes — so an autonomous worker's markers were queued under a path that
-// then ceased to exist, and because every read surface is project-scoped, no
-// drain could name them again. The payload was intact the whole time; only its
-// address was gone, which is why nothing ever reported a problem.
-//
-// Measured 2026-08-08: 13 pending items in 6 vanished buckets, 7 of them real
-// learnings captured by delivery workers on 2026-07-18 — and the loss scales
-// with the autonomous engine, i.e. with exactly the thing the learning loop
-// exists to feed.
-//
-// Resolving through git's COMMON dir is what makes this work: in a worktree it
-// points at the main repository's .git, so the worktree's items land in the
-// parent's bucket and outlive the worktree. In an ordinary checkout — including
-// a subdirectory of one — it collapses to the repo root, so every session in one
-// repository shares one bucket instead of scattering by cwd.
-//
-// Fails toward the old behaviour: outside git, or if git cannot answer, the
-// working directory is still a usable key. A queue that partitions oddly is
-// recoverable; one that refuses to open is not.
-func projectKey() (string, error) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		return "", err
-	}
-	common, err := gitRevParsePath(cwd, "--git-common-dir")
-	if err != nil {
-		return cwd, nil
-	}
-	root := filepath.Dir(common)
-	if st, serr := os.Stat(root); serr != nil || !st.IsDir() {
-		return cwd, nil
-	}
-	if resolved, rerr := filepath.EvalSymlinks(root); rerr == nil {
-		root = resolved
-	}
-	return root, nil
-}
-
 func init() {
 	learningsStatusCmd.Flags().Bool("json", false, "emit pending counts as JSON")
 	learningsPeekCmd.Flags().Bool("json", false, "emit pending items as JSON")

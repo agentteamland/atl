@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 
 	"github.com/agentteamland/atl/cli/internal/digest"
@@ -31,7 +30,7 @@ var digestShowCmd = &cobra.Command{
 	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		all, _ := cmd.Flags().GetBool("all")
-		root, err := os.Getwd()
+		root, err := projectKey()
 		if err != nil {
 			return err
 		}
@@ -88,7 +87,7 @@ var digestAddCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		root, err := os.Getwd()
+		root, err := projectKey()
 		if err != nil {
 			return err
 		}
@@ -114,7 +113,7 @@ var digestDropCmd = &cobra.Command{
 	Short: "Remove a finding that has been decided on",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		root, err := os.Getwd()
+		root, err := projectKey()
 		if err != nil {
 			return err
 		}
