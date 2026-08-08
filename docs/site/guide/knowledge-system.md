@@ -114,9 +114,17 @@ An English prompt never pays for any of this — the translation only runs when 
 
 The index rebuilds itself whenever a drain changes the knowledge base. [`atl session-start`](/cli/setup-hooks) notices the corpus changed and spawns the build **in the background** (detached), so it never blocks the session, and the build is **incremental** — only pages whose text actually changed are re-embedded, so a routine drain refreshes in seconds. What you drain this session is retrievable the next. (Under `atl work dispatch`, per-worktree workers skip the auto-build to avoid a rebuild storm.)
 
+### The tool — when the situation raises the question, not the prompt
+
+The hook answers the user's sentence. But most of what an agent needs from the record is prompted by its own situation, and an instruction — "cut the release", "merge it" — carries no question for a ranker to match at all.
+
+[`/consult`](/skills/consult) closes that gap: the agent writes the search query itself, from what it is about to do. It reaches for it when it is about to assert how something works, propose or choose between options, edit a file whose conventions it has not verified, hit an error that feels familiar, or act on an instruction naming work that has a procedure.
+
+Two properties make it worth invoking rather than waiting for the hook. The query is drawn from the always-loaded `wiki:index`, so it is written in the corpus's own vocabulary instead of the user's paraphrase — and because that index is English, a query born there searches an English corpus on both the lexical and the semantic arm. And it has an explicit off-switch: **if none of those situations is true, do not consult.** A channel that fires on every turn stops being read.
+
 ### The discipline
 
-Retrieval prompts judgment, it doesn't replace it. When the hook surfaces a page whose topic matches what you're about to do, **read it before answering**. And when the conversation shifts topic, re-scan the always-loaded `wiki:index` for a page the hook may not have ranked — the index is in context at zero cost. The canonical rule is [`core/rules/knowledge-system.md`](https://github.com/agentteamland/atl/blob/main/core/rules/knowledge-system.md).
+Retrieval prompts judgment, it doesn't replace it. Three instruments, not one: when the **hook** surfaces a page whose topic matches what you're about to do, **read it before answering**; when your own situation raises a question, **use `/consult`**; and when the conversation shifts topic, re-scan the always-loaded `wiki:index` for a page the hook may not have ranked — the index is in context at zero cost. The canonical rule is [`core/rules/knowledge-system.md`](https://github.com/agentteamland/atl/blob/main/core/rules/knowledge-system.md).
 
 ### Manual control
 
