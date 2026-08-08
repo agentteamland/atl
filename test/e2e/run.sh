@@ -242,13 +242,33 @@ for k in ${LANE_KEYS[@]+"${LANE_KEYS[@]}"}; do
   [ "$k" = free ] && continue
   delivery_n=$((delivery_n + $(wc -l < "$WORK/lane.$k")))
 done
+# ...and 1.5x that, because the estimate is a MEASUREMENT and measurements vary.
+# 400 was grounded on a clean TWO-lane run; peak draw rises with concurrency, not
+# only with count, since more lanes means more ceremony turns querying the board at
+# once. A run admitted at bare parity has no protection the moment actual draw
+# exceeds the sample.
+#
+# Measured 2026-08-08: started at 4013 against a need of 3200 — admitted at 1.25x —
+# and exhausted mid-flight. The cost of that is not the skipped work: one blueprint
+# ran 2109 seconds and THEN reported RATELIMIT. A refusal at the start costs zero;
+# an exhaustion at minute 60 discards everything spent so far. 1.5x would have
+# refused that run.
+#
+# The margin does not double-count the hourly reset. A >1h suite is refilled while
+# it works, and that refill is already priced into "peak draw, not total" above —
+# counting it again as headroom is exactly the reasoning that admitted the run that
+# then died.
 if [ "$delivery_n" -gt 0 ] && command -v gh >/dev/null 2>&1; then
   need=$((delivery_n * 400))
+  want=$((need * 3 / 2))
   gql_left="$(gh api rate_limit --jq '.resources.graphql.remaining' 2>/dev/null || echo "")"
-  if [ -n "$gql_left" ] && [ "$gql_left" -lt "$need" ] 2>/dev/null; then
-    echo "!! GraphQL budget is ${gql_left}/5000 and $delivery_n delivery blueprint(s) need about ${need}" >&2
-    echo "   and the failures surface on UNRELATED blueprints. Wait for the hourly reset," >&2
-    echo "   or run a subset that excludes the github-delivery-* lanes." >&2
+  if [ -n "$gql_left" ] && [ "$gql_left" -lt "$want" ] 2>/dev/null; then
+    gql_reset="$(gh api rate_limit --jq '((.resources.graphql.reset - now)/60|floor)' 2>/dev/null || echo "?")"
+    echo "!! GraphQL budget is ${gql_left}/5000; $delivery_n delivery blueprint(s) draw about ${need}," >&2
+    echo "   and this refuses below ${want} (1.5x) because a run admitted at bare parity" >&2
+    echo "   exhausts mid-flight — and the failures then surface on UNRELATED blueprints." >&2
+    echo "   The window resets in ~${gql_reset} min. Wait for it, or run a subset that" >&2
+    echo "   excludes the github-delivery-* lanes." >&2
     [ "${ATL_E2E_IGNORE_BUDGET:-0}" = 1 ] || exit 4
   fi
 fi
@@ -321,9 +341,20 @@ run_lane() {
     bp_secs=$((SECONDS - bp_start))
     if [ "$rc" -eq 0 ]; then
       verdict=PASSED
-    elif grep -qi 'rate limit' "$WORK/out.$name"; then
+    elif grep -qi 'rate limit' "$WORK/out.$name" \
+      || { [ "$needs" != none ] && command -v gh >/dev/null 2>&1 \
+           && [ "$(gh api rate_limit --jq '.resources.graphql.remaining' 2>/dev/null || echo 9999)" -lt 100 ]; }; then
       # Name it. A rate-limited run is not evidence about the product, and an
       # assertion message like "no tag in output" reads exactly like one.
+      #
+      # The text match alone is not enough: an exhausted budget also shows up as a
+      # read that simply comes back EMPTY, with no "rate limit" anywhere. Measured
+      # 2026-08-08 — github-delivery-engine was recorded FAILED on
+      # "issue #104 not closed (state=)", an empty state field, i.e. the read
+      # failed rather than the issue being open. So ask the budget itself at the
+      # moment of failure: state beats a phrase in the output. Scoped to blueprints
+      # that can actually spend budget, and it fails toward FAILED if gh is absent
+      # or the query errors — a wrong RATELIMIT would excuse a real defect.
       verdict=RATELIMIT
     else
       verdict=FAILED
