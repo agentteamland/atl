@@ -208,6 +208,111 @@ func (s *Store) Counts(project string) (map[Channel]int, error) {
 	return counts, nil
 }
 
+// Projects returns every project key that currently holds pending items, with
+// its per-channel counts. It is the ONE read in this package that is not scoped
+// to a single project, and it exists for exactly that reason: every other
+// surface can only see the bucket you are standing in, so a bucket whose key is
+// a directory that no longer exists is invisible everywhere — indistinguishable
+// from no bucket at all.
+//
+// That is not hypothetical. `atl work dispatch` deletes each unit's worktree
+// when it completes, and until the key became the repository root (see the CLI's
+// projectKey) an autonomous worker's markers were queued under the worktree
+// path. Measured 2026-08-08: 13 items stranded across 6 vanished buckets. The
+// payloads were intact; nothing could name them.
+//
+// Reserved buckets are skipped — they are keyed by their own scheme, not by a
+// project path.
+func (s *Store) Projects() (map[string]map[Channel]int, error) {
+	out := map[string]map[Channel]int{}
+	err := s.db.View(func(tx *bolt.Tx) error {
+		return tx.ForEach(func(name []byte, b *bolt.Bucket) error {
+			key := string(name)
+			if key == cursorBucket || key == processedBucket || key == watchdogBucket {
+				return nil
+			}
+			counts := map[Channel]int{}
+			if err := b.ForEach(func(_, v []byte) error {
+				if v == nil {
+					return nil
+				}
+				var it Item
+				if json.Unmarshal(v, &it) == nil && it.ID != "" {
+					counts[it.Channel]++
+				}
+				return nil
+			}); err != nil {
+				return err
+			}
+			if len(counts) > 0 {
+				out[key] = counts
+			}
+			return nil
+		})
+	})
+	return out, err
+}
+
+// Recover moves every pending item out of the named source buckets and into
+// target, then removes the emptied source buckets. It is the deliberate
+// re-enqueue a stranded bucket needs: keying by the repository root stops NEW
+// losses, but nothing looks for the old addresses afterwards, so items already
+// stranded need moving before they are written off.
+//
+// One transaction, so a crash cannot leave an item in neither bucket. No
+// tombstone is written for the source — a tombstone means "processed", and these
+// were never processed; writing one would make the payload un-re-enqueueable if
+// the move were ever repeated from a transcript.
+//
+// target is skipped if it appears in from, so a caller cannot empty a bucket
+// into itself.
+func (s *Store) Recover(target string, from []string) (moved int, err error) {
+	err = s.db.Update(func(tx *bolt.Tx) error {
+		tb, err := tx.CreateBucketIfNotExists([]byte(target))
+		if err != nil {
+			return err
+		}
+		for _, src := range from {
+			if src == target {
+				continue
+			}
+			sb := tx.Bucket([]byte(src))
+			if sb == nil {
+				continue
+			}
+			var keys [][]byte
+			if err := sb.ForEach(func(k, v []byte) error {
+				if v == nil {
+					return nil
+				}
+				// Re-stamp nothing: the payload, id and original EnqueuedAt are
+				// what make this a rescue rather than a re-capture. An item that
+				// already exists in the target is left as the target's copy.
+				if tb.Get(k) == nil {
+					if err := tb.Put(k, v); err != nil {
+						return err
+					}
+					moved++
+				}
+				keys = append(keys, append([]byte(nil), k...))
+				return nil
+			}); err != nil {
+				return err
+			}
+			for _, k := range keys {
+				if err := sb.Delete(k); err != nil {
+					return err
+				}
+			}
+			if err := tx.DeleteBucket([]byte(src)); err != nil && err != bolt.ErrBucketNotFound {
+				return err
+			}
+		}
+		return nil
+	})
+	return moved, err
+}
+
 // cursorBucket holds per-project last-tick timestamps. It is a reserved bucket
 // name a project key (an absolute path) can never collide with.
 const cursorBucket = "__cursors__"

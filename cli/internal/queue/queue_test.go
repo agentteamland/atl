@@ -277,3 +277,137 @@ func TestWatchdogLatch(t *testing.T) {
 		t.Errorf("profile-fact latch = %q after learning overwrote — channels must not share a slot", k)
 	}
 }
+
+// Projects is the only cross-project read in this package, and it exists so a
+// bucket whose directory is gone can still be NAMED. Every other surface is
+// project-scoped, which is why 13 stranded items produced no signal for three
+// weeks.
+func TestProjectsSeesEveryBucketIncludingVanishedOnes(t *testing.T) {
+	st := newTestStore(t)
+	live := t.TempDir()
+	gone := filepath.Join(t.TempDir(), "deleted-worktree") // never created
+
+	for _, p := range []string{live, gone} {
+		if _, err := st.Enqueue(p, Item{ID: NewID(ChannelLearning, p), Channel: ChannelLearning, Payload: "x"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	got, err := st.Projects()
+	if err != nil {
+		t.Fatalf("Projects: %v", err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("got %d project(s), want both the live and the vanished one: %v", len(got), got)
+	}
+	if got[gone][ChannelLearning] != 1 {
+		t.Fatalf("the vanished bucket is not reported: %v", got)
+	}
+}
+
+// Reserved buckets are keyed by their own scheme, not by a project path, so they
+// must never appear as projects — otherwise the stranded-bucket check would
+// report `__cursors__` as a deleted directory on every machine.
+func TestProjectsSkipsReservedBuckets(t *testing.T) {
+	st := newTestStore(t)
+	p := t.TempDir()
+	if err := st.SetCursor(p, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.SetWatchdogLatch(p, "sess", "learning", "k"); err != nil {
+		t.Fatal(err)
+	}
+	got, err := st.Projects()
+	if err != nil {
+		t.Fatalf("Projects: %v", err)
+	}
+	for k := range got {
+		if k == cursorBucket || k == processedBucket || k == watchdogBucket {
+			t.Fatalf("reserved bucket %q reported as a project", k)
+		}
+	}
+}
+
+// Recover is the deliberate re-enqueue a stranded bucket needs: keying by the
+// repository root stops NEW losses, but nothing looks for the old addresses
+// afterwards, so what is already stranded has to be moved before it is written
+// off.
+func TestRecoverMovesItemsAndRemovesTheSourceBucket(t *testing.T) {
+	s := newTestStore(t)
+	gone, target := "/gone/worktree/7", "/live/repo"
+	it := Item{ID: NewID(ChannelLearning, "worker learning"), Channel: ChannelLearning, Payload: "worker learning", EnqueuedAt: time.Unix(100, 0).UTC()}
+	if _, err := s.Enqueue(gone, it); err != nil {
+		t.Fatal(err)
+	}
+
+	moved, err := s.Recover(target, []string{gone})
+	if err != nil || moved != 1 {
+		t.Fatalf("Recover: moved %d, err %v — want 1, nil", moved, err)
+	}
+
+	got, err := s.Pending(target, "")
+	if err != nil || len(got) != 1 {
+		t.Fatalf("target holds %d item(s), err %v — want the rescued one", len(got), err)
+	}
+	// The payload, id and ORIGINAL capture time survive: this is a rescue, not a
+	// re-capture, and a re-stamped time would misdate three-week-old knowledge.
+	if got[0].Payload != it.Payload || got[0].ID != it.ID || !got[0].EnqueuedAt.Equal(it.EnqueuedAt) {
+		t.Fatalf("item was altered in transit: %+v", got[0])
+	}
+	// The source bucket is gone, so the doctor's stranded check goes quiet — a
+	// warning with no way to clear it is one people stop reading.
+	projects, err := s.Projects()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, still := projects[gone]; still {
+		t.Fatalf("source bucket %q still reported: %v", gone, projects)
+	}
+}
+
+// No tombstone is written for the source. A tombstone means "processed", and a
+// stranded item never was — writing one would make the payload permanently
+// un-re-enqueueable if the same marker were ever re-mined from a transcript.
+func TestRecoverDoesNotTombstoneTheSource(t *testing.T) {
+	s := newTestStore(t)
+	gone, target := "/gone/x", "/live/y"
+	it := Item{ID: NewID(ChannelLearning, "p"), Channel: ChannelLearning, Payload: "p"}
+	if _, err := s.Enqueue(gone, it); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Recover(target, []string{gone}); err != nil {
+		t.Fatal(err)
+	}
+	added, err := s.Enqueue(gone, it)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !added {
+		t.Fatal("re-enqueue into the source was refused — Recover left a tombstone, so the payload is now unrecoverable there")
+	}
+}
+
+// An id already present in the target wins: recovering twice, or recovering
+// something a human already rescued by hand, must not duplicate it.
+func TestRecoverSkipsAnItemTheTargetAlreadyHas(t *testing.T) {
+	s := newTestStore(t)
+	gone, target := "/gone/z", "/live/z"
+	it := Item{ID: NewID(ChannelLearning, "dup"), Channel: ChannelLearning, Payload: "dup"}
+	if _, err := s.Enqueue(gone, it); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Enqueue(target, it); err != nil {
+		t.Fatal(err)
+	}
+	moved, err := s.Recover(target, []string{gone})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if moved != 0 {
+		t.Fatalf("moved %d — the target already had this id, so nothing should move", moved)
+	}
+	got, _ := s.Pending(target, "")
+	if len(got) != 1 {
+		t.Fatalf("target holds %d copies — a rescue must not duplicate", len(got))
+	}
+}

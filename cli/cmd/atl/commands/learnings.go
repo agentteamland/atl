@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -470,7 +471,76 @@ func firstLine(s string) string {
 	return s
 }
 
-// openQueue opens the default queue and resolves the current project key (cwd).
+// learningsRecoverCmd moves pending items out of buckets whose project directory
+// no longer exists and into this project's bucket, where a drain can reach them.
+//
+// It exists because the doctor's stranded-bucket warning would otherwise have no
+// remedy, and a warning nobody can clear becomes wallpaper — this repo has
+// measured that failure on its own signals. Explicit rather than automatic: the
+// items land in whatever project you are standing in, which is a judgement about
+// where that knowledge belongs, not something to guess.
+var learningsRecoverCmd = &cobra.Command{
+	Use:   "recover",
+	Short: "Move pending items from deleted projects into this one, so a drain can reach them",
+	Long: "Buckets keyed to a directory that no longer exists — an `atl work dispatch` worktree,\n" +
+		"a throwaway checkout — hold items no project-scoped surface can name. This moves them\n" +
+		"into the current project's bucket. Payload, id and original capture time are preserved,\n" +
+		"so the drain sees a rescue rather than a re-capture. Dry-run unless --apply.",
+	Args: cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		apply, _ := cmd.Flags().GetBool("apply")
+		st, project, err := openQueue()
+		if err != nil {
+			return err
+		}
+		defer st.Close()
+
+		projects, err := st.Projects()
+		if err != nil {
+			return err
+		}
+		var stranded []string
+		items := 0
+		for key, counts := range projects {
+			if key == project {
+				continue
+			}
+			if fi, serr := os.Stat(key); serr == nil && fi.IsDir() {
+				continue
+			}
+			stranded = append(stranded, key)
+			for _, n := range counts {
+				items += n
+			}
+		}
+		sort.Strings(stranded)
+
+		if len(stranded) == 0 {
+			fmt.Println("atl learnings: nothing stranded — every pending item is in a live project")
+			return nil
+		}
+		for _, k := range stranded {
+			parts := make([]string, 0, len(projects[k]))
+			for ch, n := range projects[k] {
+				parts = append(parts, fmt.Sprintf("%s:%d", ch, n))
+			}
+			sort.Strings(parts)
+			fmt.Printf("  [%s] %s\n", strings.Join(parts, " "), k)
+		}
+		if !apply {
+			fmt.Printf("atl learnings: %d item(s) in %d deleted project(s) — dry run; re-run with --apply to move them into %s\n", items, len(stranded), project)
+			return nil
+		}
+		moved, err := st.Recover(project, stranded)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("atl learnings: recovered %d item(s) into %s — run a drain to process them\n", moved, project)
+		return nil
+	},
+}
+
+// openQueue opens the default queue and resolves the current project key.
 func openQueue() (*queue.Store, string, error) {
 	dbPath, err := queue.DefaultPath()
 	if err != nil {
@@ -480,12 +550,55 @@ func openQueue() (*queue.Store, string, error) {
 	if err != nil {
 		return nil, "", err
 	}
-	project, err := os.Getwd()
+	project, err := projectKey()
 	if err != nil {
 		_ = st.Close()
 		return nil, "", err
 	}
 	return st, project, nil
+}
+
+// projectKey is the queue's partition key: the repository the current directory
+// belongs to, falling back to the directory itself outside git.
+//
+// It used to be the bare working directory, and that lost learnings. `atl work
+// dispatch` cuts one git WORKTREE per unit and deletes it when the unit
+// completes — so an autonomous worker's markers were queued under a path that
+// then ceased to exist, and because every read surface is project-scoped, no
+// drain could name them again. The payload was intact the whole time; only its
+// address was gone, which is why nothing ever reported a problem.
+//
+// Measured 2026-08-08: 13 pending items in 6 vanished buckets, 7 of them real
+// learnings captured by delivery workers on 2026-07-18 — and the loss scales
+// with the autonomous engine, i.e. with exactly the thing the learning loop
+// exists to feed.
+//
+// Resolving through git's COMMON dir is what makes this work: in a worktree it
+// points at the main repository's .git, so the worktree's items land in the
+// parent's bucket and outlive the worktree. In an ordinary checkout — including
+// a subdirectory of one — it collapses to the repo root, so every session in one
+// repository shares one bucket instead of scattering by cwd.
+//
+// Fails toward the old behaviour: outside git, or if git cannot answer, the
+// working directory is still a usable key. A queue that partitions oddly is
+// recoverable; one that refuses to open is not.
+func projectKey() (string, error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+	common, err := gitRevParsePath(cwd, "--git-common-dir")
+	if err != nil {
+		return cwd, nil
+	}
+	root := filepath.Dir(common)
+	if st, serr := os.Stat(root); serr != nil || !st.IsDir() {
+		return cwd, nil
+	}
+	if resolved, rerr := filepath.EvalSymlinks(root); rerr == nil {
+		root = resolved
+	}
+	return root, nil
 }
 
 func init() {
@@ -495,5 +608,6 @@ func init() {
 	learningsTranscriptCmd.Flags().Bool("json", false, "emit turns as JSON")
 	learningsTranscriptCmd.Flags().Int("limit", 2, "read the most recent N transcripts (cursorless read only)")
 	learningsTranscriptCmd.Flags().String("channel", "", "sweep forward for this capture channel, advancing its cursor")
-	learningsCmd.AddCommand(learningsStatusCmd, learningsPeekCmd, learningsAckCmd, learningsEnqueueCmd, learningsTranscriptCmd)
+	learningsRecoverCmd.Flags().Bool("apply", false, "actually move the items (default is a dry run)")
+	learningsCmd.AddCommand(learningsStatusCmd, learningsPeekCmd, learningsAckCmd, learningsEnqueueCmd, learningsTranscriptCmd, learningsRecoverCmd)
 }

@@ -27,6 +27,8 @@ atl learnings ack <id>               # mark an item processed (delete it)
 atl learnings transcript             # recent conversation flow (a plain read)
 atl learnings transcript --json      # the same flow as role/text records
 atl learnings transcript --channel learning   # sweep forward, advancing that channel's cursor
+atl learnings recover                # list items stranded in deleted projects (dry run)
+atl learnings recover --apply        # move them into this project, where a drain can reach them
 ```
 
 ## Subcommands
@@ -113,6 +115,18 @@ Human-readable output is one line per turn:
 [user] no, use refresh tokens not sessions
 [assistant] Good call — switching to refresh tokens.
 ```
+
+### `atl learnings recover`
+
+Moves pending items out of buckets whose project directory **no longer exists** and into the current project's, where a drain can reach them.
+
+The queue partitions by project, and every read surface is project-scoped — so a bucket keyed to a deleted directory is invisible from everywhere, indistinguishable from no bucket at all. `atl work dispatch` cuts one git worktree per unit and deletes it on completion, so before the key became the repository root, an autonomous worker's markers were queued under a path that then ceased to exist. Measured 2026-08-08: **13 items across 6 vanished buckets**, seven of them real learnings captured by delivery workers three weeks earlier. The payloads were intact the whole time; only their address was gone.
+
+Keying by the repository root stops new losses. It cannot surface what is already stranded — after a re-key, nothing looks for the old addresses — which is why this exists beside it.
+
+**Dry run by default.** `--apply` performs the move. Payload, id and the original capture time are preserved, so a drain sees a three-week-old rescue rather than something captured today; an id the target already holds is left alone, so recovering twice never duplicates. No tombstone is written for the source: a tombstone means *processed*, and a stranded item never was.
+
+`atl doctor` reports the same condition as `queue-stranded`.
 
 ## Examples
 
