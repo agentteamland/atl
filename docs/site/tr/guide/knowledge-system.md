@@ -114,9 +114,17 @@ Bunun kendi kimlik bilgisine ihtiyacı var: bir oturumun girişi ana uygulamada 
 
 Bir drain bilgi tabanını değiştirdiğinde dizin kendini yeniden kurar. [`atl session-start`](/cli/setup-hooks) korpusun değiştiğini fark eder ve derlemeyi **arka planda** (ayrık/detached) başlatır, böylece oturumu asla bloklamaz; ve derleme **artımlıdır** — yalnızca metni gerçekten değişen sayfalar yeniden gömülür, dolayısıyla rutin bir drain saniyeler içinde tazelenir. Bu oturumda drain ettiğiniz, bir sonraki oturumda erişilebilir. (`atl work dispatch` altında, worktree başına worker'lar yeniden-derleme fırtınasını önlemek için otomatik derlemeyi atlar.)
 
+### Araç — soruyu istem değil, durumun kendisi doğurduğunda
+
+Kanca, kullanıcının cümlesini yanıtlar. Oysa bir ajanın kayıttan ihtiyaç duyduğu şeyin çoğunu kendi durumu doğurur; ve bir talimat — "sürümü çıkar", "merge et" — bir sıralayıcının eşleştirebileceği hiçbir soru taşımaz.
+
+[`/consult`](/tr/skills/consult) bu boşluğu kapatır: arama sorgusunu, yapmak üzere olduğu şeyden yola çıkarak ajanın kendisi yazar. Bir şeyin nasıl çalıştığını iddia etmek üzereyken, bir tasarım önerirken ya da seçenekler arasında seçim yaparken, kurallarını doğrulamadığı bir dosyayı düzenlerken, tanıdık gelen bir hataya çarptığında, veya bir prosedürü olan işi adlandıran bir talimatı uygularken devreye girer.
+
+İki özelliği, kancayı beklemek yerine onu çağırmayı değerli kılar. Sorgu, sürekli-yüklü `wiki:index`'ten türetilir; yani kullanıcının başka sözcüklerle anlatımı yerine korpusun kendi söz dağarcığıyla yazılır — ve o dizin İngilizce olduğu için, orada doğan bir sorgu İngilizce korpusu hem sözcüksel hem anlamsal kolda arar. Bir de açık bir kapatma anahtarı vardır: **bu durumlardan hiçbiri geçerli değilse, danışma.** Her turda ateşleyen bir kanal okunmaz hale gelir.
+
 ### Disiplin
 
-Erişim yargıyı tetikler, onun yerine geçmez. Kanca yapacağınız işle konusu eşleşen bir sayfa sunduğunda, **cevaplamadan önce onu okuyun**. Ve konuşma konu değiştirdiğinde, kancanın sıralamamış olabileceği bir sayfa için sürekli-yüklü `wiki:index`'i yeniden tarayın — dizin sıfır maliyetle bağlamdadır. Kaynak kural: [`core/rules/knowledge-system.md`](https://github.com/agentteamland/atl/blob/main/core/rules/knowledge-system.md).
+Erişim yargıyı tetikler, onun yerine geçmez. Tek değil, üç alet: **kanca** yapacağınız işle konusu eşleşen bir sayfa sunduğunda **cevaplamadan önce onu okuyun**; soruyu kendi durumunuz doğurduğunda **`/consult` kullanın**; ve konuşma konu değiştirdiğinde, kancanın sıralamamış olabileceği bir sayfa için sürekli-yüklü `wiki:index`'i yeniden tarayın — dizin sıfır maliyetle bağlamdadır. Kaynak kural: [`core/rules/knowledge-system.md`](https://github.com/agentteamland/atl/blob/main/core/rules/knowledge-system.md).
 
 ### Elle kontrol
 
