@@ -32,6 +32,41 @@ func TestCatastrophe(t *testing.T) {
 		{"clean dry-run allowed", "git clean -n", false},
 		{"clean dry-run cluster allowed", "git clean -nfd", false},
 
+		// discarding the working tree — blocked in the spellings that cannot mean
+		// anything else, and NOT in the ones that are ordinary git.
+		//
+		// Both arms are in one block on purpose. A rule measured only on what it
+		// refuses passes just as well when it refuses everything, and over-breadth is
+		// the failure that matters here: `git checkout <branch>` is the commonest
+		// command there is, and a guard that blocks it gets routed around, after which
+		// it is not a guard.
+		{"checkout dot", "git checkout .", true},
+		{"checkout dashdash dot", "git checkout -- .", true},
+		{"checkout dashdash path", "git checkout -- src/foo.go", true},
+		{"checkout treeish path", "git checkout HEAD -- .", true},
+		{"checkout force dot", "git checkout -f .", true},
+		{"checkout force branch", "git checkout -f main", true},
+		{"checkout force long", "git checkout --force main", true},
+		{"checkout in a -C invocation", "git -C /tmp/x checkout .", true},
+		{"restore dot", "git restore .", true},
+		{"restore path", "git restore src/foo.go", true},
+		{"restore staged and worktree", "git restore --staged --worktree .", true},
+		{"restore from a source", "git restore --source=HEAD~1 src/foo.go", true},
+		{"discard after a safe command", "git status && git checkout .", true},
+
+		// The legitimate cases. Every one of these is something done several times a
+		// day, and the last two are the smallest cases the rule could plausibly catch
+		// by accident — a `.` that belongs to git's own -C, and an unstage that leaves
+		// the file's content exactly where it was.
+		{"checkout a branch allowed", "git checkout main", false},
+		{"checkout a new branch allowed", "git checkout -b feature/x", false},
+		{"checkout a new branch from a ref allowed", "git checkout -q -b fix/y origin/main", false},
+		{"checkout tracking allowed", "git checkout --track origin/x", false},
+		{"checkout detached allowed", "git checkout --detach main", false},
+		{"switch is not in scope", "git switch main", false},
+		{"checkout with -C dot allowed", "git -C . checkout main", false},
+		{"restore staged only allowed", "git restore --staged src/foo.go", false},
+
 		// destructive SQL — blocked, case-insensitive.
 		{"drop table", `psql -c "DROP TABLE users"`, true},
 		{"drop table lower", `mysql -e "drop table users"`, true},
