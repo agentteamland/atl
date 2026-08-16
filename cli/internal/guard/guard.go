@@ -312,6 +312,14 @@ var catastrophes = []catastrophe{
 			"Preview with `git clean -n` first. (Catastrophe layer: irreversible.)",
 	},
 	{
+		name:  "discard-worktree",
+		match: isWorktreeDiscard,
+		reason: "atl guard — this discards uncommitted changes in the working tree, and unlike a reset " +
+			"there is no reflog entry to recover from: the content was never committed, so nothing " +
+			"holds a copy. Commit or stash first, or name the specific file you mean rather than `.`. " +
+			"(Catastrophe layer: irreversible.)",
+	},
+	{
 		name:  "destructive-sql",
 		match: isDestructiveSQL,
 		reason: "atl guard — a destructive SQL statement (DROP / TRUNCATE) was detected; it irreversibly " +
@@ -349,6 +357,124 @@ func isForcePush(seg string) bool {
 
 func isResetHard(seg string) bool {
 	return reGitReset.MatchString(seg) && reResetHard.MatchString(seg)
+}
+
+// isWorktreeDiscard matches the `git checkout` / `git restore` spellings that throw
+// away uncommitted work in the working tree.
+//
+// # Why this is in the table at all
+//
+// `git checkout .` is the ordinary way to discard every uncommitted change in a tree,
+// and it is strictly worse than `git reset --hard`, which is already here: a reset at
+// least moves a ref, so the reflog holds where you were. Discarded worktree content was
+// never committed, so no object holds a copy and there is nothing to recover from.
+// ATL's own branch-hygiene rule names the path — "git checkout main with a dirty
+// working tree (silent data-loss path)" — so the discipline was written and enforced by
+// nothing, which is the gap this table exists to close.
+//
+// # Why a subset rather than the family
+//
+// `git checkout <branch>` is the commonest git command there is, and a family match
+// would refuse it. An over-broad guard is worse than a narrow one in a way that is easy
+// to miss: a false refusal is indistinguishable from a true one at the moment it
+// happens, the person who hits it is in a hurry, and it trains its own circumvention.
+//
+// So only spellings that cannot mean anything but "discard" are refused:
+//
+//   - a bare `.` argument, which is a pathspec and never a branch
+//   - `--`, which is git's own marker that what follows is a path
+//   - `-f` / `--force`, which discards local changes even on a branch switch
+//   - for `restore`, everything except a `--staged`-only invocation, because restore
+//     has no branch-switching meaning: with `--staged` alone it rewrites the index and
+//     leaves the file's content on disk, and any other form overwrites the file
+//
+// # The gap this leaves, declared rather than closed
+//
+// `git checkout somefile.txt` is destructive and is PERMITTED, because a bare word
+// after `checkout` is ambiguous between a path and a branch and there is no way to tell
+// from the string. Separating them needs git's own view of the repository, which a
+// PreToolUse hook does not have. Declared here for the same reason the secret-exfil
+// rule declares its pipe-split gap: a known hole somebody can find is better than a
+// silent one, and better than a rule that refuses `git checkout main`.
+func isWorktreeDiscard(seg string) bool {
+	rest, sub := afterGitSubcommand(seg, "checkout", "restore")
+	if sub == "" {
+		return false
+	}
+	if sub == "restore" {
+		// Restore always writes the working tree unless it was told to touch only the
+		// index. `--staged` alone moves HEAD's content into the index and leaves the
+		// file alone; `--staged --worktree` is the destructive pair, so the presence of
+		// --worktree puts it back in scope.
+		staged := false
+		worktree := false
+		for _, w := range rest {
+			switch w {
+			case "--staged", "-S":
+				staged = true
+			case "--worktree", "-W":
+				worktree = true
+			}
+		}
+		return !staged || worktree
+	}
+	for _, w := range rest {
+		if w == "." || w == "--" || w == "--force" {
+			return true
+		}
+		// A short-flag cluster carrying f: `-f`, `-fq`. Checked against the words AFTER
+		// the subcommand, so a `-f` belonging to some other command in the same segment
+		// cannot reach this.
+		if len(w) > 1 && w[0] == '-' && w[1] != '-' && strings.ContainsRune(w, 'f') {
+			return true
+		}
+	}
+	return false
+}
+
+// afterGitSubcommand returns the words following one of subs in a git invocation, and
+// which one matched.
+//
+// The words BEFORE the subcommand are excluded deliberately. `git -C . checkout main`
+// carries a `.` argument and is an ordinary branch switch; a scan over the whole
+// segment would refuse it, and that is precisely the legitimate-small-case failure this
+// rule's own comment warns about.
+func afterGitSubcommand(seg string, subs ...string) ([]string, string) {
+	words := strings.Fields(seg)
+	for i, w := range words {
+		if w != "git" {
+			continue
+		}
+		for j := i + 1; j < len(words); j++ {
+			for _, s := range subs {
+				if words[j] == s {
+					return words[j+1:], s
+				}
+			}
+			// Stop at the first word that is not an option or its value: that word is
+			// the subcommand, and if it is not one of ours this invocation is not.
+			if !strings.HasPrefix(words[j], "-") && !isGitGlobalOptionValue(words, j) {
+				break
+			}
+		}
+	}
+	return nil, ""
+}
+
+// isGitGlobalOptionValue reports whether words[i] is the value of a preceding git
+// global option that takes one — `git -C <dir> checkout ...`, `git -c k=v checkout ...`.
+//
+// Without it the scan stops at the directory argument and never reaches the
+// subcommand, so `git -C /some/path checkout .` would be permitted.
+func isGitGlobalOptionValue(words []string, i int) bool {
+	if i == 0 {
+		return false
+	}
+	switch words[i-1] {
+	case "-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path":
+		return true
+	}
+	return false
 }
 
 func isForceClean(seg string) bool {
