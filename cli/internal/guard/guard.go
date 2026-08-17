@@ -20,8 +20,10 @@
 package guard
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
+	"time"
 )
 
 // Input is the subset of the Claude Code PreToolUse hook payload guard reads.
@@ -107,6 +109,87 @@ const PipeExitNudge = "atl guard — this reads $? after a pipeline, which is th
 	"without the filter and read its status, or `set -o pipefail` first. (a check whose failure " +
 	"does not reach the exit code is not a check)"
 
+// StaleMessageNudge is the quality-layer text for committing from a message file
+// that was written long before this turn.
+const StaleMessageNudge = "atl guard — the message file this commit reads was last written %s ago, " +
+	"which is longer than a turn: %s. If the heredoc that should have written it did not run — the " +
+	"commonest cause is this guard refusing the compound command it was part of, since a commit " +
+	"message about a dangerous command contains that command's words — then `git commit -F` reads " +
+	"whatever was left at that path and exits 0 with the WRONG message and the right files. Read " +
+	"the file back before committing, and give each message its own filename so a stale one cannot " +
+	"be picked up silently. (a commit that succeeds with the wrong message reports nothing)"
+
+// staleAfter is how old a message file must be before the nudge fires.
+//
+// Chosen against the two cases rather than by taste. The failure this exists for was
+// a file FIFTEEN HOURS old; a message written for the commit in hand is written
+// seconds before it. Ten minutes sits far from both, and it is the point at which a
+// turn has plainly done other work in between — which is exactly when "did my heredoc
+// actually run?" stops being obvious.
+//
+// Erring toward firing is correct here because the two costs are not comparable: a
+// false positive is one line of context, and a false negative is a commit whose
+// message describes different work, discovered by whoever reads the history later.
+const staleAfter = 10 * time.Minute
+
+// commitMessageFileRe pulls the path out of a `git commit` that reads its message
+// from a file: `-F <path>`, `--file <path>`, `--file=<path>`.
+//
+// Anchored on `commit` so that `-F` belonging to some other command in the same
+// segment cannot reach this — the same reason the worktree-discard rule scans only
+// the words after its subcommand.
+var commitMessageFileRe = regexp.MustCompile(`\bcommit\b[^;|&\n]*?(?:-F|--file)[=\s]+("[^"]+"|'[^']+'|\S+)`)
+
+// StaleCommitMessage reports the message file a `git commit` would read when that
+// file is older than staleAfter, and how old it is.
+//
+// age is injected rather than called directly so the policy is testable without
+// touching a clock or a disk — the same seam fileExists uses.
+//
+// # Why this is a check and not a rule
+//
+// The failure is silent by construction: correct files, exit 0, and a message from
+// another day. Nothing about the result says it happened, so the only surface that
+// could report it is the moment the command is issued. It has now fired three times
+// across sessions, and a wiki page plus an always-loaded index entry did not stop it
+// — which is the case for a deterministic check rather than a fourth telling.
+//
+// # Why the predicate is the file's AGE and not the flag
+//
+// Writing the message to a file and passing the path is the CORRECT practice here —
+// an inline message is scanned by this guard and mangled by the shell. So a nudge on
+// every `-F` would fire on every commit, and a signal that always fires is one that
+// stops being read; this project has measured that at 277 out of 277. Age separates
+// the two cases: a file written for the commit in hand is seconds old, and the one
+// that produces this failure is hours old.
+func StaleCommitMessage(cmd string, age func(string) (time.Duration, bool)) (time.Duration, string, bool) {
+	if cmd == "" || age == nil {
+		return 0, "", false
+	}
+	m := commitMessageFileRe.FindStringSubmatch(cmd)
+	if m == nil {
+		return 0, "", false
+	}
+	p := strings.Trim(m[1], `"'`)
+	if p == "" || p == "-" {
+		return 0, "", false // `-F -` reads stdin; there is no file to be stale
+	}
+	d, ok := age(p)
+	if !ok || d < staleAfter {
+		return 0, "", false
+	}
+	return d, p, true
+}
+
+// roundAge renders a duration the way somebody reads one when deciding whether a file
+// is theirs: whole hours past an hour, whole minutes below it.
+func roundAge(d time.Duration) string {
+	if d >= time.Hour {
+		return fmt.Sprintf("%d hour(s)", int(d/time.Hour))
+	}
+	return fmt.Sprintf("%d minute(s)", int(d/time.Minute))
+}
+
 // pipeExitRe matches a `$?` read that follows a pipeline in the same command:
 // a `|`, then a command separator, then `$?` before the next separator.
 // Deliberately loose about what sits between — the point is proximity, not
@@ -151,7 +234,7 @@ func PipeExitCode(cmd string) bool {
 // exists on disk; firstEdit reports (and records) whether this is the first edit
 // of a path in the session. Both are injected so the policy is testable without
 // disk or per-session state.
-func Decide(in Input, fileExists func(string) bool, firstEdit func(path string) bool) Result {
+func Decide(in Input, fileExists func(string) bool, firstEdit func(path string) bool, age func(string) (time.Duration, bool)) Result {
 	switch in.ToolName {
 	case "Bash":
 		if reason, blocked := Catastrophe(in.ToolInput.Command); blocked {
@@ -159,6 +242,9 @@ func Decide(in Input, fileExists func(string) bool, firstEdit func(path string) 
 		}
 		if PipeExitCode(in.ToolInput.Command) {
 			return Result{Action: Context, Reason: PipeExitNudge}
+		}
+		if d, path, stale := StaleCommitMessage(in.ToolInput.Command, age); stale {
+			return Result{Action: Context, Reason: fmt.Sprintf(StaleMessageNudge, roundAge(d), path)}
 		}
 	case "Edit", "MultiEdit", "Write":
 		p := in.ToolInput.FilePath

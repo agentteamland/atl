@@ -3,6 +3,7 @@ package guard
 import (
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestCatastrophe(t *testing.T) {
@@ -174,6 +175,11 @@ func TestCatastrophe(t *testing.T) {
 	}
 }
 
+// noAge is the age seam for a test that is not about message-file staleness: no
+// path resolves, so StaleCommitMessage cannot fire and the case under test is the
+// only thing being measured.
+var noAge = func(string) (time.Duration, bool) { return 0, false }
+
 func TestDecide(t *testing.T) {
 	exists := func(string) bool { return true }
 	missing := func(string) bool { return false }
@@ -235,7 +241,7 @@ func TestDecide(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			got := Decide(c.in, c.exists, c.firstEdit)
+			got := Decide(c.in, c.exists, c.firstEdit, noAge)
 			if got.Action != c.want {
 				t.Fatalf("Decide(%+v) action = %q, want %q", c.in, got.Action, c.want)
 			}
@@ -322,7 +328,7 @@ func TestPipeExitCodeNotFlagged(t *testing.T) {
 // interrupt a legitimate pipeline read.
 func TestPipeExitCodeIsContextNotDeny(t *testing.T) {
 	in := Input{ToolName: "Bash", ToolInput: ToolInput{Command: `cmd | tail -1; echo $?`}}
-	got := Decide(in, func(string) bool { return true }, func(string) bool { return true })
+	got := Decide(in, func(string) bool { return true }, func(string) bool { return true }, noAge)
 	if got.Action != Context {
 		t.Errorf("action = %q, want %q (never Deny)", got.Action, Context)
 	}
@@ -337,7 +343,7 @@ func TestPipeExitCodeIsContextNotDeny(t *testing.T) {
 func TestCatastropheOutranksPipeNudge(t *testing.T) {
 	cmd := "git push --for" + "ce origin main | tee log; echo $?"
 	got := Decide(Input{ToolName: "Bash", ToolInput: ToolInput{Command: cmd}},
-		func(string) bool { return true }, func(string) bool { return true })
+		func(string) bool { return true }, func(string) bool { return true }, noAge)
 	if got.Action != Deny {
 		t.Errorf("action = %q, want %q", got.Action, Deny)
 	}
@@ -385,11 +391,11 @@ func TestDecideRoutesSpecEditsToTheSpecNudge(t *testing.T) {
 	exists := func(string) bool { return true }
 	first := func(string) bool { return true }
 
-	spec := Decide(Input{ToolName: "Edit", ToolInput: ToolInput{FilePath: "/r/skills/x/SKILL.md"}}, exists, first)
+	spec := Decide(Input{ToolName: "Edit", ToolInput: ToolInput{FilePath: "/r/skills/x/SKILL.md"}}, exists, first, noAge)
 	if spec.Action != Context || spec.Reason != SpecNudge {
 		t.Errorf("a spec edit must get the spec nudge, got %+v", spec)
 	}
-	other := Decide(Input{ToolName: "Edit", ToolInput: ToolInput{FilePath: "/r/cli/main.go"}}, exists, first)
+	other := Decide(Input{ToolName: "Edit", ToolInput: ToolInput{FilePath: "/r/cli/main.go"}}, exists, first, noAge)
 	if other.Action != Context || other.Reason != NudgeText {
 		t.Errorf("ordinary code must keep the generic nudge, got %+v", other)
 	}
@@ -399,7 +405,7 @@ func TestDecideRoutesSpecEditsToTheSpecNudge(t *testing.T) {
 		t.Error("the quality layer never blocks")
 	}
 	again := Decide(Input{ToolName: "Edit", ToolInput: ToolInput{FilePath: "/r/skills/x/SKILL.md"}},
-		exists, func(string) bool { return false })
+		exists, func(string) bool { return false }, noAge)
 	if again.Action != "" {
 		t.Errorf("a repeat edit must stay silent, got %+v", again)
 	}
@@ -409,8 +415,68 @@ func TestDecideRoutesSpecEditsToTheSpecNudge(t *testing.T) {
 // spec branch must not fire on creation either.
 func TestSpecNudgeSkipsNewFiles(t *testing.T) {
 	got := Decide(Input{ToolName: "Write", ToolInput: ToolInput{FilePath: "/r/skills/x/SKILL.md"}},
-		func(string) bool { return false }, func(string) bool { return true })
+		func(string) bool { return false }, func(string) bool { return true }, noAge)
 	if got.Action != "" {
 		t.Errorf("creating a spec must not nudge, got %+v", got)
+	}
+}
+
+// A commit reading a message file older than a turn is nudged; one reading a file
+// written moments ago is silent.
+//
+// Both arms, because either alone passes over a predicate that is not reading
+// anything: a check that never fires passes the fresh case, and one that always
+// fires passes the stale case. The silent arm is the load-bearing one here —
+// writing the message to a file and passing the path is the CORRECT practice, so a
+// check that fired on every `-F` would fire on every commit, and this project has
+// measured what happens to a signal that always fires.
+func TestStaleCommitMessageFiresOnAgeNotOnTheFlag(t *testing.T) {
+	stale := func(string) (time.Duration, bool) { return 15 * time.Hour, true }
+	fresh := func(string) (time.Duration, bool) { return 3 * time.Second, true }
+	missing := func(string) (time.Duration, bool) { return 0, false }
+
+	for _, c := range []struct {
+		name string
+		cmd  string
+		age  func(string) (time.Duration, bool)
+		want bool
+	}{
+		{"a stale message file", "git commit -F /tmp/msg.txt", stale, true},
+		{"long flag, stale", "git commit --file /tmp/msg.txt", stale, true},
+		{"equals spelling, stale", "git commit --file=/tmp/msg.txt", stale, true},
+		{"quoted path, stale", `git commit -F "/tmp/my msg.txt"`, stale, true},
+		{"stale, with other flags between", "git commit -q -F /tmp/msg.txt", stale, true},
+
+		// The silent arm. Each of these is something done many times a day.
+		{"a message written moments ago", "git commit -F /tmp/msg.txt", fresh, false},
+		{"a file that is not there at all", "git commit -F /tmp/gone.txt", missing, false},
+		{"an inline message", `git commit -m "fix: a thing"`, stale, false},
+		{"reading the message from stdin", "git commit -F -", stale, false},
+		{"-F belonging to another command in the same line", "grep -F needle file; git status", stale, false},
+		{"no commit at all", "tar -F /tmp/msg.txt", stale, false},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			_, _, got := StaleCommitMessage(c.cmd, c.age)
+			if got != c.want {
+				t.Errorf("StaleCommitMessage(%q) = %v, want %v", c.cmd, got, c.want)
+			}
+		})
+	}
+}
+
+// It is the quality tier: a commit from an old file may be exactly what somebody
+// meant, so this says what the risk is and lets the call through.
+func TestStaleCommitMessageIsContextNotDeny(t *testing.T) {
+	in := Input{ToolName: "Bash", ToolInput: ToolInput{Command: "git commit -F /tmp/msg.txt"}}
+	got := Decide(in, func(string) bool { return true }, func(string) bool { return true },
+		func(string) (time.Duration, bool) { return 15 * time.Hour, true })
+	if got.Action != Context {
+		t.Errorf("action = %q, want %q (never Deny)", got.Action, Context)
+	}
+	if !strings.Contains(got.Reason, "15 hour(s)") {
+		t.Errorf("the nudge must name how old the file is, got %q", got.Reason)
+	}
+	if !strings.Contains(got.Reason, "/tmp/msg.txt") {
+		t.Errorf("the nudge must name the file, got %q", got.Reason)
 	}
 }
