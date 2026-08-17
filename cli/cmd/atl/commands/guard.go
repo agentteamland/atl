@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io"
 	"os"
+	"time"
 
 	"github.com/agentteamland/atl/cli/internal/guard"
 	"github.com/spf13/cobra"
@@ -32,7 +33,7 @@ var guardCmd = &cobra.Command{
 		if err := json.Unmarshal(data, &in); err != nil {
 			return nil
 		}
-		res := guard.Decide(in, fileExists, guard.FirstEditFunc(in.SessionID))
+		res := guard.Decide(in, fileExists, guard.FirstEditFunc(in.SessionID), fileAge)
 		out := guardOutput(res)
 		if out == nil {
 			return nil // no-op: emit nothing, normal permission flow applies
@@ -40,6 +41,18 @@ var guardCmd = &cobra.Command{
 		_ = json.NewEncoder(cmd.OutOrStdout()).Encode(out)
 		return nil
 	},
+}
+
+// fileAge is how long ago a path was last written, and whether it could be read at
+// all. A path that does not exist returns false rather than a zero age: git will fail
+// loudly on it by itself, and reporting it as "brand new" would be the one answer that
+// suppresses the check for the one case it cannot help with.
+func fileAge(p string) (time.Duration, bool) {
+	fi, err := os.Stat(p)
+	if err != nil {
+		return 0, false
+	}
+	return time.Since(fi.ModTime()), true
 }
 
 func fileExists(p string) bool {
