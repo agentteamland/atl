@@ -28,23 +28,39 @@ set -eu
 
 GLOBAL="$HOME/.atl/profiles"
 
-# 1. The store directory. Restore is the one skill that legitimately runs before anything
-#    else exists — a brand-new machine — so it creates rather than complains.
+# 1. Where from, BEFORE anything is created. The remote is the record; nothing else stores
+#    it — and resolving it first is what lets a declined restore leave the machine exactly
+#    as it found it.
+#
+#    The old order created the directory and ran `git init` first, then asked. A user who
+#    declined was left holding an empty repository they never asked for, and that leftover
+#    is not cosmetic: `/profile-backup` decides "is this store versioned?" with
+#    `rev-parse --git-dir`, which an empty repo satisfies — so a declined restore silently
+#    moved backup from reporting `not-versioned` to reporting `no-remote`, about a store
+#    with no content and no history. Two states with different remedies, made to look alike
+#    by a directory nobody wanted.
+REMOTE=""
+if git -C "$GLOBAL" rev-parse --git-dir >/dev/null 2>&1; then
+  REMOTE="$(git -C "$GLOBAL" remote get-url origin 2>/dev/null || true)"
+fi
+if [ -z "$REMOTE" ]; then
+  if [ -z "${ATL_PROFILE_REMOTE:-}" ]; then echo "no-remote"; exit 0; fi
+  REMOTE="$ATL_PROFILE_REMOTE"
+fi
+
+# 2. Only now that a destination is known: the store directory, and the repo under it.
+#    Restore is the one skill that legitimately runs before anything else exists — a
+#    brand-new machine — so it creates rather than complains. `atl session-start` normally
+#    brings a store under git, but it only versions a store that already has content, and
+#    on a new machine there is none yet.
 if [ ! -d "$GLOBAL" ]; then
   mkdir -p "$GLOBAL"
 fi
-
-# 2. Under git. `atl session-start` normally does this, but it only versions a store that
-#    already has content, and on a new machine there is none yet — so restore cannot assume
-#    the repo is there.
 if ! git -C "$GLOBAL" rev-parse --git-dir >/dev/null 2>&1; then
   git -C "$GLOBAL" init -q
 fi
-
-# 3. Where from? The remote is the record; nothing else stores it.
 if [ -z "$(git -C "$GLOBAL" remote 2>/dev/null)" ]; then
-  if [ -z "${ATL_PROFILE_REMOTE:-}" ]; then echo "no-remote"; exit 0; fi
-  git -C "$GLOBAL" remote add origin "$ATL_PROFILE_REMOTE"
+  git -C "$GLOBAL" remote add origin "$REMOTE"
 fi
 
 if ! git -C "$GLOBAL" fetch -q origin; then echo "fetch-failed"; exit 1; fi
