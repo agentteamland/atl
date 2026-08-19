@@ -41,10 +41,34 @@ import (
 // what its English twin scores — 75% against today's 25%.
 
 const (
-	// translateTimeout bounds the translation subprocess. Generous on purpose:
-	// the decision explicitly traded latency for recall, and a translation that
-	// times out costs nothing but the original query, which is what would have
-	// run anyway.
+	// translateTimeout bounds the translation subprocess.
+	//
+	// DERIVED, not chosen. The binding constraint is not the latency of a
+	// translation — it is the harness's own ceiling on the hook this runs inside,
+	// which nothing in this repository had measured or recorded.
+	//
+	// Claude Code cancels a `command` hook at a default that UserPromptSubmit
+	// lowers to 30 SECONDS, and `atl retrieve` is registered as exactly that with
+	// no `timeout` of its own (settings.Hook cannot express one). So 30s is the
+	// whole budget for translation AND everything after it.
+	//
+	// The rest of the hook, measured warm on this machine, costs ~2.5s; its worst
+	// case is bounded by the 5s context around the embedder and the query, plus a
+	// cold index load — call it ~7s. That leaves ~23s for translation, and 20s
+	// keeps a margin under it.
+	//
+	// Why not raise it toward the ceiling, which the observed distribution invites:
+	// translation measured 9–24s over nine samples (median 16), and a 92s success
+	// was measured by hand. Those longer calls cannot be served from here at ANY
+	// value of this constant — and raising it trades a VISIBLE failure for an
+	// INVISIBLE one. A translation that hits this deadline logs
+	// `translate-failed:timeout` and the prompt still searches untranslated; a hook
+	// the harness kills at 30s logs NOTHING and loses retrieval entirely, which is
+	// both the worse outcome and the unobservable one.
+	//
+	// So the tail is not served by a bigger number. It is served by the cache
+	// above: a query translated once is free every time after, including while the
+	// weekly limit is exhausted.
 	translateTimeout = 20 * time.Second
 
 	// maxTranslatableRunes caps what is sent. A retrieval query is a question,
