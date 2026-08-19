@@ -372,14 +372,60 @@ func translationInstruction(prompt string) string {
 		"Text:\n" + prompt
 }
 
+// soleQueryLine reduces the child's reply to the one line that could be a query,
+// and refuses when more than one survives.
+//
+// The previous form took everything before the first newline, under the comment
+// "a query is one line; prose is not". That names the right property and
+// implements a different one — line POSITION rather than line COUNT — and the two
+// come apart on the commonest disobedience there is: a PREPENDED preamble. On
+// exactly the case this guard exists for it therefore kept the preamble, discarded
+// the query, and returned the result as a SUCCESS.
+//
+// Measured against five realistic reply shapes, four produced a valid-looking
+// query that was then searched for:
+//
+//	"Here is the English search query:"
+//	"English search query:"
+//	"```"
+//	"Sure! Here you go:"
+//
+// That is worse than not translating. Translation is fail-OPEN by contract, and
+// this did not fail open — it failed confidently, and a preamble shares its
+// vocabulary with the corpus ("search query", "knowledge base"), so the search
+// returned plausible wrong pages under a `translated` log line.
+//
+// Fences are stripped rather than counted. A fenced reply is obedient in every
+// respect except decoration, and once the decoration is gone exactly one content
+// line remains — so recovering it costs nothing and keeps a common shape working.
+//
+// Anything still multi-line is REFUSED rather than picked from. Choosing among
+// several lines would be a guess about which one the model meant, and being wrong
+// there is the defect above wearing a heuristic. Refusal costs only what a failed
+// translation always cost: the prompt searches with its original wording.
+func soleQueryLine(raw string) (string, bool) {
+	var lines []string
+	for _, ln := range strings.Split(raw, "\n") {
+		ln = strings.TrimSpace(ln)
+		if ln == "" || strings.HasPrefix(ln, "```") {
+			continue
+		}
+		lines = append(lines, ln)
+	}
+	if len(lines) != 1 {
+		return "", false
+	}
+	return lines[0], true
+}
+
 // cleanTranslation validates what came back. A translator is an LLM and can
 // answer the question instead of translating it, refuse, or explain itself; each
 // of those is worse as a query than the original, so anything that does not look
 // like a short query is rejected rather than used.
 func cleanTranslation(raw, original string) (string, bool) {
-	s := strings.TrimSpace(raw)
-	if i := strings.IndexByte(s, '\n'); i >= 0 {
-		s = strings.TrimSpace(s[:i]) // a query is one line; prose is not
+	s, ok := soleQueryLine(raw)
+	if !ok {
+		return "", false
 	}
 	s = strings.Trim(s, `"'`)
 	if s == "" {

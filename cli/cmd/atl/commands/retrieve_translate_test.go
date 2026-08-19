@@ -65,12 +65,46 @@ func TestCleanTranslationTreatsAnUnchangedAnswerAsNoTranslation(t *testing.T) {
 	}
 }
 
-// Only the first line survives. A model that emits the query and then adds a
-// note would otherwise inject its prose into the search terms.
-func TestCleanTranslationKeepsOnlyTheFirstLine(t *testing.T) {
-	got, ok := cleanTranslation("marker hash dedup queue\n\nNote: I kept the identifiers unchanged as requested.", "isaretci tekillestirme")
+// A multi-line reply is REFUSED, in both directions, and the second half of that
+// is a deliberate trade rather than an oversight.
+//
+// This test replaces one that asserted the opposite — "only the first line
+// survives" — whose rationale was a model emitting the query and THEN a note. That
+// rationale is real and the old rule handled it; what it could not handle is the
+// mirror, a note emitted BEFORE the query, which is the shape actually measured
+// (four of fourteen replies in one window). On that shape taking the first line
+// kept "Here is the English search query:" and searched for it under a
+// `translated` log line.
+//
+// So the trade is: a trailing note used to be salvaged and now is not, and a
+// leading preamble used to be searched for and now is not. It is taken on two
+// grounds. The leading shape is measured and the trailing one is hypothetical; and
+// the two fail differently — refusing is logged honestly as a skip and the prompt
+// searches untranslated, while salvaging by position fails SILENTLY, with a
+// preamble that shares its vocabulary with the corpus and so returns plausible
+// wrong pages.
+func TestCleanTranslationRefusesAMultiLineReply(t *testing.T) {
+	orig := "isaretci tekillestirme"
+	for _, raw := range []string{
+		"Here is the English search query:\nmarker hash dedup queue",
+		"English search query:\nmarker hash dedup queue",
+		"Sure! Here you go:\nmarker hash dedup queue",
+		"marker hash dedup queue\n\nNote: I kept the identifiers unchanged as requested.",
+	} {
+		if got, ok := cleanTranslation(raw, orig); ok {
+			t.Errorf("accepted a multi-line reply as %q; want refusal so the prompt searches untranslated", got)
+		}
+	}
+}
+
+// A fenced reply IS recovered. It is obedient in every respect except decoration,
+// and stripping the fence leaves exactly one content line — so the refusal above
+// must not swallow it. Without this the commonest well-behaved formatting would be
+// thrown away, and the old rule was worse still: it returned "```" as the query.
+func TestCleanTranslationRecoversAFencedQuery(t *testing.T) {
+	got, ok := cleanTranslation("```\nmarker hash dedup queue\n```", "isaretci tekillestirme")
 	if !ok || got != "marker hash dedup queue" {
-		t.Fatalf("got %q ok=%v, want the first line alone", got, ok)
+		t.Fatalf("got %q ok=%v, want the fenced query recovered", got, ok)
 	}
 }
 
