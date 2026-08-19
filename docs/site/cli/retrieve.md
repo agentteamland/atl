@@ -51,6 +51,11 @@ Two lines deserve reading carefully:
 
 The `translated` row itself is not counted as a prompt — it is a modifier on the fire that follows, and counting it would inflate the denominator every percentage above divides by. Its sibling `translate-skipped` is kept out on the same terms but has no row of its own: it marks a translation that ran and whose answer was deliberately not used — the text was already English, or the model returned prose where a query was asked for. If the `translated` row is missing entirely, nothing has been translated here — usually because no credential is configured. The translator needs one of its own, either `~/.atl/claude-token` or an exported environment variable, and **where** you export it decides whether a hook can see it at all — see [the knowledge system guide](/guide/knowledge-system).
 
+The `sessions spawned` row is the one to watch: **every translation the cache did not serve
+starts a `claude` session against the same weekly usage budget your own sessions draw on.**
+It is printed rather than left as arithmetic over three other rows, because a number nobody
+derives is a number nobody sees.
+
 A translation is **cached** once it succeeds, globally rather than per project, because the
 same sentence becomes the same query in every repository. A repeat is served from
 `~/.atl/cache/translate` with no session spawned at all — which matters most when the usage

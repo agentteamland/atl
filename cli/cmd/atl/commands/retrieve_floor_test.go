@@ -652,3 +652,33 @@ func TestFireStatsSplitsTranslateFailuresByReasonAndKeepsOldLinesHonest(t *testi
 		t.Errorf("Total = %d, want 0 — the fixture holds only translate modifiers, no prompt", st.Total)
 	}
 }
+
+// The spend line counts every session the translator actually started — successes that
+// were not cached, plus failures, since a failure spawned a process too and a refused
+// one still cost the round trip.
+//
+// It is an explicit line rather than three numbers a reader could subtract, because a
+// number nobody derives is a number nobody sees: 214 of these accumulated across
+// projects during the week the maintainer exhausted an account, and every one of them
+// was already visible in the log to anyone who thought to do the arithmetic.
+func TestSpendCountsEverySessionTheTranslatorStarted(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "fires.log")
+	body := "2026-08-01T00:00:00Z\ttranslated\n" + // spawned
+		"2026-08-01T00:00:01Z\ttranslated\n" + // spawned
+		"2026-08-01T00:00:02Z\ttranslated:cached\n" + // NOT spawned
+		"2026-08-01T00:00:03Z\ttranslated:cached\n" + // NOT spawned
+		"2026-08-01T00:00:04Z\ttranslate-failed:quota\n" // spawned, and refused
+	if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	st, err := readFireStats(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st.Translated != 4 || st.TranslatedCached != 2 {
+		t.Fatalf("translated=%d cached=%d, want 4 and 2", st.Translated, st.TranslatedCached)
+	}
+	if spawned := st.Translated - st.TranslatedCached + st.TranslateFailed; spawned != 3 {
+		t.Errorf("spawned = %d, want 3 — two uncached successes and one refused attempt", spawned)
+	}
+}

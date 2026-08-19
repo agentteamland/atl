@@ -988,6 +988,17 @@ func renderFireStats(st retrieveFireStats) string {
 				st.TranslatedCached)
 		}
 	}
+	// The spend, stated rather than left as arithmetic for the reader.
+	//
+	// Every one of these is a `claude` session against the SAME weekly budget the
+	// user's own sessions draw on. That sentence is the entire reason this line
+	// exists: 214 of them accumulated across projects, unnoticed, during the week the
+	// maintainer exhausted one account — and nothing anywhere said so. A number a
+	// reader has to derive by subtracting two others is a number nobody derives.
+	if spawned := st.Translated - st.TranslatedCached + st.TranslateFailed; spawned > 0 {
+		fmt.Fprintf(&b, "  sessions spawned %5d       (translation spends the same weekly budget your own sessions do)\n",
+			spawned)
+	}
 	// Shown because it is the one state a user cannot otherwise see: translation is
 	// fail-open, so a failure produces no error, no missing output, and no change a
 	// reader would notice — only a silently worse search. The session-start notice
