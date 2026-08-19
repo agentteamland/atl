@@ -216,19 +216,26 @@ func runRetrieveHook(cmd *cobra.Command) {
 	// one part the decision explicitly agreed to pay time for.
 	query := prompt
 	if ix.LexicalHits(prompt) == 0 && claudeAvailable() {
-		translated, outcome := translatePrompt(cmd.Context(), prompt)
+		translated, outcome, why := translatePrompt(cmd.Context(), prompt)
 		switch outcome {
 		case translateOK:
 			query = translated
 			logRetrieveFire(root, "translated", nil)
 		case translateFailed:
 			// Record the failure too. Translation is fail-open and silent by
-			// design, so without this line a credential that has EXPIRED is
-			// indistinguishable from one that is working: the env var is still
-			// set, the notice stays suppressed, and every non-English prompt
+			// design, so without this line a translator that has STOPPED WORKING is
+			// indistinguishable from one that is working: the credential is still
+			// there, the notice stays suppressed, and every non-English prompt
 			// quietly searches on one arm. This is the only evidence of that
 			// state that costs nothing to collect.
-			logRetrieveFire(root, "translate-failed", nil)
+			//
+			// The REASON rides in the token. The old form logged a bare
+			// "translate-failed" for four different conditions, so the stats line
+			// could only guess at the cause — and its guess ("credential expired?")
+			// was wrong about the one that was actually happening. An old line with
+			// no reason still parses; it counts as unclassified, which is honest,
+			// because nothing recorded what those failures were.
+			logRetrieveFire(root, "translate-failed:"+string(why), nil)
 		default:
 			// The subprocess ran and its answer was not used — already English,
 			// or prose where a query was asked for. Logged under its own token so
@@ -505,13 +512,34 @@ type retrieveFireStats struct {
 	Total, Fired, Silent, Machine, Short int
 	Translated                           int
 	TranslateFailed                      int
-	Turns, Consulted, ConsultedEmpty     int
-	Offered                              int
-	Pages                                map[string]int
+	// TranslateFailedBy is the same total, split by WHY. The total alone could not
+	// name a cause, so the line that rendered it guessed one — and guessed wrong
+	// about the condition that was actually happening.
+	TranslateFailedBy                map[string]int
+	Turns, Consulted, ConsultedEmpty int
+	Offered                          int
+	Pages                            map[string]int
 }
 
 // readFireStats tallies the fire log. A missing log is an empty tally, not an
 // error — the log only exists once the hook has run since this shipped.
+// translateFailureOrder is the reason table the stats line renders from: the key as
+// logged, and the remedy that key implies.
+//
+// A table rather than a switch, and the remedy sits BESIDE the key rather than being
+// written at the call site, because the defect being fixed here was exactly a remedy
+// that had come adrift from the condition it described. Four conditions with four
+// different answers cannot share one sentence.
+//
+// Ordered by what a reader should act on first, not alphabetically.
+var translateFailureOrder = []struct{ key, remedy string }{
+	{"quota", "(the usage limit is exhausted — this spends the same weekly budget as a session)"},
+	{"auth", "(the credential was refused — re-authenticate; see the session-start notice)"},
+	{"timeout", "(the translator was still running when its deadline fired)"},
+	{"no-binary", "(`claude` is not on PATH for the process the hook starts)"},
+	{"unclassified", "(it failed and the log could not say why — lines written before reasons existed count here)"},
+}
+
 func readFireStats(logPath string) (retrieveFireStats, error) {
 	st := retrieveFireStats{Pages: map[string]int{}}
 	b, err := os.ReadFile(logPath)
@@ -555,8 +583,21 @@ func readFireStats(logPath string) (retrieveFireStats, error) {
 		if f[1] == "translate-skipped" {
 			continue
 		}
-		if f[1] == "translate-failed" {
+		if strings.HasPrefix(f[1], "translate-failed") {
 			st.TranslateFailed++
+			// The reason rides after a colon. A line written before reasons existed
+			// has none, and it counts as unclassified rather than being assigned to
+			// the likeliest bucket — nothing recorded what those failures were, and
+			// inventing a label for them here would be the same fabrication this
+			// change exists to remove, one layer down.
+			why := "unclassified"
+			if _, r, found := strings.Cut(f[1], ":"); found && r != "" {
+				why = r
+			}
+			if st.TranslateFailedBy == nil {
+				st.TranslateFailedBy = map[string]int{}
+			}
+			st.TranslateFailedBy[why]++
 			continue
 		}
 		// Turns and consults are not prompts either. A turn is the denominator
@@ -930,13 +971,24 @@ func renderFireStats(st retrieveFireStats) string {
 			st.Translated, pct(st.Translated))
 	}
 	// Shown because it is the one state a user cannot otherwise see: translation is
-	// fail-open, so an expired credential produces no error, no missing output, and
-	// no change a reader would notice — only a silently worse search. The
-	// session-start notice needs three consecutive failures before it speaks; this
-	// line shows the state from the first one.
+	// fail-open, so a failure produces no error, no missing output, and no change a
+	// reader would notice — only a silently worse search. The session-start notice
+	// needs three consecutive failures before it speaks; this line shows the state
+	// from the first one.
+	//
+	// Broken out by REASON, and the parenthetical no longer guesses. It used to read
+	// "credential expired?" for every failure; the condition actually occurring was
+	// an exhausted weekly quota, and that guess cost a diagnosis — the credential was
+	// probed and found healthy before anyone read the child's own error text.
 	if st.TranslateFailed > 0 {
-		fmt.Fprintf(&b, "  translate-failed %5d       (the translator could not run — credential expired?)\n",
-			st.TranslateFailed)
+		fmt.Fprintf(&b, "  translate-failed %5d\n", st.TranslateFailed)
+		for _, r := range translateFailureOrder {
+			n := st.TranslateFailedBy[r.key]
+			if n == 0 {
+				continue
+			}
+			fmt.Fprintf(&b, "    %-14s %5d       %s\n", r.key, n, r.remedy)
+		}
 	}
 	// The agent-initiated half, reported against TURNS rather than against fires.
 	// "Reads per offered page" is the wrong rate — the hook offers pages on every

@@ -3,6 +3,7 @@ package commands
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -66,9 +67,9 @@ const (
 // `claude -p` is invoked with NO --model flag on purpose. The user's own default
 // model is used, so no model name exists in this codebase to go stale when a
 // model is retired — a requirement of the decision, not an omission.
-func translatePrompt(ctx context.Context, prompt string) (string, translateOutcome) {
+func translatePrompt(ctx context.Context, prompt string) (string, translateOutcome, translateFailure) {
 	if len([]rune(prompt)) > maxTranslatableRunes {
-		return "", translateSkipped
+		return "", translateSkipped, ""
 	}
 	cred, ok := translatorCredential()
 	if !ok {
@@ -76,36 +77,113 @@ func translatePrompt(ctx context.Context, prompt string) (string, translateOutco
 		// not failed: no subprocess ran, so nothing was observed about a credential's
 		// validity — and the next prompt will find claudeAvailable false and print the
 		// missing-credential notice, which is the correct one for this state.
-		return "", translateSkipped
+		return "", translateSkipped, ""
 	}
 	ctx, cancel := context.WithTimeout(ctx, translateTimeout)
 	defer cancel()
 
 	cmd := translateCommand(ctx, prompt, cred)
-	var out, discard bytes.Buffer
+	var out, errOut bytes.Buffer
 	cmd.Stdout = &out
-	// stderr is captured and dropped on purpose: this runs inside a hook whose
-	// stdout is injected into the agent's context, and a stray warning from the
-	// child would land there as if it were retrieved knowledge.
-	cmd.Stderr = &discard
+	// stderr is captured and NEVER PRINTED, which is the original reason and it
+	// still holds: this runs inside a hook whose stdout is injected into the
+	// agent's context, and a stray warning from the child would land there as if it
+	// were retrieved knowledge.
+	//
+	// What changed is that it is no longer DISCARDED. The buffer was called
+	// `discard` and thrown away, so every failure below collapsed into one counter
+	// and the stats line had to guess at the cause — it printed "credential
+	// expired?" over a quota exhaustion and sent the diagnosis to the wrong place.
+	// The text is read here to classify, and goes nowhere else.
+	cmd.Stderr = &errOut
 	if err := cmd.Run(); err != nil {
-		// The ONLY credential-shaped outcome: the subprocess did not reach a usable
-		// exit. A 401 lands here; so does a timeout, which is why three in a row —
-		// not one — are what the expired notice is built on.
-		return "", translateFailed
+		// Several different conditions land here — a rejected credential, an
+		// exhausted quota, a timeout, a missing binary — and they have different
+		// remedies. Classified rather than counted; see classifyTranslateFailure.
+		return "", translateFailed, classifyTranslateFailure(ctx, err, out.String()+errOut.String())
 	}
 	q, ok := cleanTranslation(out.String(), prompt)
 	if !ok {
 		// The subprocess ran fine and its answer was deliberately not used: already
 		// English, empty, or prose instead of a query. That says nothing whatever
 		// about the credential, so it must not be logged as though it did.
-		return "", translateSkipped
+		return "", translateSkipped, ""
 	}
-	return q, translateOK
+	return q, translateOK, ""
 }
 
 // translateOutcome distinguishes the three things that can happen, because only
 // one of them is evidence about the credential.
+// translateFailure names WHY a translation did not run.
+//
+// It exists because the counter it replaces could not tell four conditions apart and
+// printed a guess for all of them. The guess was "credential expired?", the condition
+// was an exhausted weekly quota, and the diagnosis went to the wrong place — the
+// credential was read, probed and found perfectly healthy before anyone thought to
+// read the child's own error text, which had said so all along.
+//
+// Four conditions, four remedies: buy or wait for quota, re-authenticate, raise the
+// timeout, install the binary. One number cannot carry that.
+type translateFailure string
+
+const (
+	// failTimeout — the deadline fired. STRUCTURAL: read from the context, not from
+	// any message, so it holds whatever language the child speaks.
+	failTimeout translateFailure = "timeout"
+	// failNoBinary — `claude` is not on PATH. Also structural.
+	failNoBinary translateFailure = "no-binary"
+	// failQuota — the usage limit is exhausted. Text-matched; see the note below.
+	failQuota translateFailure = "quota"
+	// failAuth — the credential was refused. Text-matched.
+	failAuth translateFailure = "auth"
+	// failUnclassified — it failed and this could not say why.
+	//
+	// A real bucket rather than a default that guesses. The whole defect being fixed
+	// here was a guess printed with the confidence of a measurement, so an unreadable
+	// failure must say it is unreadable: an honest "unclassified" sends the reader to
+	// the evidence, and a wrong label sends them somewhere else entirely.
+	failUnclassified translateFailure = "unclassified"
+)
+
+// classifyTranslateFailure says why the translator did not run.
+//
+// # Structural first, text second, and the order is the point
+//
+// A timeout and a missing binary are readable from Go's own values and cannot be
+// wrong. Quota and auth are only distinguishable from the child's PROSE, and this
+// project has measured what that costs: a message match is a claim about a program's
+// human-readable output, and human-readable output is localised. `git` answers in
+// Turkish on this machine, which is how a fail-closed guard came to refuse every
+// init it was written to permit.
+//
+// So the text arm is deliberately the LAST resort, it is matched case-insensitively
+// on several phrasings, and when nothing matches it returns unclassified rather than
+// picking the likeliest. That last clause is the whole correction: the code being
+// replaced picked the likeliest and was wrong.
+func classifyTranslateFailure(ctx context.Context, err error, output string) translateFailure {
+	// The deadline first. It is checked before anything else because a killed
+	// subprocess also prints whatever it had got to, and that text would otherwise be
+	// classified as though the process had finished and reported it.
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		return failTimeout
+	}
+	if errors.Is(err, exec.ErrNotFound) {
+		return failNoBinary
+	}
+	low := strings.ToLower(output)
+	for _, m := range []string{"weekly limit", "usage limit", "rate limit", "quota", "limit reached"} {
+		if strings.Contains(low, m) {
+			return failQuota
+		}
+	}
+	for _, m := range []string{"not logged in", "expired", "unauthorized", "invalid api key", "401"} {
+		if strings.Contains(low, m) {
+			return failAuth
+		}
+	}
+	return failUnclassified
+}
+
 type translateOutcome int
 
 const (

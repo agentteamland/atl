@@ -51,6 +51,18 @@ turns           62
 
 `translated` satırının kendisi bir istem olarak sayılmaz — kendisinden sonra gelen fire üzerinde bir niteleyicidir ve sayılması yukarıdaki her yüzdenin bölündüğü paydayı şişirirdi. Kardeşi `translate-skipped` aynı gerekçeyle dışarıda tutulur ama kendine ait bir satırı yoktur: çalışmış, ancak cevabı bilerek kullanılmamış bir çeviriyi işaretler — metin zaten İngilizceydi ya da model, sorgu beklenen yerde düz metin döndürdü. `translated` satırı hiç görünmüyorsa burada hiçbir şey çevrilmemiş demektir — genellikle bir kimlik bilgisi tanımlı olmadığı için. Çevirmenin kendine ait bir kimlik bilgisine ihtiyacı vardır: ya `~/.atl/claude-token` ya da dışa aktarılmış bir ortam değişkeni — ve onu **nerede** dışa aktardığın, bir hook'un onu görüp göremeyeceğini belirler; bkz. [bilgi sistemi kılavuzu](/tr/guide/knowledge-system).
 
+Bir çeviri **başarısız** olduğunda istatistikler `translate-failed` toplamını gerekçesine
+göre ayırarak basar — `quota`, `auth`, `timeout`, `no-binary`, `unclassified` — çünkü bunlar
+dört farklı çareye sahip dört farklı durumdur ve tek bir sayı bunu taşıyamaz. Bu satır eskiden
+hepsi için tek bir tahmin basıyordu; haftalık kullanım limiti tükenmiş bir makinede
+"credential expired?" diyordu ve teşhisi yanlış yere yönlendiriyordu.
+
+`quota` iki kez okunmayı hak eder: **her çeviri bir `claude` oturumu başlatır ve kendi
+oturumlarınla aynı kullanım bütçesinden harcar.** `unclassified`, hatanın tanımlanamadığı
+anlamına gelir — gerekçeler kaydedilmeye başlamadan önce yazılmış satırlar dahil; bunlar en
+olası kovaya atanmak yerine dürüstçe sayılır.
+
+
 ## `index` ve `warm`
 
 `index` korpus dizinini yeniden kurar. Nadiren gerekir — korpus değiştiğinde session-start arka planda yeniden kurar, ve silinen bir sayfa artık tespit edilir (yalnızca-silme içeren bir değişiklik eskiden dizini var olmayan bir dosyayı sunar halde bırakıyordu).

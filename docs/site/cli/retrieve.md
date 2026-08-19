@@ -51,6 +51,18 @@ Two lines deserve reading carefully:
 
 The `translated` row itself is not counted as a prompt — it is a modifier on the fire that follows, and counting it would inflate the denominator every percentage above divides by. Its sibling `translate-skipped` is kept out on the same terms but has no row of its own: it marks a translation that ran and whose answer was deliberately not used — the text was already English, or the model returned prose where a query was asked for. If the `translated` row is missing entirely, nothing has been translated here — usually because no credential is configured. The translator needs one of its own, either `~/.atl/claude-token` or an exported environment variable, and **where** you export it decides whether a hook can see it at all — see [the knowledge system guide](/guide/knowledge-system).
 
+When a translation **fails**, the stats print a `translate-failed` total broken out by
+reason — `quota`, `auth`, `timeout`, `no-binary`, `unclassified` — because those are four
+different conditions with four different remedies, and one number cannot carry that. The
+row used to print a single guess for all of them; on a machine whose weekly usage limit was
+exhausted it said "credential expired?", and sent the diagnosis to the wrong place.
+
+`quota` is worth reading twice: **each translation spawns a `claude` session and spends the
+same usage budget your own sessions do.** `unclassified` means the failure could not be
+identified — including lines written before reasons were recorded, which are counted
+honestly rather than assigned to the likeliest bucket.
+
+
 ## `index` and `warm`
 
 `index` rebuilds the corpus index. You rarely need it — session-start rebuilds in the background when the corpus has moved, and a deleted page is detected now (a delete-only change used to leave the index serving a file that no longer exists).

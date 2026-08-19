@@ -1,10 +1,14 @@
 package commands
 
 import (
+	"context"
+	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // Fixtures are written without diacritics on purpose. They only need to be
@@ -258,7 +262,7 @@ func TestTranslationNoticeOnlyWhereItWouldChangeSomething(t *testing.T) {
 // An oversized prompt is a paste, not a question: the lexical arm already has
 // plenty to match on, and sending it costs latency for nothing.
 func TestTranslateSkipsAnOversizedPrompt(t *testing.T) {
-	if _, out := translatePrompt(t.Context(), strings.Repeat("z", maxTranslatableRunes+1)); out != translateSkipped {
+	if _, out, _ := translatePrompt(t.Context(), strings.Repeat("z", maxTranslatableRunes+1)); out != translateSkipped {
 		t.Fatalf("outcome = %v, want translateSkipped — the cap is a deliberate skip, and recording it as a failure would count toward 'your credential expired'", out)
 	}
 }
@@ -430,5 +434,63 @@ func TestSkippedTranslationsAreNotEvidenceOfAnExpiry(t *testing.T) {
 	writeFires(t, idx2, "translate-failed", "translate-skipped", "translate-failed", "translate-skipped", "translate-failed")
 	if !translationFailing(idx2) {
 		t.Error("three real failures stopped counting because skips sat between them")
+	}
+}
+
+// The classifier's whole reason for existing is that four conditions used to be one
+// number with one guess attached. So the test is a table of all four plus the honest
+// fifth, and the arm that matters most is the LAST one: an unreadable failure must
+// say it is unreadable rather than pick the likeliest, because picking the likeliest
+// is precisely the defect being removed.
+func TestClassifyTranslateFailureNamesTheConditionOrAdmitsItCannot(t *testing.T) {
+	deadline, cancel := context.WithDeadline(context.Background(), time.Now().Add(-time.Second))
+	defer cancel()
+	live := context.Background()
+
+	for _, c := range []struct {
+		name   string
+		ctx    context.Context
+		err    error
+		output string
+		want   translateFailure
+	}{
+		// Structural. Read from Go's own values, so they hold whatever language the
+		// child speaks — which is why they are checked first.
+		{"a fired deadline", deadline, errors.New("signal: killed"), "", failTimeout},
+		{"the binary is missing", live, exec.ErrNotFound, "", failNoBinary},
+
+		// A killed subprocess still prints whatever it had reached. Without the
+		// deadline being checked FIRST, that fragment would classify the timeout as
+		// whatever it happened to look like.
+		{"a deadline that also printed", deadline, errors.New("killed"), "You've hit your weekly limit", failTimeout},
+
+		// Text-matched. The first is the exact string the live machine produced.
+		{"the real quota message", live, errors.New("exit status 1"),
+			"You've hit your weekly limit · resets 8pm (Europe/Istanbul)", failQuota},
+		{"another quota phrasing", live, errors.New("exit status 1"), "Usage limit reached", failQuota},
+		{"a refused credential", live, errors.New("exit status 1"), "Invalid API key · Please run /login", failAuth},
+		{"an expired one", live, errors.New("exit status 1"), "OAuth access token has expired", failAuth},
+
+		// The load-bearing arm. Nothing recognisable came back, so the answer is
+		// "I cannot say" — not the most likely of the four.
+		{"something nobody anticipated", live, errors.New("exit status 3"), "panic: interface conversion", failUnclassified},
+		{"no output at all", live, errors.New("exit status 1"), "", failUnclassified},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			if got := classifyTranslateFailure(c.ctx, c.err, c.output); got != c.want {
+				t.Errorf("classify(%q) = %q, want %q", c.output, got, c.want)
+			}
+		})
+	}
+}
+
+// Matching is case-insensitive because the child's wording is not ours to pin. This
+// is the weakest arm by construction — a message match is a claim about
+// human-readable output, and human-readable output is localised. The two structural
+// arms exist so the conditions that HAVE a machine-readable signal never depend on
+// this one.
+func TestClassifyTranslateFailureIgnoresCase(t *testing.T) {
+	if got := classifyTranslateFailure(context.Background(), errors.New("x"), "WEEKLY LIMIT REACHED"); got != failQuota {
+		t.Errorf("got %q, want %q — the match must not depend on capitalisation", got, failQuota)
 	}
 }
