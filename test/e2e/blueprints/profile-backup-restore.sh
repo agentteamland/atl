@@ -159,11 +159,24 @@ out=$( bash "$BS" 2>&1 ); rc=$?
 { marker "$out" 'nothing-to-back-up' && [ "$rc" -eq 0 ]; } \
   && ok "empty store → 'nothing-to-back-up', exit 0" || bad "empty-store path: rc=$rc out=[$out]"
 
+# A store with content but no repo is now BROUGHT under git rather than refused. The skill
+# runs `atl store version` — the same pass the session boundary runs — and then re-checks,
+# so the flow continues to the remote question instead of stopping with an instruction the
+# user could not act on.
+#
+# This assertion replaces one that pinned the old contract (`not-versioned`, non-zero). The
+# old behaviour was deliberate rather than a defect, so this is a contract change and is
+# recorded as one: `not-versioned` still exists and now means "storegit declined this store"
+# — nested inside another repo, or empty — rather than "nobody has run the thing that
+# versions it".
+#
+# Asserting the repo was CREATED, not just that the output moved on: the output alone would
+# also be produced by a store that was already a repo, which is not what this exercises.
 mkdir -p "$STORE/people/x"; printf 'x\n' > "$STORE/people/x/profile.md"
 out=$( bash "$BS" 2>&1 ); rc=$?
-{ marker "$out" 'not-versioned' && [ "$rc" -ne 0 ]; } \
-  && ok "store present but not a git repo → 'not-versioned', exit $rc" \
-  || bad "not-versioned path: rc=$rc out=[$out]"
+{ marker "$out" 'no-remote' && [ "$rc" -eq 0 ] && [ -d "$STORE/.git" ]; } \
+  && ok "store present but not a git repo → brought under git, flow reaches 'no-remote'" \
+  || bad "on-demand versioning path: rc=$rc out=[$out] git=[$([ -d "$STORE/.git" ] && echo yes || echo no)]"
 
 seed_store
 # The instrument's own health, asserted rather than assumed: storegit only reports on stores it
@@ -186,7 +199,7 @@ marker "$out" 'public-remote' && ok "PUBLIC remote → the guard printed 'public
                               || bad "PUBLIC remote did not print 'public-remote': out=[$out]"
 [ "$rc" -ne 0 ] && ok "PUBLIC remote → non-zero exit ($rc)" || bad "PUBLIC remote exited 0 — the guard did not stop"
 [ -z "$(git -C "$STORE" remote)" ] \
-  && ok "PUBLIC remote → nothing was attached (the guard runs before `remote add`)" \
+  && ok "PUBLIC remote → nothing was attached (the guard runs before 'remote add')" \
   || bad "PUBLIC remote → a remote WAS attached: $(git -C "$STORE" remote -v | head -1)"
 
 # The public answer must NOT be overridable. This is the asymmetry that makes the escape

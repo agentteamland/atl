@@ -3,6 +3,8 @@ package commands
 import (
 	"fmt"
 
+	"github.com/spf13/cobra"
+
 	"github.com/agentteamland/atl/cli/internal/manifest"
 	"github.com/agentteamland/atl/cli/internal/scope"
 	"github.com/agentteamland/atl/cli/internal/storegit"
@@ -90,4 +92,54 @@ func reportUnbackedStores(projectRoot string) {
 				"rule for that store's owning team.\n", where, st.Unpushed)
 		}
 	}
+}
+
+// storeCmd groups the deterministic operations over team-declared durable stores.
+//
+// It exists so a SKILL can invoke the same versioning pass the session boundary runs,
+// rather than growing a second mechanism that versions the same directory on different
+// terms. `/profile-backup` used to refuse when a store was not yet a repo — correctly,
+// because creating one there would have been that second mechanism — which left the user
+// holding an instruction they could not act on: the skill told them versioning was
+// session-start's job and session-start had not run.
+//
+// One implementation, two triggers, is the resolution.
+var storeCmd = &cobra.Command{
+	Use:   "store",
+	Short: "Operations over the durable stores installed teams declare",
+	Long: "A durable store is a directory an installed team DECLARED as holding content that\n" +
+		"must survive — `capabilities.<name>.store` in its team.json. Core never learns which\n" +
+		"team owns which path; it honors the declaration.\n\n" +
+		"  atl store version    bring each declared store under local git and commit what changed",
+	SilenceUsage: true,
+}
+
+// storeVersionCmd is the on-demand half of the retention floor.
+//
+// The automatic half runs at session-start. This is the same call, so the two can never
+// disagree about what versioning means — and because `storegit` decides for itself what is
+// eligible (an absent store is not created, an EMPTY one is not initialised, a store nested
+// inside another repo is left alone), invoking it on demand is as safe as the pass that
+// runs uninvited.
+//
+// Prints what it did rather than staying silent: unlike the session-start pass, something
+// asked for this, and a caller that asked deserves an answer even when the answer is zero.
+var storeVersionCmd = &cobra.Command{
+	Use:          "version",
+	Short:        "Bring every declared durable store under local git and commit what changed",
+	SilenceUsage: true,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		root, _ := projectKey()
+		n := versionDeclaredStores(root)
+		if n == 0 {
+			fmt.Fprintln(cmd.OutOrStdout(), "no-store-versioned")
+			return nil
+		}
+		fmt.Fprintf(cmd.OutOrStdout(), "versioned %d durable store(s)\n", n)
+		return nil
+	},
+}
+
+func init() {
+	storeCmd.AddCommand(storeVersionCmd)
 }
