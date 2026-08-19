@@ -1,10 +1,16 @@
 package commands
 
 import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // Fixtures are written without diacritics on purpose. They only need to be
@@ -59,12 +65,46 @@ func TestCleanTranslationTreatsAnUnchangedAnswerAsNoTranslation(t *testing.T) {
 	}
 }
 
-// Only the first line survives. A model that emits the query and then adds a
-// note would otherwise inject its prose into the search terms.
-func TestCleanTranslationKeepsOnlyTheFirstLine(t *testing.T) {
-	got, ok := cleanTranslation("marker hash dedup queue\n\nNote: I kept the identifiers unchanged as requested.", "isaretci tekillestirme")
+// A multi-line reply is REFUSED, in both directions, and the second half of that
+// is a deliberate trade rather than an oversight.
+//
+// This test replaces one that asserted the opposite — "only the first line
+// survives" — whose rationale was a model emitting the query and THEN a note. That
+// rationale is real and the old rule handled it; what it could not handle is the
+// mirror, a note emitted BEFORE the query, which is the shape actually measured
+// (four of fourteen replies in one window). On that shape taking the first line
+// kept "Here is the English search query:" and searched for it under a
+// `translated` log line.
+//
+// So the trade is: a trailing note used to be salvaged and now is not, and a
+// leading preamble used to be searched for and now is not. It is taken on two
+// grounds. The leading shape is measured and the trailing one is hypothetical; and
+// the two fail differently — refusing is logged honestly as a skip and the prompt
+// searches untranslated, while salvaging by position fails SILENTLY, with a
+// preamble that shares its vocabulary with the corpus and so returns plausible
+// wrong pages.
+func TestCleanTranslationRefusesAMultiLineReply(t *testing.T) {
+	orig := "isaretci tekillestirme"
+	for _, raw := range []string{
+		"Here is the English search query:\nmarker hash dedup queue",
+		"English search query:\nmarker hash dedup queue",
+		"Sure! Here you go:\nmarker hash dedup queue",
+		"marker hash dedup queue\n\nNote: I kept the identifiers unchanged as requested.",
+	} {
+		if got, ok := cleanTranslation(raw, orig); ok {
+			t.Errorf("accepted a multi-line reply as %q; want refusal so the prompt searches untranslated", got)
+		}
+	}
+}
+
+// A fenced reply IS recovered. It is obedient in every respect except decoration,
+// and stripping the fence leaves exactly one content line — so the refusal above
+// must not swallow it. Without this the commonest well-behaved formatting would be
+// thrown away, and the old rule was worse still: it returned "```" as the query.
+func TestCleanTranslationRecoversAFencedQuery(t *testing.T) {
+	got, ok := cleanTranslation("```\nmarker hash dedup queue\n```", "isaretci tekillestirme")
 	if !ok || got != "marker hash dedup queue" {
-		t.Fatalf("got %q ok=%v, want the first line alone", got, ok)
+		t.Fatalf("got %q ok=%v, want the fenced query recovered", got, ok)
 	}
 }
 
@@ -258,7 +298,7 @@ func TestTranslationNoticeOnlyWhereItWouldChangeSomething(t *testing.T) {
 // An oversized prompt is a paste, not a question: the lexical arm already has
 // plenty to match on, and sending it costs latency for nothing.
 func TestTranslateSkipsAnOversizedPrompt(t *testing.T) {
-	if _, out := translatePrompt(t.Context(), strings.Repeat("z", maxTranslatableRunes+1)); out != translateSkipped {
+	if _, out, _ := translatePrompt(t.Context(), strings.Repeat("z", maxTranslatableRunes+1)); out != translateSkipped {
 		t.Fatalf("outcome = %v, want translateSkipped — the cap is a deliberate skip, and recording it as a failure would count toward 'your credential expired'", out)
 	}
 }
@@ -430,5 +470,187 @@ func TestSkippedTranslationsAreNotEvidenceOfAnExpiry(t *testing.T) {
 	writeFires(t, idx2, "translate-failed", "translate-skipped", "translate-failed", "translate-skipped", "translate-failed")
 	if !translationFailing(idx2) {
 		t.Error("three real failures stopped counting because skips sat between them")
+	}
+}
+
+// The classifier's whole reason for existing is that four conditions used to be one
+// number with one guess attached. So the test is a table of all four plus the honest
+// fifth, and the arm that matters most is the LAST one: an unreadable failure must
+// say it is unreadable rather than pick the likeliest, because picking the likeliest
+// is precisely the defect being removed.
+func TestClassifyTranslateFailureNamesTheConditionOrAdmitsItCannot(t *testing.T) {
+	deadline, cancel := context.WithDeadline(context.Background(), time.Now().Add(-time.Second))
+	defer cancel()
+	live := context.Background()
+
+	for _, c := range []struct {
+		name   string
+		ctx    context.Context
+		err    error
+		output string
+		want   translateFailure
+	}{
+		// Structural. Read from Go's own values, so they hold whatever language the
+		// child speaks — which is why they are checked first.
+		{"a fired deadline", deadline, errors.New("signal: killed"), "", failTimeout},
+		{"the binary is missing", live, exec.ErrNotFound, "", failNoBinary},
+
+		// A killed subprocess still prints whatever it had reached. Without the
+		// deadline being checked FIRST, that fragment would classify the timeout as
+		// whatever it happened to look like.
+		{"a deadline that also printed", deadline, errors.New("killed"), "You've hit your weekly limit", failTimeout},
+
+		// Text-matched. The first is the exact string the live machine produced.
+		{"the real quota message", live, errors.New("exit status 1"),
+			"You've hit your weekly limit · resets 8pm (Europe/Istanbul)", failQuota},
+		{"another quota phrasing", live, errors.New("exit status 1"), "Usage limit reached", failQuota},
+		{"a refused credential", live, errors.New("exit status 1"), "Invalid API key · Please run /login", failAuth},
+		{"an expired one", live, errors.New("exit status 1"), "OAuth access token has expired", failAuth},
+
+		// The load-bearing arm. Nothing recognisable came back, so the answer is
+		// "I cannot say" — not the most likely of the four.
+		{"something nobody anticipated", live, errors.New("exit status 3"), "panic: interface conversion", failUnclassified},
+		{"no output at all", live, errors.New("exit status 1"), "", failUnclassified},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			if got := classifyTranslateFailure(c.ctx, c.err, c.output); got != c.want {
+				t.Errorf("classify(%q) = %q, want %q", c.output, got, c.want)
+			}
+		})
+	}
+}
+
+// Matching is case-insensitive because the child's wording is not ours to pin. This
+// is the weakest arm by construction — a message match is a claim about
+// human-readable output, and human-readable output is localised. The two structural
+// arms exist so the conditions that HAVE a machine-readable signal never depend on
+// this one.
+func TestClassifyTranslateFailureIgnoresCase(t *testing.T) {
+	if got := classifyTranslateFailure(context.Background(), errors.New("x"), "WEEKLY LIMIT REACHED"); got != failQuota {
+		t.Errorf("got %q, want %q — the match must not depend on capitalisation", got, failQuota)
+	}
+}
+
+// A translation survives the process that produced it, which is the whole point: the
+// mechanism spends the user's own usage budget, so translating the same sentence twice
+// is spending it twice for one answer.
+func TestTranslationCacheRoundTrips(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	const prompt = "profil deposu nerede duruyor"
+
+	if _, hit := cachedTranslation(prompt); hit {
+		t.Fatal("an empty cache reported a hit")
+	}
+	storeTranslation(prompt, "where the profile store lives")
+	got, hit := cachedTranslation(prompt)
+	if !hit || got != "where the profile store lives" {
+		t.Fatalf("round trip failed: got %q hit=%v", got, hit)
+	}
+	// A different prompt is a different entry. Obvious, and it is the assertion that
+	// would catch a key derived from something constant.
+	if _, hit := cachedTranslation("bambaska bir soru"); hit {
+		t.Error("an unrelated prompt hit the cache")
+	}
+}
+
+// The key is derived from the INSTRUCTION, not from the prompt alone.
+//
+// That is what makes a change to the instruction invalidate every stored answer. A key
+// over the prompt alone would keep serving answers to a question no longer being asked,
+// and nothing would report it — the entries would still be well-formed. This project has
+// measured the same failure in an index whose vectors outlived the model that made them.
+func TestTranslationKeyCoversTheInstructionSoAChangeInvalidatesIt(t *testing.T) {
+	const prompt = "oturum baslangici"
+	sum := sha256.Sum256([]byte(prompt))
+	if translationKey(prompt) == hex.EncodeToString(sum[:]) {
+		t.Error("the key is a hash of the prompt alone — rewording the instruction would " +
+			"leave every cached answer in place, answering the old question")
+	}
+}
+
+// An empty answer is not an answer. Storing one would turn a single bad response into a
+// permanent one, which is the specific way a cache makes things worse rather than
+// merely failing to help.
+func TestTranslationCacheRefusesAnEmptyAnswer(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	storeTranslation("bir soru", "   \n ")
+	if _, hit := cachedTranslation("bir soru"); hit {
+		t.Error("an empty translation was cached")
+	}
+}
+
+// The maintainer runs several projects at once, so concurrent writers are the ordinary
+// case rather than an edge. One file per entry plus an atomic rename is what makes that
+// safe; a single shared file would be read-modify-written and the loser's entry would
+// vanish with no error.
+func TestTranslationCacheSurvivesConcurrentWriters(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	done := make(chan struct{})
+	for i := 0; i < 8; i++ {
+		go func(n int) {
+			defer func() { done <- struct{}{} }()
+			p := "soru " + string(rune('a'+n))
+			storeTranslation(p, "query "+string(rune('a'+n)))
+		}(i)
+	}
+	for i := 0; i < 8; i++ {
+		<-done
+	}
+	for i := 0; i < 8; i++ {
+		p := "soru " + string(rune('a'+i))
+		got, hit := cachedTranslation(p)
+		if !hit || got != "query "+string(rune('a'+i)) {
+			t.Errorf("%q lost or corrupted: got %q hit=%v", p, got, hit)
+		}
+	}
+	// No temporary file may survive. A leftover .tmp-* is a half-written answer sitting
+	// where a reader could one day be pointed at it.
+	dir, _ := translationCacheDir()
+	entries, _ := os.ReadDir(dir)
+	for _, e := range entries {
+		if strings.HasPrefix(e.Name(), ".tmp-") {
+			t.Errorf("a temporary file survived: %s", e.Name())
+		}
+	}
+}
+
+// A cache hit is served by translatePrompt itself, with NO credential present.
+//
+// This is the assertion the tests above cannot make. They call the cache functions
+// directly, so they pin the resolver and are structurally incapable of noticing that
+// the call path never consults it — which a revert arm demonstrated: neutralising the
+// lookup inside translatePrompt reddened nothing.
+//
+// The absent credential is what makes this test say something worth saying. With no
+// credential no subprocess can run, so a returned translation can only have come from
+// the cache — and that is precisely the state a user is in when their weekly limit is
+// exhausted. The cache is worth most exactly when the translator is unavailable, and
+// this is the arm that proves it works there.
+func TestTranslatePromptServesTheCacheWithoutACredential(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "")
+	t.Setenv("ANTHROPIC_API_KEY", "")
+	const prompt = "profil deposu nerede duruyor"
+	storeTranslation(prompt, "where the profile store lives")
+
+	got, outcome, why := translatePrompt(context.Background(), prompt)
+	if outcome != translateCached {
+		t.Fatalf("outcome = %v, want translateCached (why=%q) — with no credential the "+
+			"only possible source is the cache", outcome, why)
+	}
+	if got != "where the profile store lives" {
+		t.Errorf("got %q, want the cached query", got)
+	}
+}
+
+// And the miss path still degrades the way it did before: no credential, no cache
+// entry, nothing runs. The cache must not have turned an honest skip into anything else.
+func TestTranslatePromptStillSkipsOnAMissWithNoCredential(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "")
+	t.Setenv("ANTHROPIC_API_KEY", "")
+
+	if _, outcome, _ := translatePrompt(context.Background(), "hic gorulmemis bir soru"); outcome != translateSkipped {
+		t.Errorf("outcome = %v, want translateSkipped", outcome)
 	}
 }

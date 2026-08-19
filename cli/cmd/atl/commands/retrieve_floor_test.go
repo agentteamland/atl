@@ -610,3 +610,75 @@ func TestFireStatsDoesNotCountASkippedTranslationAsAPrompt(t *testing.T) {
 		t.Fatalf("TranslateFailed = %d, want 1 — excluding it from the denominator must not make it invisible", st.TranslateFailed)
 	}
 }
+
+// A failure reason rides after a colon, and a line written before reasons existed
+// still parses.
+//
+// The backward-compatible half is the one with a correctness claim in it. Fifty-four
+// such lines exist on the maintainer's machine and NOTHING recorded what they were —
+// so they count as unclassified. Assigning them to the likeliest bucket would be the
+// same fabrication this whole change removes, one layer down: the renderer used to
+// guess a cause, and a parser that guessed retroactively would put the guess back
+// where nobody could see it.
+func TestFireStatsSplitsTranslateFailuresByReasonAndKeepsOldLinesHonest(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "fires.log")
+	body := "2026-08-01T00:00:00Z\ttranslate-failed\n" + // written before reasons existed
+		"2026-08-02T00:00:00Z\ttranslate-failed\n" +
+		"2026-08-03T00:00:00Z\ttranslate-failed:quota\n" +
+		"2026-08-04T00:00:00Z\ttranslate-failed:quota\n" +
+		"2026-08-05T00:00:00Z\ttranslate-failed:timeout\n" +
+		"2026-08-06T00:00:00Z\ttranslated\n"
+	if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	st, err := readFireStats(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st.TranslateFailed != 5 {
+		t.Errorf("TranslateFailed = %d, want 5 — the total must not change shape", st.TranslateFailed)
+	}
+	for reason, want := range map[string]int{"quota": 2, "timeout": 1, "unclassified": 2} {
+		if got := st.TranslateFailedBy[reason]; got != want {
+			t.Errorf("%s = %d, want %d (all: %v)", reason, got, want, st.TranslateFailedBy)
+		}
+	}
+	// EVERY translate line is a MODIFIER on the fire that follows, not a fire of its
+	// own — `translated` included, which this assertion originally got wrong and the
+	// test caught. Counting them would inflate the denominator every percentage
+	// divides by, and it would inflate it hardest on a machine whose translator is
+	// failing, which is exactly where the instrument is needed.
+	if st.Total != 0 {
+		t.Errorf("Total = %d, want 0 — the fixture holds only translate modifiers, no prompt", st.Total)
+	}
+}
+
+// The spend line counts every session the translator actually started — successes that
+// were not cached, plus failures, since a failure spawned a process too and a refused
+// one still cost the round trip.
+//
+// It is an explicit line rather than three numbers a reader could subtract, because a
+// number nobody derives is a number nobody sees: 214 of these accumulated across
+// projects during the week the maintainer exhausted an account, and every one of them
+// was already visible in the log to anyone who thought to do the arithmetic.
+func TestSpendCountsEverySessionTheTranslatorStarted(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "fires.log")
+	body := "2026-08-01T00:00:00Z\ttranslated\n" + // spawned
+		"2026-08-01T00:00:01Z\ttranslated\n" + // spawned
+		"2026-08-01T00:00:02Z\ttranslated:cached\n" + // NOT spawned
+		"2026-08-01T00:00:03Z\ttranslated:cached\n" + // NOT spawned
+		"2026-08-01T00:00:04Z\ttranslate-failed:quota\n" // spawned, and refused
+	if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	st, err := readFireStats(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st.Translated != 4 || st.TranslatedCached != 2 {
+		t.Fatalf("translated=%d cached=%d, want 4 and 2", st.Translated, st.TranslatedCached)
+	}
+	if spawned := st.Translated - st.TranslatedCached + st.TranslateFailed; spawned != 3 {
+		t.Errorf("spawned = %d, want 3 — two uncached successes and one refused attempt", spawned)
+	}
+}

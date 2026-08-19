@@ -3,6 +3,9 @@ package commands
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -38,10 +41,34 @@ import (
 // what its English twin scores — 75% against today's 25%.
 
 const (
-	// translateTimeout bounds the translation subprocess. Generous on purpose:
-	// the decision explicitly traded latency for recall, and a translation that
-	// times out costs nothing but the original query, which is what would have
-	// run anyway.
+	// translateTimeout bounds the translation subprocess.
+	//
+	// DERIVED, not chosen. The binding constraint is not the latency of a
+	// translation — it is the harness's own ceiling on the hook this runs inside,
+	// which nothing in this repository had measured or recorded.
+	//
+	// Claude Code cancels a `command` hook at a default that UserPromptSubmit
+	// lowers to 30 SECONDS, and `atl retrieve` is registered as exactly that with
+	// no `timeout` of its own (settings.Hook cannot express one). So 30s is the
+	// whole budget for translation AND everything after it.
+	//
+	// The rest of the hook, measured warm on this machine, costs ~2.5s; its worst
+	// case is bounded by the 5s context around the embedder and the query, plus a
+	// cold index load — call it ~7s. That leaves ~23s for translation, and 20s
+	// keeps a margin under it.
+	//
+	// Why not raise it toward the ceiling, which the observed distribution invites:
+	// translation measured 9–24s over nine samples (median 16), and a 92s success
+	// was measured by hand. Those longer calls cannot be served from here at ANY
+	// value of this constant — and raising it trades a VISIBLE failure for an
+	// INVISIBLE one. A translation that hits this deadline logs
+	// `translate-failed:timeout` and the prompt still searches untranslated; a hook
+	// the harness kills at 30s logs NOTHING and loses retrieval entirely, which is
+	// both the worse outcome and the unobservable one.
+	//
+	// So the tail is not served by a bigger number. It is served by the cache
+	// above: a query translated once is free every time after, including while the
+	// weekly limit is exhausted.
 	translateTimeout = 20 * time.Second
 
 	// maxTranslatableRunes caps what is sent. A retrieval query is a question,
@@ -66,9 +93,16 @@ const (
 // `claude -p` is invoked with NO --model flag on purpose. The user's own default
 // model is used, so no model name exists in this codebase to go stale when a
 // model is retired — a requirement of the decision, not an omission.
-func translatePrompt(ctx context.Context, prompt string) (string, translateOutcome) {
+func translatePrompt(ctx context.Context, prompt string) (string, translateOutcome, translateFailure) {
 	if len([]rune(prompt)) > maxTranslatableRunes {
-		return "", translateSkipped
+		return "", translateSkipped, ""
+	}
+	// The cache is consulted BEFORE the credential, and that ordering is deliberate.
+	// A hit needs no credential, spawns no subprocess and spends no quota, so a
+	// machine whose limit is exhausted still gets its translation for anything it has
+	// translated before — which is exactly when it is most needed and least available.
+	if q, hit := cachedTranslation(prompt); hit {
+		return q, translateCached, ""
 	}
 	cred, ok := translatorCredential()
 	if !ok {
@@ -76,42 +110,220 @@ func translatePrompt(ctx context.Context, prompt string) (string, translateOutco
 		// not failed: no subprocess ran, so nothing was observed about a credential's
 		// validity — and the next prompt will find claudeAvailable false and print the
 		// missing-credential notice, which is the correct one for this state.
-		return "", translateSkipped
+		return "", translateSkipped, ""
 	}
 	ctx, cancel := context.WithTimeout(ctx, translateTimeout)
 	defer cancel()
 
 	cmd := translateCommand(ctx, prompt, cred)
-	var out, discard bytes.Buffer
+	var out, errOut bytes.Buffer
 	cmd.Stdout = &out
-	// stderr is captured and dropped on purpose: this runs inside a hook whose
-	// stdout is injected into the agent's context, and a stray warning from the
-	// child would land there as if it were retrieved knowledge.
-	cmd.Stderr = &discard
+	// stderr is captured and NEVER PRINTED, which is the original reason and it
+	// still holds: this runs inside a hook whose stdout is injected into the
+	// agent's context, and a stray warning from the child would land there as if it
+	// were retrieved knowledge.
+	//
+	// What changed is that it is no longer DISCARDED. The buffer was called
+	// `discard` and thrown away, so every failure below collapsed into one counter
+	// and the stats line had to guess at the cause — it printed "credential
+	// expired?" over a quota exhaustion and sent the diagnosis to the wrong place.
+	// The text is read here to classify, and goes nowhere else.
+	cmd.Stderr = &errOut
 	if err := cmd.Run(); err != nil {
-		// The ONLY credential-shaped outcome: the subprocess did not reach a usable
-		// exit. A 401 lands here; so does a timeout, which is why three in a row —
-		// not one — are what the expired notice is built on.
-		return "", translateFailed
+		// Several different conditions land here — a rejected credential, an
+		// exhausted quota, a timeout, a missing binary — and they have different
+		// remedies. Classified rather than counted; see classifyTranslateFailure.
+		return "", translateFailed, classifyTranslateFailure(ctx, err, out.String()+errOut.String())
 	}
 	q, ok := cleanTranslation(out.String(), prompt)
+	if ok {
+		// Only a validated query is cached. cleanTranslation is what rejects an
+		// explanation, a refusal or an unchanged echo, so storing before it would
+		// make a bad answer permanent — a cache turns a transient wrong into a
+		// standing one.
+		storeTranslation(prompt, q)
+	}
 	if !ok {
 		// The subprocess ran fine and its answer was deliberately not used: already
 		// English, empty, or prose instead of a query. That says nothing whatever
 		// about the credential, so it must not be logged as though it did.
-		return "", translateSkipped
+		return "", translateSkipped, ""
 	}
-	return q, translateOK
+	return q, translateOK, ""
 }
 
 // translateOutcome distinguishes the three things that can happen, because only
 // one of them is evidence about the credential.
+// translationCacheDir is where translated queries are kept.
+//
+// GLOBAL, not per project. A translation is a pure function of its input — the same
+// Turkish phrase becomes the same English query in every repository — so a per-project
+// cache would fragment it and re-spend the usage budget once per project for the same
+// sentence. The store it caches against is global for the same reason.
+func translationCacheDir() (string, error) {
+	layer, err := scope.LayerDir(scope.Global, "")
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(layer, "cache", "translate"), nil
+}
+
+// translationKey identifies a cached translation.
+//
+// It hashes the INSTRUCTION as well as the prompt, and that is the load-bearing half.
+// A cached value is only valid for the question that produced it, so changing the
+// instruction — a new rule, a reworded constraint — must invalidate every entry rather
+// than silently keep serving answers to a question no longer being asked. Writing the
+// producer's identity into the artifact is the alternative to remembering to bump a
+// version by hand, and this project has measured what happens when that is left to
+// memory.
+//
+// Hashed rather than stored: the prompt is the user's own text and does not belong in a
+// filename, in a log, or anywhere a directory listing can be read.
+func translationKey(prompt string) string {
+	sum := sha256.Sum256([]byte(translationInstruction(prompt)))
+	return hex.EncodeToString(sum[:])
+}
+
+// cachedTranslation returns a previously translated query, if there is one.
+//
+// Every failure is a MISS rather than an error. The cache is an optimisation over a
+// mechanism that is already fail-open; a cache that could break translation would be
+// worse than no cache at all.
+func cachedTranslation(prompt string) (string, bool) {
+	dir, err := translationCacheDir()
+	if err != nil {
+		return "", false
+	}
+	b, err := os.ReadFile(filepath.Join(dir, translationKey(prompt)))
+	if err != nil {
+		return "", false
+	}
+	q := strings.TrimSpace(string(b))
+	return q, q != ""
+}
+
+// storeTranslation records a successful translation.
+//
+// One file per entry, not one file holding all of them. The maintainer runs several
+// projects at once, so a single JSON file would be read-modify-written by concurrent
+// hooks and the loser's entry would vanish with no error — which is the failure the
+// durable queue was given a directory to avoid. A file per key has no such race, and
+// the write is atomic through a rename so a killed process cannot leave a half-written
+// answer to be served as a real one.
+//
+// Only SUCCESSES are cached. A failure is a fact about the moment — an exhausted quota,
+// a timeout — and caching it would turn a transient condition into a permanent one.
+//
+// No eviction, stated rather than implied. An entry is a query and its translation,
+// on the order of a couple of hundred bytes; a year of heavy use is a few megabytes.
+// Writing a retention policy that nothing implements would be worse than saying there
+// is none.
+func storeTranslation(prompt, query string) {
+	dir, err := translationCacheDir()
+	if err != nil || strings.TrimSpace(query) == "" {
+		return
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return
+	}
+	final := filepath.Join(dir, translationKey(prompt))
+	tmp, err := os.CreateTemp(dir, ".tmp-*")
+	if err != nil {
+		return
+	}
+	name := tmp.Name()
+	if _, err := tmp.WriteString(query); err != nil {
+		tmp.Close()
+		os.Remove(name)
+		return
+	}
+	if err := tmp.Close(); err != nil {
+		os.Remove(name)
+		return
+	}
+	if err := os.Rename(name, final); err != nil {
+		os.Remove(name)
+	}
+}
+
+// translateFailure names WHY a translation did not run.
+//
+// It exists because the counter it replaces could not tell four conditions apart and
+// printed a guess for all of them. The guess was "credential expired?", the condition
+// was an exhausted weekly quota, and the diagnosis went to the wrong place — the
+// credential was read, probed and found perfectly healthy before anyone thought to
+// read the child's own error text, which had said so all along.
+//
+// Four conditions, four remedies: buy or wait for quota, re-authenticate, raise the
+// timeout, install the binary. One number cannot carry that.
+type translateFailure string
+
+const (
+	// failTimeout — the deadline fired. STRUCTURAL: read from the context, not from
+	// any message, so it holds whatever language the child speaks.
+	failTimeout translateFailure = "timeout"
+	// failNoBinary — `claude` is not on PATH. Also structural.
+	failNoBinary translateFailure = "no-binary"
+	// failQuota — the usage limit is exhausted. Text-matched; see the note below.
+	failQuota translateFailure = "quota"
+	// failAuth — the credential was refused. Text-matched.
+	failAuth translateFailure = "auth"
+	// failUnclassified — it failed and this could not say why.
+	//
+	// A real bucket rather than a default that guesses. The whole defect being fixed
+	// here was a guess printed with the confidence of a measurement, so an unreadable
+	// failure must say it is unreadable: an honest "unclassified" sends the reader to
+	// the evidence, and a wrong label sends them somewhere else entirely.
+	failUnclassified translateFailure = "unclassified"
+)
+
+// classifyTranslateFailure says why the translator did not run.
+//
+// # Structural first, text second, and the order is the point
+//
+// A timeout and a missing binary are readable from Go's own values and cannot be
+// wrong. Quota and auth are only distinguishable from the child's PROSE, and this
+// project has measured what that costs: a message match is a claim about a program's
+// human-readable output, and human-readable output is localised. `git` answers in
+// Turkish on this machine, which is how a fail-closed guard came to refuse every
+// init it was written to permit.
+//
+// So the text arm is deliberately the LAST resort, it is matched case-insensitively
+// on several phrasings, and when nothing matches it returns unclassified rather than
+// picking the likeliest. That last clause is the whole correction: the code being
+// replaced picked the likeliest and was wrong.
+func classifyTranslateFailure(ctx context.Context, err error, output string) translateFailure {
+	// The deadline first. It is checked before anything else because a killed
+	// subprocess also prints whatever it had got to, and that text would otherwise be
+	// classified as though the process had finished and reported it.
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		return failTimeout
+	}
+	if errors.Is(err, exec.ErrNotFound) {
+		return failNoBinary
+	}
+	low := strings.ToLower(output)
+	for _, m := range []string{"weekly limit", "usage limit", "rate limit", "quota", "limit reached"} {
+		if strings.Contains(low, m) {
+			return failQuota
+		}
+	}
+	for _, m := range []string{"not logged in", "expired", "unauthorized", "invalid api key", "401"} {
+		if strings.Contains(low, m) {
+			return failAuth
+		}
+	}
+	return failUnclassified
+}
+
 type translateOutcome int
 
 const (
 	translateOK      translateOutcome = iota // a usable query came back
 	translateSkipped                         // nothing ran, or its answer was rejected
 	translateFailed                          // the subprocess did not run to a usable exit
+	translateCached                          // served from the cache; no subprocess, no quota
 )
 
 // translateCommand builds the translator subprocess. Separated from
@@ -160,14 +372,60 @@ func translationInstruction(prompt string) string {
 		"Text:\n" + prompt
 }
 
+// soleQueryLine reduces the child's reply to the one line that could be a query,
+// and refuses when more than one survives.
+//
+// The previous form took everything before the first newline, under the comment
+// "a query is one line; prose is not". That names the right property and
+// implements a different one — line POSITION rather than line COUNT — and the two
+// come apart on the commonest disobedience there is: a PREPENDED preamble. On
+// exactly the case this guard exists for it therefore kept the preamble, discarded
+// the query, and returned the result as a SUCCESS.
+//
+// Measured against five realistic reply shapes, four produced a valid-looking
+// query that was then searched for:
+//
+//	"Here is the English search query:"
+//	"English search query:"
+//	"```"
+//	"Sure! Here you go:"
+//
+// That is worse than not translating. Translation is fail-OPEN by contract, and
+// this did not fail open — it failed confidently, and a preamble shares its
+// vocabulary with the corpus ("search query", "knowledge base"), so the search
+// returned plausible wrong pages under a `translated` log line.
+//
+// Fences are stripped rather than counted. A fenced reply is obedient in every
+// respect except decoration, and once the decoration is gone exactly one content
+// line remains — so recovering it costs nothing and keeps a common shape working.
+//
+// Anything still multi-line is REFUSED rather than picked from. Choosing among
+// several lines would be a guess about which one the model meant, and being wrong
+// there is the defect above wearing a heuristic. Refusal costs only what a failed
+// translation always cost: the prompt searches with its original wording.
+func soleQueryLine(raw string) (string, bool) {
+	var lines []string
+	for _, ln := range strings.Split(raw, "\n") {
+		ln = strings.TrimSpace(ln)
+		if ln == "" || strings.HasPrefix(ln, "```") {
+			continue
+		}
+		lines = append(lines, ln)
+	}
+	if len(lines) != 1 {
+		return "", false
+	}
+	return lines[0], true
+}
+
 // cleanTranslation validates what came back. A translator is an LLM and can
 // answer the question instead of translating it, refuse, or explain itself; each
 // of those is worse as a query than the original, so anything that does not look
 // like a short query is rejected rather than used.
 func cleanTranslation(raw, original string) (string, bool) {
-	s := strings.TrimSpace(raw)
-	if i := strings.IndexByte(s, '\n'); i >= 0 {
-		s = strings.TrimSpace(s[:i]) // a query is one line; prose is not
+	s, ok := soleQueryLine(raw)
+	if !ok {
+		return "", false
 	}
 	s = strings.Trim(s, `"'`)
 	if s == "" {
