@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"github.com/spf13/cobra"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -165,4 +166,32 @@ func TestReportUnbackedStoresSpeaksThenGoesQuiet(t *testing.T) {
 	if !strings.Contains(out, "1 commit(s) ahead") {
 		t.Fatalf("drift case said %q, want the unpushed count", out)
 	}
+}
+
+// The command has to be REACHABLE, not merely defined. A correct body that no parent
+// registers is the characteristic failure of a scaffolded unit: build, vet and every unit
+// test pass over it while the command does not exist at runtime, so nothing that gates a
+// release can see the gap.
+//
+// This matters more than usual here because a SKILL is the caller. `/profile-backup` runs
+// `atl store version` and treats a failure as "this store is not eligible for versioning" —
+// so an unregistered command would not surface as a missing command, it would surface as a
+// store that can never be backed up, with an honest-looking message explaining why.
+func TestStoreVersionIsReachableFromRoot(t *testing.T) {
+	var store *cobra.Command
+	for _, c := range rootCmd.Commands() {
+		if c.Name() == "store" {
+			store = c
+			break
+		}
+	}
+	if store == nil {
+		t.Fatal("`store` is not registered on rootCmd — `atl store version` does not exist at runtime")
+	}
+	for _, c := range store.Commands() {
+		if c.Name() == "version" {
+			return
+		}
+	}
+	t.Fatal("`version` is not registered on `store` — the skill's call would fail")
 }

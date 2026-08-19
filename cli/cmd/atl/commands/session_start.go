@@ -91,6 +91,18 @@ var sessionStartCmd = &cobra.Command{
 		// write policy is last-write-wins can still surrender its previous value.
 		// Placed after the queue lock is released — it touches no queue state, and a
 		// git commit is slow enough to be worth keeping out of that window.
+		//
+		// This is now the ONLY automatic trigger. `atl tick` used to run the same pass
+		// behind its throttle, covering the case a session boundary cannot: a long
+		// session that overwrites the same field twice keeps the value from before the
+		// first write and loses the one between them. That call was removed on the
+		// maintainer's decision — capture should write profiles and not perform git
+		// ceremony — and the trade is real rather than notional, so it is recorded
+		// here rather than argued away.
+		//
+		// What makes it affordable is that the pass is no longer only automatic:
+		// `atl store version` runs the identical call on demand, and /profile-backup
+		// invokes it, so a user who wants a snapshot now has one command for it.
 		if n := versionDeclaredStores(project); n > 0 {
 			fmt.Printf("atl: snapshotted %d durable store(s) to local git — previous values stay recoverable\n", n)
 		}

@@ -40,10 +40,26 @@ if [ ! -d "$SRC" ] || [ -z "$(ls -A "$SRC" 2>/dev/null)" ]; then
   echo "nothing-to-back-up"; exit 0
 fi
 
-# 2. The store is versioned by `atl session-start`, not here. If it is not a repo, that
-#    path has not run or is disabled — report it rather than quietly creating a second
-#    mechanism that versions the same directory on different terms.
-git -C "$SRC" rev-parse --git-dir >/dev/null 2>&1 || { echo "not-versioned"; exit 1; }
+# 2. Under git — and if it is not, bring it there by running the SAME pass the session
+#    boundary runs, rather than refusing.
+#
+#    This step used to stop with `not-versioned`. The reasoning was sound and is preserved:
+#    creating a repo here with `git init` would have been a second mechanism versioning the
+#    same directory on different terms. What it left the user holding, though, was an
+#    instruction they could not act on — the skill said versioning is session-start's job,
+#    and session-start had not run.
+#
+#    `atl store version` is that same call exposed as a command, so this is one
+#    implementation with two triggers rather than two implementations. It decides
+#    eligibility for itself: an absent store is not created, an EMPTY one is not
+#    initialised, and a store nested inside another repo is left alone. So if the re-check
+#    below still fails, the refusal is storegit's own and `not-versioned` is the honest
+#    answer — it now means "this store is not eligible for versioning", not "nobody has
+#    run the thing that would version it".
+if ! git -C "$SRC" rev-parse --git-dir >/dev/null 2>&1; then
+  atl store version >/dev/null 2>&1 || true
+  git -C "$SRC" rev-parse --git-dir >/dev/null 2>&1 || { echo "not-versioned"; exit 1; }
+fi
 
 # 3. Where would it go? A remote IS the recorded destination — git already holds it, so no
 #    config file, no path to vet, and no way for the record to drift from reality.
