@@ -3,6 +3,8 @@ package commands
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
@@ -71,6 +73,13 @@ func translatePrompt(ctx context.Context, prompt string) (string, translateOutco
 	if len([]rune(prompt)) > maxTranslatableRunes {
 		return "", translateSkipped, ""
 	}
+	// The cache is consulted BEFORE the credential, and that ordering is deliberate.
+	// A hit needs no credential, spawns no subprocess and spends no quota, so a
+	// machine whose limit is exhausted still gets its translation for anything it has
+	// translated before — which is exactly when it is most needed and least available.
+	if q, hit := cachedTranslation(prompt); hit {
+		return q, translateCached, ""
+	}
 	cred, ok := translatorCredential()
 	if !ok {
 		// The credential was there when claudeAvailable ran and is gone now. Skipped,
@@ -103,6 +112,13 @@ func translatePrompt(ctx context.Context, prompt string) (string, translateOutco
 		return "", translateFailed, classifyTranslateFailure(ctx, err, out.String()+errOut.String())
 	}
 	q, ok := cleanTranslation(out.String(), prompt)
+	if ok {
+		// Only a validated query is cached. cleanTranslation is what rejects an
+		// explanation, a refusal or an unchanged echo, so storing before it would
+		// make a bad answer permanent — a cache turns a transient wrong into a
+		// standing one.
+		storeTranslation(prompt, q)
+	}
 	if !ok {
 		// The subprocess ran fine and its answer was deliberately not used: already
 		// English, empty, or prose instead of a query. That says nothing whatever
@@ -114,6 +130,99 @@ func translatePrompt(ctx context.Context, prompt string) (string, translateOutco
 
 // translateOutcome distinguishes the three things that can happen, because only
 // one of them is evidence about the credential.
+// translationCacheDir is where translated queries are kept.
+//
+// GLOBAL, not per project. A translation is a pure function of its input — the same
+// Turkish phrase becomes the same English query in every repository — so a per-project
+// cache would fragment it and re-spend the usage budget once per project for the same
+// sentence. The store it caches against is global for the same reason.
+func translationCacheDir() (string, error) {
+	layer, err := scope.LayerDir(scope.Global, "")
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(layer, "cache", "translate"), nil
+}
+
+// translationKey identifies a cached translation.
+//
+// It hashes the INSTRUCTION as well as the prompt, and that is the load-bearing half.
+// A cached value is only valid for the question that produced it, so changing the
+// instruction — a new rule, a reworded constraint — must invalidate every entry rather
+// than silently keep serving answers to a question no longer being asked. Writing the
+// producer's identity into the artifact is the alternative to remembering to bump a
+// version by hand, and this project has measured what happens when that is left to
+// memory.
+//
+// Hashed rather than stored: the prompt is the user's own text and does not belong in a
+// filename, in a log, or anywhere a directory listing can be read.
+func translationKey(prompt string) string {
+	sum := sha256.Sum256([]byte(translationInstruction(prompt)))
+	return hex.EncodeToString(sum[:])
+}
+
+// cachedTranslation returns a previously translated query, if there is one.
+//
+// Every failure is a MISS rather than an error. The cache is an optimisation over a
+// mechanism that is already fail-open; a cache that could break translation would be
+// worse than no cache at all.
+func cachedTranslation(prompt string) (string, bool) {
+	dir, err := translationCacheDir()
+	if err != nil {
+		return "", false
+	}
+	b, err := os.ReadFile(filepath.Join(dir, translationKey(prompt)))
+	if err != nil {
+		return "", false
+	}
+	q := strings.TrimSpace(string(b))
+	return q, q != ""
+}
+
+// storeTranslation records a successful translation.
+//
+// One file per entry, not one file holding all of them. The maintainer runs several
+// projects at once, so a single JSON file would be read-modify-written by concurrent
+// hooks and the loser's entry would vanish with no error — which is the failure the
+// durable queue was given a directory to avoid. A file per key has no such race, and
+// the write is atomic through a rename so a killed process cannot leave a half-written
+// answer to be served as a real one.
+//
+// Only SUCCESSES are cached. A failure is a fact about the moment — an exhausted quota,
+// a timeout — and caching it would turn a transient condition into a permanent one.
+//
+// No eviction, stated rather than implied. An entry is a query and its translation,
+// on the order of a couple of hundred bytes; a year of heavy use is a few megabytes.
+// Writing a retention policy that nothing implements would be worse than saying there
+// is none.
+func storeTranslation(prompt, query string) {
+	dir, err := translationCacheDir()
+	if err != nil || strings.TrimSpace(query) == "" {
+		return
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return
+	}
+	final := filepath.Join(dir, translationKey(prompt))
+	tmp, err := os.CreateTemp(dir, ".tmp-*")
+	if err != nil {
+		return
+	}
+	name := tmp.Name()
+	if _, err := tmp.WriteString(query); err != nil {
+		tmp.Close()
+		os.Remove(name)
+		return
+	}
+	if err := tmp.Close(); err != nil {
+		os.Remove(name)
+		return
+	}
+	if err := os.Rename(name, final); err != nil {
+		os.Remove(name)
+	}
+}
+
 // translateFailure names WHY a translation did not run.
 //
 // It exists because the counter it replaces could not tell four conditions apart and
@@ -190,6 +299,7 @@ const (
 	translateOK      translateOutcome = iota // a usable query came back
 	translateSkipped                         // nothing ran, or its answer was rejected
 	translateFailed                          // the subprocess did not run to a usable exit
+	translateCached                          // served from the cache; no subprocess, no quota
 )
 
 // translateCommand builds the translator subprocess. Separated from

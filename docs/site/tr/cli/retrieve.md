@@ -51,6 +51,12 @@ turns           62
 
 `translated` satırının kendisi bir istem olarak sayılmaz — kendisinden sonra gelen fire üzerinde bir niteleyicidir ve sayılması yukarıdaki her yüzdenin bölündüğü paydayı şişirirdi. Kardeşi `translate-skipped` aynı gerekçeyle dışarıda tutulur ama kendine ait bir satırı yoktur: çalışmış, ancak cevabı bilerek kullanılmamış bir çeviriyi işaretler — metin zaten İngilizceydi ya da model, sorgu beklenen yerde düz metin döndürdü. `translated` satırı hiç görünmüyorsa burada hiçbir şey çevrilmemiş demektir — genellikle bir kimlik bilgisi tanımlı olmadığı için. Çevirmenin kendine ait bir kimlik bilgisine ihtiyacı vardır: ya `~/.atl/claude-token` ya da dışa aktarılmış bir ortam değişkeni — ve onu **nerede** dışa aktardığın, bir hook'un onu görüp göremeyeceğini belirler; bkz. [bilgi sistemi kılavuzu](/tr/guide/knowledge-system).
 
+Bir çeviri başarılı olduğunda **önbelleğe** alınır — proje bazında değil global olarak, çünkü
+aynı cümle her depoda aynı sorguya dönüşür. Tekrarı `~/.atl/cache/translate` üzerinden, hiçbir
+oturum başlatılmadan karşılanır; bu da en çok kullanım limiti tükendiğinde işe yarar, çünkü bir
+önbellek isabeti kimlik bilgisi gerektirmez ve bütçeden harcamaz. `translated` altındaki
+`from cache` satırı, harcanmayan bütçedir.
+
 Bir çeviri **başarısız** olduğunda istatistikler `translate-failed` toplamını gerekçesine
 göre ayırarak basar — `quota`, `auth`, `timeout`, `no-binary`, `unclassified` — çünkü bunlar
 dört farklı çareye sahip dört farklı durumdur ve tek bir sayı bunu taşıyamaz. Bu satır eskiden

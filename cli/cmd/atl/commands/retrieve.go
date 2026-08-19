@@ -221,6 +221,13 @@ func runRetrieveHook(cmd *cobra.Command) {
 		case translateOK:
 			query = translated
 			logRetrieveFire(root, "translated", nil)
+		case translateCached:
+			// Logged under its own token so the saving is MEASURABLE. The card that
+			// produced this work could not size the cache from the existing record,
+			// because the log kept the outcome and never the input — there was
+			// nothing to deduplicate against. From here the rate measures itself.
+			query = translated
+			logRetrieveFire(root, "translated:cached", nil)
 		case translateFailed:
 			// Record the failure too. Translation is fail-open and silent by
 			// design, so without this line a translator that has STOPPED WORKING is
@@ -511,7 +518,11 @@ func logRetrieveFire(projectRoot, outcome string, paths []string) {
 type retrieveFireStats struct {
 	Total, Fired, Silent, Machine, Short int
 	Translated                           int
-	TranslateFailed                      int
+	// TranslatedCached is the subset served without spawning anything. It is the
+	// quota NOT spent, which is the number the user actually wants and the one the
+	// previous log shape could never produce.
+	TranslatedCached int
+	TranslateFailed  int
 	// TranslateFailedBy is the same total, split by WHY. The total alone could not
 	// name a cause, so the line that rendered it guessed one — and guessed wrong
 	// about the condition that was actually happening.
@@ -563,8 +574,11 @@ func readFireStats(logPath string) (retrieveFireStats, error) {
 		// the denominator every percentage below is computed against — and inflate
 		// it further the more the feature is used, so the instrument would degrade
 		// exactly as the thing it measures gets adopted.
-		if f[1] == "translated" {
+		if strings.HasPrefix(f[1], "translated") {
 			st.Translated++
+			if f[1] == "translated:cached" {
+				st.TranslatedCached++
+			}
 			continue
 		}
 		// Same reasoning, other outcome: a skipped translation is a modifier on the
@@ -969,6 +983,10 @@ func renderFireStats(st retrieveFireStats) string {
 	if st.Translated > 0 {
 		fmt.Fprintf(&b, "  translated %5d  %s   (of the above — a query with no lexical hit)\n",
 			st.Translated, pct(st.Translated))
+		if st.TranslatedCached > 0 {
+			fmt.Fprintf(&b, "    from cache %5d       (no session spawned — the usage budget this did not spend)\n",
+				st.TranslatedCached)
+		}
 	}
 	// Shown because it is the one state a user cannot otherwise see: translation is
 	// fail-open, so a failure produces no error, no missing output, and no change a
