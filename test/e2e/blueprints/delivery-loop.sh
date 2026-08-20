@@ -122,6 +122,12 @@ dturn "/refine. Groom and decompose the analyzed Feature(s) into implementable w
 if has '[.workItems[] | select(.fields."System.WorkItemType"=="Product Backlog Item" and (.fields."System.Tags"//""|test("historic")|not))] | length'; then ok "refine decomposed the Feature into work-units (PBIs)"; else note "no new PBIs this run (LLM-variable: refine is a less-deterministic ceremony)"; fi
 if has '[.workItems[] | select((.relations // []) | map(.rel) | any(test("Dependency")))] | length'; then ok "a Dependency link was recorded"; else note "no Dependency link this run (LLM-variable)"; fi
 if has '[.workItems[] | select((.fields."System.Tags"//"")|test("area:"))] | length'; then ok "work-units carry area tags (pack binding)"; else note "no area tag written this run (LLM-variable; pack binding is exercised at Layer-B)"; fi
+# The ESTIMATE, observed where the gap happens rather than only as an absence three ceremonies
+# downstream. sprint-plan's admission turns on this field — "an item with no estimate is a planning
+# gap; never admit an unestimated unit" — so a unit without one is unplannable by contract, and the
+# whole chain below correctly refuses. Until this line existed the field was checked NOWHERE in this
+# blueprint, and its absence surfaced only as a red assertion naming sprint-start.
+if has '[.workItems[] | select(.fields."System.WorkItemType"=="Product Backlog Item" and (.fields."System.Tags"//""|test("historic")|not) and (.fields."Microsoft.VSTS.Scheduling.StoryPoints" // null) != null)] | length'; then ok "refine estimated at least one work-unit (StoryPoints set — the admission precondition)"; else note "no work-unit carries StoryPoints this run (LLM-variable; sprint-plan will correctly refuse to admit unestimated units, and the branch below expects that)"; fi
 
 # ---- 3. /sprint-plan — velocity from the seeded closed sprints, then admit --------
 dturn "/sprint-plan. Compute capacity from the velocity of the last 3 closed sprints (read them via work_list_iterations + wit_get_work_items_for_iteration). The candidate backlog work-units are the New-state PBIs at the project-root IterationPath (read them via wit_list_backlog_work_items or a WIQL query for state='New' PBIs) — the current sprint is empty. Select the top backlog units by StackRank at a single granularity, and MOVE each admitted unit into the current sprint by setting its System.IterationPath (wit_update_work_item) to the sprint's path. Report the computed velocity." || bad "sprint-plan turn errored"
@@ -141,13 +147,40 @@ if [ -f "$PROJ/.delivery/plan.json" ] && jq -e '.' "$PROJ/.delivery/plan.json" >
   # behavior now (sprint-start fail-fast refuses a degenerate sprint, never writes a silent empty plan)
   if jq -e '.units | length >= 1 and (.[0] | has("id") and has("predecessors") and has("stackRank"))' "$PROJ/.delivery/plan.json" >/dev/null 2>&1; then ok "plan.json carries populated units (id/predecessors/stackRank)"; else bad "plan.json materialized with empty/malformed units — sprint-start must refuse a degenerate sprint, not write an empty plan"; fi
 else
-  # New behavior (sprint-start-edge-cases): a degenerate sprint — no workable units, e.g. refine
-  # produced 0 PBIs — is a fail-fast REFUSE, so NO plan.json is the CORRECT outcome. Only a genuine
-  # failure (workable PBIs exist but sprint-start wrote no plan) is CORE-bad.
-  if has '[.workItems[] | select(.fields."System.WorkItemType"=="Product Backlog Item" and (.fields."System.Tags"//""|test("historic")|not))] | length'; then
-    bad "no plan.json materialized despite workable PBIs (sprint-start should have planned them)"
+  # No plan.json. THREE upstream states produce that, and collapsing them into two is what made
+  # this assertion blame the wrong ceremony:
+  #
+  #   (a) refine produced no PBIs at all            -> degenerate sprint; the refusal is correct
+  #   (b) PBIs exist but none carry an ESTIMATE     -> sprint-plan must refuse admission, by its
+  #                                                    own contract ("an item with no estimate is a
+  #                                                    planning gap — never admit an unestimated
+  #                                                    unit"), so the refusal is correct here too
+  #   (c) ESTIMATED PBIs exist and none were planned -> the genuine failure
+  #
+  # The old predicate was (a) versus "any PBI exists", which folded (b) into (c): it demanded a
+  # plan the planner's own spec forbids producing, and reported a correct DOUBLE refusal as a
+  # product defect named after sprint-start — the last ceremony to speak rather than the one the
+  # gap was in. Measured on the v2.32.0 gate: refine produced six dependency-linked, area-tagged
+  # PBIs with no StoryPoints; sprint-plan quoted its own rule and stopped without moving anything;
+  # sprint-start refused a sprint with zero admitted units; the run went red.
+  #
+  # And it passed VACUOUSLY whenever nothing ran. On the gate immediately before that one the
+  # Claude quota was exhausted, refine produced nothing, "any PBI exists" was false, and the
+  # assertion never fired. An assertion that passes both when everything works and when nothing
+  # runs carries almost no information about either.
+  if has '[.workItems[] | select(.fields."System.WorkItemType"=="Product Backlog Item" and (.fields."System.Tags"//""|test("historic")|not) and (.fields."Microsoft.VSTS.Scheduling.StoryPoints" // null) != null)] | length'; then
+    bad "estimated PBIs exist and no plan.json was written — the planning chain admitted nothing it was able to admit"
+  elif has '[.workItems[] | select(.fields."System.WorkItemType"=="Product Backlog Item" and (.fields."System.Tags"//""|test("historic")|not))] | length'; then
+    # (b) The units exist and are unplannable. Both ceremonies refusing is the CORRECT outcome, so
+    # what is checked here is that the reason was SURFACED — a silent stop and a reasoned refusal
+    # are identical in the tally, and only one of them is the behaviour the spec asks for.
+    if grep -Eiq 'no estimate|planning gap|unestimated|story ?points|zero admitted|nothing .{0,20}admitted|no admitted work-units' "$HOME/turns.log" 2>/dev/null; then
+      ok "refine left the units unestimated and the planning chain refused them, naming the reason (estimate = admission precondition)"
+    else
+      note "PBIs exist but none carry an estimate, and no refusal reason was detected in turns.log (LLM-variable wording; the refusal itself is correct)"
+    fi
   else
-    # no workable PBIs upstream (refine produced none) -> sprint-start SHOULD fail-fast refuse.
+    # (a) no workable PBIs upstream (refine produced none) -> sprint-start SHOULD fail-fast refuse.
     # Positive check: confirm it SURFACED the refusal, else a silent no-op (the original bug) passes identically.
     if grep -Eiq 'sprint is (empty|complete)|no admitted work-units|nothing to dispatch|degenerate sprint' "$HOME/turns.log" 2>/dev/null; then
       ok "sprint-start fail-fast refused the degenerate sprint + surfaced the reason (no workable PBIs upstream)"
