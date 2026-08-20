@@ -366,6 +366,29 @@ var retrieveIndexCmd = &cobra.Command{
 
 		t0 := time.Now()
 		ix := retrieve.BuildIncremental(ctx, docs, e, old)
+
+		// A build that ran out of context must NOT be written. When the deadline
+		// fires, every page the build had not reached carries a nil vector — and
+		// those nils are permanent, because the incremental reuse key is
+		// (path, text): a page saved without a vector matches its own checksum on
+		// the next build and is reused as though it had been embedded, so it is
+		// invisible to the semantic arm for good. The corruption looks FRESH to the
+		// freshness check, which is why a retry repairs nothing.
+		//
+		// Refusing the write leaves the previous index in place. That is strictly
+		// better than a fresh-looking corrupt one, and it makes a too-short deadline
+		// a loud failure instead of a silent quality regression nobody can attribute.
+		//
+		// The check is on the CONTEXT and not on the shape of the vectors, and that
+		// distinction is load-bearing: a nil vector is also the documented outcome
+		// for a single document that could not be embedded ("best-effort ... stays
+		// lexically searchable" — see BuildIncremental). Refusing every index that
+		// contains a nil would break that on purpose-built behaviour. Only the
+		// context separates "one page failed" from "the build was cut off".
+		if cerr := ctx.Err(); cerr != nil {
+			return fmt.Errorf("atl retrieve: the index build did not finish (%w) — %s left untouched; re-run with a longer --timeout", cerr, idxPath)
+		}
+
 		if err := ix.Save(idxPath); err != nil {
 			return err
 		}
@@ -896,7 +919,22 @@ func gitRevParsePath(dir, flag string) (string, error) {
 }
 
 func init() {
-	retrieveIndexCmd.Flags().Duration("timeout", 15*time.Minute, "overall deadline for the index build")
+	// 15 minutes was correct for the English embedder it was chosen with. The
+	// multilingual model that replaced it is 2.7x slower per chunk (1.841s vs
+	// 0.673s, same machine, back to back), which took a cold build of this
+	// project's corpus from ~17 to ~45 minutes — so the old default cut a cold
+	// build off at roughly a third and, before the guard above, saved the wreckage
+	// over a good index and reported success.
+	//
+	// 90 minutes is that measurement doubled. The exact number matters much less
+	// now than it did: expiry is a refusal, not a corruption, so being wrong here
+	// costs a re-run rather than an index nobody can tell is broken. On a small
+	// corpus the build finishes in seconds and the deadline never fires at all.
+	//
+	// It is still a measurement with an expiry date. It tracks the model AND the
+	// corpus size, both of which move — re-derive it if either changes, and do not
+	// read 90 as a property of the code.
+	retrieveIndexCmd.Flags().Duration("timeout", 90*time.Minute, "overall deadline for the index build")
 	retrieveIndexCmd.Flags().Bool("lexical", false, "build a BM25-only index without the semantic embedder")
 	retrieveWarmCmd.Flags().Duration("timeout", 5*time.Minute, "overall deadline for the model download + warm")
 	retrieveCmd.Flags().String("query", "", "search with this query instead of reading a hook payload on stdin")
