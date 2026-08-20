@@ -94,6 +94,21 @@ func BuildIncremental(ctx context.Context, docs []Doc, e *Embedder, old *Index) 
 	}
 	ix.Vecs = make([][]float32, len(docs))
 	for i, d := range docs {
+		// Stop when the context is done. Without this the loop keeps calling the
+		// embedder for every remaining document against a dead context: each call
+		// errors, falls into the per-chunk retry (which errors too), pools an empty
+		// slice and stores nil — so a cancelled build spends the rest of its
+		// documents producing nothing. The resilient fallback is what makes the
+		// waste silent, since it turns a hard cancellation into an empty result.
+		//
+		// The returned index is then PARTIAL, and that is the caller's problem to
+		// refuse: `atl retrieve index` checks ctx.Err() before Save precisely
+		// because a partial index saved over a good one is unrecoverable. Signalling
+		// partiality through the return type would change this function's signature
+		// for the one caller that already has the context in hand.
+		if ctx.Err() != nil {
+			break
+		}
 		if v, ok := reuse[d.Path+"\x00"+d.Text]; ok {
 			ix.Vecs[i] = v // unchanged since the last index — reuse the embedding
 			continue
