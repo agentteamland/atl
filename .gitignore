@@ -28,6 +28,20 @@ coverage.out
 /.atl/backlog.md
 /.atl/tasks.md
 
+# `atl session-start` writes this to remember which generation of its own assets it last
+# reflected. Generated state, not source — and the only thing under .atl/ that is.
+#
+# By NAME rather than by ignoring .atl/, which holds this repo's v2 decision doc. The
+# advisory home ignores the whole directory with the reason "ATL tooling state (generated,
+# not source)", and that sentence is true of its marker and false of the wiki page and two
+# journal entries sitting beside it — ~20 KB tracked nowhere. A rule about a CONTAINER is
+# right about one member and silent about the rest.
+#
+# Untracked is not safe, only unnoticed: `git add -A` sweeps it, and this project has
+# measured the same class reaching a tracked file — three .DS_Store committed into the
+# tier-3/4 profile store by an automatic snapshot. Tracked as #612.
+/.atl/seen-generation
+
 # e2e run mirror (stable path for test/e2e/watch.sh)
 test/e2e/.last-run.log
 # per-lane logs, written beside the aggregate by the lane runner (watch.sh reads them)
