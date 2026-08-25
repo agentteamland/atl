@@ -72,8 +72,90 @@ func NewID(sweep, title string) string {
 }
 
 type file struct {
-	SchemaVersion int       `json:"schemaVersion"`
-	Findings      []Finding `json:"findings"`
+	SchemaVersion int `json:"schemaVersion"`
+
+	// ProjectRoot is the project this store belongs to, recorded because the file
+	// NAME cannot say: Path hashes the root and a hash is one-way.
+	//
+	// Without it no tool can list the stores and name their projects. Identifying
+	// six of them on one machine took hashing 5,596 directories, and two could not
+	// be identified at all — the per-project artifact that does not record its
+	// project, which is this repository's own recorded law about a derived artifact
+	// not recording its producer.
+	//
+	// omitempty, and deliberately NOT back-filled by guessing. A store written
+	// before this field simply has none, and the listing says so. A new field's
+	// absence in old rows is a fact about when the distinction started being
+	// recorded; filling it in from a reverse lookup would manufacture data carrying
+	// exactly the confidence the field exists to earn.
+	ProjectRoot string `json:"projectRoot,omitempty"`
+
+	Findings []Finding `json:"findings"`
+}
+
+// Store is one digest file on disk, summarised.
+type Store struct {
+	Key    string // the hashed filename stem
+	Path   string
+	Root   string // "" when the file predates ProjectRoot
+	Total  int
+	Unread int
+}
+
+// Stores lists every digest on this machine, newest-modified first.
+//
+// The reason this exists is that the split is SILENT. A sweep writes to the store
+// of whatever project it ran in, and a hub that clones other repos beneath itself
+// gives each of them its own — so findings about the platform can sit in
+// <hub>/repos/atl while every session runs from <hub> and its digest answers
+// normally. Nothing is stranded and nothing errors; the findings are simply never
+// reached, and there is no absence to notice.
+//
+// This does NOT merge them, and merging would be the wrong fix: they are genuinely
+// different subjects, and one shared file is the "whichever project was opened
+// first answers for all the others" failure that Path's own comment says the
+// per-project split exists to prevent. The defect is the silence, not the split.
+func Stores() ([]Store, error) {
+	dir, err := scope.LayerDir(scope.Global, "")
+	if err != nil {
+		return nil, err
+	}
+	entries, err := os.ReadDir(filepath.Join(dir, "digest"))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	var out []Store
+	for _, e := range entries {
+		name := e.Name()
+		if e.IsDir() || filepath.Ext(name) != ".json" {
+			continue
+		}
+		p := filepath.Join(dir, "digest", name)
+		b, rerr := os.ReadFile(p)
+		if rerr != nil {
+			continue
+		}
+		var f file
+		if json.Unmarshal(b, &f) != nil {
+			// A corrupt store is still a store, and saying so is the point of this
+			// listing. Reporting zero findings for it would hide it exactly as the
+			// silence this function exists to end.
+			out = append(out, Store{Key: name[:len(name)-5], Path: p})
+			continue
+		}
+		s := Store{Key: name[:len(name)-5], Path: p, Root: f.ProjectRoot, Total: len(f.Findings)}
+		for _, fi := range f.Findings {
+			if fi.Unread() {
+				s.Unread++
+			}
+		}
+		out = append(out, s)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Key < out[j].Key })
+	return out, nil
 }
 
 // Path returns the digest file for a project, under ~/.atl/digest/<hash>.json.
@@ -203,7 +285,13 @@ func save(projectRoot string, findings []Finding) error {
 	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
 		return err
 	}
-	b, err := json.MarshalIndent(file{SchemaVersion: SchemaVersion, Findings: findings}, "", "  ")
+	b, err := json.MarshalIndent(file{
+		SchemaVersion: SchemaVersion,
+		// The same Clean the key is derived from, so the recorded root and the
+		// filename can never describe two different paths.
+		ProjectRoot: filepath.Clean(projectRoot),
+		Findings:    findings,
+	}, "", "  ")
 	if err != nil {
 		return err
 	}

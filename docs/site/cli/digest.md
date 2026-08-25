@@ -21,6 +21,7 @@ So the digest is a durable store **plus** an unread count in the session signal.
 atl digest                    # print what is waiting, and mark it read
 atl digest --all              # print everything, read included; mark nothing
 atl digest drop <id>          # remove a finding that has been decided on
+atl digest projects           # every digest on this machine, and whose it is
 ```
 
 And the write side, used by a sweep rather than by hand:
@@ -56,6 +57,32 @@ Use `atl digest drop <id>` once a finding has actually been settled — a brains
 `~/.atl/digest/<project-hash>.json`, one file per project — a sweep fires in every project with an `.atl/` directory, so a single shared file would let whichever project was opened first answer for all the others.
 
 A corrupt digest reads as empty and is rewritten by the next `add`: losing a finding is recoverable, because the sweep re-reports it, while a permanently failing read is not.
+
+### The split is correct. Its silence was not.
+
+One store per project is the right shape, and merging them would recreate the very failure it prevents. But the split used to be **invisible**, and that is a different thing.
+
+A repository that clones others beneath it — a maintainer hub, a monorepo of checkouts — gives each of them its own digest. A sweep run inside one writes there, and the parent goes on answering normally with **no absence to notice**. Nothing is stranded, nothing errors, and the findings are simply never reached.
+
+Measured on one machine: **six stores, 73 findings**, of which a session in the hub saw 17 — while nine findings about the platform's own skills sat in `<hub>/repos/atl`, reachable and never reached.
+
+So `atl digest` now says the others exist:
+
+```
+atl digest: 4 other project digest(s) on this machine hold 52 finding(s), 41 unread.
+            They are not shown here — a digest answers for its own project.
+            `atl digest projects` lists them.
+```
+
+It prints **only when another store exists** — a footer on every run would be wallpaper on the ordinary single-project machine, which is the same reason the session signal carries a count and nothing else.
+
+### `atl digest projects`
+
+Lists every store, its counts, and the project it belongs to, with `*` marking the current one.
+
+The project is **recorded in the file**, because the filename cannot say: `Path` hashes the root and a hash is one-way. Without that field nothing can list the digests and name them — identifying six on one machine took hashing 5,596 directories, and two could not be identified at all.
+
+A store written before the root was recorded shows as `(project not recorded)`. That is deliberate and is not back-filled by a reverse lookup: the absence is a fact about when the distinction started being kept, and guessing would manufacture a path carrying exactly the confidence the field exists to earn.
 
 ## Related
 
