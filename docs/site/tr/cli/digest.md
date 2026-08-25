@@ -21,6 +21,7 @@ Bu yüzden digest, kalıcı bir depo **artı** oturum sinyalindeki okunmadı say
 atl digest                    # bekleyeni yazdır ve okundu işaretle
 atl digest --all              # okunmuşlar dahil hepsini yazdır; hiçbirini işaretleme
 atl digest drop <id>          # kararı verilmiş bir bulguyu kaldır
+atl digest projects           # bu makinedeki her digest ve kime ait olduğu
 ```
 
 Ve yazma tarafı — elle değil, bir süpürme tarafından kullanılır:
@@ -56,6 +57,32 @@ Bir bulgu gerçekten sonuçlandığında — bir brainstorm açıldı, bir kart 
 `~/.atl/digest/<proje-hash>.json`, proje başına bir dosya — bir süpürme `.atl/` dizini olan her projede ateşlenir, dolayısıyla tek bir ortak dosya, ilk açılan projenin diğerlerinin hepsi adına cevap vermesine yol açardı.
 
 Bozuk bir digest boş okunur ve bir sonraki `add` ile yeniden yazılır: bir bulguyu kaybetmek telafi edilebilir — süpürme onu tekrar bildirir — kalıcı olarak başarısız bir okuma ise edilemez.
+
+### Bölünme doğru. Sessizliği değildi.
+
+Proje başına bir depo doğru şekildir ve onları birleştirmek, tam da önlediği hatayı geri getirirdi. Ama bölünme eskiden **görünmezdi**, ve bu ayrı bir şey.
+
+Altına başka depolar klonlayan bir depo — bir bakım hub'ı, checkout'lardan oluşan bir monorepo — her birine kendi digest'ini verir. İçlerinden birinde koşan bir süpürme oraya yazar, üstteki ise normal cevap vermeye devam eder ve **fark edilecek bir yokluk oluşmaz**. Hiçbir şey mahsur kalmaz, hiçbir şey hata vermez; bulgulara sadece hiç ulaşılmaz.
+
+Bir makinede ölçüldü: **altı depo, 73 bulgu** — hub'daki bir oturum bunların 17'sini görüyordu, platformun kendi becerileri hakkındaki dokuz bulgu ise `<hub>/repos/atl` içinde duruyordu: ulaşılabilir, ve hiç ulaşılmamış.
+
+Artık `atl digest` diğerlerinin var olduğunu söylüyor:
+
+```
+atl digest: 4 other project digest(s) on this machine hold 52 finding(s), 41 unread.
+            They are not shown here — a digest answers for its own project.
+            `atl digest projects` lists them.
+```
+
+**Yalnızca başka bir depo varsa** yazar — her koşuda çıkan bir dipnot, sıradan tek-projeli makinede duvar kâğıdı olurdu; oturum sinyalinin yalnızca bir sayaç taşımasının sebebi de aynı.
+
+### `atl digest projects`
+
+Her depoyu, sayılarını ve ait olduğu projeyi listeler; `*` içinde bulunduğunuz projeyi işaretler.
+
+Proje **dosyanın içine kaydedilir**, çünkü dosya adı bunu söyleyemez: `Path` kökü hash'ler ve hash tek yönlüdür. Bu alan olmadan hiçbir araç digest'leri listeleyip adlandıramaz — bir makinede altısını teşhis etmek 5.596 dizini hash'lemeye mal oldu, ve ikisi hiç teşhis edilemedi.
+
+Kök kaydedilmeden önce yazılmış bir depo `(project not recorded)` olarak görünür. Bu bilinçli ve ters aramayla doldurulmaz: yokluk, ayrımın ne zaman tutulmaya başlandığına dair bir olgudur, ve tahmin etmek tam da alanın kazanmak için var olduğu güveni taşıyan bir yol uydururdu.
 
 ## İlgili
 

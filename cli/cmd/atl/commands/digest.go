@@ -57,12 +57,114 @@ var digestShowCmd = &cobra.Command{
 		}
 		if shown == 0 {
 			fmt.Println("atl digest: nothing waiting")
+			// The footer belongs on THIS path too, and it was originally placed only
+			// after it. "Nothing waiting here, and 56 findings in four other stores"
+			// is the single most useful thing this command can say — and an empty
+			// digest is exactly when a reader most needs telling that the rest exist.
+			// Returning early made the message unreachable in its best case.
+			printOtherStores(root)
 			return nil
 		}
 		if !all {
 			if n, merr := digest.MarkRead(root); merr == nil && n > 0 {
 				fmt.Printf("\natl digest: %d finding(s) marked read — `atl digest drop <id>` once decided\n", n)
 			}
+		}
+		printOtherStores(root)
+		return nil
+	},
+}
+
+// printOtherStores says that the other digests exist, and nothing more.
+//
+// The split itself is correct — one store per project, so whichever project was
+// opened first cannot answer for the rest. What was wrong is that it was SILENT:
+// a hub that clones repos beneath it gives each its own store, a sweep run inside
+// one writes there, and the hub's digest goes on answering normally with no
+// absence to notice. Measured on one machine: six stores, 73 findings, of which a
+// hub session saw 17 — and nine findings about the platform's own skills sat in
+// <hub>/repos/atl, reachable and never reached.
+//
+// It prints ONLY when another store exists. A footer on every run is the
+// constant-channel shape this package's own header rejects, and it would be
+// wallpaper on the overwhelmingly common single-project machine.
+func printOtherStores(root string) {
+	stores, err := digest.Stores()
+	if err != nil {
+		return
+	}
+	// Deliberately NOT `len(stores) < 2`. That was the first guard here and it was
+	// wrong in the case this exists for: a project with no digest of its own has
+	// exactly one store on disk — somebody else's — and is precisely the reader who
+	// needs telling. The real question is how many stores are not mine, which the
+	// count below answers.
+	mine, err := digest.Path(root)
+	if err != nil {
+		return
+	}
+	others, total, unread := 0, 0, 0
+	for _, s := range stores {
+		if s.Path == mine {
+			continue
+		}
+		others++
+		total += s.Total
+		unread += s.Unread
+	}
+	if others == 0 {
+		return
+	}
+	fmt.Printf("\natl digest: %d other project digest(s) on this machine hold %d finding(s), %d unread.\n",
+		others, total, unread)
+	fmt.Printf("            They are not shown here — a digest answers for its own project.\n")
+	fmt.Printf("            `atl digest projects` lists them.\n")
+}
+
+var digestProjectsCmd = &cobra.Command{
+	Use:   "projects",
+	Short: "List every digest on this machine and the project each belongs to",
+	Long: "List every digest store under ~/.atl/digest, with its project and its counts.\n\n" +
+		"A digest is per project on purpose, so one project cannot answer for the rest.\n" +
+		"The cost of that is a split nothing reported: a hub that clones repos beneath\n" +
+		"itself gives each of them its own store, and the hub goes on answering normally\n" +
+		"while findings accumulate somewhere nobody opens a session.\n\n" +
+		"A store written before the project root was recorded shows as `not recorded`.\n" +
+		"That is not guessed at — a reverse lookup would manufacture a path carrying more\n" +
+		"confidence than the file has.",
+	Args: cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		stores, err := digest.Stores()
+		if err != nil {
+			return err
+		}
+		if len(stores) == 0 {
+			fmt.Println("atl digest: no digests on this machine")
+			return nil
+		}
+		mine := ""
+		if root, rerr := projectKey(); rerr == nil {
+			if p, perr := digest.Path(root); perr == nil {
+				mine = p
+			}
+		}
+		total, unread, unnamed := 0, 0, 0
+		for _, s := range stores {
+			here := "  "
+			if s.Path == mine {
+				here = "* "
+			}
+			root := s.Root
+			if root == "" {
+				root = "(project not recorded — written before this was tracked)"
+				unnamed++
+			}
+			fmt.Printf("%s%s  %3d finding(s), %d unread  %s\n", here, s.Key, s.Total, s.Unread, root)
+			total += s.Total
+			unread += s.Unread
+		}
+		fmt.Printf("\n%d store(s), %d finding(s), %d unread. `*` is this project.\n", len(stores), total, unread)
+		if unnamed > 0 {
+			fmt.Printf("%d store(s) do not record their project. Anything written to them from now on will.\n", unnamed)
 		}
 		return nil
 	},
@@ -134,7 +236,7 @@ func init() {
 	digestAddCmd.Flags().String("sweep", "", "the sweep reporting this finding (observe, skill-stocktake, ...)")
 	digestAddCmd.Flags().String("title", "", "one line naming the finding — half of its stable key")
 
-	digestCmd.AddCommand(digestShowCmd, digestAddCmd, digestDropCmd)
+	digestCmd.AddCommand(digestShowCmd, digestAddCmd, digestDropCmd, digestProjectsCmd)
 	// Bare `atl digest` is the reader's entry point; the sub-commands are for the
 	// sweep that writes and the reader who settles.
 	digestCmd.RunE = digestShowCmd.RunE
