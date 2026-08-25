@@ -58,7 +58,7 @@ var digestShowCmd = &cobra.Command{
 		if shown == 0 {
 			fmt.Println("atl digest: nothing waiting")
 			// The footer belongs on THIS path too, and it was originally placed only
-			// after it. "Nothing waiting here, and 56 findings in four other stores"
+			// after it. "Nothing waiting here, and 56 findings in five other stores"
 			// is the single most useful thing this command can say — and an empty
 			// digest is exactly when a reader most needs telling that the rest exist.
 			// Returning early made the message unreachable in its best case.
@@ -81,9 +81,14 @@ var digestShowCmd = &cobra.Command{
 // opened first cannot answer for the rest. What was wrong is that it was SILENT:
 // a hub that clones repos beneath it gives each its own store, a sweep run inside
 // one writes there, and the hub's digest goes on answering normally with no
-// absence to notice. Measured on one machine: six stores, 73 findings, of which a
-// hub session saw 17 — and nine findings about the platform's own skills sat in
-// <hub>/repos/atl, reachable and never reached.
+// absence to notice. Measured on one machine on 2026-08-25: six stores, 73 findings,
+// of which a hub session saw 17 — and nine findings about the platform's own skills
+// sat in <hub>/repos/atl, reachable and never reached.
+//
+// The date is load-bearing rather than decorative. Store counts move with ordinary
+// use, so an undated figure here reads as current forever and gets quoted onward; a
+// reader who reconciles it against a live run and finds a different number should
+// conclude the store changed, not that the mechanism is broken.
 //
 // It prints ONLY when another store exists. A footer on every run is the
 // constant-channel shape this package's own header rejects, and it would be
