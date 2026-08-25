@@ -76,11 +76,39 @@ Fan out finders across these lenses; each is blind to the others (a multi-modal 
   contradicting its own body; this corpus has had a table stale for two weeks while a RESOLVED
   note sat two screens below it) · **unverifiable** (judgment, narrative, rationale — report as
   unverifiable, never guess).
+  ⚠ **A `file:line` pin is a HINT, not a citation.** Verify a claim by its **symbol or its
+  content** — grep the identifier, read the surrounding code. Never jump to the line number and
+  judge by whatever is sitting there. **A drifted pin is not evidence of staleness and must not
+  be reported as a finding.**
+
+  Two directions, and the expensive one is the second. A reader who follows a drifted pin lands
+  on unrelated code and may call a correct page stale. Worse, a sweep that checks pins
+  *mechanically* reports a large number of perfectly correct pages as stale — and this corpus
+  already measures the path-existence check at **76–90% false positive**, so a line-number check
+  would be worse still. A channel that is mostly noise stops being read, which is exactly when
+  the genuinely wrong pages get missed.
+
+  Measured (Investment, 2026-08-22 sweep): three pins had drifted and in all three the
+  surrounding sentence was **correct** — `MarketCalendar.cs:76 → :95`,
+  `PlaceOrderHandler.cs:258 → :323`, `seed.sql:387,418,421 → :405,441,444`. No mechanism
+  catches this: the page is right, the code is right, and the coordinate joining them is wrong.
+
   Two things that decide whether this lens finds anything. **Ask per section, not per page** —
   one question per file returns about one finding per file, because an LLM summarises rather
   than enumerates; demand a verdict for every section so coverage is checkable arithmetic. And
   **read the tail**: these pages grow by appending, so the newest and most-likely-stale claims
   are at the end of the longest ones, exactly where a skim stops.
+
+  **What actually produces findings, and what the cheap scans are FOR.** The two productive
+  passes are (1) crossing each page's last-touched date against the recently-changed source
+  files, and (2) deciding **per section** on the pages covering subsystems that moved in the
+  last week. Plain symbol- and path-existence scans found almost nothing on their own — 118
+  symbols and 116 paths, near-zero yield.
+
+  Keep them anyway, and use them for the opposite job: they are cheap, and in the same sweep
+  they let **four** candidate findings be confidently **DROPPED** rather than padding the list.
+  They are a **refutation** instrument, not a discovery one. Run them to kill candidates, never
+  to generate them.
   ⚠ **The dominant false positive here is a page DOCUMENTING that something is dead being read
   as ASSERTING it is alive.** A path-existence check over this corpus measures 76-90% false
   positive for that reason alone, which is why no such check is deterministic. So quote the
@@ -185,3 +213,16 @@ repo) the recorded cursor. Keep it tight.
 ## Source
 
 - CLI: [cli/cmd/atl/commands/observe.go](https://github.com/agentteamland/atl/blob/main/cli/cmd/atl/commands/observe.go)
+
+### Conventions added here, with when and why
+
+- **2026-08-25 — a `file:line` pin is a hint, not a citation**, and the cheap scans are a
+  refutation instrument rather than a discovery one. Decided on the evidence of the Investment
+  2026-08-22 sweep (three drifted pins whose surrounding sentences were all correct; 118 symbol
+  and 116 path checks at near-zero discovery yield but four confident drops). Recorded as a
+  decision taken then — a negative grep over `.atl/docs`, `.atl/brain-storms` and `.atl/wiki`
+  at the time returned nothing, so nobody had ruled on it before and this is not a recovered
+  rationale.
+
+  It belongs to the **procedure**, not to any project's wiki: the rule is about how a sweep
+  MEASURES a page, not about how pages go wrong.
