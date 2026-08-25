@@ -64,12 +64,12 @@ One store per project is the right shape, and merging them would recreate the ve
 
 A repository that clones others beneath it — a maintainer hub, a monorepo of checkouts — gives each of them its own digest. A sweep run inside one writes there, and the parent goes on answering normally with **no absence to notice**. Nothing is stranded, nothing errors, and the findings are simply never reached.
 
-Measured on one machine: **six stores, 73 findings**, of which a session in the hub saw 17 — while nine findings about the platform's own skills sat in `<hub>/repos/atl`, reachable and never reached.
+Measured on one machine (2026-08-25): **six stores, 70 findings**, of which a session in the hub saw 14 — while nine findings about the platform's own skills sat in `<hub>/repos/atl`, reachable and never reached.
 
 So `atl digest` now says the others exist:
 
 ```
-atl digest: 4 other project digest(s) on this machine hold 52 finding(s), 41 unread.
+atl digest: 5 other project digest(s) on this machine hold 56 finding(s), 50 unread.
             They are not shown here — a digest answers for its own project.
             `atl digest projects` lists them.
 ```

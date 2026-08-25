@@ -64,12 +64,12 @@ Proje başına bir depo doğru şekildir ve onları birleştirmek, tam da önled
 
 Altına başka depolar klonlayan bir depo — bir bakım hub'ı, checkout'lardan oluşan bir monorepo — her birine kendi digest'ini verir. İçlerinden birinde koşan bir süpürme oraya yazar, üstteki ise normal cevap vermeye devam eder ve **fark edilecek bir yokluk oluşmaz**. Hiçbir şey mahsur kalmaz, hiçbir şey hata vermez; bulgulara sadece hiç ulaşılmaz.
 
-Bir makinede ölçüldü: **altı depo, 73 bulgu** — hub'daki bir oturum bunların 17'sini görüyordu, platformun kendi becerileri hakkındaki dokuz bulgu ise `<hub>/repos/atl` içinde duruyordu: ulaşılabilir, ve hiç ulaşılmamış.
+Bir makinede ölçüldü (2026-08-25): **altı depo, 70 bulgu** — hub'daki bir oturum bunların 14'ünü görüyordu, platformun kendi becerileri hakkındaki dokuz bulgu ise `<hub>/repos/atl` içinde duruyordu: ulaşılabilir, ve hiç ulaşılmamış.
 
 Artık `atl digest` diğerlerinin var olduğunu söylüyor:
 
 ```
-atl digest: 4 other project digest(s) on this machine hold 52 finding(s), 41 unread.
+atl digest: 5 other project digest(s) on this machine hold 56 finding(s), 50 unread.
             They are not shown here — a digest answers for its own project.
             `atl digest projects` lists them.
 ```
