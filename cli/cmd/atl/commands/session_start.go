@@ -113,20 +113,7 @@ var sessionStartCmd = &cobra.Command{
 		// current one rather than one commit stale.
 		reportUnbackedStores(project)
 
-		// Reclamation awareness — surface only high-signal orphans (gains/edits
-		// beside an installed unit), not wholly-unowned dirs (usually the user's own
-		// non-ATL Claude Code assets — noise). Awareness only; `atl gc` is the action.
-		if orphans, oerr := gc.Scan(project, time.Now()); oerr == nil {
-			n := 0
-			for _, o := range orphans {
-				if o.Owned {
-					n++
-				}
-			}
-			if n > 0 {
-				fmt.Printf("atl: %d orphaned file(s) beside installed units — run `atl gc` to review (reversible)\n", n)
-			}
-		}
+		reclaimableSignal(project)
 
 		// Signal each channel's pending items so Claude folds them in via that
 		// channel's drain skill (counts read above, before the queue was closed).
@@ -232,6 +219,58 @@ var sessionStartCmd = &cobra.Command{
 // the board reflects reality. Unlike the docs/skills/rules "due" signals (which are
 // monorepo-internal), the trigger is the config file, present in any board-backed
 // project. Never fails: a hook must not block the session.
+// reclaimableSignal reports what `atl gc` would actually reclaim, and nothing else.
+//
+// # It used to count the set gc REFUSES, and that made it permanent
+//
+// gc partitions what it finds three ways: files the project's git has committed, gains
+// beside an installed unit, and everything else. Only the third is swept; the first two
+// are retained by default and gc says so in its own words, calling them "gains" rather
+// than orphans.
+//
+// This signal counted the SECOND group. So it named an action — run `atl gc` — that could
+// not change what it reported: gc looked, said it was keeping them, and the next session
+// said the same thing again. Measured on this machine: `atl gc --apply` ran, reclaimed the
+// one genuinely orphaned item, reported `nothing to reclaim`, and the signal still said
+// four. The only flag that would have cleared it, `--include-gains`, deletes them — and of
+// the four here, three were byte-identical to a shipped copy and one existed nowhere else
+// on the disk, in no repository, under no git.
+//
+// It also fired in EVERY project, because those four sit under the global root. A session
+// working on an unrelated codebase was told, every time, to review four files belonging to
+// an agent it would never invoke.
+//
+// # Why counting the swept set is the fix rather than rewording
+//
+// A signal has to name a state somebody can move out of, or it is furniture. The swept set
+// is exactly that: `atl gc --apply` empties it, and the next session is quiet. The gains
+// stay visible where they are correctly labelled — in `atl gc`'s own output, which is what
+// a person runs when they want to know what accumulated.
+//
+// The original comment reasoned the other way: gains are "high-signal" and wholly-unowned
+// directories are "usually the user's own non-ATL assets — noise". That worry is real and it
+// is gc's to answer, not this signal's — gc is dry-run by default and reversible, so a noisy
+// listing costs a reading. Measured across three projects at the time of the change, the
+// swept set was empty in all three, so nothing is being traded away here.
+func reclaimableSignal(projectRoot string) {
+	orphans, err := gc.Scan(projectRoot, time.Now())
+	if err != nil {
+		return
+	}
+	n := 0
+	for _, o := range orphans {
+		// The same predicate gc sweeps on. Kept in step with it deliberately: a signal
+		// derived from a different rule than the action it names is how this one came to
+		// report a state its own remedy could not reach.
+		if !o.Tracked && !o.Owned {
+			n++
+		}
+	}
+	if n > 0 {
+		fmt.Printf("atl: %d reclaimable item(s) — run `atl gc` to review (dry run; reversible)\n", n)
+	}
+}
+
 func boardTrackedSignal(projectRoot string) {
 	if projectRoot == "" {
 		return
