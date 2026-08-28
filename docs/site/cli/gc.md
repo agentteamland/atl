@@ -48,7 +48,13 @@ Deletion is the one place ATL can't be silently automatic, so gc makes the opera
 4. **`atl gc --undo`** — restores the most recent batch to its original paths.
 5. **`atl gc --purge`** — the only real delete: hard-removes trash batches older than 30 days.
 
-So there is no irreversible data loss at any step. The action stays manual (you run `atl gc`), but awareness is automatic: a session-start note surfaces high-signal orphans (`atl: N orphaned file(s) beside installed units — run atl gc to review`) so you never have to remember to check.
+So there is no irreversible data loss at any step. The action stays manual (you run `atl gc`), but awareness is automatic: a session-start note surfaces what `--apply` would actually reclaim (`atl: N reclaimable item(s) — run atl gc to review (dry run; reversible)`) so you never have to remember to check.
+
+:::warning It used to count the set gc refuses
+Until 2026-08-28 that note counted the **retained gains** instead — so it fired in every project, every session, and running the command it named could not change it: gc looked, said it was keeping them, and the next session said the same thing. The only flag that would have cleared it, `--include-gains`, deletes them. It now counts the swept set, which `--apply` empties, so the note is a state you can leave.
+
+The gains are still reported — by `atl gc` itself, where they are labelled as gains rather than as orphans.
+:::
 
 ## Related
 

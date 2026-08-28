@@ -48,7 +48,13 @@ Silme, ATL'nin sessizce otomatik olamayacağı tek yerdir; bu yüzden gc işlemi
 4. **`atl gc --undo`** — en son grubu orijinal yollarına geri yükler.
 5. **`atl gc --purge`** — tek gerçek silme: 30 günden eski çöp gruplarını kalıcı kaldırır.
 
-Yani hiçbir adımda geri-alınamaz veri kaybı yoktur. Eylem manuel kalır (sen `atl gc` çalıştırırsın), ama farkındalık otomatiktir: bir oturum-başı notu yüksek-sinyalli sahipsizleri yüzeye çıkarır (`atl: N orphaned file(s) beside installed units — run atl gc to review`), böylece kontrol etmeyi hatırlamak zorunda kalmazsın.
+Yani hiçbir adımda geri-alınamaz veri kaybı yoktur. Eylem manuel kalır (sen `atl gc` çalıştırırsın), ama farkındalık otomatiktir: bir oturum-başı notu `--apply` komutunun gerçekten geri alacağı şeyi yüzeye çıkarır (`atl: N reclaimable item(s) — run atl gc to review (dry run; reversible)`), böylece kontrol etmeyi hatırlamak zorunda kalmazsın.
+
+:::warning Eskiden gc'nin reddettiği kümeyi sayıyordu
+2026-08-28'e kadar bu not **korunan kazançları** sayıyordu — yani her projede, her oturumda ateşliyordu ve adlandırdığı komutu çalıştırmak onu değiştiremiyordu: gc bakıyor, "bunları tutuyorum" diyor, bir sonraki oturum aynı şeyi söylüyordu. Onu temizleyebilecek tek bayrak, `--include-gains`, o dosyaları siler. Artık süpürülen kümeyi sayıyor; `--apply` o kümeyi boşalttığı için not, çıkılabilecek bir durumu adlandırıyor.
+
+Kazançlar hâlâ raporlanıyor — `atl gc`'nin kendi çıktısında, sahipsiz değil kazanç olarak etiketlenmiş hâlde.
+:::
 
 ## İlgili
 
