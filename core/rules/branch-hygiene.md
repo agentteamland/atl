@@ -8,11 +8,14 @@ Before editing in a shared repo:
 
 ```bash
 git branch --show-current                      # on the branch you expect? (usually main)
+git symbolic-ref -q HEAD                       # ...and on a branch AT ALL? exit 1 = detached
 git status --porcelain                         # clean?
 git rev-list --count HEAD..@{u} 2>/dev/null    # behind upstream?
 ```
 
 - Branch isn't what you expect → STOP. It may be a stale merged branch or another session's work-in-progress. Surface before editing.
+- **`git branch --show-current` is SILENT in the one state it exists to refuse.** On a detached `HEAD` it prints nothing and exits **0** — the same status as the healthy case — so a caller reading the exit code learns nothing, and one comparing against an expected name only passes by luck, because an empty string compares unequal to everything. The obvious alternative is worse: `git rev-parse --abbrev-ref HEAD` returns the literal **`HEAD`**, a plausible *value* rather than an error, so the failure reads as being on a branch called `HEAD`. Exactly one of the three signals through the exit status, which is why it is in the block above. Measured, attached / detached: `branch --show-current` → `main` exit 0 / `""` exit 0 · `rev-parse --abbrev-ref` → `main` exit 0 / `HEAD` exit 0 · **`symbolic-ref -q HEAD` → `refs/heads/main` exit 0 / `""` exit 1.**
+- Detached `HEAD` → STOP before committing. A commit made there is reachable from no branch, so it is invisible to every branch-based check in this rule and is what a later garbage collection is entitled to remove.
 - Working tree is dirty → STOP. Uncommitted changes might be lost work. Surface; ask.
 - Behind upstream → `git pull --ff-only` first, then proceed.
 
