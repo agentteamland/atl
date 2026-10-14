@@ -16,12 +16,15 @@ Each person is a directory `~/.atl/profiles/people/<slug>/`:
 ```
 people/<slug>/
 ├── profile.md        # frontmatter = the schema fields (per person-interface.md); body = free narrative
+├── history.md        # the dated record behind the frontmatter (append-only); named by meta.history-file
 ├── wiki/             # topic-organized current truth for this person (overwritable pages)
 └── learnings/        # pattern-organized, KB-rebuilt (recurring patterns about this person)
 ```
 
 `profile.md` frontmatter holds the structured fields; the markdown body holds the human
-narrative (the story a lens reads for nuance the fields can't carry). `wiki/` and
+narrative (the story a lens reads for nuance the fields can't carry). The frontmatter holds
+**current truth only**: the evidence, quotes and write logs behind a value live in
+`history.md` (see *Value vs. record* in `marker-drain.md`). `wiki/` and
 `learnings/` are the person's *internal* organization — they do not blur with the
 project-scoped `.atl/wiki/` and `.atl/journal/`; the two worlds cross-reference by free
 relative markdown links only.

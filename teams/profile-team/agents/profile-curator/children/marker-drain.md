@@ -75,7 +75,8 @@ For every `field-path: value` in `fields`:
      an unmatched identity appends. Without this a re-drain of an unchanged fact appends a
      second copy of the same entry, and "join is idempotent" above stops being true. Match
      on meaning, not bytes: the same goal reworded is the same goal, and the fuller wording
-     wins.
+     wins **for the current-truth statement** — the added evidence goes to `history.md`
+     (*Value vs. record*, below), never into the entry.
    - `history-tracked` (`state.emotional`/`financial`, and the enum `state.status` /
      `state.standing` fields) → push the old `current` + its date onto `history`, then set
      the new `current`. **Only sound where the values are mutually exclusive** — see the
@@ -83,8 +84,21 @@ For every `field-path: value` in `fields`:
      that plainly holds several values at once, do **not** displace: merge, and report the
      interface as needing correction.
 4. **Source flag** — set `_sources.<field-path>` to the effective source
-   (`user-confirmed` | `agent-inferred-<today>` | `lens-set`).
+   (`user-confirmed` | `agent-inferred-<today>` | `lens-set`). The flag alone: no trailing
+   comment carrying a write log.
 5. Update `meta.last-updated` to today.
+
+**Value vs. record — the frontmatter holds current truth only.** A written value is the
+current-truth statement, at most ~300 characters per entry. Everything dated about it —
+the evidence, verbatim quotes, later corroborations, the agent's reading, the per-write
+`_sources` log line, the "added by this drain" annotation — is **appended** to the sibling
+`<entity>/history.md` under `### <field-path>`, never written into the value or as a
+frontmatter comment. Name the file once in `meta.history-file: history.md`. Tier gates are
+unchanged: a Tier-3/4 value is written whole and is never shortened to fit. Why: measured
+on a real store, one profile's frontmatter reached ~2,460 lines this way, every drain
+lengthening an entry or a `_sources` comment, until a default read ended inside the
+frontmatter and never reached the narrative; splitting the dated record into `history.md`
+brought it back to a few hundred lines with nothing lost.
 
 ### 4. Lazy-fill / migrate (existing profile)
 Compare `meta.schema-version` P against the interface's `schema-version` I. If behind,
@@ -209,7 +223,8 @@ Each item resolves to one of three shapes:
 - [ ] Entity resolved (slug or alias); a **new** entity passed the reality gate (§5.0)
 - [ ] Each field tier-gated; Tier-3 inference / un-consented Tier-4 skipped + reported
 - [ ] Change-policy applied (overwrite vs history-tracked)
-- [ ] `_sources.<path>` set for every written field
+- [ ] `_sources.<path>` set for every written field (the flag only, with no trailing log)
+- [ ] Dated evidence and logs appended to `history.md`, not into the value; frontmatter ≤ 400 lines after the write — if over, move the dated material out before acking
 - [ ] `meta.schema-version` current (add-only lazy-fill, or a breaking migration per `schema-migration.md`)
 - [ ] Salience recomputed (manual override respected)
 
