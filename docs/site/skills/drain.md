@@ -26,8 +26,10 @@ The queue guarantees exactly-once delivery and dedup by content hash. An acked i
 Before peeking the queue, harvest what the agent forgot to mark. Sweep the conversation flow (prose only — tool calls and results are stripped):
 
 ```bash
-atl learnings transcript --channel learning
+out=$(mktemp) && atl learnings transcript --channel learning > "$out" 2>&1; echo "$out"; wc -c < "$out"
 ```
+
+The output goes to a file and the drain reads the file whole. A sweep advances the cursor over everything it **prints**, not over what is read, so piping it through `tail`, `head` or any other truncation would mark the dropped prose as mined and lose it for good — silently. There is no non-advancing form of the sweep, so the file is how a large window stays out of a single tool result.
 
 The `--channel` flag is what makes this a **sweep**: it resumes from where the last drain stopped and moves the `learning` cursor forward, so successive drains cover a session completely. Without it the command is a plain read of the most recent prose, and whatever accumulated between two drains is read by neither. If it reports transcript still unmined, the drain reports that in its summary; a large backlog drains across successive runs rather than in one, since the 256 KB budget exists to fit the mining subagent's context.
 

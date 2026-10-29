@@ -26,8 +26,10 @@ Kuyruk, içerik özetine (hash) göre tam-olarak-bir-kez teslim ve yineleme ayı
 Kuyruğa gözatmadan önce, ajanın işaretlemeyi unuttuğunu derle. Konuşma akışını tara (yalnızca düz metin — araç çağrıları ve sonuçları ayıklanır):
 
 ```bash
-atl learnings transcript --channel learning
+out=$(mktemp) && atl learnings transcript --channel learning > "$out" 2>&1; echo "$out"; wc -c < "$out"
 ```
+
+Çıktı bir dosyaya yazılır ve drain dosyayı baştan sona okur. Bir tarama imleci okunan kadar değil, **yazdırdığı** her şey kadar ilerletir; bu yüzden onu `tail`, `head` ya da başka bir kırpma aracından geçirmek, atılan metni madenlenmiş sayar ve onu kalıcı olarak — sessizce — kaybeder. Taramanın imleci ilerletmeyen bir biçimi yoktur; büyük bir pencereyi tek bir araç sonucuna sığdırmamanın yolu dosyadır.
 
 Bunu bir **tarama** yapan şey `--channel` bayrağıdır: son drain'in bıraktığı yerden devam eder ve `learning` imlecini ileri taşır; böylece ardışık drain'ler bir oturumu baştan sona kapsar. Bayrak olmadan komut, yalnızca en son düz metnin düz bir okumasıdır ve iki drain arasında biriken her şey ikisi tarafından da okunmaz. Hâlâ madenlenmemiş transkript bildirirse, drain bunu özetinde raporlar; büyük bir birikim tek seferde değil ardışık çalıştırmalarda erir, çünkü 256 KB bütçesi madenleme alt-ajanının bağlamına sığmak için vardır.
 
