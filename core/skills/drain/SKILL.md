@@ -28,9 +28,19 @@ structurally gone).
 Before peeking the queue, harvest what the agent forgot to mark. Sweep the
 conversation flow (prose only — tool calls/results are stripped):
 
+```bash
+out=$(mktemp) && atl learnings transcript --channel learning > "$out" 2>&1; echo "$out"; wc -c < "$out"
 ```
-atl learnings transcript --channel learning
-```
+
+**Capture the whole output to a file, then read the file — in chunks if it is
+large. Never pipe the sweep through `tail`, `head` or any other truncation.** The
+command advances the cursor over everything it *prints*, not over what you
+*read*: whatever a truncating pipe drops is marked mined and is never swept again,
+and nothing reports it. There is no non-advancing form of the sweep (the bare
+command reads a different, cursorless window), so the file is the only safe way to
+keep a large window out of a single tool result. (Measured 2026-10-29: two drains
+in a row read the sweep through `tail -c`, the second after the first had recorded
+it as a lesson — a drain does not read its own lessons, which is why this is here.)
 
 **Always pass `--channel learning`.** That is what makes this a *sweep*: it
 resumes from where the last drain stopped and moves the `learning` cursor
