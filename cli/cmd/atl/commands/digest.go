@@ -182,11 +182,15 @@ var digestAddCmd = &cobra.Command{
 		"read from stdin so it can carry evidence without shell quoting.\n\n" +
 		"Idempotent by (sweep, title): re-reporting a finding refreshes its body and\n" +
 		"leaves its read state alone, so a sweep that runs daily converges instead of\n" +
-		"re-interrupting the reader about the same thing.",
+		"re-interrupting the reader about the same thing.\n\n" +
+		"With --key (from `atl observe key`) the identity is (sweep, key) instead, and\n" +
+		"the title is only wording: a re-report worded differently — or in another\n" +
+		"language — refreshes the same finding rather than adding a second one.",
 	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		sweep, _ := cmd.Flags().GetString("sweep")
 		title, _ := cmd.Flags().GetString("title")
+		key, _ := cmd.Flags().GetString("key")
 		if strings.TrimSpace(sweep) == "" || strings.TrimSpace(title) == "" {
 			return fmt.Errorf("atl digest add: --sweep and --title are both required")
 		}
@@ -202,14 +206,19 @@ var digestAddCmd = &cobra.Command{
 			Sweep: strings.TrimSpace(sweep),
 			Title: strings.TrimSpace(title),
 			Body:  strings.TrimRight(string(body), "\n"),
+			Key:   strings.TrimSpace(key),
 		})
 		if err != nil {
 			return err
 		}
+		id := digest.NewID(strings.TrimSpace(sweep), strings.TrimSpace(title))
+		if k := strings.TrimSpace(key); k != "" {
+			id = digest.KeyID(strings.TrimSpace(sweep), k)
+		}
 		if added {
-			fmt.Printf("atl digest: recorded %s\n", digest.NewID(sweep, title))
+			fmt.Printf("atl digest: recorded %s\n", id)
 		} else {
-			fmt.Printf("atl digest: %s already recorded — refreshed, read state kept\n", digest.NewID(sweep, title))
+			fmt.Printf("atl digest: %s already recorded — refreshed, read state kept\n", id)
 		}
 		return nil
 	},
@@ -239,7 +248,8 @@ var digestDropCmd = &cobra.Command{
 func init() {
 	digestShowCmd.Flags().Bool("all", false, "print every finding, read ones included, and mark nothing")
 	digestAddCmd.Flags().String("sweep", "", "the sweep reporting this finding (observe, skill-stocktake, ...)")
-	digestAddCmd.Flags().String("title", "", "one line naming the finding — half of its stable key")
+	digestAddCmd.Flags().String("title", "", "one line naming the finding — half of its stable key unless --key is given")
+	digestAddCmd.Flags().String("key", "", "a stable subject key (from `atl observe key`) to identify the finding by instead of its title")
 
 	digestCmd.AddCommand(digestShowCmd, digestAddCmd, digestDropCmd, digestProjectsCmd)
 	// Bare `atl digest` is the reader's entry point; the sub-commands are for the

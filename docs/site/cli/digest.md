@@ -28,7 +28,8 @@ And the write side, used by a sweep rather than by hand:
 
 ```bash
 printf '<evidence, why it matters, suggested next step>' \
-  | atl digest add --sweep observe --title '<the one-line claim>'
+  | atl digest add --sweep observe --title '<the one-line claim>' \
+      --key "$(atl observe key <kind> <anchor>...)"
 ```
 
 > ⚠ **Reading your own sweep's output? Use `--all`.** The session-start signal reports an **unread count**, so running the bare form to check that findings landed marks them read and sets that count to zero — the sweep completes "successfully" and the next session is told nothing is waiting. The damage presents as **silence**, not as an error. Recovery is manual: capture each finding's id, title and body, `drop` it, then re-`add` — `add` deliberately preserves the read state, so re-adding alone does not restore unread.
@@ -45,6 +46,12 @@ A finding is keyed by `(sweep, title)`, not by its body. Re-reporting one:
 That second part is what makes a daily sweep bearable. A sweep fires whenever its scanned paths move, and a latent gap does not stop being one because it was reported yesterday — so without this, every sweep would be a fresh interruption about the same thing.
 
 Keying on the title rather than the body is deliberate for the same reason: a sweep that re-words its evidence between runs is reporting the same finding.
+
+### Keying by subject: `--key`
+
+A title is still wording, and a sweep writes in whatever language the session runs in. One finding reported in English on Monday and in Turkish on Friday has two titles, so `(sweep, title)` records it twice. With `--key`, the identity is `(sweep, key)` instead, and the title becomes plain wording: a re-report under the same key refreshes the title **and** the body and keeps the read state.
+
+The key comes from [`atl observe key`](/cli/observe#the-stable-key-of-a-finding), which derives it from what the finding is *about* (a fixed lens plus the card references and paths its evidence cites) rather than from what it *says*. `/observe` passes one for every finding it records. Without `--key` the behaviour is unchanged.
 
 ## Reading is not deciding
 

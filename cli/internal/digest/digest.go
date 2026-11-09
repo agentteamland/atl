@@ -52,6 +52,12 @@ type Finding struct {
 	Title string `json:"title"`
 	Body  string `json:"body"`
 
+	// Key, when set, replaces the title as the finding's identity — see
+	// SubjectKey. A sweep writes prose in whatever language the session runs in,
+	// so a title-derived ID splits one finding into two the first time the
+	// wording changes; a key derived from what the finding is ABOUT does not.
+	Key string `json:"key,omitempty"`
+
 	AddedAt time.Time `json:"addedAt"`
 	// ReadAt is nil while the finding is unread. Reading does not delete: a
 	// finding the reader has seen but not yet decided on is still real, and a
@@ -200,14 +206,23 @@ func Load(projectRoot string) ([]Finding, error) {
 	return f.Findings, nil
 }
 
+// KeyID is the ID of a finding identified by a subject key rather than a title.
+// Prefixed so a key can never collide with a title that happens to spell it.
+func KeyID(sweep, key string) string { return NewID(sweep, "key:"+key) }
+
 // Add records a finding, returning false when one with the same ID is already
-// present. An existing finding is refreshed in place — its body is updated to
-// the latest wording — but its ReadAt is PRESERVED: re-reporting must not make a
+// present (by Key when one is given, else by title). An existing finding is
+// refreshed in place — its body is updated to the latest wording — but its
+// ReadAt is PRESERVED: re-reporting must not make a
 // finding the reader has already seen unread again, which would turn every sweep
 // into a fresh interruption about the same thing.
 func Add(projectRoot string, f Finding) (added bool, err error) {
 	if f.ID == "" {
-		f.ID = NewID(f.Sweep, f.Title)
+		if f.Key != "" {
+			f.ID = KeyID(f.Sweep, f.Key)
+		} else {
+			f.ID = NewID(f.Sweep, f.Title)
+		}
 	}
 	if f.AddedAt.IsZero() {
 		f.AddedAt = time.Now().UTC()
@@ -219,6 +234,12 @@ func Add(projectRoot string, f Finding) (added bool, err error) {
 	for i := range findings {
 		if findings[i].ID == f.ID {
 			findings[i].Body = f.Body
+			if f.Key != "" {
+				// Keyed: the title is wording, not identity, so the latest
+				// wording wins — including a re-report in another language.
+				findings[i].Title = f.Title
+				findings[i].Key = f.Key
+			}
 			return false, save(projectRoot, findings)
 		}
 	}
