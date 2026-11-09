@@ -9,6 +9,7 @@ ATL karar yüzeyi (bir `.atl/` dizini) olan her projede çalışır. Dışında 
 ```bash
 atl observe            # proaktif gözlemci taramasının zamanı geldi mi bildir
 atl observe --record   # HEAD'i son gözlemci taraması olarak damgala (bir /observe koşusundan sonra)
+atl observe key <tür> <çapa>...   # bir bulgunun kararlı anahtarını yazdır
 ```
 
 ## "Zamanı geldi" ne demek
@@ -30,6 +31,22 @@ Bundan sonra her tarama sinyali **pasif biçimini** yazdırır — `a proactive 
 Adında *sevkiyat* geçmesi bilinçlidir: otomatik işten vazgeçmek, işin zamanının geldiğini bilmekten vazgeçmekle aynı şey değildir.
 
 `--record`, HEAD + zamanı son tarama olarak damgalar (`~/.atl/observe-state.json` içinde) ve bu kaçış-engelini ~1 gün sıfırlar. `/observe` bunu bir taramanın sonunda çağırır.
+
+## Bir bulgunun kararlı anahtarı {#the-stable-key-of-a-finding}
+
+`atl observe key`, bir süpürmenin daha önce bildirdiği bir bulguyu tanımak için kullandığı anahtarı yazdırır — [`atl digest add`](/tr/cli/digest) için `--key` olarak ve bir pano kartı oluşturulmadan önce aranan etiket olarak.
+
+```bash
+atl observe key stale-truth .atl/backlog.md AB#1201
+# atl-observe:618a598a7a20
+```
+
+Anahtar, bulgunun nasıl **ifade edildiğinden** değil, neyle **ilgili** olduğundan türetilir. Süpürme, oturum hangi dilde yürüyorsa o dilde düzyazı yazan bir LLM'dir; anahtar süpürmenin uydurduğu bir slug iken, eskimiş tek bir backlog satırı bir kez `observe:backlog-virtual-account-shipped`, günler sonra yeniden `observe:backlog-sanal-hesap-shipped` olarak kartlandı ve önce-kontrol sorgusu eşleşecek hiçbir şey bulamadı. Tanımlayıcılar çevrilmez, olduğu gibi kopyalanır; bu yüzden her süpürmede aynı dizgedir.
+
+- **tür** sabit bir sözlükten biridir, `/observe` mercekleriyle eşleşir: `ripe-trigger`, `shipped-vs-designed`, `growth-risk`, `decided-unshipped`, `stale-truth`, `global-setup`.
+- **çapalar** bir kart referansı (`AB#2033`, `atl#434`; büyük/küçük harf duyarsız karşılaştırılır) ya da var olan bir yoldur — projeye göre göreli, mutlak veya `~/…` — isteğe bağlı olarak `yol#Sembol`.
+
+Sıra, tekrarlar, `./` öneki ve kart referansının harf büyüklüğü anahtarı değiştirmez. Serbest bir ifade, bir slug ve bir satır numarası hash'lenmez, **reddedilir**: bunlar tam da koşudan koşuya değişen girdilerdir ve bir satır iğnesi, desteklediği iddia doğru kalırken kayar.
 
 ## İlgili
 

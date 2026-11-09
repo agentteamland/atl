@@ -28,7 +28,8 @@ Ve yazma tarafı — elle değil, bir süpürme tarafından kullanılır:
 
 ```bash
 printf '<kanıt, neden önemli, önerilen sonraki adım>' \
-  | atl digest add --sweep observe --title '<tek satırlık iddia>'
+  | atl digest add --sweep observe --title '<tek satırlık iddia>' \
+      --key "$(atl observe key <tür> <çapa>...)"
 ```
 
 > ⚠ **Kendi sweep'inizin çıktısını mı okuyorsunuz? `--all` kullanın.** Oturum-başlangıcı sinyali **okunmamış sayısını** raporlar; bulguların düştüğünü doğrulamak için çıplak formu çalıştırmak onları okundu işaretler ve o sayıyı sıfırlar — sweep "başarıyla" biter ve bir sonraki oturuma hiçbir şeyin beklemediği söylenir. Hasar hata olarak değil, **sessizlik** olarak görünür. Kurtarma elle yapılır: her bulgunun id'sini, başlığını ve gövdesini alın, `drop` edin, sonra yeniden `add` edin — `add` okundu durumunu bilerek korur, yani tek başına yeniden eklemek okunmamışa döndürmez.
@@ -45,6 +46,12 @@ Bir bulgu gövdesiyle değil, `(sweep, title)` ile anahtarlanır. Aynı bulgu te
 İkinci kısım günlük bir süpürmeyi katlanılır kılan şeydir. Bir süpürme taradığı yollar her hareket ettiğinde ateşlenir ve gizli bir boşluk, dün bildirildi diye gizli bir boşluk olmaktan çıkmaz — bu olmasa her süpürme aynı şey hakkında yeni bir kesinti olurdu.
 
 Gövde yerine başlıkla anahtarlamak da aynı nedenle bilinçlidir: koşular arasında kanıtını farklı ifade eden bir süpürme, aynı bulguyu bildiriyordur.
+
+### Konuya göre anahtarlama: `--key`
+
+Başlık yine de bir ifadedir ve bir süpürme, oturum hangi dilde yürüyorsa o dilde yazar. Pazartesi İngilizce, cuma Türkçe bildirilen tek bir bulgunun iki başlığı olur; `(sweep, title)` onu iki kez kaydeder. `--key` verildiğinde kimlik `(sweep, key)` olur ve başlık yalnızca ifadeye dönüşür: aynı anahtarla yapılan tekrar bildirim başlığı **ve** gövdeyi tazeler, okundu durumunu korur.
+
+Anahtar [`atl observe key`](/tr/cli/observe#the-stable-key-of-a-finding) komutundan gelir; bulgunun ne *söylediğinden* değil, neyle *ilgili* olduğundan türetilir (sabit bir mercek ile kanıtının andığı kart referansları ve yollar). `/observe` kaydettiği her bulgu için bir anahtar verir. `--key` olmadan davranış değişmez.
 
 ## Okumak karar vermek değildir
 

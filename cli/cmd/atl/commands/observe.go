@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/agentteamland/atl/cli/internal/digest"
@@ -110,6 +111,37 @@ func digestSessionSignal(projectRoot string) {
 		"(per the sweep-dispatch rule); they need a human call, not a card\n", n)
 }
 
+// observeKeyCmd prints the language-independent key of a finding. It exists
+// because the key used to be whatever slug the sweep wrote that day, and a sweep
+// writing in two languages carded one stale backlog row twice (AB#2033 /
+// AB#2137): the check-first query was looking for the other day's words.
+var observeKeyCmd = &cobra.Command{
+	Use:   "key <kind> <anchor>...",
+	Short: "Print the stable key of a finding — for the digest and for a board card's check-first",
+	Long: "Derive a finding's key from what it is ABOUT, not from how it is worded: its\n" +
+		"lens (kind) plus the identifiers its evidence cites (anchors). The same subject\n" +
+		"yields the same key in every sweep, in any language, in any anchor order.\n\n" +
+		"kind is one of: " + strings.Join(digest.SubjectKinds, ", ") + ".\n" +
+		"An anchor is a card reference (AB#2033, atl#434) or a path that exists\n" +
+		"(relative to the project, absolute, or ~/...), optionally path#Symbol.\n" +
+		"A free phrase, a slug or a line number is refused: those are exactly the\n" +
+		"inputs that change between runs.",
+	Args: cobra.MinimumNArgs(2),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		root, err := observeRoot()
+		if err != nil {
+			return fmt.Errorf("observe key: no .atl/ surface here")
+		}
+		k, err := digest.SubjectKey(root, args[0], args[1:])
+		if err != nil {
+			return fmt.Errorf("observe key: %w", err)
+		}
+		fmt.Println(k)
+		return nil
+	},
+}
+
 func init() {
 	observeCmd.Flags().Bool("record", false, "record HEAD as the last observer sweep (after an /observe run)")
+	observeCmd.AddCommand(observeKeyCmd)
 }

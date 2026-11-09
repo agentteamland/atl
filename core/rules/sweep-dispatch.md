@@ -51,7 +51,9 @@ Split by whether a finding needs a decision:
 
 - **Actionable and already decided** — a ripe deferral trigger, a deterministic drift — goes to the
   **board** as a work item, checked-first by a stable key so a daily sweep converges instead of
-  re-carding the same thing.
+  re-carding the same thing. The key comes from `atl observe key` (the finding's lens plus the
+  identifiers its evidence cites), never from the sweep's own wording: a sweep writes in the
+  session's language, and a key made of words splits one finding into two cards.
 - **Needing judgement** — a latent gap, a proposed rule, a redundancy between two skills — reaches
   the **user as a digest**. Never auto-carded: a finding that needs a decision needs it *before* it
   needs a ticket, and `/observe` states that constraint for itself.
@@ -65,10 +67,11 @@ must actually decide — which is the only version short enough to get read.
 A sweep records each judgement-call finding with:
 
 ```bash
-printf '<the evidence and why it matters>' | atl digest add --sweep observe --title '<one line>'
+printf '<the evidence and why it matters>' \
+  | atl digest add --sweep observe --title '<one line>' --key "$(atl observe key <kind> <anchor>...)"
 ```
 
-Idempotent by `(sweep, title)`: re-reporting refreshes the body and **leaves the read state alone**,
+Idempotent by `(sweep, key)` — or `(sweep, title)` when no key is given: re-reporting refreshes the body and **leaves the read state alone**,
 so a sweep that fires whenever its paths move converges instead of re-interrupting about the same
 thing.
 

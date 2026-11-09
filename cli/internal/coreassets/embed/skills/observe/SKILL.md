@@ -140,21 +140,49 @@ a real, valid result, not a failure to try harder.
 **Write each finding to the digest, do not just say it.** Under `sweep-dispatch` this skill
 usually runs as a background subagent, so there is no live turn to present into: a finding
 spoken here reaches nobody, and a sweep that ran while the user was away would simply be
-lost. Per finding:
+lost. Per finding, derive its **key** first, then record it under that key:
 
 ```bash
+KEY=$(atl observe key <kind> <anchor>...)   # e.g. stale-truth .atl/backlog.md AB#1201
 printf '<evidence, why it matters, suggested next step>' \
-  | atl digest add --sweep observe --title '<the one-line claim>'
+  | atl digest add --sweep observe --title '<the one-line claim, in English>' --key "$KEY"
 ```
 
-Idempotent by `(sweep, title)` — re-reporting refreshes the body and leaves the read state
-alone, so running daily converges instead of re-interrupting about the same thing. The
+`<kind>` is the lens that found it (`ripe-trigger`, `shipped-vs-designed`, `growth-risk`,
+`decided-unshipped`, `stale-truth`, `global-setup`); the anchors are the identifiers the
+evidence cites — the deferred item's card reference for a ripe trigger, otherwise the card
+references and the paths (optionally `path#Symbol`, never a line number) the finding is
+about. Choose the anchors that **name the subject**, not every path you happened to read.
+
+Idempotent by `(sweep, key)` — re-reporting refreshes the title and body and leaves the read
+state alone, so running daily converges instead of re-interrupting about the same thing. The
 session-start signal then tells the next session how many are waiting, and the rule says
 what to do about them.
+
+⚠ **Never invent the key yourself, and never key on the title.** Measured 2026-11-09: a
+sweep carded one stale backlog row as `observe:backlog-virtual-account-shipped`, a later
+sweep wrote the same finding in the session's language as
+`observe:backlog-sanal-hesap-shipped`, the check-first query found nothing, and the row was
+carded twice (AB#2033 and AB#2137 — one New, one Done). A key made of words is a key made
+of whatever the sweep wrote that day; `atl observe key` hashes identifiers, which are copied
+verbatim in every language, and refuses a slug or a phrase. Write titles and card titles in
+**English** as well (committed and board artifacts are English) — but that is hygiene, not
+the dedup: two English sentences about one finding differ just as easily.
 
 **Do not** auto-open PRs or auto-create work items from (b) — a latent-gap finding often
 needs a decision (a brainstorm), so record it and let the user choose; a genuinely ripe (a)
 trigger can be offered as "want a board item / to pull this forward?"
+
+**Whenever a finding does become a board card**, it goes through the same key:
+- **Check first, across every state.** Search the board for the key as a tag / label
+  (`atl-observe:<hash>`) **including Done and closed items** — a card that was already closed
+  is still the card for that subject; re-opening or commenting on it is the convergence, a
+  second card is the duplicate. Found → update it, never create.
+- **Fallback, for cards made before this key existed:** search the observe-made cards for
+  the finding's anchors (the card references and paths are in their bodies, in any language)
+  and adopt a match — stamp the key on it — instead of opening a new one.
+- **Create only when both miss**, with the key as a tag / label and an `Anchors:` line in
+  the body listing the anchors, so a later sweep's fallback can find it too.
 
 If you *are* running in a live turn (the user invoked `/observe` directly), present the
 ranked list as well — but still write it to the digest, so a finding they do not act on
