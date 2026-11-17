@@ -133,8 +133,8 @@ threads and vote on Azure, `gh pr comment` / `gh pr review` on GitHub — not `/
 compiles the report, opens (or finds) the `dev` → `release` **promotion PR**, and then hands the decision
 to **`atl work promote`** — a deterministic command that reads a durable **approval record** back from the
 backend, compares it to the PR's current head, and merges only on an exact match. Opening that PR is no
-longer the promotion — **merging it is**. In v1 the gate is bound on the **GitHub** backend only — see
-**GitHub-only in v1** at the end of this section for what is still missing on Azure.
+longer the promotion — **merging it is**. The gate is bound on both backends — see **How the gate reaches
+each backend** at the end of this section.
 
 **The check is code, not ceremony instructions, and that is the point.** It first shipped as a procedure
 written into the `/sprint-review` skill, and a real run had the same ceremony follow it on one turn and
@@ -182,9 +182,12 @@ what to set:
 | A record with no 40-hex id under `## Approved Commit` | Holds, and asks for a re-post naming the current head (`unparseable-record`). |
 | A record naming a commit that is not the PR's head | Holds — the approved state is not the state that would ship (`superseded`). |
 | The record could not be read | Holds. Unverified is not approved (`read-failed`). |
-| The record matched, but GitHub refused the pinned merge | Holds (`merge-refused`) — `dev` moved between the check and the merge, so the provider rejected it. Nothing was promoted; approve the new head. |
+| The record matched, but the provider refused the pinned merge | Holds (`merge-refused`) — `dev` moved between the check and the merge, so GitHub (or Azure, with TF401192) rejected it. Nothing was promoted; approve the new head. |
+| Azure: the record matched but the PAT named by `config.pat.ref` is not set | Holds (`no-credential`) — the approval verified, nothing was completed. Export the PAT and re-run. |
+| Azure: the completion was sent but never reported completed | Holds (`merge-unconfirmed`) — check the PR before re-running; the gate does not report a promotion it has not seen. |
+| Azure: more than one open `dev` → `release` PR | Holds (`ambiguous-pr`) — abandon the extras, or re-run with `--pr`. |
 | No open `dev` → `release` PR to act on | Holds — open it first (`no-open-pr`). This is also how an already-promoted sprint converges: a re-run merges nothing. |
-| The command cannot reach the backend | Holds (`backend-unbound`) — see **GitHub-only in v1** below. |
+| The configured backend is neither GitHub nor Azure | Holds (`backend-unbound`) — see **How the gate reaches each backend** below. |
 
 A hold is not a rejection: nothing is closed, nothing is tagged carryover, and the record is left where it
 is. An explicit **reject** stays conversational and runs the existing carryover path — the gate protects
@@ -204,22 +207,20 @@ promotion is commit-scoped (it can never silently ship a state later than the on
 attributable (a durable record naming a commit, an author, and a timestamp) — a correctness gate, not an
 authentication one.
 
-**GitHub-only in v1 — and the reason is the transport, not the data.** On Azure both of the gate's reads
-are bound in the adapter: the approval record via PR threads, and the head commit via the branch read
-(`repo_branch`, `action: "get"`), whose response carries it in `objectId` — resolved against a live server,
-so it is written down. But those are MCP tools, callable only from an LLM turn, and `atl work promote` is a
-Go binary with no MCP client. It can issue neither read, so **the commit-bound gate does not operate on the
-Azure backend yet.**
+**How the gate reaches each backend.** On **GitHub** it runs `gh`: one `gh pr view` reads the head and the
+records together, and `gh pr merge --merge --match-head-commit` makes GitHub itself refuse a head that moved.
+On **Azure DevOps** it runs the `az` CLI (with the `azure-devops` extension) for the reads — the open
+promotion PR, its head (`lastMergeSourceCommit`) and its comment threads — and completes the PR with one REST
+call that names the verified commit as `lastMergeSourceCommit`. Azure refuses that call with HTTP 409
+(TF401192) when the source branch has moved past the commit, so the merge is pinned exactly as on GitHub.
+The completion needs the personal access token named by `config.pat.ref` (default `AZURE_DEVOPS_PAT`) in the
+environment; without it the gate verifies the record and then holds with `no-credential`. Any other backend
+holds with `backend-unbound`. On no backend does the gate fall back to a conversational approval, and the
+ceremony never reads the head itself and promotes on it — a head the caller supplies is a head the caller
+can get wrong, which is the prose gate this replaced.
 
-That is a **HOLD, not a fallback** — a read the command cannot issue is a read failure, so on Azure
-`/sprint-review` compiles the report, opens (or finds) the promotion PR, and then holds: `atl work promote`
-reports `backend-unbound`, calls no Azure surface at all, and merges nothing. It does **not** revert to
-promoting on a conversational approval, and the ceremony does not read the head itself and promote on it
-either — a head the caller supplies is a head the caller can get wrong, which is the prose gate this
-replaced. Until a transport exists, an Azure project on this version promotes by completing that promotion
-PR itself, in Azure DevOps. Choosing how a deterministic Go gate should reach Azure — a team-owned REST
-helper like the attachment carve-out, or an Azure client inside `atl` — is the named next step, and it is
-an open design decision rather than a lookup.
+(Until 2026-11-17 this section said the gate was GitHub-only and held on Azure, because the gate had no
+way to reach Azure. It now does, through `az` plus the pinned REST completion.)
 
 ## What ships
 

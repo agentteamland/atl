@@ -133,8 +133,8 @@ değil.
 `dev` → `release` **promote PR'ını** açar (ya da bulur) ve kararı **`atl work promote`**'a devreder —
 backend'den kalıcı bir **onay kaydını** geri okuyan, onu PR'ın güncel head'iyle karşılaştıran ve yalnız
 birebir eşleşmede merge eden deterministik bir komut. O PR'ı açmak artık promote etmek değildir —
-**promote etmek onu merge etmektir**. v1'de bu kapı yalnız **GitHub** backend'inde bağlıdır — Azure'da
-hâlâ neyin eksik olduğu için bu bölümün sonundaki **v1'de yalnızca GitHub** bloğuna bak.
+**promote etmek onu merge etmektir**. Kapı her iki backend'de de bağlıdır — bu bölümün sonundaki
+**Kapı her backend'e nasıl erişir** bloğuna bak.
 
 **Bu kontrol seremoni talimatı değil, koddur — ve asıl mesele budur.** İlk sürümünde kontrol
 `/sprint-review` becerisinin içine yazılmış bir prosedürdü ve gerçek bir koşuda aynı seremoni onu bir turda
@@ -183,9 +183,12 @@ tam olarak neyi set etmen gerektiğini yazar:
 | Kayıt var ama `## Approved Commit` altında 40-hex id yok | Bekletir; güncel head'i veren yeni bir kayıt ister (`unparseable-record`). |
 | Kayıt, PR'ın head'i olmayan bir commit'i veriyor | Bekletir — onaylanan durum, teslim edilecek durum değildir (`superseded`). |
 | Kayıt okunamadı | Bekletir. Doğrulanmamış, onaylanmış değildir (`read-failed`). |
-| Kayıt eşleşti ama GitHub SHA'ya sabitlenmiş merge'ü reddetti | Bekletir (`merge-refused`) — kontrol ile merge arasında `dev` ilerlediği için sağlayıcı reddetti. Hiçbir şey promote edilmedi; yeni head'i onayla. |
+| Kayıt eşleşti ama sağlayıcı SHA'ya sabitlenmiş merge'ü reddetti | Bekletir (`merge-refused`) — kontrol ile merge arasında `dev` ilerlediği için GitHub (ya da TF401192 ile Azure) reddetti. Hiçbir şey promote edilmedi; yeni head'i onayla. |
+| Azure: kayıt eşleşti ama `config.pat.ref`'in adlandırdığı PAT tanımlı değil | Bekletir (`no-credential`) — onay doğrulandı, hiçbir şey tamamlanmadı. PAT'i export edip yeniden koş. |
+| Azure: tamamlama gönderildi ama tamamlandığı hiç bildirilmedi | Bekletir (`merge-unconfirmed`) — yeniden koşmadan önce PR'a bak; kapı görmediği bir promote'u bildirmez. |
+| Azure: birden fazla açık `dev` → `release` PR'ı var | Bekletir (`ambiguous-pr`) — fazlalıkları terk et ya da `--pr` ile yeniden koş. |
 | Üzerinde çalışılacak açık bir `dev` → `release` PR'ı yok | Bekletir — önce onu aç (`no-open-pr`). Zaten promote edilmiş bir sprint de böyle yakınsar: yeniden koşu hiçbir şeyi merge etmez. |
-| Komut backend'e erişemiyor | Bekletir (`backend-unbound`) — aşağıdaki **v1'de yalnızca GitHub** bloğuna bak. |
+| Yapılandırılan backend ne GitHub ne Azure | Bekletir (`backend-unbound`) — aşağıdaki **Kapı her backend'e nasıl erişir** bloğuna bak. |
 
 HOLD bir ret değildir: hiçbir şey kapatılmaz, hiçbir şeye carryover etiketi konmaz ve kayıt olduğu yerde
 bırakılır. Açık bir **ret** sohbette kalır ve mevcut carryover yolunu işletir — kapı yalnız geri alınamaz
@@ -206,22 +209,20 @@ edemez. Kapının kazandırdığı şey şudur: bir promote artık commit-kapsam
 yenisini sessizce teslim edemez) ve atfedilebilirdir (bir commit, bir yazar ve bir zaman damgası veren
 kalıcı bir kayıt) — bu bir doğruluk kapısıdır, bir kimlik doğrulama kapısı değil.
 
-**v1'de yalnızca GitHub — ve sebebi veri değil, taşıma katmanı.** Azure'da kapının her iki okuması da
-adapter'da bağlıdır: onay kaydı PR thread'leri üzerinden, head commit ise branch okuması (`repo_branch`,
-`action: "get"`) üzerinden — yanıt onu `objectId` alanında taşır ve bu, canlı bir sunucuya karşı
-çözümlendiği için yazılıdır. Ne var ki bunlar yalnızca bir LLM turundan çağrılabilen MCP araçlarıdır ve
-`atl work promote`, MCP istemcisi olmayan bir Go ikilisidir. İki okumadan hiçbirini yapamaz; **dolayısıyla
-commit'e bağlı kapı Azure backend'inde henüz çalışmıyor.**
+**Kapı her backend'e nasıl erişir.** **GitHub**'da `gh` çalıştırır: tek bir `gh pr view` head'i ve kayıtları
+birlikte okur, `gh pr merge --merge --match-head-commit` ise kaymış bir head'i GitHub'ın kendisine reddettirir.
+**Azure DevOps**'ta okumalar için `azure-devops` eklentili `az` CLI'ını çalıştırır — açık promote PR'ı, onun
+head'i (`lastMergeSourceCommit`) ve yorum thread'leri — ve PR'ı, doğrulanan commit'i `lastMergeSourceCommit`
+olarak veren tek bir REST çağrısıyla tamamlar. Kaynak dal o commit'in ötesine geçmişse Azure bu çağrıyı HTTP
+409 (TF401192) ile reddeder; yani merge, GitHub'daki gibi commit'e sabitlenir. Tamamlama, ortamda
+`config.pat.ref`'in adlandırdığı kişisel erişim token'ını (varsayılan `AZURE_DEVOPS_PAT`) ister; o yoksa kapı
+kaydı doğrular ve ardından `no-credential` ile bekletir. Başka her backend `backend-unbound` ile bekletir.
+Hiçbir backend'de kapı sohbette verilen bir onaya geri dönmez ve seremoni head'i kendisi okuyup ona göre
+promote etmez — çağıranın verdiği bir head, çağıranın yanlış verebileceği bir head'dir ve bu, tam olarak
+yerine geçilen düzyazı kapısıdır.
 
-Bu bir **HOLD'dur, bir geri-dönüş (fallback) değil** — komutun yapamadığı bir okuma, okuma hatasıdır:
-Azure'da `/sprint-review` raporu derler, promote PR'ını açar (ya da bulur) ve sonra bekletir; `atl work
-promote` `backend-unbound` bildirir, hiçbir Azure yüzeyini çağırmaz ve hiçbir şeyi merge etmez. Sohbette
-verilen bir onayla promote etmeye **geri dönmez**; seremoni head'i kendisi okuyup ona göre promote de etmez
-— çağıranın verdiği bir head, çağıranın yanlış verebileceği bir head'dir ve bu, tam olarak yerine geçilen
-düzyazı kapısıdır. Bir taşıma katmanı çıkana kadar bu sürümdeki bir Azure projesi, promote'u o PR'ı Azure
-DevOps üzerinde kendisi tamamlayarak yapar. Deterministik bir Go kapısının Azure'a nasıl erişeceğine karar
-vermek — attachment carve-out'u gibi takıma ait bir REST yardımcısı mı, yoksa `atl` içinde bir Azure
-istemcisi mi — adı konmuş bir sonraki adımdır ve bir arama değil, açık bir tasarım kararıdır.
+(2026-11-17'ye kadar bu bölüm kapının yalnızca GitHub'da çalıştığını ve Azure'da beklettiğini söylüyordu,
+çünkü kapının Azure'a erişme yolu yoktu. Artık var: `az` artı commit'e sabitlenmiş REST tamamlaması.)
 
 ## Neler geliyor
 

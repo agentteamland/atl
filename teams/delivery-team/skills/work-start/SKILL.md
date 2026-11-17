@@ -67,8 +67,10 @@ so this skill will not issue writes against it. Drive this unit by hand, or
 re-verify the Azure tool names and bind them in backends/azure/adapter.md first.
 ```
 
-That mirrors `atl work promote`, which already returns a `backend-unbound` hold on Azure rather
-than re-deriving a path it cannot verify.
+That mirrors `atl work promote`, which returns a `backend-unbound` hold on any backend it has no
+verified transport for rather than re-deriving a path it cannot verify. (This used to say it held on
+Azure; since 2026-11-17 the gate binds Azure through the `az` CLI and a pinned REST completion —
+`backends/azure/adapter.md` §10 — while this skill's Azure map is still unverified.)
 
 ## Procedure
 

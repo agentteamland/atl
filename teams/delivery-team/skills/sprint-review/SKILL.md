@@ -300,10 +300,12 @@ From the project root, run:
 atl work promote --json
 ```
 
-A single read returns the promotion PR's current head **and** every `**[Promotion Approval]**`
-record on it — one snapshot, so a comment posted mid-check cannot make the comparison lie — and the
-PR is merged, pinned to that commit, only when a record names that exact head. Read the verdict, not
-the record:
+The command reads the promotion PR's current head **and** every `**[Promotion Approval]**` record on
+it, and merges the PR — pinned to that commit, so the provider itself refuses the merge if the head
+moved — only when a record names that exact head. On GitHub that is `gh pr merge
+--match-head-commit`; on Azure it reads through the `az` CLI and completes the PR with one REST call
+whose `lastMergeSourceCommit` is the verified commit (`backends/azure/adapter.md` §10). Read the
+verdict, not the record:
 
 - **Exit 0** (`"verdict": "promoted"`) — the promotion landed. `approved` is the merged commit, `pr`
   the promotion PR, and the matching entry in `records` carries the approver and their timestamp.
@@ -311,10 +313,13 @@ the record:
   was set, no work-item state changed, no `carryover` was written. **A hold is not a reject** — no
   rejection reason is filed and the gate simply waits for a valid record. `reason` is the
   machine-readable cause: `no-open-pr` · `no-record` · `unparseable-record` · `superseded` ·
-  `read-failed` · `merge-refused` · `backend-unbound`.
+  `read-failed` · `merge-refused` · `backend-unbound`, and on Azure also `ambiguous-pr` (more than
+  one open promotion PR) · `no-credential` (the approval verified but the PAT named by
+  `config.pat.ref` is not set, so nothing was completed) · `merge-unconfirmed` (the completion was
+  sent but Azure had not reported the PR completed at that commit — check the PR before re-running).
 - **Non-zero exit with NO JSON on stdout** — a setup error, not a verdict: the project has no
-  `.delivery/config.json`, or its GitHub coordinates are incomplete. The single line on stderr says
-  which. Nothing was merged here either, so the promotion still **holds** — surface the setup error
+  `.delivery/config.json`, or its backend coordinates are incomplete (`owner`/`repo` on GitHub;
+  `org`/`project`/`repo` on Azure). The single line on stderr says which. Nothing was merged here either, so the promotion still **holds** — surface the setup error
   as-is and fix the config; do not treat a missing verdict as permission to promote by hand.
 
 **Whatever the exit code, the promotion happened only if the command says `promoted`.** Never merge
@@ -332,16 +337,15 @@ approved state is not the state that would be promoted. It **holds, never auto-c
 approval is not carried forward to the newer commit, and the stale record is left untouched as audit
 history for the next one to supersede.
 
-**Backend scope in v1 — the gate operates on the GitHub backend only.** On **Azure** both legs of
-concept #16 are bound *for you* — you can read the approval record and the head commit through the
-MCP — but `atl work promote` is a Go binary with no MCP client, so **the command** cannot issue
-either read (`backends/azure/adapter.md` §10). **Unverified is never approved** — it reports this
-itself as `"reason": "backend-unbound"`; relay it like any other hold. Azure does **not** fall back
-to a conversational approval, this ceremony never substitutes a local `git` read for the adapter,
-and — the trap worth naming, because you *can* do it — **you must not read the head yourself and
-promote on it**, nor hand it to the command. A head the ceremony supplies is a head the ceremony
-could get wrong, and a gate that trusts its caller for the one value it exists to verify is the
-prose gate concept #16 replaced.
+**Backend scope — GitHub and Azure.** On **Azure** the command reaches the backend itself: it reads
+through the `az` CLI and completes the PR with one pinned REST call, using the PAT named by
+`config.pat.ref` (`backends/azure/adapter.md` §10). (Until 2026-11-17 this paragraph said the gate ran
+on GitHub only and held on Azure with `backend-unbound`; that is no longer true.) Any other backend
+still holds with `"reason": "backend-unbound"` — relay it like any other hold. On every backend the
+same trap applies, and it is worth naming because you *can* do it: **you must not read the head
+yourself and promote on it** — not through the MCP, not with `gh`, not by hand — nor hand it to the
+command. A head the ceremony supplies is a head the ceremony could get wrong, and a gate that trusts
+its caller for the one value it exists to verify is the prose gate concept #16 replaced.
 
 #### 6c. Record the outcome
 

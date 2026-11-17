@@ -1,8 +1,10 @@
 package promotiongate
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -14,9 +16,31 @@ import (
 // plus the promote path without touching the network or merging anything.
 type Runner func(name string, args ...string) ([]byte, error)
 
-// ExecRunner runs the real gh binary.
+// ExecRunner runs the real binary (gh or az). On success it returns stdout only:
+// both tools print warnings to stderr, and a warning interleaved into the JSON this
+// gate parses would turn a healthy read into a parse failure. On failure it returns
+// stdout+stderr, so the error carries the tool's own explanation.
 func ExecRunner(name string, args ...string) ([]byte, error) {
-	return exec.Command(name, args...).CombinedOutput()
+	return run(exec.Command(name, args...))
+}
+
+// EnvRunner is ExecRunner with extra environment entries appended — how the Azure
+// PAT reaches az as AZURE_DEVOPS_EXT_PAT without ever appearing in an argv.
+func EnvRunner(extra ...string) Runner {
+	return func(name string, args ...string) ([]byte, error) {
+		cmd := exec.Command(name, args...)
+		cmd.Env = append(os.Environ(), extra...)
+		return run(cmd)
+	}
+}
+
+func run(cmd *exec.Cmd) ([]byte, error) {
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &stdout, &stderr
+	if err := cmd.Run(); err != nil {
+		return append(stdout.Bytes(), stderr.Bytes()...), err
+	}
+	return stdout.Bytes(), nil
 }
 
 func (g Gate) gh(args ...string) (string, error) {
