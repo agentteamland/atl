@@ -57,6 +57,139 @@ func ProjectDir(projectRoot string) (string, error) {
 	return filepath.Join(home, ".claude", "projects", SlugForPath(projectRoot)), nil
 }
 
+// FindProject returns the transcripts of every session that belongs to
+// projectRoot, modified strictly after since, oldest first — across all the
+// transcript directories those sessions were written to, not just the root's.
+//
+// One directory is not enough because Claude Code files a session under the slug
+// of its OWN working directory, while the stores that consume transcripts are
+// keyed by the repository root (so their items outlive a worktree). A session
+// opened in a worktree (<root>/.claude/worktrees/<name>, the Claude Code desktop
+// default), in a delivery worktree, or in a subdirectory (<root>/game) therefore
+// writes to a directory the root's slug never names, and reading only
+// ProjectDir(projectRoot) silently captured nothing from it: the tick reported
+// "0 marker(s)" while the live session's markers were never read (atl#524).
+//
+// Two kinds of directory are read:
+//
+//   - ProjectDir(projectRoot) and ProjectDir(d) for each d in extra — directories
+//     the caller already knows belong to the project (the session's own working
+//     directory is the one that matters: it covers a worktree that lives outside
+//     the root, which no prefix can find).
+//   - every other directory whose name extends the root's slug with a path
+//     separator. The slug is lossy — "/a/ATL/x", "/a/ATL-x" and "/a/ATL.x" all
+//     slug to "-a-ATL-x" — so a prefix match is only a candidate: it is accepted
+//     when one of its transcripts records a working directory that IS projectRoot
+//     or lies under it, and then only if belongs (when non-nil) agrees. belongs
+//     is how the caller excludes a nested repository that happens to live inside
+//     the root's tree but is a project of its own.
+//
+// A candidate is only confirmed when it has transcripts newer than since, so a
+// pass over a project with many finished worktrees reads one record per
+// directory that actually has something new, not one per directory ever made.
+// Nothing is cached: the confirmation reads the transcript it is about to drain.
+func FindProject(projectRoot string, since time.Time, belongs func(cwd string) bool, extra ...string) ([]File, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return nil, err
+	}
+	base := filepath.Join(home, ".claude", "projects")
+	own := SlugForPath(projectRoot)
+
+	trusted := map[string]bool{own: true}
+	for _, d := range extra {
+		if d != "" {
+			trusted[SlugForPath(d)] = true
+		}
+	}
+
+	entries, err := os.ReadDir(base)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	var files []File
+	for _, e := range entries {
+		name := e.Name()
+		if !e.IsDir() {
+			continue
+		}
+		isTrusted := trusted[name]
+		// A path under the root slugs to the root's slug, then the separator's
+		// hyphen, then the rest — anything else shares only a name prefix.
+		isCandidate := !isTrusted && len(name) > len(own) && strings.HasPrefix(name, own) && name[len(own)] == '-'
+		if !isTrusted && !isCandidate {
+			continue
+		}
+		found, err := Find(filepath.Join(base, name), since)
+		if err != nil {
+			return nil, err
+		}
+		if len(found) == 0 {
+			continue
+		}
+		if isCandidate {
+			cwd, ok := sessionCwd(found)
+			if !ok || !pathWithin(cwd, projectRoot) || (belongs != nil && !belongs(cwd)) {
+				continue
+			}
+		}
+		files = append(files, found...)
+	}
+	sort.SliceStable(files, func(i, j int) bool {
+		return files[i].ModTime.Before(files[j].ModTime)
+	})
+	return files, nil
+}
+
+// pathWithin reports whether p is root or lies under it, by path — not by slug,
+// which is exactly the comparison that cannot tell /a/ATL/x from /a/ATL-x.
+func pathWithin(p, root string) bool {
+	p, root = filepath.Clean(p), filepath.Clean(root)
+	return p == root || strings.HasPrefix(p, root+string(filepath.Separator))
+}
+
+// cwdProbeRecords bounds how far into a transcript sessionCwd reads. The cwd is
+// on the first conversational record; the records before it are a handful of
+// queue-operation lines. A transcript with no cwd in its opening records is
+// treated as unconfirmed, never guessed at.
+const cwdProbeRecords = 64
+
+// sessionCwd returns the working directory recorded in the newest of files —
+// falling back to older ones if the newest has none yet (a session file whose
+// first records are still being written). It reads only the opening records.
+func sessionCwd(files []File) (string, bool) {
+	for i := len(files) - 1; i >= 0 && i >= len(files)-3; i-- {
+		if cwd, ok := fileCwd(files[i].Path); ok {
+			return cwd, true
+		}
+	}
+	return "", false
+}
+
+func fileCwd(path string) (string, bool) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", false
+	}
+	defer f.Close()
+	dec := json.NewDecoder(bufio.NewReaderSize(f, readBufBytes))
+	for i := 0; i < cwdProbeRecords; i++ {
+		var rec struct {
+			Cwd string `json:"cwd"`
+		}
+		if err := dec.Decode(&rec); err != nil {
+			return "", false
+		}
+		if rec.Cwd != "" {
+			return rec.Cwd, true
+		}
+	}
+	return "", false
+}
+
 // File is a discovered transcript. Size comes from the same stat the walk
 // already does, so a resuming mine can tell "nothing appended" from "unread
 // bytes" without opening the file.
