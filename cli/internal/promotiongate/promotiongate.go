@@ -20,9 +20,11 @@
 package promotiongate
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 )
 
 // Verdicts. A promotion either happened or it did not — a hold is not a reject:
@@ -42,6 +44,16 @@ const (
 	ReasonSuperseded     = "superseded"
 	ReasonReadFailed     = "read-failed"
 	ReasonMergeRefused   = "merge-refused"
+	// Azure only. The approval verified, but completing an Azure PR is one REST
+	// call atl issues itself (backends/azure/adapter.md §10) and it needs the PAT
+	// named by config.pat.ref — absent, nothing is merged.
+	ReasonNoCredential = "no-credential"
+	// Azure only. The completion was accepted but Azure did not report the PR
+	// completed at the approved commit within the wait — completion is async there.
+	ReasonMergeUnconfirmed = "merge-unconfirmed"
+	// Azure only. More than one open dev→release PR, so there is no single PR whose
+	// head the approval can be compared against.
+	ReasonAmbiguousPR = "ambiguous-pr"
 )
 
 // The record's locators, byte-for-byte as knowledge/backend-interface.md #16 and
@@ -92,15 +104,49 @@ type Result struct {
 }
 
 // Gate is one promotion decision: the repo and branch pair to act on, plus the
-// exec seam every gh call goes through.
+// exec seam every gh / az call goes through.
 type Gate struct {
-	Owner   string
+	// Backend selects the transport: "" or "github" → gh (gh.go), "azure" → az for
+	// the reads and one REST PATCH for the completion (az.go).
+	Backend string
+	Owner   string // github: the repo owner
+	Org     string // azure: the organization (name or https URL)
+	Project string // azure: the project
 	Repo    string
 	Dev     string
 	Release string
 	PR      int // 0 = resolve the open dev→release PR
 	Run     Runner
+
+	// Azure completion. PAT is the raw token read from the env var PATRef names
+	// (config.pat.ref); it is sent as Basic auth and never printed. HTTP is the seam
+	// the PATCH goes through (nil = the real client); Sleep and PollAttempts pace the
+	// wait for Azure's asynchronous completion (nil/0 = time.Sleep, 30 attempts).
+	PAT          string
+	PATRef       string
+	HTTP         HTTPDoer
+	Sleep        func(time.Duration)
+	PollAttempts int
 }
+
+func (g Gate) azure() bool { return g.Backend == "azure" }
+
+// label names the repository in messages: owner/repo on GitHub, org/project/repo
+// on Azure.
+func (g Gate) label() string {
+	if g.azure() {
+		return g.Org + "/" + g.Project + "/" + g.Repo
+	}
+	return g.Owner + "/" + g.Repo
+}
+
+// mergeHold is a completion failure that is not a plain provider refusal: it
+// carries its own reason and PO-facing message.
+type mergeHold struct {
+	reason, message string
+}
+
+func (e *mergeHold) Error() string { return e.message }
 
 // ParseRecords collects EVERY approval record on the PR, in the order gh returns
 // comments (oldest first). The approval channel is append-and-supersede, so
@@ -158,11 +204,21 @@ func approvedCommit(body string) string {
 // current head, and merges only on an exact match. Every other outcome is a hold:
 // no merge, no state change, nothing carried forward.
 func (g Gate) Verify() Result {
-	repo := g.Owner + "/" + g.Repo
+	repo := g.label()
 
 	pr := g.PR
 	if pr == 0 {
-		n, err := g.findPromotionPR(repo)
+		var n int
+		var err error
+		if g.azure() {
+			n, err = g.azFindPromotionPR()
+		} else {
+			n, err = g.findPromotionPR(repo)
+		}
+		var amb *mergeHold
+		if errors.As(err, &amb) {
+			return holdf(amb.reason, "%s", amb.message)
+		}
 		if err != nil {
 			return holdf(ReasonReadFailed, "HOLD — could not read the open promotion PR from `%s` into `%s` on %s (%v). Unverified is not approved.", g.Dev, g.Release, repo, err)
 		}
@@ -172,7 +228,14 @@ func (g Gate) Verify() Result {
 		pr = n
 	}
 
-	head, comments, err := g.viewPR(repo, pr)
+	var head string
+	var comments []Comment
+	var err error
+	if g.azure() {
+		head, comments, err = g.azViewPR(pr)
+	} else {
+		head, comments, err = g.viewPR(repo, pr)
+	}
 	if err != nil {
 		res := holdf(ReasonReadFailed, "HOLD — could not read the promotion PR's approval record and current head commit (%v). Unverified is not approved.", err)
 		res.PR = pr
@@ -201,11 +264,27 @@ func (g Gate) Verify() Result {
 		if r.Commit != head {
 			continue
 		}
-		if err := g.merge(repo, pr, head); err != nil {
-			res.Reason = ReasonMergeRefused
+		var mergeErr error
+		if g.azure() {
+			mergeErr = g.azMerge(pr, head)
+		} else {
+			mergeErr = g.merge(repo, pr, head)
+		}
+		if mergeErr != nil {
 			res.Approved = head
-			res.Message = fmt.Sprintf("HOLD — the approval for %s verified, but the merge of %s#%d was refused (%v). --match-head-commit means the provider itself refuses to merge anything but that commit, so `dev` most likely advanced between the check and the merge. Nothing was promoted; re-run after adding a %s record for the new head.",
-				head, repo, pr, err, sentinel)
+			var mh *mergeHold
+			if errors.As(mergeErr, &mh) {
+				res.Reason = mh.reason
+				res.Message = mh.message
+				return res
+			}
+			pin := "--match-head-commit means the provider itself refuses to merge anything but that commit"
+			if g.azure() {
+				pin = "The completion is pinned to that commit (lastMergeSourceCommit), so Azure itself refuses to complete anything else (TF401192)"
+			}
+			res.Reason = ReasonMergeRefused
+			res.Message = fmt.Sprintf("HOLD — the approval for %s verified, but the merge of %s#%d was refused (%v). %s, so `dev` most likely advanced between the check and the merge. Nothing was promoted; re-run after adding a %s record for the new head.",
+				head, repo, pr, mergeErr, pin, sentinel)
 			return res
 		}
 		res.Verdict = Promoted
@@ -249,29 +328,22 @@ approved, reset `+"`%s`"+` to %s first.`,
 	return res
 }
 
-// HoldBackendUnbound is the verdict for a backend this command cannot reach. On
-// Azure BOTH legs of concept #16 are bound in the adapter — the approval record via
-// the PR-thread tools, the head commit via `repo_branch` (action "get"), whose
-// response carries it in objectId — but every one of those is an MCP tool, and this
-// binary has no MCP client, so it can issue neither read. The data is available; the
-// transport is not, and which transport a deterministic Go gate should use on Azure
-// is an open design question (backends/azure/adapter.md §10), not a lookup.
+// HoldBackendUnbound is the verdict for a backend this command has no transport
+// for. `atl work promote` binds GitHub (gh.go) and Azure DevOps (az.go); any other
+// configured backend holds here, before any call.
 //
-// The tempting shortcut is to let the ceremony — which CAN call the MCP — read the
-// head and pass it in. That is refused deliberately: a head supplied by the caller is
-// a head the caller can get wrong, and a gate that trusts its caller for the one
-// value it exists to verify is the prose gate this package replaced.
-//
-// So the gate holds: unverified is never approved, no conversational fallback, and no
-// local git read substituted for the adapter.
+// The tempting shortcut for an unbound backend is to let the ceremony read the head
+// through whatever tool it has and pass it in. That is refused deliberately: a head
+// supplied by the caller is a head the caller can get wrong, and a gate that trusts
+// its caller for the one value it exists to verify is the prose gate this package
+// replaced. So the gate holds: unverified is never approved, no conversational
+// fallback, and no local git read substituted for the adapter.
 func HoldBackendUnbound(backend string) Result {
-	return holdf(ReasonBackendUnbound, `HOLD — on the %s backend I cannot read the promotion PR's current head commit, so I
+	return holdf(ReasonBackendUnbound, `HOLD — on the %q backend I cannot read the promotion PR's current head commit, so I
 cannot verify that your approval names the commit that would be promoted. I have NOT
 promoted anything; unverified is not approved. The promotion PR and its approval
-record (if any) are preserved. The adapter does bind both reads for an LLM caller;
-what is missing is a way for THIS command to issue them, which is an open design
-decision (backends/azure/adapter.md §10). Until it is made and built, promotion on
-this backend holds — do not read the head by hand and promote on it.`, backend)
+record (if any) are preserved. This command binds the github and azure backends
+only — do not read the head by hand and promote on it.`, backend)
 }
 
 func holdf(reason, format string, a ...any) Result {

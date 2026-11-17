@@ -358,10 +358,10 @@ func TestVerifyReadArgv(t *testing.T) {
 	}
 }
 
-// TestHoldBackendUnbound proves a non-GitHub backend holds rather than falling
-// back to a conversational promotion.
+// TestHoldBackendUnbound proves a backend with no transport holds rather than
+// falling back to a conversational promotion.
 func TestHoldBackendUnbound(t *testing.T) {
-	res := HoldBackendUnbound("azure")
+	res := HoldBackendUnbound("gitlab")
 	if res.Verdict != Hold || res.Reason != ReasonBackendUnbound {
 		t.Fatalf("verdict=%q reason=%q", res.Verdict, res.Reason)
 	}

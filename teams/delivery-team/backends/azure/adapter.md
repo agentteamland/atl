@@ -18,7 +18,11 @@ caller. Do not improvise an Azure call that isn't described here.
 - **The Go orchestrator (`atl work dispatch`) never calls Azure.** It is a
   deterministic, zero-LLM, zero-Azure supervisor: it spawns workers (with the PAT +
   MCP config in their environment) and observes them through `status.json`. Every
-  Azure call originates from an **LLM** caller (a ceremony or a worker) using the MCP.
+  Azure call from a ceremony or a worker is an **LLM** call through the MCP. The one
+  deterministic Azure caller is the promotion gate, `atl work promote`: a Go binary
+  cannot use the MCP, so it reads through the `az` CLI and completes the promotion PR
+  with one pinned REST call (§10). It is not an adapter for LLM callers and gives them
+  no second path.
 - **Auth = a PAT from the environment, never a file, never the argv.** The
   `azureDevOps` MCP authenticates with a Personal Access Token referenced by name
   from the environment (the official `@azure-devops/mcp … --authentication pat`
@@ -54,7 +58,7 @@ rules below or is escalated, not guessed.
 | **Promotion approval record (#16)** | write: `repo_pull_request_thread_write` (action `create`, `content` = the record) · read: `repo_pull_request_thread` (action `list`), sentinel-matched (§7) |
 | List a project's repos (discovery, e.g. `/delivery-init`) | `repo_list_repos_by_project` |
 | **Read a branch (its head commit id, #16)** | `repo_branch` (action `get`, `branchName`) → the head commit id is the response's top-level **`objectId`** (resolved against a live server, §10) |
-| **Verify the promotion approval + merge `dev`→`release` (#16)** | **bound for an LLM caller, not for `atl work promote`** — both legs are MCP rows above, and the gate is a Go binary with no MCP client; it holds with `backend-unbound` and calls no Azure surface (§10) |
+| **Verify the promotion approval + merge `dev`→`release` (#16)** | **`atl work promote`** — not an MCP row: the deterministic gate reads through the `az` CLI and completes the PR with one REST call pinned to the verified commit (§10). Never perform this merge through the MCP. |
 | Read repo/file | `repo_get_repo_by_name_or_id` / `repo_get_file_content` |
 | Read / upsert / list wiki pages | `wiki_get_page_content` / `wiki_create_or_update_page` / `wiki_list_pages` / `wiki_get_wiki` / `wiki_list_wikis` |
 | Discovery search | `search_workitem` / `search_wiki` / `search_code` |
@@ -330,7 +334,7 @@ no two roles fight over a page:
   target wiki is resolved once (`wiki_get_wiki`/`wiki_list_wikis`) at `/delivery-init` and
   cached in `.delivery/config.json` (`wikiId`).
 
-## 9. The one REST carve-out — attachment upload
+## 9. The one REST carve-out for LLM callers — attachment upload
 
 **Exactly one** Azure operation has no MCP tool: uploading an attachment (evidence —
 test screenshots / result files) to a work-item. (The DRAFT detail-spec once said
@@ -375,65 +379,70 @@ landed (`MergedToBase` = `rev-list origin/dev..branch == 0`) — it never merges
   reviews only at sprint review (`dev`→`release` promotion). The carve-out is scoped to the
   machine, never the interactive session.
 
-**The `dev`→`release` promotion — both READS are bound; `atl work promote` still does not run here.**
-Concept #16 has two legs: a durable approval record naming one commit, and a read of the promotion
-PR's **current head commit id** so the two can be compared. Both are now bound *for an LLM caller*:
-the **record leg** via the PR-thread tools (§2 + §7 — a PO can post the record today), and the
-**head-commit read** via `repo_branch` (action `get`), whose response carries the branch's head
-commit id in its top-level **`objectId`** — read off a live Azure DevOps server, so §2's
-never-invent rule is satisfied for that field and it is written down. Do **not** close the read with
-a local `git` read even now: the head must come through the active adapter, or the gate is verifying
-something other than what the backend will merge.
+**The `dev`→`release` promotion is `atl work promote`, and on this backend it runs through the `az`
+CLI plus one REST call.** Concept #16 has two legs: a durable approval record naming one commit, and a
+read of the promotion PR's **current head commit id** so the two can be compared. The gate is a Go
+binary, so it cannot use the MCP rows above; this section records how it reaches Azure instead.
 
-**What is still unbound is the gate's TRANSPORT, not its data.** `atl work promote` is a Go binary
-and both legs above are MCP tools; `atl` ships no MCP client, so the command cannot issue either
-call. This is a *different* blocker from the one this section carried until the field was resolved,
-and it is a design question rather than a lookup: §1 fixes MCP-first for every **LLM** caller and
-`atl work dispatch` is stated to never call Azure, but neither settles how a **deterministic Go
-gate** — which did not exist when those were decided — should reach Azure. The options are a
-team-owned REST helper in the `az-attach.sh` pattern (§9) versus an Azure client inside `atl`, and
-§1's "a raw-REST worker would fork the adapter into two implementations" is an argument against the
-second that has never been put to the question. **No recorded decision resolves it**, and one is
-needed before the compare-and-merge leg can be built. So **a reader must not take this section as
-"the gate is live on Azure"**.
+> **Correction (2026-11-17).** Until this date this section said the gate's transport was an open
+> design question with two candidates — a team-owned REST helper in the `az-attach.sh` pattern, or an
+> Azure client inside `atl` — and that promotion must HOLD on Azure (`backend-unbound`) until one was
+> chosen. It also said Azure had no `--match-head-commit` equivalent "in evidence", so the gate could
+> only verify-then-complete with a window in which `dev` could advance. Both statements are retired:
+> a third transport was chosen, and the missing evidence was gathered on a live server (below).
 
-**What that means operationally is a HOLD, not a fallback.** A read the gate cannot issue is a
-**read failure**, and #16 fails closed on a read failure exactly as it does on a missing or
-mismatched record: until the transport is decided and built, the `dev`→`release` promotion **holds**
-on this backend and reports why. It does **not** revert to promoting on a conversational PO
-decision — that is precisely the weakness #16 exists to remove, and reintroducing it as a fallback
-would give this backend the worst of both. Nor may the head be passed *into* the gate by the
-ceremony that ran the MCP read: a value an LLM supplies is a value an LLM can get wrong, and a gate
-that trusts its caller for the thing it exists to verify is the prose gate #16 replaced. Unverified
-is never approved.
+**Decision: shell out to the official `az` CLI (with the `azure-devops` extension) for the reads,
+exactly as the GitHub binding shells out to `gh`; issue the completion as one REST `PATCH`.** No MCP
+client inside `atl`, no LLM in the path. It mirrors the GitHub binding one-for-one and needs no new
+client for the reads. The completion cannot go through `az`, measured on azure-devops extension 1.0.5:
+`az devops invoke --area git --resource pullRequests` always resolves to the project-scoped GET-by-id
+route (`{project}/_apis/git/pullRequests/{id}`), which answers *"The requested resource does not
+support http method 'PATCH'"*, and `az repos pr update --status completed` pins the head **it** reads
+rather than the commit the gate verified. So the gate sends that one write itself.
 
-**The promotion operation is `atl work promote`** — the deterministic gate that verifies the record
-against the PR's head and merges in the same call (the GitHub adapter §10 binds it; `/sprint-review`
-step 6b runs it). On this backend it resolves the configured `backend` and, having no way to issue
-the adapter's reads, returns the hold **`"reason": "backend-unbound"`** — it makes **no** call to any
-Azure surface, merges nothing, and leaves the promotion PR and any approval record untouched. That
-is the whole Azure binding of #16's compare-and-merge leg today: a refusal that names itself.
-Nothing in this file authorizes promoting around it.
+| Step | Call |
+|---|---|
+| Find the open promotion PR | `az repos pr list --org <url> --project <p> --repository <repo> --source-branch <dev> --target-branch <release> --status active --detect false` → `pullRequestId`. None → hold `no-open-pr`; more than one → hold `ambiguous-pr`. |
+| Read the head | `az repos pr show --id <n> --org <url> --detect false` → **`lastMergeSourceCommit.commitId`**; a PR whose `status` is not `active` is a read failure. |
+| Read the records | `az devops invoke --area git --resource pullRequestThreads --route-parameters project=<p> repositoryId=<repo> pullRequestId=<n> --api-version 7.1` → `value[].comments[]`: `content`, `publishedDate`, `author.uniqueName`; `commentType: "system"` and deleted comments are skipped. The sentinel and heading rules are §7's. |
+| Complete, pinned | Re-read the head immediately before and re-compare, then `PATCH {org}/{project}/_apis/git/repositories/{repo}/pullrequests/{n}?api-version=7.1` with `{"status":"completed","lastMergeSourceCommit":{"commitId":"<verified sha>"},"completionOptions":{"mergeStrategy":"noFastForward","deleteSourceBranch":false,"transitionWorkItems":false}}`. Never `autoComplete`, never delete `dev`. |
+| Confirm | Completion is **asynchronous** — the PATCH answers with the PR still `active` and `mergeStatus: "queued"`. The gate polls `az repos pr show` and reports `promoted` only when the PR is `completed` at the verified commit; otherwise it holds `merge-unconfirmed` (or `merge-refused` on `conflicts` / `failure` / `rejectedByPolicy` / `abandoned`). |
 
-**The named next step:** decide the gate's Azure transport (above), then build the compare-and-merge
-leg against it and lift this notice. The completion write it will need is `repo_update_pull_request`
-for an LLM caller (below); its shape under any other transport is **unresolved** and must be
-evidenced before it is written down, exactly as the branch read's field was.
+`--org` is always explicit and `--detect` is off, so `az` never falls back to its configured defaults
+or the working directory's git remote — on a machine whose `az devops configure` defaults name a
+different organization, an implicit org would read the wrong project.
 
-Two rules hold from now, so that nothing else has to be undone once the transport lands:
+**The pin is atomic — the twin of GitHub's `--match-head-commit`.** Measured on 2026-11-17 against a
+live server (throwaway branches and PRs in a real project, cleaned up afterwards): a completion whose
+`lastMergeSourceCommit` names a commit the source branch has since moved past is refused with
+**HTTP 409**:
 
-- **Never set `autoComplete` when the promotion PR is opened.** `autoComplete` lets the server
-  complete the PR the moment its policies pass — which would promote `dev` before any gate ran, and
-  would do it invisibly. Open the promotion PR plain; setting `autoComplete` is the deliberate merge
-  action, taken only after a verified match, never a property the PR carries from birth.
-- **Azure has no `--match-head-commit` equivalent in evidence**, so the two backends are
-  asymmetric here and the asymmetry is real, not cosmetic. GitHub pins the SHA *in the merge call*
-  and the provider itself refuses a moved head (verify-**and**-merge, atomic). Azure can only
-  verify-**then**-complete, leaving a narrow window between the comparison and the completion in
-  which `dev` could advance. Mitigation once the gate binds: re-read the head **immediately** before
-  the `autoComplete` write and re-compare — never reuse the value read earlier in the ceremony.
-  Closing the window outright needs an Azure PR-completion SHA guard confirmed against the live API;
-  that is deferred, and the window is stated rather than papered over.
+```
+{"message":"TF401192: The source branch has been modified since the last merge attempt.",
+ "typeName":"Microsoft.TeamFoundation.Git.Server.GitPullRequestStaleException, Microsoft.TeamFoundation.Git.Server",
+ "typeKey":"GitPullRequestStaleException", ...}
+```
+
+and the PR stays active with nothing merged; the same call naming the current head was accepted and
+completed with a real merge commit (two parents). So the provider, not the caller's speed, closes the
+verify→merge window — the re-read before the PATCH only makes the hold name the new head instead of
+relaying the server's error.
+
+**Credentials.** The reads use whatever login `az` already holds; when the env var named by
+`config.pat.ref` (default `AZURE_DEVOPS_PAT`) is set, its value is passed to `az` as
+`AZURE_DEVOPS_EXT_PAT` in the child's environment. The PATCH needs that PAT (Basic auth, empty user):
+with the env var unset the gate verifies and then holds **`no-credential`**, merging nothing. The PAT
+never appears in an argv, a URL, a message or the JSON verdict.
+
+**Still true, and not a fallback:** a read the gate cannot issue is a read failure and holds; there is
+no conversational fallback, no local `git` read in place of the adapter, and the ceremony never reads
+the head and hands it to the command — a head the caller supplies is a head the caller can get wrong.
+Never perform this merge through the MCP (`repo_update_pull_request`) either: that path has no pin.
+
+**One rule from before still holds: never set `autoComplete` when the promotion PR is opened.**
+`autoComplete` lets the server complete the PR the moment its policies pass — which would promote
+`dev` before any gate ran, and would do it invisibly. Open the promotion PR plain; the gate's pinned
+completion is the only merge.
 
 ## 11. Mockability & testing (how this contract is exercised)
 

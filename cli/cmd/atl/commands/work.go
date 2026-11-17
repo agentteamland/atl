@@ -110,6 +110,19 @@ var workDispatchCmd = &cobra.Command{
 // are covered without a network.
 var workPromoteRunner = promotiongate.ExecRunner
 
+// workPromoteAzRunner builds the az seam. With a PAT it rides to az as
+// AZURE_DEVOPS_EXT_PAT in the child's environment, never in an argv; without one,
+// az uses whatever login it already holds.
+var workPromoteAzRunner = func(pat string) promotiongate.Runner {
+	if pat == "" {
+		return promotiongate.ExecRunner
+	}
+	return promotiongate.EnvRunner("AZURE_DEVOPS_EXT_PAT=" + pat)
+}
+
+// workPromoteHTTP is the seam the Azure completion PATCH goes through.
+var workPromoteHTTP promotiongate.HTTPDoer = promotiongate.HTTPRequest
+
 var workPromoteCmd = &cobra.Command{
 	Use:   "promote",
 	Short: "Verify the commit-bound promotion approval and merge the dev→release PR",
@@ -146,10 +159,27 @@ var workPromoteCmd = &cobra.Command{
 				PR:      workPromotePR,
 				Run:     workPromoteRunner,
 			}.Verify()
+		case "azure":
+			if cfg.Org == "" || cfg.Project == "" || cfg.Repo == "" {
+				return fmt.Errorf("%s is missing org/project/repo — the azure backend needs all three", dispatch.DeliveryConfigPath(root))
+			}
+			ref := cfg.PATRef()
+			pat := os.Getenv(ref)
+			res = promotiongate.Gate{
+				Backend: "azure",
+				Org:     cfg.Org,
+				Project: cfg.Project,
+				Repo:    cfg.Repo,
+				Dev:     cfg.DevBranch(),
+				Release: cfg.ReleaseBranch(),
+				PR:      workPromotePR,
+				Run:     workPromoteAzRunner(pat),
+				PAT:     pat,
+				PATRef:  ref,
+				HTTP:    workPromoteHTTP,
+			}.Verify()
 		default:
-			// Outside GitHub, concept #16's reads are bound only for an LLM caller
-			// (Azure's are MCP tools), and this binary has no way to issue them —
-			// so the comparison cannot run at all. See HoldBackendUnbound.
+			// No transport for this backend — hold before any call. See HoldBackendUnbound.
 			res = promotiongate.HoldBackendUnbound(backend)
 		}
 

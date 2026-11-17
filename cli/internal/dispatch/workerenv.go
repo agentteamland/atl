@@ -95,6 +95,10 @@ func (c *DeliveryConfig) patRef() string {
 	return "AZURE_DEVOPS_PAT"
 }
 
+// PATRef is patRef for callers outside the engine — `atl work promote` reads the
+// same PAT to complete an Azure promotion PR.
+func (c *DeliveryConfig) PATRef() string { return c.patRef() }
+
 // githubTokenRef is the env-var name the GitHub token is read from — config.credential.ref,
 // defaulting to GH_TOKEN (matching /delivery-init + backends/github/adapter.md). The engine
 // reads the value from THAT env var and injects it into the worker as GH_TOKEN, so `gh` always

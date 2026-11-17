@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/agentteamland/atl/cli/internal/promotiongate"
 )
 
 const (
@@ -187,16 +189,124 @@ func TestWorkPromotePRFlag(t *testing.T) {
 	}
 }
 
-// TestWorkPromoteAzureHolds proves the unbound backend holds instead of falling
-// back to a conversational promotion — and makes no gh call at all.
-func TestWorkPromoteAzureHolds(t *testing.T) {
-	f := &fakeGH{}
-	out, err := runPromote(t, `{"org":"acme","project":"widgets","backend":"azure"}`, f)
+const azureCfg = `{"org":"acme","project":"Widgets","repo":"Widgets","backend":"azure",` +
+	`"branchPair":{"dev":"dev","release":"release"},"pat":{"ref":"ATL_TEST_AZ_PAT"}}`
+
+// fakeAZ answers az from canned stdout keyed by subcommand and serves a queue of
+// `repos pr show` answers (view read, re-read, completion poll).
+type fakeAZ struct {
+	calls   [][]string
+	show    []string
+	threads string
+	patched []string // PATCH urls
+	pats    []string
+}
+
+func (f *fakeAZ) runner(name string, args ...string) ([]byte, error) {
+	f.calls = append(f.calls, append([]string{name}, args...))
+	switch strings.Join(args[:min(3, len(args))], " ") {
+	case "repos pr list":
+		return []byte(`[{"pullRequestId":1457}]`), nil
+	case "repos pr show":
+		out := f.show[0]
+		if len(f.show) > 1 {
+			f.show = f.show[1:]
+		}
+		return []byte(out), nil
+	}
+	return []byte(f.threads), nil
+}
+
+func azShowJSON(status, head string) string {
+	return `{"status":"` + status + `","mergeStatus":"succeeded","lastMergeSourceCommit":{"commitId":"` + head + `"}}`
+}
+
+func azThreadsWith(sha string) string {
+	return `{"count":1,"value":[{"isDeleted":false,"comments":[{"commentType":"text",` +
+		`"publishedDate":"2026-11-17T16:35:02.993Z","author":{"uniqueName":"po@example.com"},` +
+		`"content":"**[Promotion Approval]**\n\n## Approved Commit\n` + sha + `\n"}]}]}`
+}
+
+// runAzurePromote wires the az and HTTP seams to fake and records the PAT each
+// receives — the env var named by config.pat.ref, never an argv.
+func runAzurePromote(t *testing.T, fake *fakeAZ, args ...string) (string, error) {
+	t.Helper()
+	prevAz, prevHTTP := workPromoteAzRunner, workPromoteHTTP
+	t.Cleanup(func() { workPromoteAzRunner, workPromoteHTTP = prevAz, prevHTTP })
+	workPromoteAzRunner = func(pat string) promotiongate.Runner {
+		fake.pats = append(fake.pats, pat)
+		return fake.runner
+	}
+	workPromoteHTTP = func(method, url string, body []byte, pat string) (int, []byte, error) {
+		fake.patched = append(fake.patched, method+" "+url)
+		fake.pats = append(fake.pats, pat)
+		return 200, []byte(`{"status":"active","mergeStatus":"queued"}`), nil
+	}
+	return runPromote(t, azureCfg, nil, args...)
+}
+
+// TestWorkPromoteAzureMerges is the Azure promoting path end to end through the
+// command: config coordinates, the PAT from config.pat.ref, one pinned completion.
+func TestWorkPromoteAzureMerges(t *testing.T) {
+	t.Setenv("ATL_TEST_AZ_PAT", "pat-value")
+	f := &fakeAZ{
+		show:    []string{azShowJSON("active", promoteSHA), azShowJSON("active", promoteSHA), azShowJSON("completed", promoteSHA)},
+		threads: azThreadsWith(promoteSHA),
+	}
+	out, err := runAzurePromote(t, f)
+	if err != nil {
+		t.Fatalf("promote failed: %v\n%s", err, out)
+	}
+	want := "PATCH https://dev.azure.com/acme/Widgets/_apis/git/repositories/Widgets/pullrequests/1457?api-version=7.1"
+	if len(f.patched) != 1 || f.patched[0] != want {
+		t.Errorf("completion requests = %v, want [%s]", f.patched, want)
+	}
+	for _, p := range f.pats {
+		if p != "pat-value" {
+			t.Errorf("seam got PAT %q, want the value of config.pat.ref's env var", p)
+		}
+	}
+	if !strings.Contains(out, "Promoted") {
+		t.Errorf("stdout: %s", out)
+	}
+}
+
+// TestWorkPromoteAzureHoldsWithoutPAT — the approval verifies but no completion is
+// sent without a credential, and the hold names the env var to set.
+func TestWorkPromoteAzureHoldsWithoutPAT(t *testing.T) {
+	t.Setenv("ATL_TEST_AZ_PAT", "")
+	f := &fakeAZ{show: []string{azShowJSON("active", promoteSHA)}, threads: azThreadsWith(promoteSHA)}
+	out, err := runAzurePromote(t, f, "--json")
 	if err == nil {
-		t.Fatal("the azure backend must exit non-zero")
+		t.Fatal("a hold must exit non-zero")
+	}
+	if len(f.patched) != 0 {
+		t.Fatal("no completion may be sent without a PAT")
+	}
+	if !strings.Contains(out, `"reason": "no-credential"`) || !strings.Contains(out, "ATL_TEST_AZ_PAT") {
+		t.Errorf("stdout: %s", out)
+	}
+}
+
+// TestWorkPromoteAzureNeedsRepo — a config without the repo coordinate is a setup
+// error, not a guess.
+func TestWorkPromoteAzureNeedsRepo(t *testing.T) {
+	if _, err := runPromote(t, `{"org":"acme","project":"Widgets","backend":"azure"}`, nil); err == nil ||
+		!strings.Contains(err.Error(), "org/project/repo") {
+		t.Fatalf("err = %v, want a missing-coordinate error", err)
+	}
+}
+
+// TestWorkPromoteUnboundBackendHolds proves a backend with no transport holds
+// instead of falling back to a conversational promotion — and makes no call.
+func TestWorkPromoteUnboundBackendHolds(t *testing.T) {
+	f := &fakeGH{}
+	out, err := runPromote(t, `{"owner":"acme","repo":"widgets","backend":"gitlab"}`, f)
+	if err == nil {
+		t.Fatal("an unbound backend must exit non-zero")
 	}
 	if len(f.calls) != 0 {
-		t.Errorf("azure must not shell out: %v", f.calls)
+		t.Errorf("an unbound backend must not shell out: %v", f.calls)
 	}
 	if !strings.Contains(out, "cannot read the promotion PR's current head commit") {
 		t.Errorf("stdout: %s", out)
