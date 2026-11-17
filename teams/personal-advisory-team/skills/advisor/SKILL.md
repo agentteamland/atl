@@ -38,7 +38,10 @@ ls ~/.atl/profiles/                      # locate the profiles world + the is-se
   themselves in — **if it is larger than your read tool's single-call window, read it in
   successive chunks (offset/limit) until you reach the end of the file.** Never open the
   conversation on a partial read of who they are. Also read its `wiki/` and `learnings/` if
-  present. The `is-self` profile is the one flagged as the user themselves.
+  present. The `is-self` profile is the one flagged as the user themselves. Its sibling
+  `history.md` (named by `meta.history-file`) holds the dated record behind the frontmatter —
+  the full wording, evidence and quotes behind a shortened value — so open it when you need
+  the evidence behind a value.
 - **First use — no `is-self` profile yet?** Expected the first time. Do **not** interrogate
   them with a questionnaire. Begin the relationship naturally, and let step 5 record what you
   learn as it surfaces.
@@ -90,7 +93,8 @@ you know them better for the rest of *this* conversation, and forever — you re
 profile as the conversation goes.
 
 For v1 this is a direct, confirmed write: append the durable fact to the `is-self` profile
-(its `learnings/` if the profile is structured, or a short dated note) — never a silent,
+(its `learnings/` if the profile is structured, or a short dated note in `history.md` — never
+in the frontmatter, which holds current truth only) — never a silent,
 deferred "I'll remember that." Only what is genuinely durable and specific; skip transient
 small talk. (The fuller immediate-learning mechanism — curator-grade tier-gating and
 interface-fill on each capture — is the next build iteration; the contract it must keep is
