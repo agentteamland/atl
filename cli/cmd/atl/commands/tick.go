@@ -114,7 +114,7 @@ var tickCmd = &cobra.Command{
 			}
 		}
 
-		scanned, found, enqueued, skipped, overLong, nearMiss, err := drainProjectTranscripts(st, project, chans)
+		scanned, found, enqueued, skipped, overLong, nearMiss, err := drainProjectTranscripts(st, project, workingDir(), chans)
 		if err != nil {
 			return err
 		}
@@ -173,27 +173,40 @@ var tickCmd = &cobra.Command{
 // typo, the one unknown-channel case worth reporting.
 //
 // chans is the active channel set, passed in rather than recomputed so the whole
-// invocation drains, signals, and measures against exactly one set.
-func drainProjectTranscripts(st *queue.Store, project string, chans []manifest.Channel) (scanned, found, enqueued, skipped, overLong int, nearMiss map[string]int, err error) {
-	dir, err := transcript.ProjectDir(project)
-	if err != nil {
-		return 0, 0, 0, 0, 0, nil, err
-	}
+// invocation drains, signals, and measures against exactly one set. cwd is the
+// session's own working directory: its transcript directory is always read (it
+// may be a worktree outside the root, which no slug prefix finds) and it is
+// where the watchdog's live session is looked for. Empty means unknown.
+func drainProjectTranscripts(st *queue.Store, project, cwd string, chans []manifest.Channel) (scanned, found, enqueued, skipped, overLong int, nearMiss map[string]int, err error) {
 	since, err := st.Cursor(project)
 	if err != nil {
 		return 0, 0, 0, 0, 0, nil, err
 	}
-	files, err := transcript.Find(dir, since)
+	// Every directory this project's sessions were filed under — the root's, the
+	// caller's own, and those of worktrees and subdirectories (atl#524) — read
+	// against ONE modtime cursor. One cursor stays correct across directories: it
+	// is a threshold every directory is filtered by on the same pass, so a file
+	// in any of them that changes after the pass is read on the next.
+	files, err := transcript.FindProject(project, since, transcriptBelongsTo(project), cwd)
 	if err != nil {
 		return 0, 0, 0, 0, 0, nil, fmt.Errorf("find transcripts: %w", err)
 	}
+	liveDir := ""
+	if cwd != "" {
+		if d, derr := transcript.ProjectDir(cwd); derr == nil {
+			liveDir = d
+		}
+	}
 	known := channelNames(chans)
-	var newest time.Time
-	var newestPath string
+	var newest, liveNewest time.Time
+	var livePath string
 	for _, f := range files {
 		if f.ModTime.After(newest) {
 			newest = f.ModTime
-			newestPath = f.Path
+		}
+		if filepath.Dir(f.Path) == liveDir && f.ModTime.After(liveNewest) {
+			liveNewest = f.ModTime
+			livePath = f.Path
 		}
 		text, dropped, e := transcript.ExtractText(f.Path)
 		overLong += dropped
@@ -231,11 +244,17 @@ func drainProjectTranscripts(st *queue.Store, project string, chans []manifest.C
 	// Record that the maintenance pass ran, for doctor's tick-freshness check.
 	_ = st.SetLastTick(project, time.Now())
 
-	// Capture watchdog: the newest scanned transcript is the live main session
-	// (subagent transcripts live in per-session SUBDIRS, which Find never enters).
-	// A dry stretch there means markers may have been forgotten — the one
-	// non-deterministic link in the capture pipeline made detectable.
-	captureWatchdogNotice(st, project, newestPath, chans)
+	// Capture watchdog: the live session is the newest scanned transcript in the
+	// CALLER's own directory (subagent transcripts live in per-session SUBDIRS,
+	// which Find never enters). It used to be the newest transcript overall, which
+	// was the same thing while only one directory was read; now that worktree and
+	// subdirectory sessions are read too, the newest overall can be another
+	// session's, and its dry stretch would be reported to an agent that never had
+	// it. No transcript of the caller's own this pass means no measurement — fail
+	// toward silence, as every other watchdog path does. A dry stretch in the live
+	// session means markers may have been forgotten — the one non-deterministic
+	// link in the capture pipeline made detectable.
+	captureWatchdogNotice(st, project, livePath, chans)
 	return scanned, found, enqueued, skipped, overLong, nearMiss, nil
 }
 
@@ -340,4 +359,48 @@ func projectStamp(project string) string {
 func init() {
 	tickCmd.Flags().String("file", "", "drain a single file instead of discovering transcripts (manual/debug)")
 	tickCmd.Flags().Duration("throttle", 0, "skip the drain+doctor pass if the last tick was within this duration (e.g. 10m)")
+}
+
+// workingDir is the process's working directory, or "" when it cannot be read —
+// the hook runs in the session's directory, so this is where that session's
+// transcript is filed.
+func workingDir() string {
+	d, err := os.Getwd()
+	if err != nil {
+		return ""
+	}
+	return d
+}
+
+// transcriptBelongsTo confirms that a session recorded with working directory
+// cwd — already known to lie under root by path — is part of root's project as
+// projectKey would resolve it, rather than of a repository nested inside root's
+// tree (a vendored checkout, or the maintainer hub's repos/ clones), whose
+// markers belong to that repository's own queue.
+//
+// It asks about the nearest directory that still EXISTS, because a finished
+// worktree's transcripts outlive the worktree: its path is gone, but its parent
+// (<root>/.claude/worktrees) still resolves to root, while a removed worktree of
+// a nested repository resolves to that repository. When git cannot answer at
+// all, the project is not under git and the path prefix is the only evidence
+// there is — the same fallback projectKey itself takes.
+func transcriptBelongsTo(root string) func(cwd string) bool {
+	return func(cwd string) bool {
+		dir := filepath.Clean(cwd)
+		for {
+			if st, err := os.Stat(dir); err == nil && st.IsDir() {
+				break
+			}
+			parent := filepath.Dir(dir)
+			if parent == dir {
+				return false
+			}
+			dir = parent
+		}
+		if projectKeyFrom(dir) == root {
+			return true
+		}
+		_, err := gitRevParsePath(dir, "--git-common-dir")
+		return err != nil
+	}
 }

@@ -227,6 +227,15 @@ var learningsTranscriptCmd = &cobra.Command{
 		"cover a session completely instead of re-reading its tail; --limit does not\n" +
 		"apply, since a transcript with unmined turns is never skipped for being old.",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// Deliberately the working directory, not projectKey, and deliberately
+		// one transcript directory, unlike the tick's capture (atl#524). The mine
+		// is run by a drain inside the session that asked for it, so the cwd's
+		// directory IS that session's; and its per-channel cursor is keyed by
+		// the same cwd. Widening discovery to the whole project here would hand
+		// every worktree session every other session's transcripts as "new
+		// since the baseline" (mined from byte 0), and re-keying the cursor to
+		// the root would orphan every existing worktree cursor — a backlog flood
+		// and a re-key, for a path that is not losing anything today.
 		project, err := os.Getwd()
 		if err != nil {
 			return err
